@@ -242,9 +242,56 @@ const clientesRouter = router({
     if (!db) return [];
     return db.select().from(contratos).where(eq(contratos.clienteId, input.clienteId)).orderBy(desc(contratos.createdAt));
   }),
+  importarCSV: protectedProcedure
+    .input(z.object({
+      registros: z.array(z.object({
+        nome: z.string().min(1),
+        cpfCnpj: z.string().optional(),
+        telefone: z.string().optional(),
+        whatsapp: z.string().optional(),
+        email: z.string().optional(),
+        chavePix: z.string().optional(),
+        endereco: z.string().optional(),
+        cidade: z.string().optional(),
+        estado: z.string().optional(),
+        observacoes: z.string().optional(),
+      }))
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      let importados = 0;
+      let erros = 0;
+      const detalhesErros: string[] = [];
+      for (const reg of input.registros) {
+        try {
+          if (!reg.nome || reg.nome.trim().length < 2) {
+            erros++;
+            detalhesErros.push(`Linha ignorada: nome inválido ("${reg.nome}")`);
+            continue;
+          }
+          await db.insert(clientes).values({
+            nome: reg.nome.trim(),
+            cpfCnpj: reg.cpfCnpj?.trim() || undefined,
+            telefone: reg.telefone?.trim() || undefined,
+            whatsapp: reg.whatsapp?.trim() || reg.telefone?.trim() || undefined,
+            email: reg.email?.trim() || undefined,
+            chavePix: reg.chavePix?.trim() || undefined,
+            endereco: reg.endereco?.trim() || undefined,
+            cidade: reg.cidade?.trim() || undefined,
+            estado: reg.estado?.trim() || undefined,
+            observacoes: reg.observacoes?.trim() || undefined,
+          });
+          importados++;
+        } catch (e: any) {
+          erros++;
+          detalhesErros.push(`Erro ao importar "${reg.nome}": ${e?.message ?? 'erro desconhecido'}`);
+        }
+      }
+      return { importados, erros, detalhesErros };
+    }),
 });
-
-// ─── CONTRATOS ───────────────────────────────────────────────────────────────
+// ─── CONTRATOS ────────────────────────────────────────────────────────────────
 const contratosRouter = router({
   list: protectedProcedure
     .input(z.object({
@@ -390,14 +437,140 @@ const contratosRouter = router({
 
   updateStatus: protectedProcedure
     .input(z.object({ id: z.number(), status: z.enum(['ativo', 'quitado', 'inadimplente', 'cancelado']) }))
-    .mutation(async ({ input }) => {
+     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("DB unavailable");
       await db.update(contratos).set({ status: input.status }).where(eq(contratos.id, input.id));
       return { success: true };
     }),
+  gerarPDF: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      // Buscar dados completos do contrato
+      const rows = await db.select({
+        contrato: contratos,
+        clienteNome: clientes.nome,
+        clienteCpfCnpj: clientes.cpfCnpj,
+        clienteTelefone: clientes.telefone,
+        clienteWhatsapp: clientes.whatsapp,
+        clienteChavePix: clientes.chavePix,
+        clienteEndereco: clientes.endereco,
+        clienteCidade: clientes.cidade,
+        clienteEstado: clientes.estado,
+      }).from(contratos)
+        .innerJoin(clientes, eq(contratos.clienteId, clientes.id))
+        .where(eq(contratos.id, input.id)).limit(1);
+      const row = rows[0];
+      if (!row) throw new Error("Contrato não encontrado");
+      // Buscar parcelas
+      const parcelasData = await db.select().from(parcelas)
+        .where(eq(parcelas.contratoId, input.id))
+        .orderBy(parcelas.numeroParcela);
+      // Buscar configurações da empresa
+      // Buscar configurações como mapa chave->valor
+      const configRows = await db.select().from(configuracoes);
+      const configMap: Record<string, string> = {};
+      configRows.forEach(r => { if (r.chave && r.valor) configMap[r.chave] = r.valor; });
+      const c = row.contrato;
+      const dataInicio = c.dataInicio ? new Date(c.dataInicio).toLocaleDateString('pt-BR') : '-';
+      const valorPrincipal = Number(c.valorPrincipal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      // Calcular valor total a partir das parcelas
+      const valorTotalNum = parcelasData.reduce((sum, p) => sum + Number(p.valorOriginal), 0);
+      const valorTotal = valorTotalNum > 0
+        ? valorTotalNum.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        : valorPrincipal;
+      const valorParcela = Number(c.valorParcela).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const taxaJuros = `${c.taxaJuros}% ${c.tipoTaxa === 'mensal' ? 'ao mês' : 'ao dia'}`;
+      const nomeEmpresa = configMap['nome_empresa'] ?? configMap['nomeEmpresa'] ?? 'CobraPro';
+      const cnpjEmpresa = configMap['cnpj'] ?? '';
+      const enderecoEmpresa = configMap['endereco'] ?? '';
+      const modalidadeLabel: Record<string, string> = {
+        emprestimo_padrao: 'Empréstimo Padrão',
+        emprestimo_diario: 'Empréstimo Diário',
+        tabela_price: 'Tabela Price',
+        venda_produto: 'Venda de Produto',
+        desconto_cheque: 'Desconto de Cheque',
+        reparcelamento: 'Reparcelamento',
+      };
+      // Gerar HTML do contrato
+      const parcelasHTML = parcelasData.slice(0, 24).map(p => {
+        const venc = p.dataVencimento ? new Date(p.dataVencimento).toLocaleDateString('pt-BR') : '-';
+        const val = Number(p.valorOriginal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        return `<tr><td>${p.numeroParcela}</td><td>${venc}</td><td>${val}</td><td>${p.status === 'paga' ? 'PAGA' : p.status === 'atrasada' ? 'ATRASADA' : 'PENDENTE'}</td></tr>`;
+      }).join('');
+      const html = `
+        <!DOCTYPE html><html lang="pt-BR"><head>
+        <meta charset="UTF-8">
+        <style>
+          body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 20px; }
+          h1 { font-size: 18px; text-align: center; margin-bottom: 4px; }
+          h2 { font-size: 13px; margin: 16px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+          .header { text-align: center; margin-bottom: 20px; }
+          .empresa { font-size: 14px; font-weight: bold; }
+          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; }
+          .field { margin-bottom: 4px; }
+          .label { font-weight: bold; color: #555; }
+          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+          th { background: #1a1a1a; color: white; padding: 6px; text-align: left; font-size: 10px; }
+          td { padding: 5px 6px; border-bottom: 1px solid #eee; font-size: 10px; }
+          tr:nth-child(even) td { background: #f9f9f9; }
+          .assinatura { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+          .ass-box { border-top: 1px solid #333; padding-top: 6px; text-align: center; }
+          .rodape { margin-top: 20px; font-size: 9px; color: #888; text-align: center; }
+          .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; }
+          .badge-ativo { background: #dcfce7; color: #166534; }
+          .badge-quitado { background: #dbeafe; color: #1e40af; }
+        </style></head><body>
+        <div class="header">
+          <div class="empresa">${nomeEmpresa}</div>
+          ${cnpjEmpresa ? `<div>CNPJ: ${cnpjEmpresa}</div>` : ''}
+          ${enderecoEmpresa ? `<div>${enderecoEmpresa}</div>` : ''}
+          <h1>CONTRATO DE ${(modalidadeLabel[c.modalidade ?? ''] ?? 'CRÉDITO').toUpperCase()}</h1>
+          <div>Nº ${String(c.id).padStart(6, '0')} &nbsp;&bull;&nbsp; ${dataInicio}</div>
+        </div>
+        <h2>DADOS DO CONTRATANTE</h2>
+        <div class="grid">
+          <div class="field"><span class="label">Nome:</span> ${row.clienteNome}</div>
+          <div class="field"><span class="label">CPF/CNPJ:</span> ${row.clienteCpfCnpj ?? '-'}</div>
+          <div class="field"><span class="label">Telefone:</span> ${row.clienteTelefone ?? '-'}</div>
+          <div class="field"><span class="label">Chave PIX:</span> ${row.clienteChavePix ?? '-'}</div>
+          ${row.clienteEndereco ? `<div class="field col-span-2"><span class="label">Endereço:</span> ${row.clienteEndereco}${row.clienteCidade ? ', ' + row.clienteCidade : ''}${row.clienteEstado ? '/' + row.clienteEstado : ''}</div>` : ''}
+        </div>
+        <h2>CONDIÇÕES DO CONTRATO</h2>
+        <div class="grid">
+          <div class="field"><span class="label">Modalidade:</span> ${modalidadeLabel[c.modalidade ?? ''] ?? c.modalidade}</div>
+          <div class="field"><span class="label">Status:</span> <span class="badge badge-${c.status}">${c.status?.toUpperCase()}</span></div>
+          <div class="field"><span class="label">Capital:</span> ${valorPrincipal}</div>
+          <div class="field"><span class="label">Valor Total:</span> ${valorTotal}</div>
+          <div class="field"><span class="label">Taxa de Juros:</span> ${taxaJuros}</div>
+          <div class="field"><span class="label">Nº Parcelas:</span> ${c.numeroParcelas}x de ${valorParcela}</div>
+          ${c.descricao ? `<div class="field" style="grid-column:span 2"><span class="label">Descrição:</span> ${c.descricao}</div>` : ''}
+        </div>
+        <h2>PLANO DE PAGAMENTO</h2>
+        <table>
+          <thead><tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
+          <tbody>${parcelasHTML}</tbody>
+        </table>
+        ${parcelasData.length > 24 ? `<p style="font-size:9px;color:#888">... e mais ${parcelasData.length - 24} parcelas</p>` : ''}
+        <div class="assinatura">
+          <div class="ass-box">
+            <div>${nomeEmpresa}</div>
+            <div style="font-size:9px;color:#888">Credor / Contratado</div>
+          </div>
+          <div class="ass-box">
+            <div>${row.clienteNome}</div>
+            <div style="font-size:9px;color:#888">Devedor / Contratante</div>
+          </div>
+        </div>
+        <div class="rodape">
+          Documento gerado em ${new Date().toLocaleString('pt-BR')} — CobraPro Sistema de Gestão Financeira
+        </div>
+        </body></html>`;
+      return { html, contratoId: c.id, clienteNome: row.clienteNome };
+    }),
 });
-
 // ─── PARCELAS ────────────────────────────────────────────────────────────────
 const parcelasRouter = router({
   list: protectedProcedure

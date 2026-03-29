@@ -70,3 +70,18 @@
 - [ ] Dashboard: top 5 clientes do período (fase futura)
 - [ ] Caixa: transferência entre contas (fase futura)
 - [ ] Caixa: ajuste manual de saldo (fase futura)
+
+## Fase 9: Novas Funcionalidades
+- [ ] Remover login Manus e implementar autenticação própria (email/senha)
+- [ ] Importação de base de dados via CSV na tela de Clientes
+- [ ] Geração de contrato em PDF com dados do cliente e parcelas
+
+## Fase 10: Sistema 100% Funcional
+- [ ] Autenticação própria email/senha (sem Manus OAuth)
+- [ ] Rotas POST /api/auth/login e /api/auth/register no servidor
+- [ ] Criar usuário admin koletor3@gmail.com / 97556511
+- [ ] Página inicial com layout da página de vendas CobraPro
+- [ ] Tela de login própria com email/senha
+- [ ] Todos os módulos com dados 100% dinâmicos do banco
+- [ ] Importação de base de dados via CSV (clientes)
+- [ ] Geração de contrato em PDF

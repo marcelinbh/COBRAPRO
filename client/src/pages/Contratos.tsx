@@ -7,8 +7,41 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
-import { Plus, Search, FileText, ChevronRight } from "lucide-react";
+import { Plus, Search, FileText, ChevronRight, Download } from "lucide-react";
+import { toast } from "sonner";
 import { formatarMoeda, formatarData, MODALIDADE_LABELS, STATUS_CONTRATO_LABELS } from "../../../shared/finance";
+
+function BotaoPDF({ contratoId }: { contratoId: number }) {
+  const gerarPDF = trpc.contratos.gerarPDF.useMutation({
+    onSuccess: (data) => {
+      const win = window.open("", "_blank");
+      if (win) {
+        win.document.write(data.html);
+        win.document.close();
+        setTimeout(() => win.print(), 600);
+      } else {
+        toast.error("Permita pop-ups para gerar o PDF.");
+      }
+    },
+    onError: (e) => toast.error("Erro ao gerar PDF: " + e.message),
+  });
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      className="gap-1.5 shrink-0 h-8 px-2.5"
+      onClick={(e) => { e.stopPropagation(); gerarPDF.mutate({ id: contratoId }); }}
+      disabled={gerarPDF.isPending}
+      title="Gerar Contrato em PDF"
+    >
+      {gerarPDF.isPending
+        ? <span className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
+        : <Download className="h-3.5 w-3.5" />}
+      <span className="hidden sm:inline text-xs">PDF</span>
+    </Button>
+  );
+}
 
 export default function Contratos() {
   const [, setLocation] = useLocation();
@@ -118,11 +151,12 @@ export default function Contratos() {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 shrink-0 ml-4">
+                <div className="flex items-center gap-2 shrink-0 ml-4">
                   <div className="text-right hidden sm:block">
                     <div className="font-display text-lg text-foreground">{formatarMoeda(contrato.valorPrincipal)}</div>
                     <div className="text-xs text-muted-foreground">Principal</div>
                   </div>
+                  <BotaoPDF contratoId={contrato.id} />
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />
                 </div>
               </div>

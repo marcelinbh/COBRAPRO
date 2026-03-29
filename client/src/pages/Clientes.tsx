@@ -13,8 +13,184 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Plus, Search, User, Phone, CreditCard, ChevronRight, Star
+  Plus, Search, User, Phone, CreditCard, ChevronRight, Star, Upload, Download, AlertCircle, CheckCircle2
 } from "lucide-react";
+
+// ─── IMPORTAR BASE DE DADOS (CSV) ─────────────────────────────────────────────────
+function ImportarCSVDialog({ onSuccess }: { onSuccess: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [preview, setPreview] = useState<any[]>([]);
+  const [allRows, setAllRows] = useState<any[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [resultado, setResultado] = useState<{ importados: number; erros: number; detalhesErros: string[] } | null>(null);
+
+  const importMutation = trpc.clientes.importarCSV.useMutation({
+    onSuccess: (data) => {
+      setResultado(data);
+      if (data.importados > 0) onSuccess();
+    },
+    onError: (e) => toast.error("Erro na importação: " + e.message),
+  });
+
+  const parseCSV = (text: string) => {
+    const lines = text.trim().split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const raw = lines[0].split(/[;,]/).map(h =>
+      h.trim().toLowerCase().replace(/["']/g, '')
+        .replace(/\s+/g, '')
+        .replace('nomecompleto', 'nome')
+        .replace('cpf/cnpj', 'cpfcnpj')
+        .replace('cpfoucnpj', 'cpfcnpj')
+        .replace('cpf', 'cpfcnpj')
+    );
+    return lines.slice(1).filter(l => l.trim()).map(line => {
+      const values = line.split(/[;,]/).map(v => v.trim().replace(/^"|"$/g, ''));
+      const obj: any = {};
+      raw.forEach((h, i) => { obj[h] = values[i] ?? ''; });
+      return obj;
+    });
+  };
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setResultado(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const rows = parseCSV(text);
+      setAllRows(rows);
+      setPreview(rows.slice(0, 5));
+    };
+    reader.readAsText(file, 'UTF-8');
+  };
+
+  const handleImport = () => {
+    if (allRows.length === 0) return;
+    const registros = allRows.map(r => ({
+      nome: (r.nome || r.name || '').toString().trim(),
+      cpfCnpj: (r.cpfcnpj || r.cpf || r.cnpj || '').toString().trim(),
+      telefone: (r.telefone || r.fone || '').toString().trim(),
+      whatsapp: (r.whatsapp || r.zap || r.telefone || '').toString().trim(),
+      email: (r.email || '').toString().trim(),
+      chavePix: (r.chavepix || r.pix || '').toString().trim(),
+      endereco: (r.endereco || r.address || '').toString().trim(),
+      cidade: (r.cidade || r.city || '').toString().trim(),
+      estado: (r.estado || r.state || '').toString().trim(),
+      observacoes: (r.observacoes || r.obs || '').toString().trim(),
+    })).filter(r => r.nome.length >= 2);
+    importMutation.mutate({ registros });
+  };
+
+  const downloadTemplate = () => {
+    const csv = 'nome;cpfCnpj;telefone;whatsapp;email;chavePix;endereco;cidade;estado;observacoes\nJoão Silva;123.456.789-00;(11) 99999-0001;(11) 99999-0001;joao@email.com;123.456.789-00;Rua das Flores 100;São Paulo;SP;Cliente VIP';
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'modelo_importacao_cobrapro.csv'; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleClose = (v: boolean) => {
+    setOpen(v);
+    if (!v) { setPreview([]); setAllRows([]); setFileName(''); setResultado(null); }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogTrigger asChild>
+        <Button variant="outline" className="gap-2 border-dashed">
+          <Upload className="h-4 w-4" />Importar Base de Dados
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl tracking-wide">IMPORTAR BASE DE DADOS</DialogTitle>
+        </DialogHeader>
+        {resultado ? (
+          <div className="space-y-4 py-4">
+            <div className={`flex items-center gap-3 p-4 rounded-xl border ${
+              resultado.erros === 0 ? 'bg-success/10 border-success/30' : 'bg-warning/10 border-warning/30'
+            }`}>
+              {resultado.erros === 0
+                ? <CheckCircle2 className="h-6 w-6 text-success shrink-0" />
+                : <AlertCircle className="h-6 w-6 text-warning shrink-0" />}
+              <div>
+                <p className="font-semibold">{resultado.importados} clientes importados com sucesso</p>
+                {resultado.erros > 0 && <p className="text-sm text-muted-foreground">{resultado.erros} registros com erro</p>}
+              </div>
+            </div>
+            {resultado.detalhesErros.length > 0 && (
+              <div className="bg-muted rounded-lg p-3 text-xs text-muted-foreground max-h-32 overflow-y-auto">
+                {resultado.detalhesErros.map((e, i) => <p key={i}>{e}</p>)}
+              </div>
+            )}
+            <Button className="w-full" onClick={() => setOpen(false)}>Fechar</Button>
+          </div>
+        ) : (
+          <div className="space-y-4 mt-2">
+            <div className="bg-muted/30 border border-dashed rounded-xl p-4 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Formato aceito: CSV (separado por ; ou ,)</p>
+              <p>Colunas: <span className="text-primary font-medium">nome</span> (obrigatório), cpfCnpj, telefone, whatsapp, email, chavePix, endereco, cidade, estado, observacoes</p>
+            </div>
+            <label htmlFor="csv-upload" className="block cursor-pointer">
+              <div className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-6 text-center transition-colors">
+                <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="font-medium">{fileName || 'Clique para selecionar o arquivo CSV'}</p>
+                <p className="text-xs text-muted-foreground mt-1">.csv ou .txt — qualquer tamanho</p>
+              </div>
+              <input id="csv-upload" type="file" accept=".csv,.txt" className="hidden" onChange={handleFile} />
+            </label>
+            <Button variant="outline" size="sm" className="gap-2 w-full" onClick={downloadTemplate}>
+              <Download className="h-4 w-4" />Baixar modelo de planilha (.csv)
+            </Button>
+            {preview.length > 0 && (
+              <div>
+                <p className="text-sm font-medium mb-2">
+                  Prévia — {allRows.length} registros detectados:
+                </p>
+                <div className="bg-muted/30 rounded-lg overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="border-b border-border">
+                      {Object.keys(preview[0]).slice(0, 5).map(k => (
+                        <th key={k} className="p-2 text-left text-muted-foreground capitalize">{k}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>{preview.map((row, i) => (
+                      <tr key={i} className="border-b border-border/50">
+                        {Object.values(row).slice(0, 5).map((v: any, j) => (
+                          <td key={j} className="p-2 truncate max-w-[120px]">{v}</td>
+                        ))}
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                  {allRows.length > 5 && (
+                    <p className="text-xs text-muted-foreground p-2">... e mais {allRows.length - 5} registros</p>
+                  )}
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button
+                className="flex-1 gap-2"
+                disabled={allRows.length === 0 || importMutation.isPending}
+                onClick={handleImport}
+              >
+                {importMutation.isPending ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Importando...</>
+                ) : (
+                  <><Upload className="h-4 w-4" />Importar {allRows.length > 0 ? `${allRows.length} registros` : ''}</>
+                )}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function ScoreBadge({ score }: { score: number }) {
   let color = "text-success bg-success/15 border-success/30";
@@ -147,7 +323,10 @@ export default function Clientes() {
           <h1 className="font-display text-3xl text-foreground tracking-wide">CLIENTES</h1>
           <p className="text-sm text-muted-foreground mt-1">{clientes?.length ?? 0} clientes cadastrados</p>
         </div>
-        <NovoClienteDialog onSuccess={() => utils.clientes.list.invalidate()} />
+        <div className="flex gap-2">
+          <ImportarCSVDialog onSuccess={() => utils.clientes.list.invalidate()} />
+          <NovoClienteDialog onSuccess={() => utils.clientes.list.invalidate()} />
+        </div>
       </div>
 
       <div className="relative">
