@@ -159,15 +159,50 @@ export function registerAuthRoutes(app: Express) {
     });
 
     // Montar URL de reset
-    const origin = (req.headers.origin as string) || `https://${req.headers.host}`;
+    const origin = (req.headers.origin as string) || `https://cobrapro.online`;
     const resetUrl = `${origin}/reset-senha?token=${token}`;
 
-    // Retornar o link diretamente (em produção, enviar por email)
-    // Por ora, retornamos o link para o frontend exibir (sem dependência de SMTP)
+    // Enviar e-mail via Brevo
+    const brevoApiKey = process.env.BREVO_API_KEY ?? "";
+    if (brevoApiKey) {
+      try {
+        await fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "api-key": brevoApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sender: { name: "CobraPro", email: "noreply@cobrapro.online" },
+            to: [{ email: user.email, name: user.name ?? user.email }],
+            subject: "Recuperação de senha — CobraPro",
+            htmlContent: `
+              <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0a;color:#fff;padding:40px;border-radius:12px">
+                <div style="text-align:center;margin-bottom:32px">
+                  <h1 style="color:#22c55e;font-size:28px;margin:0">CobraPro</h1>
+                  <p style="color:#6b7280;margin:8px 0 0">Sistema de Gestão de Cobranças</p>
+                </div>
+                <h2 style="color:#fff;font-size:20px">Recuperação de senha</h2>
+                <p style="color:#d1d5db;line-height:1.6">Recebemos uma solicitação para redefinir a senha da sua conta CobraPro.</p>
+                <p style="color:#d1d5db;line-height:1.6">Clique no botão abaixo para criar uma nova senha. Este link é válido por <strong style="color:#22c55e">1 hora</strong>.</p>
+                <div style="text-align:center;margin:32px 0">
+                  <a href="${resetUrl}" style="background:#22c55e;color:#000;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block">Redefinir minha senha</a>
+                </div>
+                <p style="color:#6b7280;font-size:13px">Se você não solicitou a recuperação de senha, ignore este e-mail. Sua senha permanece a mesma.</p>
+                <hr style="border:1px solid #1f2937;margin:24px 0">
+                <p style="color:#4b5563;font-size:12px;text-align:center">CobraPro — cobrapro.online</p>
+              </div>
+            `,
+          }),
+        });
+      } catch (err) {
+        console.error("[Brevo] Erro ao enviar e-mail de recuperação:", err);
+      }
+    }
+
     res.json({
       success: true,
-      message: "Link de recuperação gerado com sucesso.",
-      resetUrl, // Frontend exibe ou copia o link
+      message: "Se o e-mail estiver cadastrado, você receberá as instruções em breve.",
     });
   });
 
@@ -215,14 +250,9 @@ export function registerAuthRoutes(app: Express) {
     res.json({ success: true, message: "Senha alterada com sucesso!" });
   });
 
-  // ── GET /api/auth/seed-admin ──────────────────────────────────────────────
-  // Rota interna para criar o admin inicial (apenas em desenvolvimento)
+  // ── POST /api/auth/seed-admin ─────────────────────────────────────────────
+  // Rota protegida por secret para criar o admin inicial
   app.post("/api/auth/seed-admin", async (req: Request, res: Response) => {
-    // Desabilitar em produção
-    if (process.env.NODE_ENV === 'production') {
-      res.status(404).json({ error: 'Not found' });
-      return;
-    }
     const { secret } = req.body as { secret?: string };
     if (secret !== "cobrapro-seed-2026") {
       res.status(403).json({ error: "Forbidden" });

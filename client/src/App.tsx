@@ -26,6 +26,8 @@ import Simulador from "./pages/Simulador";
 import ContasPagar from "./pages/ContasPagar";
 import Vendas from "./pages/Vendas";
 import Cheques from "./pages/Cheques";
+import RecuperarSenha from "./pages/RecuperarSenha";
+import ResetSenha from "./pages/ResetSenha";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -54,6 +56,8 @@ function Router() {
       {/* Landing page / Login */}
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
+      <Route path="/recuperar-senha" component={RecuperarSenha} />
+      <Route path="/reset-senha" component={ResetSenha} />
 
       {/* Rotas autenticadas com DashboardLayout */}
       <Route path="/dashboard" component={DashboardPage} />
