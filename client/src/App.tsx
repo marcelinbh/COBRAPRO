@@ -16,7 +16,7 @@ import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import PortalCliente from "./pages/PortalCliente";
 import DashboardLayout from "./components/DashboardLayout";
-import Koletores from "./pages/Koletores";
+import Usuarios from "./pages/Usuarios";
 import Reparcelamento from "./pages/Reparcelamento";
 
 function Router() {
@@ -35,7 +35,8 @@ function Router() {
       <Route path="/calendario" component={() => <DashboardLayout><Calendario /></DashboardLayout>} />
       <Route path="/relatorios" component={() => <DashboardLayout><Relatorios /></DashboardLayout>} />
       <Route path="/configuracoes" component={() => <DashboardLayout><Configuracoes /></DashboardLayout>} />
-      <Route path="/koletores" component={() => <DashboardLayout><Koletores /></DashboardLayout>} />
+      <Route path="/usuarios" component={() => <DashboardLayout><Usuarios /></DashboardLayout>} />
+      <Route path="/koletores" component={() => <DashboardLayout><Usuarios /></DashboardLayout>} />
       <Route path="/reparcelamento" component={() => <DashboardLayout><Reparcelamento /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

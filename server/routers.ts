@@ -916,6 +916,47 @@ const relatoriosRouter = router({
 
 // ─── CONFIGURAÇÕES ────────────────────────────────────────────────────────────
 const configuracoesRouter = router({
+  get: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return null;
+    const rows = await db.select().from(configuracoes);
+    const map: Record<string, string> = {};
+    for (const r of rows) map[r.chave] = r.valor ?? '';
+    return {
+      nomeEmpresa: map['nomeEmpresa'] ?? '',
+      cnpjEmpresa: map['cnpjEmpresa'] ?? '',
+      telefoneEmpresa: map['telefoneEmpresa'] ?? '',
+      enderecoEmpresa: map['enderecoEmpresa'] ?? '',
+      assinaturaWhatsapp: map['assinaturaWhatsapp'] ?? '',
+      fechamentoWhatsapp: map['fechamentoWhatsapp'] ?? '',
+      multaPadrao: parseFloat(map['multaPadrao'] ?? '2'),
+      jurosMoraDiario: parseFloat(map['jurosMoraDiario'] ?? '0.033'),
+      diasLembrete: parseInt(map['diasLembrete'] ?? '3'),
+    };
+  }),
+  save: protectedProcedure
+    .input(z.object({
+      nomeEmpresa: z.string().optional(),
+      cnpjEmpresa: z.string().optional(),
+      telefoneEmpresa: z.string().optional(),
+      enderecoEmpresa: z.string().optional(),
+      assinaturaWhatsapp: z.string().optional(),
+      fechamentoWhatsapp: z.string().optional(),
+      multaPadrao: z.number().optional(),
+      jurosMoraDiario: z.number().optional(),
+      diasLembrete: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      const entries = Object.entries(input).filter(([, v]) => v !== undefined);
+      for (const [chave, valor] of entries) {
+        await db.insert(configuracoes)
+          .values({ chave, valor: String(valor) })
+          .onDuplicateKeyUpdate({ set: { valor: String(valor) } });
+      }
+      return { success: true };
+    }),
   templates: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];

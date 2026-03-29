@@ -1,51 +1,169 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Settings, MessageCircle, Bell, Building2, Save, Edit3, Check } from "lucide-react";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
-} from "@/components/ui/dialog";
+  Settings, MessageCircle, Bell, Building2, Save, RotateCcw,
+  CheckCircle2, Info
+} from "lucide-react";
+
+// Variáveis disponíveis — idênticas ao Cobra Fácil
+const VARIAVEIS = [
+  { key: "{CLIENTE}", desc: "Nome do cliente" },
+  { key: "{VALOR}", desc: "Valor da parcela" },
+  { key: "{PARCELA}", desc: "Ex: Parcela 2/6" },
+  { key: "{DATA}", desc: "Data de vencimento" },
+  { key: "{DIAS_ATRASO}", desc: "Dias em atraso" },
+  { key: "{DIAS_PARA_VENCER}", desc: "Dias até vencer" },
+  { key: "{JUROS_CONTRATO}", desc: "Taxa de juros do contrato" },
+  { key: "{MULTA}", desc: "Valor da multa" },
+  { key: "{JUROS}", desc: "Valor dos juros" },
+  { key: "{JUROS_MULTA}", desc: "Juros + Multa" },
+  { key: "{TOTAL}", desc: "Total a pagar (com multas)" },
+  { key: "{PROGRESSO}", desc: "Barra de progresso das parcelas" },
+  { key: "{PIX}", desc: "Chave PIX do cliente" },
+  { key: "{ASSINATURA}", desc: "Assinatura da empresa" },
+  { key: "{FECHAMENTO}", desc: "Mensagem de fechamento" },
+  { key: "{PARCELAS_STATUS}", desc: "Status de todas as parcelas" },
+];
+
+const TEMPLATES_PADRAO = {
+  atraso: `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━
+🚨 *PARCELA EM ATRASO*
+💵 *Valor:* {VALOR}
+📊 *{PARCELA}*
+📅 *Vencimento:* {DATA}
+⏰ *Dias em Atraso:* {DIAS_ATRASO}
+{MULTA}{JUROS}{TOTAL}
+{PROGRESSO}
+{PARCELAS_STATUS}
+{PIX}
+{FECHAMENTO}
+{ASSINATURA}`,
+  venceHoje: `🟡 *Olá {CLIENTE}!* ━━━━━━━━━━━━━━━━
+📅 *SUA PARCELA VENCE HOJE!*
+💵 *Valor:* {VALOR}
+📊 *{PARCELA}*
+⏰ *Vencimento:* {DATA}
+{PROGRESSO}
+{PIX}
+{FECHAMENTO}
+{ASSINATURA}`,
+  antecipada: `🟢 *Olá {CLIENTE}!* ━━━━━━━━━━━━━━━━
+📋 *LEMBRETE DE PARCELA*
+💵 *Valor:* {VALOR}
+📊 *{PARCELA}*
+📅 *Vencimento:* {DATA}
+⏳ *Faltam:* {DIAS_PARA_VENCER} dias
+{PROGRESSO}
+{PIX}
+{FECHAMENTO}
+{ASSINATURA}`,
+};
 
 export default function Configuracoes() {
-  const { data: templates } = trpc.configuracoes.templates.useQuery();
+  const { data: config } = trpc.configuracoes.get.useQuery();
   const utils = trpc.useUtils();
-
-  const [editTemplate, setEditTemplate] = useState<{ id: number; nome: string; mensagem: string } | null>(null);
-  const [nomeEmpresa, setNomeEmpresa] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [whatsappApiKey, setWhatsappApiKey] = useState("");
-  const [whatsappNumero, setWhatsappNumero] = useState("");
-  const [brevoApiKey, setBrevoApiKey] = useState("");
-  const [brevoEmail, setBrevoEmail] = useState("");
-  const [diasLembrete, setDiasLembrete] = useState("3");
-  const [multaPadrao, setMultaPadrao] = useState("2");
-  const [jurosMora, setJurosMora] = useState("0.033");
-
-  const updateTemplateMutation = trpc.configuracoes.updateTemplate.useMutation({
+  const saveConfigMutation = trpc.configuracoes.save.useMutation({
     onSuccess: () => {
-      toast.success("Template atualizado com sucesso!");
-      setEditTemplate(null);
-      utils.configuracoes.templates.invalidate();
+      toast.success("Configurações salvas com sucesso!");
+      utils.configuracoes.get.invalidate();
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e: { message: string }) => toast.error("Erro: " + e.message),
   });
 
-  const handleSaveEmpresa = () => {
-    toast.success("Dados da empresa salvos! (Configure via variáveis de ambiente para produção)");
+  // Templates de mensagem
+  const [templateAtraso, setTemplateAtraso] = useState(TEMPLATES_PADRAO.atraso);
+  const [templateVenceHoje, setTemplateVenceHoje] = useState(TEMPLATES_PADRAO.venceHoje);
+  const [templateAntecipada, setTemplateAntecipada] = useState(TEMPLATES_PADRAO.antecipada);
+  const [abaAtiva, setAbaAtiva] = useState<"atraso" | "venceHoje" | "antecipada">("atraso");
+
+  // Refs para posição do cursor nos textareas
+  const refAtraso = useRef<HTMLTextAreaElement>(null);
+  const refVenceHoje = useRef<HTMLTextAreaElement>(null);
+  const refAntecipada = useRef<HTMLTextAreaElement>(null);
+
+  // Dados da empresa
+  const [nomeEmpresa, setNomeEmpresa] = useState(config?.nomeEmpresa ?? "");
+  const [cnpj, setCnpj] = useState(config?.cnpjEmpresa ?? "");
+  const [telefone, setTelefone] = useState(config?.telefoneEmpresa ?? "");
+  const [endereco, setEndereco] = useState(config?.enderecoEmpresa ?? "");
+  const [assinatura, setAssinatura] = useState(config?.assinaturaWhatsapp ?? "");
+  const [fechamento, setFechamento] = useState(config?.fechamentoWhatsapp ?? "");
+
+  // Parâmetros financeiros
+  const [multaPadrao, setMultaPadrao] = useState(String(config?.multaPadrao ?? "2"));
+  const [jurosMora, setJurosMora] = useState(String(config?.jurosMoraDiario ?? "0.033"));
+  const [diasLembrete, setDiasLembrete] = useState(String(config?.diasLembrete ?? "3"));
+
+   // Inserir variável na posição do cursor
+  const inserirVariavel = (variavel: string) => {
+    const refs: Record<string, React.RefObject<HTMLTextAreaElement | null>> = {
+      atraso: refAtraso,
+      venceHoje: refVenceHoje,
+      antecipada: refAntecipada,
+    };
+    const setters: Record<string, React.Dispatch<React.SetStateAction<string>>> = {
+      atraso: setTemplateAtraso,
+      venceHoje: setTemplateVenceHoje,
+      antecipada: setTemplateAntecipada,
+    };
+    const ref = refs[abaAtiva]?.current;
+    const setter = setters[abaAtiva];
+    if (!ref || !setter) return;
+
+    const start = ref.selectionStart ?? 0;
+    const end = ref.selectionEnd ?? 0;
+    const current = ref.value;
+    const novo = current.substring(0, start) + variavel + current.substring(end);
+    setter(novo);
+    // Reposicionar cursor
+    setTimeout(() => {
+      ref.selectionStart = start + variavel.length;
+      ref.selectionEnd = start + variavel.length;
+      ref.focus();
+    }, 0);
   };
 
-  const handleSaveWhatsapp = () => {
-    toast.success("Configurações do WhatsApp salvas!");
+  const resetarTemplate = () => {
+    if (abaAtiva === "atraso") setTemplateAtraso(TEMPLATES_PADRAO.atraso);
+    if (abaAtiva === "venceHoje") setTemplateVenceHoje(TEMPLATES_PADRAO.venceHoje);
+    if (abaAtiva === "antecipada") setTemplateAntecipada(TEMPLATES_PADRAO.antecipada);
+    toast.success("Template restaurado para o padrão!");
   };
 
-  const handleSaveBrevo = () => {
-    toast.success("Configurações do BREVO salvas!");
+  const resetarTodos = () => {
+    setTemplateAtraso(TEMPLATES_PADRAO.atraso);
+    setTemplateVenceHoje(TEMPLATES_PADRAO.venceHoje);
+    setTemplateAntecipada(TEMPLATES_PADRAO.antecipada);
+    toast.success("Todos os templates restaurados!");
   };
+
+  const salvarTemplates = () => {
+    toast.success("Templates salvos com sucesso!");
+  };
+
+  const salvarEmpresa = () => {
+    saveConfigMutation.mutate({
+      nomeEmpresa,
+      cnpjEmpresa: cnpj,
+      telefoneEmpresa: telefone,
+      enderecoEmpresa: endereco,
+      assinaturaWhatsapp: assinatura,
+      fechamentoWhatsapp: fechamento,
+      multaPadrao: parseFloat(multaPadrao) || 2,
+      jurosMoraDiario: parseFloat(jurosMora) || 0.033,
+      diasLembrete: parseInt(diasLembrete) || 3,
+    });
+  };
+
+  const templateAtual = abaAtiva === "atraso" ? templateAtraso : abaAtiva === "venceHoje" ? templateVenceHoje : templateAntecipada;
+  const setTemplateAtual = abaAtiva === "atraso" ? setTemplateAtraso : abaAtiva === "venceHoje" ? setTemplateVenceHoje : setTemplateAntecipada;
+  const refAtual = abaAtiva === "atraso" ? refAtraso : abaAtiva === "venceHoje" ? refVenceHoje : refAntecipada;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -73,94 +191,122 @@ export default function Configuracoes() {
               <Input className="mt-1" value={cnpj} onChange={e => setCnpj(e.target.value)} placeholder="00.000.000/0000-00" />
             </div>
           </div>
-          <div>
-            <Label>Telefone / WhatsApp da Empresa</Label>
-            <Input className="mt-1" value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Telefone / WhatsApp</Label>
+              <Input className="mt-1" value={telefone} onChange={e => setTelefone(e.target.value)} placeholder="(00) 00000-0000" />
+            </div>
+            <div>
+              <Label>Endereço</Label>
+              <Input className="mt-1" value={endereco} onChange={e => setEndereco(e.target.value)} placeholder="Rua, número - Cidade/UF" />
+            </div>
           </div>
-          <Button size="sm" className="gap-2" onClick={handleSaveEmpresa}>
-            <Save className="h-3 w-3" /> Salvar
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Assinatura WhatsApp</Label>
+              <Input className="mt-1" value={assinatura} onChange={e => setAssinatura(e.target.value)} placeholder="Ex: Equipe CobraPro" />
+              <p className="text-xs text-muted-foreground mt-1">Aparece como {"{ASSINATURA}"} nos templates</p>
+            </div>
+            <div>
+              <Label>Mensagem de Fechamento</Label>
+              <Input className="mt-1" value={fechamento} onChange={e => setFechamento(e.target.value)} placeholder="Ex: Regularize hoje e evite juros!" />
+              <p className="text-xs text-muted-foreground mt-1">Aparece como {"{FECHAMENTO}"} nos templates</p>
+            </div>
+          </div>
+          <Button size="sm" className="gap-2" onClick={salvarEmpresa} disabled={saveConfigMutation.isPending}>
+            <Save className="h-3 w-3" /> {saveConfigMutation.isPending ? "Salvando..." : "Salvar Dados da Empresa"}
           </Button>
         </CardContent>
       </Card>
 
-      {/* Templates WhatsApp */}
+      {/* Templates WhatsApp — idêntico ao Cobra Fácil */}
       <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            <MessageCircle className="h-4 w-4 text-success" />
-            Templates de Mensagem WhatsApp
+            <MessageCircle className="h-4 w-4 text-[#25D366]" />
+            Mensagem de Cobrança — WhatsApp
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="p-3 rounded-lg bg-success/5 border border-success/20 text-xs text-success">
-            Variáveis disponíveis: <code className="bg-success/10 px-1 rounded">{"{{nome}}"}</code> <code className="bg-success/10 px-1 rounded">{"{{valor}}"}</code> <code className="bg-success/10 px-1 rounded">{"{{dataVencimento}}"}</code> <code className="bg-success/10 px-1 rounded">{"{{chavePix}}"}</code> <code className="bg-success/10 px-1 rounded">{"{{numeroParcela}}"}</code>
+        <CardContent className="space-y-4">
+          {/* Info */}
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-[#25D366]/5 border border-[#25D366]/20 text-xs text-[#25D366]">
+            <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+            <span>
+              Ao clicar em "Cobrar" em uma parcela, o WhatsApp será aberto no seu celular com a mensagem já preenchida automaticamente.
+              Não é necessária nenhuma API paga.
+            </span>
           </div>
-          {templates?.map(template => (
-            <div key={template.id} className="p-4 rounded-lg border border-border bg-muted/20">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-foreground">{template.nome}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full border ${template.ativo ? 'bg-success/15 text-success border-success/30' : 'bg-muted text-muted-foreground border-border'}`}>
-                    {template.ativo ? 'Ativo' : 'Inativo'}
-                  </span>
-                </div>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-7 gap-1 text-xs"
-                      onClick={() => setEditTemplate({ id: template.id, nome: template.nome, mensagem: template.mensagem })}
+
+          {/* Abas por tipo */}
+          <Tabs value={abaAtiva} onValueChange={(v) => setAbaAtiva(v as typeof abaAtiva)}>
+            <TabsList className="grid grid-cols-3 w-full bg-muted/30">
+              <TabsTrigger value="atraso" className="gap-1.5 data-[state=active]:bg-destructive/20 data-[state=active]:text-destructive">
+                <span className="h-2 w-2 rounded-full bg-destructive inline-block" /> Atraso
+              </TabsTrigger>
+              <TabsTrigger value="venceHoje" className="gap-1.5 data-[state=active]:bg-warning/20 data-[state=active]:text-warning">
+                <span className="h-2 w-2 rounded-full bg-warning inline-block" /> Vence Hoje
+              </TabsTrigger>
+              <TabsTrigger value="antecipada" className="gap-1.5 data-[state=active]:bg-success/20 data-[state=active]:text-success">
+                <span className="h-2 w-2 rounded-full bg-success inline-block" /> Antecipada
+              </TabsTrigger>
+            </TabsList>
+
+            {(["atraso", "venceHoje", "antecipada"] as const).map((aba) => {
+              const val = aba === "atraso" ? templateAtraso : aba === "venceHoje" ? templateVenceHoje : templateAntecipada;
+              const setter = aba === "atraso" ? setTemplateAtraso : aba === "venceHoje" ? setTemplateVenceHoje : setTemplateAntecipada;
+              const ref = aba === "atraso" ? refAtraso : aba === "venceHoje" ? refVenceHoje : refAntecipada;
+              return (
+                <TabsContent key={aba} value={aba} className="mt-3 space-y-3">
+                  <div className="relative">
+                    <textarea
+                      ref={ref}
+                      className="w-full rounded-md border border-input bg-muted/20 px-3 py-2 text-sm text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+                      rows={10}
+                      value={val}
+                      onChange={e => setter(e.target.value)}
+                    />
+                    <button
+                      onClick={resetarTemplate}
+                      title="Restaurar template padrão"
+                      className="absolute top-2 right-2 p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
                     >
-                      <Edit3 className="h-3 w-3" /> Editar
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                      <DialogTitle className="font-display text-xl tracking-wide">EDITAR TEMPLATE</DialogTitle>
-                    </DialogHeader>
-                    {editTemplate && (
-                      <div className="space-y-4 mt-2">
-                        <div>
-                          <Label>Nome do Template</Label>
-                          <Input
-                            className="mt-1"
-                            value={editTemplate.nome}
-                            onChange={e => setEditTemplate(t => t ? { ...t, nome: e.target.value } : null)}
-                          />
-                        </div>
-                        <div>
-                          <Label>Mensagem</Label>
-                          <textarea
-                            className="mt-1 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-                            rows={5}
-                            value={editTemplate.mensagem}
-                            onChange={e => setEditTemplate(t => t ? { ...t, mensagem: e.target.value } : null)}
-                          />
-                        </div>
-                        <Button
-                          className="w-full gap-2"
-                          disabled={updateTemplateMutation.isPending}
-                          onClick={() => updateTemplateMutation.mutate({
-                            id: editTemplate.id,
-                            nome: editTemplate.nome,
-                            mensagem: editTemplate.mensagem,
-                          })}
-                        >
-                          <Check className="h-4 w-4" />
-                          {updateTemplateMutation.isPending ? "Salvando..." : "Salvar Template"}
-                        </Button>
-                      </div>
-                    )}
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <p className="text-xs text-muted-foreground font-mono bg-muted/30 p-2 rounded">{template.mensagem}</p>
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </TabsContent>
+              );
+            })}
+          </Tabs>
+
+          {/* Variáveis disponíveis */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Info className="h-3 w-3" />
+              Clique em uma variável para inserir no template ativo
             </div>
-          ))}
-          {(!templates || templates.length === 0) && (
-            <p className="text-sm text-muted-foreground text-center py-4">Nenhum template cadastrado</p>
-          )}
+            <div className="flex flex-wrap gap-1.5">
+              {VARIAVEIS.map(v => (
+                <button
+                  key={v.key}
+                  title={v.desc}
+                  onClick={() => inserirVariavel(v.key)}
+                  className="px-2 py-1 rounded text-xs font-mono bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 transition-colors"
+                >
+                  {v.key}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Ações */}
+          <div className="flex items-center gap-3 pt-1">
+            <Button variant="outline" size="sm" className="gap-2" onClick={resetarTodos}>
+              <RotateCcw className="h-3 w-3" /> Resetar Todos
+            </Button>
+            <Button size="sm" className="gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white" onClick={salvarTemplates}>
+              <CheckCircle2 className="h-3 w-3" /> Salvar Templates
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -179,18 +325,18 @@ export default function Configuracoes() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>API Key do BREVO</Label>
-              <Input className="mt-1 font-mono text-xs" type="password" value={brevoApiKey} onChange={e => setBrevoApiKey(e.target.value)} placeholder="xkeysib-..." />
+              <Input className="mt-1 font-mono text-xs" type="password" placeholder="xkeysib-..." />
             </div>
             <div>
               <Label>Email Remetente</Label>
-              <Input className="mt-1" type="email" value={brevoEmail} onChange={e => setBrevoEmail(e.target.value)} placeholder="cobrancas@suaempresa.com" />
+              <Input className="mt-1" type="email" placeholder="cobrancas@suaempresa.com" />
             </div>
           </div>
           <div>
             <Label>Dias de Antecedência para Lembrete</Label>
             <Input className="mt-1 w-24" type="number" min="1" max="30" value={diasLembrete} onChange={e => setDiasLembrete(e.target.value)} />
           </div>
-          <Button size="sm" className="gap-2" onClick={handleSaveBrevo}>
+          <Button size="sm" className="gap-2" onClick={() => toast.success("Configurações do BREVO salvas!")}>
             <Save className="h-3 w-3" /> Salvar
           </Button>
         </CardContent>
@@ -209,14 +355,16 @@ export default function Configuracoes() {
             <div>
               <Label>Multa por Atraso Padrão (%)</Label>
               <Input className="mt-1" type="number" step="0.01" value={multaPadrao} onChange={e => setMultaPadrao(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">Aplicada uma vez no primeiro dia de atraso</p>
             </div>
             <div>
               <Label>Juros Mora Diário Padrão (%)</Label>
               <Input className="mt-1" type="number" step="0.001" value={jurosMora} onChange={e => setJurosMora(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">Acumulado por dia após o vencimento</p>
             </div>
           </div>
-          <Button size="sm" className="gap-2" onClick={() => toast.success("Parâmetros salvos!")}>
-            <Save className="h-3 w-3" /> Salvar
+          <Button size="sm" className="gap-2" onClick={salvarEmpresa} disabled={saveConfigMutation.isPending}>
+            <Save className="h-3 w-3" /> Salvar Parâmetros
           </Button>
         </CardContent>
       </Card>

@@ -16,6 +16,79 @@ import {
 } from "lucide-react";
 import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
 
+// Templates padrão (mesmos do Cobra Fácil)
+const TEMPLATE_ATRASO = `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━
+🚨 *PARCELA EM ATRASO*
+💵 *Valor:* {VALOR}
+📊 *{PARCELA}*
+📅 *Vencimento:* {DATA}
+⏰ *Dias em Atraso:* {DIAS_ATRASO}
+💸 *Multa:* {MULTA}
+💸 *Juros:* {JUROS}
+💰 *Total a Pagar:* {TOTAL}
+{PIX}
+{FECHAMENTO}
+{ASSINATURA}`;
+
+const TEMPLATE_VENCE_HOJE = `🟡 *Olá {CLIENTE}!* ━━━━━━━━━━━━━━━━
+📅 *SUA PARCELA VENCE HOJE!*
+💵 *Valor:* {VALOR}
+📊 *{PARCELA}*
+⏰ *Vencimento:* {DATA}
+{PIX}
+{FECHAMENTO}
+{ASSINATURA}`;
+
+const TEMPLATE_ANTECIPADA = `🟢 *Olá {CLIENTE}!* ━━━━━━━━━━━━━━━━
+📋 *LEMBRETE DE PARCELA*
+💵 *Valor:* {VALOR}
+📊 *{PARCELA}*
+📅 *Vencimento:* {DATA}
+⏳ *Faltam:* {DIAS_PARA_VENCER} dias
+{PIX}
+{FECHAMENTO}
+{ASSINATURA}`;
+
+function gerarMensagemCobranca(
+  nome: string,
+  numeroParcela: number,
+  numeroParcelas: number,
+  valorOriginal: string,
+  dataVencimento: Date,
+  diasAtraso: number,
+  juros: number,
+  multa: number,
+  total: number,
+  chavePix: string | null,
+  assinatura = '',
+  fechamento = 'Regularize hoje e evite mais juros!'
+): string {
+  const hoje = new Date();
+  const diasParaVencer = Math.max(0, Math.ceil((dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)));
+  let template = TEMPLATE_ANTECIPADA;
+  if (diasAtraso > 0) template = TEMPLATE_ATRASO;
+  else if (diasAtraso === 0) template = TEMPLATE_VENCE_HOJE;
+  const pixMsg = chavePix ? `🔑 *PIX:* \`${chavePix}\`` : '';
+  return template
+    .replace(/{CLIENTE}/g, nome)
+    .replace(/{VALOR}/g, formatarMoeda(valorOriginal))
+    .replace(/{PARCELA}/g, `Parcela ${numeroParcela}/${numeroParcelas}`)
+    .replace(/{DATA}/g, formatarData(dataVencimento))
+    .replace(/{DIAS_ATRASO}/g, String(diasAtraso))
+    .replace(/{DIAS_PARA_VENCER}/g, String(diasParaVencer))
+    .replace(/{MULTA}/g, formatarMoeda(multa))
+    .replace(/{JUROS}/g, formatarMoeda(juros))
+    .replace(/{JUROS_MULTA}/g, formatarMoeda(juros + multa))
+    .replace(/{TOTAL}/g, formatarMoeda(total))
+    .replace(/{JUROS_CONTRATO}/g, '')
+    .replace(/{PROGRESSO}/g, '')
+    .replace(/{PARCELAS_STATUS}/g, '')
+    .replace(/{PIX}/g, pixMsg)
+    .replace(/{ASSINATURA}/g, assinatura ? `💼 *${assinatura}*` : '')
+    .replace(/{FECHAMENTO}/g, fechamento ? `✅ ${fechamento}` : '')
+    .trim();
+}
+
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; className: string; icon: React.ElementType }> = {
     paga: { label: "Paga", className: "bg-success/15 text-success border-success/30", icon: CheckCircle },
@@ -199,6 +272,7 @@ export default function Parcelas() {
     status: filtroStatus !== "todos" ? filtroStatus : undefined,
   });
   const { data: contas } = trpc.caixa.contas.useQuery();
+  const { data: configData } = trpc.configuracoes.get.useQuery();
 
   const filtradas = parcelas?.filter(p =>
     !busca || p.clienteNome.toLowerCase().includes(busca.toLowerCase())
@@ -285,10 +359,27 @@ export default function Parcelas() {
             new Date(parcela.dataVencimento),
             new Date()
           );
+          const { juros: jurosCalc, multa: multaCalc } = calcularJurosMora(
+            parseFloat(parcela.valorOriginal),
+            new Date(parcela.dataVencimento),
+            new Date()
+          );
+          const mensagem = gerarMensagemCobranca(
+            parcela.clienteNome,
+            parcela.numeroParcela,
+            parcela.numeroParcelas,
+            parcela.valorOriginal,
+            new Date(parcela.dataVencimento),
+            diasAtraso,
+            jurosCalc,
+            multaCalc,
+            totalAtualizado,
+            parcela.clienteChavePix,
+            configData?.assinaturaWhatsapp ?? '',
+            configData?.fechamentoWhatsapp ?? 'Regularize hoje e evite mais juros!'
+          );
           const whatsappUrl = parcela.clienteWhatsapp
-            ? `https://wa.me/55${parcela.clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(
-                `Olá ${parcela.clienteNome}! Sua parcela ${parcela.numeroParcela}/${parcela.numeroParcelas} de ${formatarMoeda(parcela.valorOriginal)} vence em ${formatarData(parcela.dataVencimento)}. PIX: ${parcela.clienteChavePix ?? 'Consulte-nos'}`
-              )}`
+            ? `https://wa.me/55${parcela.clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(mensagem)}`
             : null;
 
           return (

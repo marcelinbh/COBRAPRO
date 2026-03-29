@@ -85,3 +85,10 @@
 - [ ] Todos os módulos com dados 100% dinâmicos do banco
 - [ ] Importação de base de dados via CSV (clientes)
 - [ ] Geração de contrato em PDF
+
+## Fase 11: WhatsApp + Renomear Usuários
+- [ ] Renomear Koletores → Usuários em todo o sistema (menu, páginas, routers)
+- [ ] Configuração de WhatsApp na tela de Configurações (API Key, número, status)
+- [ ] Templates dinâmicos de cobrança com variáveis (nome, valor, data, PIX)
+- [ ] Envio de cobrança via WhatsApp direto das Parcelas
+- [ ] Preview do template antes de enviar
