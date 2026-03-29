@@ -23,3 +23,6 @@ services:
       - key: VITE_APP_ID
         value: "BkqW4WQ4ndZHJQHLtTMfxv"
         scope: BUILD_TIME
+      - key: BREVO_API_KEY
+        value: "BREVO_API_KEY_REMOVED"
+        scope: RUN_TIME

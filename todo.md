@@ -133,3 +133,19 @@
 - [ ] Relatório de Empréstimos (separado do relatório geral)
 - [ ] Suporte destacado no menu lateral (+55 11 96419-2613)
 - [ ] Landing page fiel ao design original cobrapro.online
+
+## Fase 17: Recuperação de Senha + Primeiro Acesso Admin
+- [ ] Página /recuperar-senha com formulário de e-mail
+- [ ] Endpoint tRPC para gerar token de reset e enviar e-mail via Brevo
+- [ ] Página /nova-senha/:token para definir nova senha
+- [ ] Criar usuário admin koletor3@gmail.com via endpoint protegido
+
+## Fase 18: Integração Brevo + Deploy Produção
+- [x] Criar remetente CobraPro (noreply@cobrapro.online) no Brevo
+- [x] Implementar envio de e-mail de recuperação de senha via Brevo API
+- [x] Criar página /recuperar-senha com formulário de e-mail
+- [x] Criar página /reset-senha com formulário de nova senha e indicador de força
+- [x] Registrar rotas /recuperar-senha e /reset-senha no App.tsx
+- [x] Habilitar endpoint /api/auth/seed-admin em produção (protegido por secret)
+- [x] Adicionar BREVO_API_KEY ao .do/app.yaml (Digital Ocean)
+- [x] Confirmar admin koletor3@gmail.com existente no banco de produção
