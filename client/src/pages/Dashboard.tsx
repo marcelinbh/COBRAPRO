@@ -92,6 +92,16 @@ export default function Dashboard() {
 
   const chartData = fluxoMensal ?? [];
 
+  // Calcular taxa de inadimplência
+  const taxaInadimplencia = kpis && kpis.capitalCirculacao > 0
+    ? ((kpis.totalInadimplente / kpis.capitalCirculacao) * 100).toFixed(1)
+    : '0.0';
+
+  // Calcular taxa de recebimento hoje
+  const taxaRecebimentoHoje = kpis && kpis.valorVenceHoje > 0
+    ? ((kpis.recebidoHoje / kpis.valorVenceHoje) * 100).toFixed(0)
+    : '0';
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -122,7 +132,7 @@ export default function Dashboard() {
           value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)}
           icon={TrendingUp}
           variant="primary"
-          subtitle="Contratos ativos"
+          subtitle={`${kpis?.contratosAtivos ?? 0} contratos ativos`}
         />
         <KPICard
           title="Total a Receber"
@@ -136,7 +146,7 @@ export default function Dashboard() {
           value={kpisLoading ? "..." : formatarMoeda(kpis?.totalInadimplente ?? 0)}
           icon={AlertTriangle}
           variant="danger"
-          subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes`}
+          subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes · ${taxaInadimplencia}%`}
         />
         <KPICard
           title="Juros Pendentes"
@@ -153,6 +163,30 @@ export default function Dashboard() {
           subtitle={formatarMoeda(kpis?.valorVenceHoje ?? 0)}
         />
       </div>
+
+      {/* Barra de saúde financeira */}
+      {kpis && kpis.capitalCirculacao > 0 && (
+        <Card className="border-border">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Saúde da Carteira</span>
+              <span className="text-xs text-muted-foreground">Taxa de inadimplência: <span className={`font-bold ${parseFloat(taxaInadimplencia) > 15 ? 'text-primary' : parseFloat(taxaInadimplencia) > 8 ? 'text-warning' : 'text-success'}`}>{taxaInadimplencia}%</span></span>
+            </div>
+            <div className="flex gap-1 h-3 rounded-full overflow-hidden">
+              <div className="bg-success rounded-l-full transition-all" style={{ width: `${Math.max(0, 100 - parseFloat(taxaInadimplencia))}%` }} title="Em dia" />
+              <div className="bg-primary rounded-r-full transition-all" style={{ width: `${Math.min(100, parseFloat(taxaInadimplencia))}%` }} title="Inadimplente" />
+            </div>
+            <div className="flex justify-between mt-1.5">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="w-2 h-2 rounded-full bg-success" /> Em dia: {formatarMoeda((kpis.capitalCirculacao - kpis.totalInadimplente))}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="w-2 h-2 rounded-full bg-primary" /> Inadimplente: {formatarMoeda(kpis.totalInadimplente)}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Charts + Lists */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

@@ -27,6 +27,26 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// ─── KOLETORES (usuários internos do sistema) ─────────────────────────────────
+export const koletores = mysqlTable("koletores", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id"),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  telefone: varchar("telefone", { length: 20 }),
+  whatsapp: varchar("whatsapp", { length: 20 }),
+  perfil: mysqlEnum("perfil", ["admin", "gerente", "koletor"]).default("koletor").notNull(),
+  limiteEmprestimo: decimal("limite_emprestimo", { precision: 15, scale: 2 }).default("0.00"),
+  comissaoPercentual: decimal("comissao_percentual", { precision: 8, scale: 4 }).default("0.00"),
+  ativo: boolean("ativo").default(true).notNull(),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Koletor = typeof koletores.$inferSelect;
+export type InsertKoletor = typeof koletores.$inferInsert;
+
 // ─── CLIENTES ────────────────────────────────────────────────────────────────
 export const clientes = mysqlTable("clientes", {
   id: int("id").autoincrement().primaryKey(),
@@ -43,6 +63,15 @@ export const clientes = mysqlTable("clientes", {
   cep: varchar("cep", { length: 9 }),
   observacoes: text("observacoes"),
   score: int("score").default(100),
+  // Fase 2: novos campos
+  categoria: mysqlEnum("categoria", ["bronze", "prata", "ouro", "prefeitura", "padrao"]).default("padrao"),
+  qualificacao: mysqlEnum("qualificacao", ["bom", "medio", "ruim"]).default("bom"),
+  limiteCredito: decimal("limite_credito", { precision: 15, scale: 2 }).default("0.00"),
+  limiteDisponivel: decimal("limite_disponivel", { precision: 15, scale: 2 }).default("0.00"),
+  koletorId: int("koletor_id"),
+  banco: varchar("banco", { length: 100 }),
+  agencia: varchar("agencia", { length: 20 }),
+  numeroConta: varchar("numero_conta", { length: 30 }),
   ativo: boolean("ativo").default(true).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
@@ -72,12 +101,14 @@ export type InsertContaCaixa = typeof contasCaixa.$inferInsert;
 export const contratos = mysqlTable("contratos", {
   id: int("id").autoincrement().primaryKey(),
   clienteId: int("cliente_id").notNull(),
+  koletorId: int("koletor_id"),
   modalidade: mysqlEnum("modalidade", [
     "emprestimo_padrao",
     "emprestimo_diario",
     "tabela_price",
     "venda_produto",
     "desconto_cheque",
+    "reparcelamento",
   ]).notNull(),
   status: mysqlEnum("status", ["ativo", "quitado", "inadimplente", "cancelado"]).default("ativo").notNull(),
   valorPrincipal: decimal("valor_principal", { precision: 15, scale: 2 }).notNull(),
@@ -93,6 +124,11 @@ export const contratos = mysqlTable("contratos", {
   descricao: text("descricao"),
   observacoes: text("observacoes"),
   contaCaixaId: int("conta_caixa_id"),
+  // Fase 2: reparcelamento
+  contratoOrigemId: int("contrato_origem_id"),
+  // Fase 2: contrato digital
+  contratoAssinado: boolean("contrato_assinado").default(false),
+  contratoUrl: varchar("contrato_url", { length: 500 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -105,6 +141,7 @@ export const parcelas = mysqlTable("parcelas", {
   id: int("id").autoincrement().primaryKey(),
   contratoId: int("contrato_id").notNull(),
   clienteId: int("cliente_id").notNull(),
+  koletorId: int("koletor_id"),
   numeroParcela: int("numero_parcela").notNull(),
   valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
   valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
@@ -116,6 +153,8 @@ export const parcelas = mysqlTable("parcelas", {
   status: mysqlEnum("status", ["pendente", "paga", "atrasada", "vencendo_hoje", "parcial"]).default("pendente").notNull(),
   contaCaixaId: int("conta_caixa_id"),
   observacoes: text("observacoes"),
+  // Fase 2: multa manual
+  multaManual: decimal("multa_manual", { precision: 15, scale: 2 }).default("0.00"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
@@ -141,6 +180,8 @@ export const transacoesCaixa = mysqlTable("transacoes_caixa", {
   parcelaId: int("parcela_id"),
   contratoId: int("contrato_id"),
   clienteId: int("cliente_id"),
+  // Fase 2: conta destino para transferências
+  contaDestinoId: int("conta_destino_id"),
   dataTransacao: timestamp("data_transacao").defaultNow().notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -165,12 +206,34 @@ export type InsertMagicLink = typeof magicLinks.$inferInsert;
 export const templatesWhatsapp = mysqlTable("templates_whatsapp", {
   id: int("id").autoincrement().primaryKey(),
   nome: varchar("nome", { length: 100 }).notNull(),
-  tipo: mysqlEnum("tipo", ["cobranca", "lembrete", "confirmacao", "boas_vindas"]).notNull(),
+  tipo: mysqlEnum("tipo", [
+    "cobranca_geral",
+    "cobranca_vencida",
+    "lembrete_vencimento",
+    "confirmacao_pagamento",
+    "boas_vindas",
+    "pix_transferencia",
+    "personalizado",
+  ]).notNull(),
   mensagem: text("mensagem").notNull(),
+  // Fase 2: variáveis suportadas e múltiplos templates
   ativo: boolean("ativo").default(true).notNull(),
+  padrao: boolean("padrao").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
 
 export type TemplateWhatsapp = typeof templatesWhatsapp.$inferSelect;
 export type InsertTemplateWhatsapp = typeof templatesWhatsapp.$inferInsert;
+
+// ─── CONFIGURAÇÕES DO SISTEMA ─────────────────────────────────────────────────
+export const configuracoes = mysqlTable("configuracoes", {
+  id: int("id").autoincrement().primaryKey(),
+  chave: varchar("chave", { length: 100 }).notNull().unique(),
+  valor: text("valor"),
+  descricao: text("descricao"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Configuracao = typeof configuracoes.$inferSelect;
+export type InsertConfiguracao = typeof configuracoes.$inferInsert;

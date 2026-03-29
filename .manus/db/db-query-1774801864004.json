@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, nome, tipo FROM templates_whatsapp;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT id, nome, tipo FROM templates_whatsapp;",
+  "rows": [
+    {
+      "id": "1",
+      "nome": "Cobrança Padrão",
+      "tipo": "cobranca"
+    },
+    {
+      "id": "2",
+      "nome": "Lembrete Vencimento",
+      "tipo": "lembrete"
+    },
+    {
+      "id": "3",
+      "nome": "Confirmação Pagamento",
+      "tipo": "confirmacao"
+    },
+    {
+      "id": "4",
+      "nome": "Boas-vindas",
+      "tipo": "boas_vindas"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnome\ttipo\n1\tCobrança Padrão\tcobranca\n2\tLembrete Vencimento\tlembrete\n3\tConfirmação Pagamento\tconfirmacao\n4\tBoas-vindas\tboas_vindas\n",
+  "stderr": "",
+  "execution_time_ms": 64
+}

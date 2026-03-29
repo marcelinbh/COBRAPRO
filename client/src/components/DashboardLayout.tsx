@@ -33,6 +33,8 @@ import {
   BarChart3,
   Settings,
   TrendingUp,
+  UserCog,
+  RefreshCw,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -45,9 +47,11 @@ const menuItems = [
   { icon: Users, label: "Clientes", path: "/clientes" },
   { icon: FileText, label: "Contratos", path: "/contratos" },
   { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
+  { icon: RefreshCw, label: "Reparcelamento", path: "/reparcelamento" },
   { icon: Wallet, label: "Caixa", path: "/caixa" },
   { icon: CalendarDays, label: "Calendário", path: "/calendario" },
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
+  { icon: UserCog, label: "Koletores", path: "/koletores" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
 ];
 

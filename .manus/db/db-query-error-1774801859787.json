@@ -1,0 +1,8 @@
+{
+  "query": "\nUPDATE `templates_whatsapp` SET `tipo` = 'cobranca_geral' WHERE `tipo` = 'cobranca';\nUPDATE `templates_whatsapp` SET `tipo` = 'lembrete_vencimento' WHERE `tipo` = 'lembrete';\nUPDATE `templates_whatsapp` SET `tipo` = 'confirmacao_pagamento' WHERE `tipo` = 'confirmacao';\nUPDATE `templates_whatsapp` SET `tipo` = 'boas_vindas' WHERE `tipo` = 'boas_vindas';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute \nUPDATE `templates_whatsapp` SET `tipo` = 'cobranca_geral' WHERE `tipo` = 'cobranca';\nUPDATE `templates_whatsapp` SET `tipo` = 'lembrete_vencimento' WHERE `tipo` = 'lembrete';\nUPDATE `templates_whatsapp` SET `tipo` = 'confirmacao_pagamento' WHERE `tipo` = 'confirmacao';\nUPDATE `templates_whatsapp` SET `tipo` = 'boas_vindas' WHERE `tipo` = 'boas_vindas';\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1265 (01000) at line 2: Data truncated for column '%s' at row %d"
+  ]
+}

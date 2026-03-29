@@ -50,3 +50,23 @@
 - [x] Testes Vitest para routers principais (12 testes passando)
 - [x] Responsividade mobile testada
 - [x] Checkpoint final
+
+## Fase 8: Melhorias Fase 2 (Auditoria)
+- [x] Schema: tabela de koletores/usuários internos
+- [x] Schema: tabela de reparcelamentos (contratoOrigemId)
+- [x] Schema: campos de limite de crédito e categoria em clientes
+- [x] Schema: templates WhatsApp avançados (tipos adicionais)
+- [x] Módulo de Koletores com CRUD e perfis (admin/gerente/koletor)
+- [x] Relatório de performance por koletor (mês/ano)
+- [x] Sistema de Reparcelamento com preview e execução
+- [x] Dashboard: barra de saúde da carteira com taxa de inadimplência
+- [x] Dashboard: taxa de inadimplência % no KPI
+- [x] Dashboard: contagem de contratos ativos no KPI
+- [x] Menu lateral: Koletores e Reparcelamento adicionados
+- [x] TypeScript: 0 erros em toda a base de código
+- [x] Testes: 12 testes passando após todas as mudanças
+- [ ] Clientes: importação em lote via CSV (fase futura)
+- [ ] Contratos: geração de contrato em PDF (fase futura)
+- [ ] Dashboard: top 5 clientes do período (fase futura)
+- [ ] Caixa: transferência entre contas (fase futura)
+- [ ] Caixa: ajuste manual de saldo (fase futura)

@@ -15,6 +15,13 @@
       "when": 1774799236008,
       "tag": "0001_aspiring_raza",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1774801835977,
+      "tag": "0002_cute_thaddeus_ross",
+      "breakpoints": true
     }
   ]
 }

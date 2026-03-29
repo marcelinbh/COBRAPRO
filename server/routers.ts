@@ -5,7 +5,8 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb } from "./db";
 import {
-  clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp
+  clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
+  koletores, configuracoes
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -764,6 +765,284 @@ const configuracoesRouter = router({
     }),
 });
 
+// ─── KOLETORES ──────────────────────────────────────────────────────────────
+const koletoresRouter = router({
+  list: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new Error("DB unavailable");
+    return db.select().from(koletores).orderBy(desc(koletores.createdAt));
+  }),
+
+  create: protectedProcedure
+    .input(z.object({
+      nome: z.string().min(2),
+      email: z.string().email().optional().or(z.literal('')),
+      telefone: z.string().optional(),
+      whatsapp: z.string().optional(),
+      perfil: z.enum(['admin', 'gerente', 'koletor']).default('koletor'),
+      limiteEmprestimo: z.number().default(0),
+      comissaoPercentual: z.number().default(0),
+      observacoes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      const result = await db.insert(koletores).values({
+        nome: input.nome,
+        email: input.email || null,
+        telefone: input.telefone || null,
+        whatsapp: input.whatsapp || null,
+        perfil: input.perfil,
+        limiteEmprestimo: input.limiteEmprestimo.toString(),
+        comissaoPercentual: input.comissaoPercentual.toString(),
+        observacoes: input.observacoes || null,
+      });
+      return { id: Number((result as any).insertId), success: true };
+    }),
+
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      nome: z.string().optional(),
+      email: z.string().optional(),
+      telefone: z.string().optional(),
+      whatsapp: z.string().optional(),
+      perfil: z.enum(['admin', 'gerente', 'koletor']).optional(),
+      limiteEmprestimo: z.number().optional(),
+      comissaoPercentual: z.number().optional(),
+      ativo: z.boolean().optional(),
+      observacoes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      const { id, limiteEmprestimo, comissaoPercentual, ...rest } = input;
+      const updateData: any = { ...rest };
+      if (limiteEmprestimo !== undefined) updateData.limiteEmprestimo = limiteEmprestimo.toString();
+      if (comissaoPercentual !== undefined) updateData.comissaoPercentual = comissaoPercentual.toString();
+      await db.update(koletores).set(updateData).where(eq(koletores.id, id));
+      return { success: true };
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      await db.update(koletores).set({ ativo: false }).where(eq(koletores.id, input.id));
+      return { success: true };
+    }),
+
+  performance: protectedProcedure
+    .input(z.object({
+      mes: z.number().optional(),
+      ano: z.number().optional(),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+      const ano = input.ano ?? new Date().getFullYear();
+      const mes = input.mes ?? new Date().getMonth() + 1;
+      const inicioMes = new Date(ano, mes - 1, 1);
+      const fimMes = new Date(ano, mes, 0, 23, 59, 59);
+
+      const todosKoletores = await db.select().from(koletores).where(eq(koletores.ativo, true));
+
+      const resultado = await Promise.all(todosKoletores.map(async (k) => {
+        const contratosKoletor = await db.select({ qtd: sql<number>`COUNT(*)`, total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
+          .from(contratos)
+          .where(and(
+            eq(contratos.koletorId, k.id),
+            gte(contratos.createdAt, inicioMes),
+            lte(contratos.createdAt, fimMes)
+          ));
+
+        const recebidoKoletor = await db.select({ total: sql<string>`COALESCE(SUM(valor_pago), 0)` })
+          .from(parcelas)
+          .where(and(
+            eq(parcelas.koletorId, k.id),
+            eq(parcelas.status, 'paga'),
+            gte(parcelas.dataPagamento, inicioMes),
+            lte(parcelas.dataPagamento, fimMes)
+          ));
+
+        const inadimplentesKoletor = await db.select({ qtd: sql<number>`COUNT(*)`, total: sql<string>`COALESCE(SUM(valor_original), 0)` })
+          .from(parcelas)
+          .where(and(
+            eq(parcelas.koletorId, k.id),
+            eq(parcelas.status, 'atrasada')
+          ));
+
+        const totalEmprestado = parseFloat(contratosKoletor[0]?.total ?? '0');
+        const totalRecebido = parseFloat(recebidoKoletor[0]?.total ?? '0');
+        const totalInadimplente = parseFloat(inadimplentesKoletor[0]?.total ?? '0');
+        const comissao = totalRecebido * (parseFloat(k.comissaoPercentual ?? '0') / 100);
+
+        return {
+          koletor: k,
+          qtdContratos: contratosKoletor[0]?.qtd ?? 0,
+          totalEmprestado,
+          totalRecebido,
+          totalInadimplente,
+          qtdInadimplentes: inadimplentesKoletor[0]?.qtd ?? 0,
+          comissao,
+          taxaInadimplencia: totalEmprestado > 0 ? (totalInadimplente / totalEmprestado) * 100 : 0,
+        };
+      }));
+
+      return resultado;
+    }),
+});
+
+// ─── REPARCELAMENTO ───────────────────────────────────────────────────────────
+const reparcelamentoRouter = router({
+  preview: protectedProcedure
+    .input(z.object({
+      contratoId: z.number(),
+      numeroParcelas: z.number().min(1),
+      taxaJuros: z.number().min(0),
+      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      dataInicio: z.string(),
+      incluirMultas: z.boolean().default(true),
+    }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+
+      // Buscar parcelas em aberto do contrato
+      const parcelasAbertas = await db.select().from(parcelas)
+        .where(and(
+          eq(parcelas.contratoId, input.contratoId),
+          inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
+        ));
+
+      const hoje = new Date();
+      let saldoDevedor = 0;
+      for (const p of parcelasAbertas) {
+        const valorBase = parseFloat(p.valorOriginal) - parseFloat(p.valorPago ?? '0');
+        let multa = 0;
+        let juros = 0;
+        if (input.incluirMultas && p.status === 'atrasada') {
+          const vencDate = p.dataVencimento instanceof Date ? p.dataVencimento : new Date(String(p.dataVencimento) + 'T00:00:00');
+          const resultado = calcularJurosMora(valorBase, vencDate, hoje, 0.033, 2);
+          multa = resultado.multa;
+          juros = resultado.juros;
+        }
+        saldoDevedor += valorBase + multa + juros;
+      }
+
+      const valorNovaParcela = calcularParcelaPadrao(saldoDevedor, input.taxaJuros, input.numeroParcelas);
+      const dataInicioDate = new Date(input.dataInicio);
+
+      return {
+        saldoDevedor,
+        valorNovaParcela,
+        totalNovo: valorNovaParcela * input.numeroParcelas,
+        qtdParcelasAbertas: parcelasAbertas.length,
+        parcelas: Array.from({ length: input.numeroParcelas }, (_, i) => {
+          const venc = new Date(dataInicioDate);
+          venc.setMonth(venc.getMonth() + i);
+          return {
+            numero: i + 1,
+            valor: valorNovaParcela,
+            vencimento: venc.toISOString().split('T')[0],
+          };
+        }),
+      };
+    }),
+
+  executar: protectedProcedure
+    .input(z.object({
+      contratoId: z.number(),
+      numeroParcelas: z.number().min(1),
+      taxaJuros: z.number().min(0),
+      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      dataInicio: z.string(),
+      incluirMultas: z.boolean().default(true),
+      observacoes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("DB unavailable");
+
+      // Buscar contrato original
+      const [contratoOriginal] = await db.select().from(contratos).where(eq(contratos.id, input.contratoId));
+      if (!contratoOriginal) throw new Error("Contrato não encontrado");
+
+      // Buscar parcelas em aberto
+      const parcelasAbertas = await db.select().from(parcelas)
+        .where(and(
+          eq(parcelas.contratoId, input.contratoId),
+          inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
+        ));
+
+      const hoje = new Date();
+      let saldoDevedor = 0;
+      for (const p of parcelasAbertas) {
+        const valorBase = parseFloat(p.valorOriginal) - parseFloat(p.valorPago ?? '0');
+        let multa = 0;
+        let juros = 0;
+        if (input.incluirMultas && p.status === 'atrasada') {
+          const vencDate = p.dataVencimento instanceof Date ? p.dataVencimento : new Date(String(p.dataVencimento) + 'T00:00:00');
+          const resultado = calcularJurosMora(valorBase, vencDate, hoje, 0.033, 2);
+          multa = resultado.multa;
+          juros = resultado.juros;
+        }
+        saldoDevedor += valorBase + multa + juros;
+      }
+
+      // Cancelar parcelas abertas do contrato original
+      for (const p of parcelasAbertas) {
+        await db.update(parcelas).set({ status: 'paga', observacoes: 'Reparcelado' }).where(eq(parcelas.id, p.id));
+      }
+
+      // Cancelar contrato original
+      await db.update(contratos).set({ status: 'quitado' }).where(eq(contratos.id, input.contratoId));
+
+      // Criar novo contrato de reparcelamento
+      const valorNovaParcela2 = calcularParcelaPadrao(saldoDevedor, input.taxaJuros, input.numeroParcelas);
+      const dataInicioDate = new Date(input.dataInicio);
+      const dataInicioStr = dataInicioDate.toISOString().split('T')[0];
+
+      const novoContrato = await db.insert(contratos).values({
+        clienteId: contratoOriginal.clienteId,
+        koletorId: contratoOriginal.koletorId ?? undefined,
+        modalidade: 'reparcelamento',
+        status: 'ativo',
+        valorPrincipal: saldoDevedor.toFixed(2),
+        taxaJuros: input.taxaJuros.toFixed(4),
+        tipoTaxa: input.tipoTaxa,
+        numeroParcelas: input.numeroParcelas,
+        valorParcela: valorNovaParcela2.toFixed(2),
+        multaAtraso: contratoOriginal.multaAtraso ?? undefined,
+        jurosMoraDiario: contratoOriginal.jurosMoraDiario ?? undefined,
+        dataInicio: dataInicioDate,
+        dataVencimentoPrimeira: dataInicioDate,
+        contratoOrigemId: input.contratoId,
+        observacoes: input.observacoes || `Reparcelamento do contrato #${input.contratoId}`,
+      });
+
+      const novoContratoId = Number((novoContrato as any).insertId);
+
+      // Criar novas parcelas
+      for (let i = 0; i < input.numeroParcelas; i++) {
+        const venc = new Date(dataInicioDate);
+        venc.setMonth(venc.getMonth() + i);
+        await db.insert(parcelas).values({
+          contratoId: novoContratoId,
+          clienteId: contratoOriginal.clienteId,
+          koletorId: contratoOriginal.koletorId ?? undefined,
+          numeroParcela: i + 1,
+          valorOriginal: valorNovaParcela2.toFixed(2),
+          dataVencimento: venc,
+          status: 'pendente',
+        });
+      }
+
+      return { success: true, novoContratoId };
+    }),
+});
+
 // ─── APP ROUTER ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -784,6 +1063,8 @@ export const appRouter = router({
   whatsapp: whatsappRouter,
   relatorios: relatoriosRouter,
   configuracoes: configuracoesRouter,
+  koletores: koletoresRouter,
+  reparcelamento: reparcelamentoRouter,
 });
 
 export type AppRouter = typeof appRouter;

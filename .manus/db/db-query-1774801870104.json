@@ -1,0 +1,9 @@
+{
+  "query": "\nALTER TABLE `templates_whatsapp` MODIFY COLUMN `tipo` varchar(50) NOT NULL;\nUPDATE `templates_whatsapp` SET `tipo` = 'cobranca_geral' WHERE `tipo` = 'cobranca';\nUPDATE `templates_whatsapp` SET `tipo` = 'lembrete_vencimento' WHERE `tipo` = 'lembrete';\nUPDATE `templates_whatsapp` SET `tipo` = 'confirmacao_pagamento' WHERE `tipo` = 'confirmacao';\nALTER TABLE `templates_whatsapp` MODIFY COLUMN `tipo` enum('cobranca_geral','cobranca_vencida','lembrete_vencimento','confirmacao_pagamento','boas_vindas','pix_transferencia','personalizado') NOT NULL;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute \nALTER TABLE `templates_whatsapp` MODIFY COLUMN `tipo` varchar(50) NOT NULL;\nUPDATE `templates_whatsapp` SET `tipo` = 'cobranca_geral' WHERE `tipo` = 'cobranca';\nUPDATE `templates_whatsapp` SET `tipo` = 'lembrete_vencimento' WHERE `tipo` = 'lembrete';\nUPDATE `templates_whatsapp` SET `tipo` = 'confirmacao_pagamento' WHERE `tipo` = 'confirmacao';\nALTER TABLE `templates_whatsapp` MODIFY COLUMN `tipo` enum('cobranca_geral','cobranca_vencida','lembrete_vencimento','confirmacao_pagamento','boas_vindas','pix_transferencia','personalizado') NOT NULL;\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 460
+}
