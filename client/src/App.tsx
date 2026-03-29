@@ -8,6 +8,7 @@ import DashboardLayout from "./components/DashboardLayout";
 
 // Pages
 import Home from "./pages/Home";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
 import ClienteDetalhe from "./pages/ClienteDetalhe";
@@ -52,6 +53,7 @@ function Router() {
 
       {/* Landing page / Login */}
       <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
 
       {/* Rotas autenticadas com DashboardLayout */}
       <Route path="/dashboard" component={DashboardPage} />

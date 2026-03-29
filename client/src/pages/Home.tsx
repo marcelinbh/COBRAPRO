@@ -2,10 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { Eye, EyeOff, Shield, Zap, TrendingUp, Users, Star, CheckCircle2, ArrowRight, Plus, Minus, Smartphone, FileText, MessageCircle, BarChart3 } from "lucide-react";
+import { Shield, Zap, TrendingUp, Users, Star, CheckCircle2, Plus, Minus, Smartphone, FileText, MessageCircle, BarChart3 } from "lucide-react";
 
 // ── Dados dos planos ────────────────────────────────────────────────────────
 const PLANOS = {
@@ -116,11 +113,6 @@ const FAQ_ITEMS = [
 export default function Home() {
   const { isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
-  const [showLogin, setShowLogin] = useState(false);
-  const [isRegister, setIsRegister] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [planoAtivo, setPlanoAtivo] = useState<PlanoKey>("anual");
   const [faqAberto, setFaqAberto] = useState<number | null>(null);
 
@@ -130,36 +122,7 @@ export default function Home() {
     }
   }, [loading, isAuthenticated, setLocation]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitting(true);
-    try {
-      const endpoint = isRegister ? "/api/auth/register" : "/api/auth/login";
-      const body = isRegister
-        ? { name: form.name, email: form.email, password: form.password }
-        : { email: form.email, password: form.password };
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        credentials: "include",
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error ?? "Erro ao autenticar");
-        return;
-      }
-
-      toast.success(isRegister ? "Conta criada com sucesso!" : "Bem-vindo de volta!");
-      window.location.href = "/dashboard";
-    } catch {
-      toast.error("Erro de conexão. Tente novamente.");
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const goToLogin = () => setLocation("/login");
 
   const plano = PLANOS[planoAtivo];
 
@@ -175,7 +138,7 @@ export default function Home() {
             className="h-12 w-auto object-contain"
           />
           <Button
-            onClick={() => setShowLogin(true)}
+            onClick={goToLogin}
             className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2 rounded-lg text-sm uppercase tracking-wide"
           >
             Acessar Sistema
@@ -228,7 +191,7 @@ export default function Home() {
               🔥 QUERO PARAR DE PERDER DINHEIRO AGORA
             </Button>
             <Button
-              onClick={() => setShowLogin(true)}
+              onClick={goToLogin}
               variant="outline"
               className="border-white/20 bg-white/5 text-white hover:bg-white/10 font-semibold px-8 py-6 rounded-xl w-full sm:w-auto"
             >
@@ -333,10 +296,7 @@ export default function Home() {
               <strong className="text-white">Com o CobraPro, o sistema lembra por você — e cobra por você.</strong>
             </p>
             <Button
-              onClick={() => {
-                const el = document.getElementById("precos");
-                el?.scrollIntoView({ behavior: "smooth" });
-              }}
+              onClick={goToLogin}
               className="bg-green-500 hover:bg-green-400 text-black font-black text-base uppercase tracking-wide px-8 py-5 rounded-xl"
             >
               ⚡ QUERO CONTROLAR MINHAS VENDAS
@@ -512,110 +472,7 @@ export default function Home() {
         <span className="text-red-500/60">cobrapro.online</span> — © 2026 CobraPro. Todos os direitos reservados.
       </footer>
 
-      {/* ── MODAL DE LOGIN ─────────────────────────────────────────────────── */}
-      {showLogin && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
-          onClick={(e) => e.target === e.currentTarget && setShowLogin(false)}
-        >
-          <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl relative">
-            <div className="flex items-center justify-center mb-6">
-              <img
-                src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
-                alt="CobraPro"
-                className="h-16 w-auto object-contain"
-              />
-            </div>
-            <h2 className="text-2xl font-black uppercase mb-1">
-              {isRegister ? "Criar Conta" : "Acessar Sistema"}
-            </h2>
-            <p className="text-white/40 text-sm mb-6">
-              {isRegister
-                ? "Crie sua conta para começar a usar o CobraPro"
-                : "Entre com seu email e senha para acessar"}
-            </p>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {isRegister && (
-                <div>
-                  <Label className="text-white/60 text-xs uppercase tracking-wide mb-1 block">Nome</Label>
-                  <Input
-                    type="text"
-                    placeholder="Seu nome completo"
-                    value={form.name}
-                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    required
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-red-500/50"
-                  />
-                </div>
-              )}
-              <div>
-                <Label className="text-white/60 text-xs uppercase tracking-wide mb-1 block">Email</Label>
-                <Input
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  required
-                  className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-red-500/50"
-                />
-              </div>
-              <div>
-                <Label className="text-white/60 text-xs uppercase tracking-wide mb-1 block">Senha</Label>
-                <div className="relative">
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    placeholder={isRegister ? "Mínimo 6 caracteres" : "Sua senha"}
-                    value={form.password}
-                    onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                    required
-                    className="bg-white/5 border-white/10 text-white placeholder:text-white/20 focus:border-red-500/50 pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-black uppercase tracking-wide py-5 rounded-xl text-base mt-2"
-              >
-                {submitting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Aguarde...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2 justify-center">
-                    {isRegister ? "Criar Conta" : "Entrar no Sistema"}
-                    <ArrowRight className="w-4 h-4" />
-                  </span>
-                )}
-              </Button>
-            </form>
-            <div className="mt-4 text-center">
-              <button
-                onClick={() => setIsRegister((v) => !v)}
-                className="text-white/30 hover:text-white/60 text-sm transition-colors"
-              >
-                {isRegister
-                  ? "Já tem conta? Fazer login"
-                  : "Não tem conta? Criar agora"}
-              </button>
-            </div>
-            <button
-              onClick={() => setShowLogin(false)}
-              className="absolute top-4 right-4 text-white/20 hover:text-white/60 text-xl leading-none"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
