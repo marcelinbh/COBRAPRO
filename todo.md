@@ -118,3 +118,18 @@
 
 ## Fase 14: Correção de Bug Crítico
 - [x] Corrigir skeleton infinito no domínio publicado (usuário não autenticado fica preso no loading)
+
+## Fase 15: Recuperação de Senha + Landing Page
+- [ ] Implementar recuperação de senha (esqueci minha senha) com token temporário
+- [ ] Reconstruir landing page fiel ao design original cobrapro.online (todas as seções do vídeo)
+
+## Fase 16: Correções Críticas + Funcionalidades Cobra Fácil
+- [ ] Corrigir erro removeChild (crash ao navegar entre páginas)
+- [ ] Cadastro de clientes robusto: 3 abas (Dados Pessoais, Endereço, Documentos), avatar, foto, CPF/CNPJ/RG, Instagram, Facebook, Profissão
+- [ ] Score de Clientes (pontuação de pagamento)
+- [ ] Veículos Registrados (financiamento de veículos)
+- [ ] Backup de Dados (exportar dados em CSV/JSON)
+- [ ] Aulas do App (tutoriais/onboarding)
+- [ ] Relatório de Empréstimos (separado do relatório geral)
+- [ ] Suporte destacado no menu lateral (+55 11 96419-2613)
+- [ ] Landing page fiel ao design original cobrapro.online

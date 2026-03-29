@@ -1,7 +1,8 @@
 import bcrypt from "bcryptjs";
-import { eq, sql } from "drizzle-orm";
+import crypto from "crypto";
+import { and, eq, gt, sql } from "drizzle-orm";
 import type { Express, Request, Response } from "express";
-import { users } from "../drizzle/schema";
+import { passwordResets, users } from "../drizzle/schema";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { getDb } from "./db";
@@ -118,6 +119,100 @@ export function registerAuthRoutes(app: Express) {
       success: true,
       user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
     });
+  });
+
+  // ── POST /api/auth/forgot-password ────────────────────────────────────
+  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+    const { email } = req.body as { email?: string };
+    if (!email) {
+      res.status(400).json({ error: "Email é obrigatório" });
+      return;
+    }
+
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Banco de dados indisponível" });
+      return;
+    }
+
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const user = result[0];
+
+    // Sempre retornar sucesso para não revelar se o email existe
+    if (!user) {
+      res.json({ success: true, message: "Se o email existir, você receberá as instruções." });
+      return;
+    }
+
+    // Gerar token seguro
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+
+    // Invalidar tokens anteriores do mesmo usuário
+    await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.userId, user.id));
+
+    // Inserir novo token
+    await db.insert(passwordResets).values({
+      userId: user.id,
+      token,
+      expiresAt,
+    });
+
+    // Montar URL de reset
+    const origin = (req.headers.origin as string) || `https://${req.headers.host}`;
+    const resetUrl = `${origin}/reset-senha?token=${token}`;
+
+    // Retornar o link diretamente (em produção, enviar por email)
+    // Por ora, retornamos o link para o frontend exibir (sem dependência de SMTP)
+    res.json({
+      success: true,
+      message: "Link de recuperação gerado com sucesso.",
+      resetUrl, // Frontend exibe ou copia o link
+    });
+  });
+
+  // ── POST /api/auth/reset-password ────────────────────────────────────
+  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+    const { token, password } = req.body as { token?: string; password?: string };
+    if (!token || !password) {
+      res.status(400).json({ error: "Token e nova senha são obrigatórios" });
+      return;
+    }
+    if (password.length < 6) {
+      res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+      return;
+    }
+
+    const db = await getDb();
+    if (!db) {
+      res.status(500).json({ error: "Banco de dados indisponível" });
+      return;
+    }
+
+    const now = new Date();
+    const resetResult = await db
+      .select()
+      .from(passwordResets)
+      .where(
+        and(
+          eq(passwordResets.token, token),
+          eq(passwordResets.usado, false),
+          gt(passwordResets.expiresAt, now)
+        )
+      )
+      .limit(1);
+
+    const reset = resetResult[0];
+    if (!reset) {
+      res.status(400).json({ error: "Token inválido ou expirado" });
+      return;
+    }
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    await db.update(users).set({ passwordHash }).where(eq(users.id, reset.userId));
+    await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.id, reset.id));
+
+    res.json({ success: true, message: "Senha alterada com sucesso!" });
   });
 
   // ── GET /api/auth/seed-admin ──────────────────────────────────────────────

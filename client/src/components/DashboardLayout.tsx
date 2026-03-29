@@ -82,12 +82,14 @@ export default function DashboardLayout({
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
+  const [, setLocation] = useLocation();
+
   // Redirecionar para a landing page quando não autenticado
   useEffect(() => {
     if (!loading && !user) {
-      window.location.replace("/");
+      setLocation("/");
     }
-  }, [loading, user]);
+  }, [loading, user, setLocation]);
 
   if (loading || !user) {
     return <DashboardLayoutSkeleton />;

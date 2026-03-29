@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `clientes` ADD `rg` varchar(20);\nALTER TABLE `clientes` ADD `cnpj` varchar(20);\nALTER TABLE `clientes` ADD `instagram` varchar(100);\nALTER TABLE `clientes` ADD `facebook` varchar(255);\nALTER TABLE `clientes` ADD `profissao` varchar(100);\nALTER TABLE `clientes` ADD `foto_url` varchar(500);\nALTER TABLE `clientes` ADD `bairro` varchar(100);\nALTER TABLE `clientes` ADD `numero` varchar(20);\nALTER TABLE `clientes` ADD `complemento` varchar(100);\nALTER TABLE `clientes` ADD `data_nascimento` date;\nALTER TABLE `clientes` ADD `sexo` enum('masculino','feminino','outro');\nALTER TABLE `clientes` ADD `estado_civil` enum('solteiro','casado','divorciado','viuvo','outro');\nALTER TABLE `clientes` ADD `nome_mae` varchar(255);\nALTER TABLE `clientes` ADD `nome_pai` varchar(255);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute ALTER TABLE `clientes` ADD `rg` varchar(20);\nALTER TABLE `clientes` ADD `cnpj` varchar(20);\nALTER TABLE `clientes` ADD `instagram` varchar(100);\nALTER TABLE `clientes` ADD `facebook` varchar(255);\nALTER TABLE `clientes` ADD `profissao` varchar(100);\nALTER TABLE `clientes` ADD `foto_url` varchar(500);\nALTER TABLE `clientes` ADD `bairro` varchar(100);\nALTER TABLE `clientes` ADD `numero` varchar(20);\nALTER TABLE `clientes` ADD `complemento` varchar(100);\nALTER TABLE `clientes` ADD `data_nascimento` date;\nALTER TABLE `clientes` ADD `sexo` enum('masculino','feminino','outro');\nALTER TABLE `clientes` ADD `estado_civil` enum('solteiro','casado','divorciado','viuvo','outro');\nALTER TABLE `clientes` ADD `nome_mae` varchar(255);\nALTER TABLE `clientes` ADD `nome_pai` varchar(255);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 2625
+}

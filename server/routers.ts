@@ -208,8 +208,8 @@ const clientesRouter = router({
       const result = await db.insert(clientes).values({
         ...input,
         email: input.email || undefined,
-      });
-      return { id: Number((result as any).insertId) };
+      }).returning({ id: clientes.id });
+      return { id: result[0].id };
     }),
 
   update: protectedProcedure
@@ -381,14 +381,14 @@ const contratosRouter = router({
         valorParcela: valorParcela.toFixed(2),
         multaAtraso: input.multaAtraso.toFixed(4),
         jurosMoraDiario: input.jurosMoraDiario.toFixed(4),
-        dataInicio: new Date(input.dataInicio + 'T00:00:00'),
-        dataVencimentoPrimeira: new Date(input.dataVencimentoPrimeira + 'T00:00:00'),
+        dataInicio: input.dataInicio,
+        dataVencimentoPrimeira: input.dataVencimentoPrimeira,
         diaVencimento: input.diaVencimento,
         descricao: input.descricao,
         observacoes: input.observacoes,
         contaCaixaId: input.contaCaixaId,
-      });
-      const contratoId = Number((result as any).insertId);
+      }).returning({ id: contratos.id });
+      const contratoId = result[0].id;
 
       // Gerar parcelas
       const primeiraData = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
@@ -413,7 +413,7 @@ const contratosRouter = router({
           clienteId: input.clienteId,
           numeroParcela: i + 1,
           valorOriginal: valorParcela.toFixed(2),
-          dataVencimento: dataVenc,
+          dataVencimento: dataVenc.toISOString().split('T')[0],
           status,
           contaCaixaId: input.contaCaixaId,
         });
@@ -752,8 +752,8 @@ const caixaRouter = router({
         tipo: input.tipo,
         banco: input.banco,
         saldoInicial: input.saldoInicial.toFixed(2),
-      });
-      return { id: Number((result as any).insertId) };
+      }).returning({ id: contasCaixa.id });
+      return { id: result[0].id };
     }),
 
   registrarTransacao: protectedProcedure
@@ -953,7 +953,7 @@ const configuracoesRouter = router({
       for (const [chave, valor] of entries) {
         await db.insert(configuracoes)
           .values({ chave, valor: String(valor) })
-          .onDuplicateKeyUpdate({ set: { valor: String(valor) } });
+          .onConflictDoUpdate({ target: configuracoes.chave, set: { valor: String(valor) } });
       }
       return { success: true };
     }),
@@ -1010,8 +1010,8 @@ const koletoresRouter = router({
         limiteEmprestimo: input.limiteEmprestimo.toString(),
         comissaoPercentual: input.comissaoPercentual.toString(),
         observacoes: input.observacoes || null,
-      });
-      return { id: Number((result as any).insertId), success: true };
+      }).returning({ id: koletores.id });
+      return { id: result[0].id, success: true };
     }),
 
   update: protectedProcedure
@@ -1137,7 +1137,7 @@ const reparcelamentoRouter = router({
         let multa = 0;
         let juros = 0;
         if (input.incluirMultas && p.status === 'atrasada') {
-          const vencDate = p.dataVencimento instanceof Date ? p.dataVencimento : new Date(String(p.dataVencimento) + 'T00:00:00');
+          const vencDate = new Date(String(p.dataVencimento) + 'T00:00:00');
           const resultado = calcularJurosMora(valorBase, vencDate, hoje, 0.033, 2);
           multa = resultado.multa;
           juros = resultado.juros;
@@ -1197,7 +1197,7 @@ const reparcelamentoRouter = router({
         let multa = 0;
         let juros = 0;
         if (input.incluirMultas && p.status === 'atrasada') {
-          const vencDate = p.dataVencimento instanceof Date ? p.dataVencimento : new Date(String(p.dataVencimento) + 'T00:00:00');
+          const vencDate = new Date(String(p.dataVencimento) + 'T00:00:00');
           const resultado = calcularJurosMora(valorBase, vencDate, hoje, 0.033, 2);
           multa = resultado.multa;
           juros = resultado.juros;
@@ -1230,13 +1230,12 @@ const reparcelamentoRouter = router({
         valorParcela: valorNovaParcela2.toFixed(2),
         multaAtraso: contratoOriginal.multaAtraso ?? undefined,
         jurosMoraDiario: contratoOriginal.jurosMoraDiario ?? undefined,
-        dataInicio: dataInicioDate,
-        dataVencimentoPrimeira: dataInicioDate,
+        dataInicio: dataInicioDate.toISOString().split('T')[0],
+        dataVencimentoPrimeira: dataInicioDate.toISOString().split('T')[0],
         contratoOrigemId: input.contratoId,
         observacoes: input.observacoes || `Reparcelamento do contrato #${input.contratoId}`,
-      });
-
-      const novoContratoId = Number((novoContrato as any).insertId);
+      }).returning({ id: contratos.id });
+      const novoContratoId = novoContrato[0].id;;
 
       // Criar novas parcelas
       for (let i = 0; i < input.numeroParcelas; i++) {
@@ -1248,12 +1247,11 @@ const reparcelamentoRouter = router({
           koletorId: contratoOriginal.koletorId ?? undefined,
           numeroParcela: i + 1,
           valorOriginal: valorNovaParcela2.toFixed(2),
-          dataVencimento: venc,
+          dataVencimento: venc.toISOString().split('T')[0],
           status: 'pendente',
         });
       }
-
-      return { success: true, novoContratoId };
+      return { success: true, novoContratoId };;
     }),
 });
 
@@ -1299,14 +1297,14 @@ const contasPagarRouter = router({
         descricao: input.descricao,
         categoria: input.categoria,
         valor: String(input.valor),
-        dataVencimento: new Date(input.dataVencimento + 'T00:00:00'),
+        dataVencimento: input.dataVencimento,
         recorrente: input.recorrente ?? false,
         periodicidade: input.periodicidade ?? 'unica',
         observacoes: input.observacoes,
         contaCaixaId: input.contaCaixaId,
         status: 'pendente',
-      });
-      return { success: true, id: result[0].insertId };
+      }).returning({ id: contasPagar.id });
+      return { success: true, id: result[0].id };
     }),
 
   pagar: protectedProcedure
@@ -1403,8 +1401,8 @@ const vendasRouter = router({
         descricao: input.descricao,
         preco: input.preco.toFixed(2),
         estoque: input.estoque,
-      });
-      return { success: true, id: result[0].insertId };
+      }).returning({ id: produtos.id });
+      return { success: true, id: result[0].id };
     }),
 
   atualizarEstoque: protectedProcedure
@@ -1523,7 +1521,7 @@ const chequesRouter = router({
         emitente: input.emitente,
         cpfCnpjEmitente: input.cpfCnpjEmitente,
         valorNominal: input.valorNominal.toFixed(2),
-        dataVencimento: dataVenc,
+        dataVencimento: dataVenc.toISOString().split('T')[0],
         taxaDesconto: input.taxaDesconto.toFixed(4),
         tipoTaxa: input.tipoTaxa,
         valorDesconto: valorDesconto.toFixed(2),
@@ -1531,7 +1529,7 @@ const chequesRouter = router({
         contaCaixaId: input.contaCaixaId,
         observacoes: input.observacoes,
         status: 'aguardando',
-      });
+      }).returning({ id: cheques.id });
       // Registrar saída no caixa (valor líquido liberado)
       if (input.contaCaixaId) {
         await db.insert(transacoesCaixa).values({
@@ -1543,7 +1541,7 @@ const chequesRouter = router({
           dataTransacao: new Date(),
         });
       }
-      return { success: true, id: result[0].insertId, valorLiquido, valorDesconto };
+      return { success: true, id: result[0].id, valorLiquido, valorDesconto };
     }),
 
   compensar: protectedProcedure
