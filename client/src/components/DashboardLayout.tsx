@@ -46,7 +46,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Users, label: "Clientes", path: "/clientes" },
   { icon: FileText, label: "Contratos", path: "/contratos" },
   { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
@@ -82,13 +82,14 @@ export default function DashboardLayout({
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  if (loading) {
-    return <DashboardLayoutSkeleton />
-  }
+  // Redirecionar para a landing page quando não autenticado
+  useEffect(() => {
+    if (!loading && !user) {
+      window.location.replace("/");
+    }
+  }, [loading, user]);
 
-  if (!user) {
-    // Redirecionar para a landing page com login próprio
-    window.location.href = "/";
+  if (loading || !user) {
     return <DashboardLayoutSkeleton />;
   }
 

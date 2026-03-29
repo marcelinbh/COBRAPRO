@@ -4,6 +4,7 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import Clientes from "./pages/Clientes";
 import ClienteDetalhe from "./pages/ClienteDetalhe";
@@ -28,8 +29,9 @@ function Router() {
     <Switch>
       {/* Portal do cliente - sem layout de dashboard */}
       <Route path="/portal/:token" component={PortalCliente} />
+      {/* Landing page / Login */}
+      <Route path="/" component={Home} />
       {/* Rotas autenticadas com DashboardLayout */}
-      <Route path="/" component={() => <DashboardLayout><Dashboard /></DashboardLayout>} />
       <Route path="/clientes" component={() => <DashboardLayout><Clientes /></DashboardLayout>} />
       <Route path="/clientes/:id" component={() => <DashboardLayout><ClienteDetalhe /></DashboardLayout>} />
       <Route path="/contratos" component={() => <DashboardLayout><Contratos /></DashboardLayout>} />

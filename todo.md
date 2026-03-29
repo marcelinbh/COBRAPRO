@@ -115,3 +115,6 @@
 - [x] Importação CSV de Clientes (já estava implementada)
 - [x] Auditoria completa do código (bugs, UX, consistência, segurança)
 - [x] Corrigir todos os problemas encontrados na auditoria
+
+## Fase 14: Correção de Bug Crítico
+- [x] Corrigir skeleton infinito no domínio publicado (usuário não autenticado fica preso no loading)
