@@ -21,6 +21,7 @@ import Reparcelamento from "./pages/Reparcelamento";
 import Simulador from "./pages/Simulador";
 import ContasPagar from "./pages/ContasPagar";
 import Vendas from "./pages/Vendas";
+import Cheques from "./pages/Cheques";
 
 function Router() {
   return (
@@ -44,6 +45,8 @@ function Router() {
       <Route path="/simulador" component={() => <DashboardLayout><Simulador /></DashboardLayout>} />
       <Route path="/contas-pagar" component={() => <DashboardLayout><ContasPagar /></DashboardLayout>} />
       <Route path="/vendas" component={() => <DashboardLayout><Vendas /></DashboardLayout>} />
+      <Route path="/cheques" component={() => <DashboardLayout><Cheques /></DashboardLayout>} />
+      <Route path="/dashboard" component={() => <DashboardLayout><Dashboard /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

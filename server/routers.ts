@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
-  koletores, configuracoes, contasPagar, produtos
+  koletores, configuracoes, contasPagar, produtos, cheques
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -1429,6 +1429,228 @@ const vendasRouter = router({
     }),
 });
 
+// ─── DESCONTO DE CHEQUES ──────────────────────────────────────────────────────────
+const chequesRouter = router({
+  listar: protectedProcedure
+    .input(z.object({
+      status: z.enum(['aguardando', 'compensado', 'devolvido', 'cancelado', 'todos']).optional(),
+      clienteId: z.number().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.select({
+        id: cheques.id,
+        clienteId: cheques.clienteId,
+        clienteNome: clientes.nome,
+        numeroCheque: cheques.numeroCheque,
+        banco: cheques.banco,
+        emitente: cheques.emitente,
+        cpfCnpjEmitente: cheques.cpfCnpjEmitente,
+        valorNominal: cheques.valorNominal,
+        dataVencimento: cheques.dataVencimento,
+        taxaDesconto: cheques.taxaDesconto,
+        tipoTaxa: cheques.tipoTaxa,
+        valorDesconto: cheques.valorDesconto,
+        valorLiquido: cheques.valorLiquido,
+        status: cheques.status,
+        contaCaixaId: cheques.contaCaixaId,
+        dataCompensacao: cheques.dataCompensacao,
+        motivoDevolucao: cheques.motivoDevolucao,
+        observacoes: cheques.observacoes,
+        createdAt: cheques.createdAt,
+      })
+        .from(cheques)
+        .leftJoin(clientes, eq(cheques.clienteId, clientes.id))
+        .orderBy(desc(cheques.createdAt));
+      const conditions: any[] = [];
+      if (input?.status && input.status !== 'todos') {
+        conditions.push(eq(cheques.status, input.status as 'aguardando' | 'compensado' | 'devolvido' | 'cancelado'));
+      }
+      if (input?.clienteId) {
+        conditions.push(eq(cheques.clienteId, input.clienteId));
+      }
+      if (conditions.length > 0) {
+        return rows.filter(r => {
+          if (input?.status && input.status !== 'todos' && r.status !== input.status) return false;
+          if (input?.clienteId && r.clienteId !== input.clienteId) return false;
+          return true;
+        });
+      }
+      return rows;
+    }),
+
+  criar: protectedProcedure
+    .input(z.object({
+      clienteId: z.number(),
+      numeroCheque: z.string().optional(),
+      banco: z.string().optional(),
+      agencia: z.string().optional(),
+      conta: z.string().optional(),
+      emitente: z.string().min(1),
+      cpfCnpjEmitente: z.string().optional(),
+      valorNominal: z.number().positive(),
+      dataVencimento: z.string(),
+      taxaDesconto: z.number().positive(),
+      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      contaCaixaId: z.number().optional(),
+      observacoes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      const dataVenc = new Date(input.dataVencimento + 'T00:00:00');
+      const hoje = new Date();
+      const diasAteVencimento = Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+      // Calcular desconto baseado na taxa e tipo
+      let taxaDiaria: number;
+      if (input.tipoTaxa === 'diaria') {
+        taxaDiaria = input.taxaDesconto / 100;
+      } else if (input.tipoTaxa === 'mensal') {
+        taxaDiaria = Math.pow(1 + input.taxaDesconto / 100, 1 / 30) - 1;
+      } else { // anual
+        taxaDiaria = Math.pow(1 + input.taxaDesconto / 100, 1 / 365) - 1;
+      }
+      const fatorDesconto = Math.pow(1 + taxaDiaria, diasAteVencimento);
+      const valorLiquido = input.valorNominal / fatorDesconto;
+      const valorDesconto = input.valorNominal - valorLiquido;
+      const result = await db.insert(cheques).values({
+        clienteId: input.clienteId,
+        numeroCheque: input.numeroCheque,
+        banco: input.banco,
+        agencia: input.agencia,
+        conta: input.conta,
+        emitente: input.emitente,
+        cpfCnpjEmitente: input.cpfCnpjEmitente,
+        valorNominal: input.valorNominal.toFixed(2),
+        dataVencimento: dataVenc,
+        taxaDesconto: input.taxaDesconto.toFixed(4),
+        tipoTaxa: input.tipoTaxa,
+        valorDesconto: valorDesconto.toFixed(2),
+        valorLiquido: valorLiquido.toFixed(2),
+        contaCaixaId: input.contaCaixaId,
+        observacoes: input.observacoes,
+        status: 'aguardando',
+      });
+      // Registrar saída no caixa (valor líquido liberado)
+      if (input.contaCaixaId) {
+        await db.insert(transacoesCaixa).values({
+          contaCaixaId: input.contaCaixaId,
+          tipo: 'saida',
+          categoria: 'outros',
+          valor: valorLiquido.toFixed(2),
+          descricao: `Desconto de cheque - ${input.emitente} (vence ${input.dataVencimento})`,
+          dataTransacao: new Date(),
+        });
+      }
+      return { success: true, id: result[0].insertId, valorLiquido, valorDesconto };
+    }),
+
+  compensar: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      contaCaixaId: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      const cheque = await db.select().from(cheques).where(eq(cheques.id, input.id)).limit(1);
+      if (!cheque[0]) throw new Error('Cheque não encontrado');
+      await db.update(cheques).set({
+        status: 'compensado',
+        dataCompensacao: new Date(),
+        contaCaixaId: input.contaCaixaId ?? cheque[0].contaCaixaId,
+      }).where(eq(cheques.id, input.id));
+      // Registrar entrada no caixa (valor nominal recebido)
+      const contaId = input.contaCaixaId ?? cheque[0].contaCaixaId;
+      if (contaId) {
+        await db.insert(transacoesCaixa).values({
+          contaCaixaId: contaId,
+          tipo: 'entrada',
+          categoria: 'outros',
+          valor: cheque[0].valorNominal,
+          descricao: `Cheque compensado - ${cheque[0].emitente}`,
+          dataTransacao: new Date(),
+        });
+      }
+      return { success: true };
+    }),
+
+  devolver: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      motivo: z.string().min(1),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      await db.update(cheques).set({
+        status: 'devolvido',
+        motivoDevolucao: input.motivo,
+      }).where(eq(cheques.id, input.id));
+      return { success: true };
+    }),
+
+  cancelar: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      await db.update(cheques).set({ status: 'cancelado' }).where(eq(cheques.id, input.id));
+      return { success: true };
+    }),
+
+  resumo: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new Error('DB unavailable');
+    const aguardando = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` })
+      .from(cheques).where(eq(cheques.status, 'aguardando'));
+    const compensados = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` })
+      .from(cheques).where(eq(cheques.status, 'compensado'));
+    const devolvidos = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` })
+      .from(cheques).where(eq(cheques.status, 'devolvido'));
+    return {
+      totalAguardando: parseFloat(aguardando[0]?.total ?? '0'),
+      qtdAguardando: aguardando[0]?.qtd ?? 0,
+      totalCompensado: parseFloat(compensados[0]?.total ?? '0'),
+      qtdCompensado: compensados[0]?.qtd ?? 0,
+      totalDevolvido: parseFloat(devolvidos[0]?.total ?? '0'),
+      qtdDevolvido: devolvidos[0]?.qtd ?? 0,
+    };
+  }),
+
+  simular: publicProcedure
+    .input(z.object({
+      valorNominal: z.number().positive(),
+      dataVencimento: z.string(),
+      taxaDesconto: z.number().positive(),
+      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+    }))
+    .query(({ input }) => {
+      const dataVenc = new Date(input.dataVencimento + 'T00:00:00');
+      const hoje = new Date();
+      const diasAteVencimento = Math.ceil((dataVenc.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+      let taxaDiaria: number;
+      if (input.tipoTaxa === 'diaria') {
+        taxaDiaria = input.taxaDesconto / 100;
+      } else if (input.tipoTaxa === 'mensal') {
+        taxaDiaria = Math.pow(1 + input.taxaDesconto / 100, 1 / 30) - 1;
+      } else {
+        taxaDiaria = Math.pow(1 + input.taxaDesconto / 100, 1 / 365) - 1;
+      }
+      const fatorDesconto = Math.pow(1 + taxaDiaria, diasAteVencimento);
+      const valorLiquido = input.valorNominal / fatorDesconto;
+      const valorDesconto = input.valorNominal - valorLiquido;
+      const taxaEfetivaTotal = (valorDesconto / valorLiquido) * 100;
+      return {
+        diasAteVencimento,
+        valorLiquido,
+        valorDesconto,
+        taxaEfetivaTotal,
+      };
+    }),
+});
+
 // ─── APP ROUTER ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -1453,6 +1675,7 @@ export const appRouter = router({
   reparcelamento: reparcelamentoRouter,
   contasPagar: contasPagarRouter,
   vendas: vendasRouter,
+  cheques: chequesRouter,
 });
 
 export type AppRouter = typeof appRouter;

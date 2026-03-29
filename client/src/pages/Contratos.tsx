@@ -10,32 +10,70 @@ import {
 import { Plus, Search, FileText, ChevronRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { formatarMoeda, formatarData, MODALIDADE_LABELS, STATUS_CONTRATO_LABELS } from "../../../shared/finance";
+import { gerarPdfContrato } from "@/lib/gerarPdfContrato";
 
 function BotaoPDF({ contratoId }: { contratoId: number }) {
-  const gerarPDF = trpc.contratos.gerarPDF.useMutation({
-    onSuccess: (data) => {
-      const win = window.open("", "_blank");
-      if (win) {
-        win.document.write(data.html);
-        win.document.close();
-        setTimeout(() => win.print(), 600);
-      } else {
-        toast.error("Permita pop-ups para gerar o PDF.");
-      }
-    },
-    onError: (e) => toast.error("Erro ao gerar PDF: " + e.message),
-  });
+  const [loading, setLoading] = useState(false);
+  const utils = trpc.useUtils();
+
+  async function handleGerarPDF(e: React.MouseEvent) {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      // Buscar dados completos do contrato
+      const contrato = await utils.contratos.byId.fetch({ id: contratoId });
+      if (!contrato) { toast.error("Contrato não encontrado"); return; }
+      // Buscar parcelas do contrato
+      const parcelasData = await utils.parcelas.list.fetch({ contratoId });
+      // Montar objeto para o PDF
+      const c = contrato.contrato;
+      gerarPdfContrato({
+        id: c.id,
+        clienteNome: contrato.clienteNome,
+        clienteCpfCnpj: null,
+        clienteTelefone: null,
+        clienteEndereco: null,
+        modalidade: c.modalidade,
+        valorPrincipal: c.valorPrincipal,
+        taxaJuros: c.taxaJuros,
+        tipoTaxa: c.tipoTaxa,
+        numeroParcelas: c.numeroParcelas,
+        valorParcela: c.valorParcela,
+        totalPagar: parcelasData.reduce((s, p) => s + parseFloat(String(p.valorOriginal)), 0),
+        dataInicio: c.dataInicio,
+        dataVencimentoPrimeira: c.dataVencimentoPrimeira,
+        status: c.status,
+        descricao: c.descricao,
+        observacoes: c.observacoes,
+        multaAtraso: c.multaAtraso,
+        jurosMoraDiario: c.jurosMoraDiario,
+        parcelas: parcelasData.map(p => ({
+          numero: p.numeroParcela,
+          dataVencimento: p.dataVencimento,
+          valorParcela: p.valorOriginal,
+          status: p.status,
+          valorPago: p.valorPago,
+          dataPagamento: p.dataPagamento,
+        })),
+      });
+      toast.success("PDF gerado com sucesso!");
+    } catch (err: any) {
+      toast.error("Erro ao gerar PDF: " + (err?.message ?? "erro desconhecido"));
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <Button
       variant="outline"
       size="sm"
       className="gap-1.5 shrink-0 h-8 px-2.5"
-      onClick={(e) => { e.stopPropagation(); gerarPDF.mutate({ id: contratoId }); }}
-      disabled={gerarPDF.isPending}
-      title="Gerar Contrato em PDF"
+      onClick={handleGerarPDF}
+      disabled={loading}
+      title="Baixar Contrato em PDF"
     >
-      {gerarPDF.isPending
+      {loading
         ? <span className="w-3.5 h-3.5 border-2 border-current/30 border-t-current rounded-full animate-spin" />
         : <Download className="h-3.5 w-3.5" />}
       <span className="hidden sm:inline text-xs">PDF</span>

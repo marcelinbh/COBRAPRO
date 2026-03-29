@@ -121,8 +121,13 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // ── GET /api/auth/seed-admin ──────────────────────────────────────────────
-  // Rota interna para criar o admin inicial (chamada uma única vez)
+  // Rota interna para criar o admin inicial (apenas em desenvolvimento)
   app.post("/api/auth/seed-admin", async (req: Request, res: Response) => {
+    // Desabilitar em produção
+    if (process.env.NODE_ENV === 'production') {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
     const { secret } = req.body as { secret?: string };
     if (secret !== "cobrapro-seed-2026") {
       res.status(403).json({ error: "Forbidden" });

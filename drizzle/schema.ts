@@ -282,3 +282,31 @@ export const produtos = mysqlTable("produtos", {
 
 export type Produto = typeof produtos.$inferSelect;
 export type InsertProduto = typeof produtos.$inferInsert;
+
+// ─── DESCONTO DE CHEQUES ──────────────────────────────────────────────────────
+export const cheques = mysqlTable("cheques", {
+  id: int("id").autoincrement().primaryKey(),
+  clienteId: int("cliente_id").notNull(),
+  numeroCheque: varchar("numero_cheque", { length: 50 }),
+  banco: varchar("banco", { length: 100 }),
+  agencia: varchar("agencia", { length: 20 }),
+  conta: varchar("conta", { length: 30 }),
+  emitente: varchar("emitente", { length: 255 }).notNull(),
+  cpfCnpjEmitente: varchar("cpf_cnpj_emitente", { length: 20 }),
+  valorNominal: decimal("valor_nominal", { precision: 15, scale: 2 }).notNull(),
+  dataVencimento: date("data_vencimento").notNull(),
+  taxaDesconto: decimal("taxa_desconto", { precision: 8, scale: 4 }).notNull(),
+  tipoTaxa: mysqlEnum("tipo_taxa", ["mensal", "diaria", "anual"]).default("mensal").notNull(),
+  valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).notNull(),
+  valorLiquido: decimal("valor_liquido", { precision: 15, scale: 2 }).notNull(),
+  status: mysqlEnum("status", ["aguardando", "compensado", "devolvido", "cancelado"]).default("aguardando").notNull(),
+  contaCaixaId: int("conta_caixa_id"),
+  dataCompensacao: timestamp("data_compensacao"),
+  motivoDevolucao: varchar("motivo_devolucao", { length: 255 }),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Cheque = typeof cheques.$inferSelect;
+export type InsertCheque = typeof cheques.$inferInsert;

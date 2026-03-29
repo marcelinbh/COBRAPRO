@@ -103,8 +103,15 @@
 - [x] Criar contratos e empréstimos reais de teste
 - [x] Simulador de Empréstimos (calculadora interativa)
 - [x] Contas a Pagar (módulo completo)
-- [ ] Desconto de Cheques (módulo completo)
+- [x] Desconto de Cheques (módulo completo)
 - [x] Vendas de Produtos (módulo completo)
 - [x] Empréstimos Diários (modalidade - já existia)
 - [x] Tabela Price (modalidade com cálculo PMT - já existia)
-- [ ] Testar fluxo completo de cobrança via WhatsApp
+- [x] Testar fluxo completo de cobrança via WhatsApp
+
+## Fase 13: Sugestões + Auditoria Completa
+- [x] Desconto de Cheques (módulo completo com schema, router, página)
+- [x] Exportação de Contrato em PDF (jsPDF client-side com download direto)
+- [x] Importação CSV de Clientes (já estava implementada)
+- [x] Auditoria completa do código (bugs, UX, consistência, segurança)
+- [x] Corrigir todos os problemas encontrados na auditoria

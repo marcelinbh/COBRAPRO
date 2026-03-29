@@ -36,6 +36,13 @@
       "when": 1774805796861,
       "tag": "0004_stale_baron_strucker",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1774806897608,
+      "tag": "0005_true_black_panther",
+      "breakpoints": true
     }
   ]
 }

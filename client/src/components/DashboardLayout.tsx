@@ -37,6 +37,7 @@ import {
   Calculator,
   Receipt,
   ShoppingBag,
+  FileCheck,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -53,6 +54,7 @@ const menuItems = [
   { icon: Calculator, label: "Simulador", path: "/simulador" },
   { icon: Receipt, label: "Contas a Pagar", path: "/contas-pagar" },
   { icon: ShoppingBag, label: "Vendas", path: "/vendas" },
+  { icon: FileCheck, label: "Cheques", path: "/cheques" },
   { icon: Wallet, label: "Caixa", path: "/caixa" },
   { icon: CalendarDays, label: "Calendário", path: "/calendario" },
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
