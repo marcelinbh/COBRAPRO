@@ -1,0 +1,25 @@
+name: cobrapro
+region: nyc
+services:
+  - name: cobrapro
+    source_dir: /
+    github:
+      repo: marcelinbh/COBRAPRO
+      branch: main
+      deploy_on_push: true
+    build_command: npm install -g pnpm && pnpm install && pnpm build
+    run_command: pnpm start
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "8080"
+      - key: VITE_OAUTH_PORTAL_URL
+        value: "https://manus.im"
+        scope: BUILD_TIME
+      - key: VITE_APP_ID
+        value: "BkqW4WQ4ndZHJQHLtTMfxv"
+        scope: BUILD_TIME
