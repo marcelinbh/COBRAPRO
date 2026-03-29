@@ -16,18 +16,21 @@ export default function NovoContrato() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
+  // Ler parâmetros da URL (vindos do Simulador ou Vendas)
+  const urlParams = new URLSearchParams(window.location.search);
+
   const [form, setForm] = useState({
     clienteId: "",
-    modalidade: "emprestimo_padrao",
-    valorPrincipal: "",
-    taxaJuros: "5",
-    tipoTaxa: "mensal",
-    numeroParcelas: "12",
-    dataInicio: new Date().toISOString().split('T')[0],
+    modalidade: urlParams.get('modalidade') || "emprestimo_padrao",
+    valorPrincipal: urlParams.get('valorPrincipal') || "",
+    taxaJuros: urlParams.get('taxaJuros') || "5",
+    tipoTaxa: urlParams.get('tipoTaxa') || "mensal",
+    numeroParcelas: urlParams.get('numeroParcelas') || "12",
+    dataInicio: urlParams.get('dataInicio') || new Date().toISOString().split('T')[0],
     dataVencimentoPrimeira: "",
     contaCaixaId: "",
-    descricao: "",
-    observacoes: "",
+    descricao: urlParams.get('descricao') || "",
+    observacoes: urlParams.get('observacoes') || "",
     multaAtraso: "2",
     jurosMoraDiario: "0.033",
   });

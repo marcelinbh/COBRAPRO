@@ -59,10 +59,11 @@ export default function Home() {
       <header className="fixed top-0 left-0 right-0 z-50 bg-[#0A0A0A]/90 backdrop-blur-sm border-b border-white/5">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-xl font-black tracking-tight">COBRAPRO</span>
+            <img
+              src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
+              alt="CobraPro"
+              className="h-12 w-auto object-contain"
+            />
           </div>
           <Button
             onClick={() => setShowLogin(true)}
@@ -284,11 +285,12 @@ export default function Home() {
         >
           <div className="bg-[#111111] border border-white/10 rounded-2xl p-8 w-full max-w-md shadow-2xl">
             {/* Logo */}
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-8 h-8 bg-red-600 rounded-lg flex items-center justify-center">
-                <Zap className="w-4 h-4 text-white" />
-              </div>
-              <span className="text-xl font-black tracking-tight">COBRAPRO</span>
+            <div className="flex items-center justify-center mb-6">
+              <img
+                src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
+                alt="CobraPro"
+                className="h-16 w-auto object-contain"
+              />
             </div>
 
             <h2 className="text-2xl font-black uppercase mb-1">

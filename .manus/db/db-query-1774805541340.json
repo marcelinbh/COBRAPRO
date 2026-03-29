@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, nome FROM clientes ORDER BY id DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT id, nome FROM clientes ORDER BY id DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "5",
+      "nome": "Roberto Carlos Lima"
+    },
+    {
+      "id": "4",
+      "nome": "Ana Paula Ferreira"
+    },
+    {
+      "id": "3",
+      "nome": "João Pedro Oliveira"
+    },
+    {
+      "id": "2",
+      "nome": "Maria Aparecida Silva"
+    },
+    {
+      "id": "1",
+      "nome": "Carlos Eduardo Santos"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnome\n5\tRoberto Carlos Lima\n4\tAna Paula Ferreira\n3\tJoão Pedro Oliveira\n2\tMaria Aparecida Silva\n1\tCarlos Eduardo Santos\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

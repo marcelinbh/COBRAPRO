@@ -1,0 +1,9 @@
+{
+  "query": "\nINSERT INTO produtos (nome, descricao, preco, estoque, ativo) VALUES\n('Smartphone Samsung Galaxy A55', 'Celular 128GB, 8GB RAM, câmera 50MP', 1299.90, 5, true),\n('Notebook Lenovo IdeaPad 3', 'Intel Core i5, 8GB RAM, SSD 256GB, 15.6\"', 2499.00, 3, true),\n('Smart TV LG 43\"', '4K UHD, WebOS, Wi-Fi, Bluetooth', 1899.90, 2, true),\n('Geladeira Brastemp 375L', 'Frost Free, Inox, 2 portas', 2799.00, 1, true),\n('Máquina de Lavar Electrolux 12kg', 'Cesto inox, 12 programas de lavagem', 1599.90, 4, true),\n('Ar Condicionado Split 12000 BTU', 'Inverter, quente/frio, Wi-Fi', 2199.00, 2, true),\n('Sofá 3 lugares', 'Tecido suede, cor cinza, estrutura de madeira', 1299.00, 3, true),\n('Bicicleta Caloi 21 marchas', 'Aro 26, freios a disco, suspensão dianteira', 899.90, 5, true);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute \nINSERT INTO produtos (nome, descricao, preco, estoque, ativo) VALUES\n('Smartphone Samsung Galaxy A55', 'Celular 128GB, 8GB RAM, câmera 50MP', 1299.90, 5, true),\n('Notebook Lenovo IdeaPad 3', 'Intel Core i5, 8GB RAM, SSD 256GB, 15.6\"', 2499.00, 3, true),\n('Smart TV LG 43\"', '4K UHD, WebOS, Wi-Fi, Bluetooth', 1899.90, 2, true),\n('Geladeira Brastemp 375L', 'Frost Free, Inox, 2 portas', 2799.00, 1, true),\n('Máquina de Lavar Electrolux 12kg', 'Cesto inox, 12 programas de lavagem', 1599.90, 4, true),\n('Ar Condicionado Split 12000 BTU', 'Inverter, quente/frio, Wi-Fi', 2199.00, 2, true),\n('Sofá 3 lugares', 'Tecido suede, cor cinza, estrutura de madeira', 1299.00, 3, true),\n('Bicicleta Caloi 21 marchas', 'Aro 26, freios a disco, suspensão dianteira', 899.90, 5, true);\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 98
+}

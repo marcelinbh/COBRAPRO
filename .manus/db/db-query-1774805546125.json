@@ -1,0 +1,30 @@
+{
+  "query": "SELECT id, nome FROM contas_caixa ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT id, nome FROM contas_caixa ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "nome": "Caixa Principal"
+    },
+    {
+      "id": "2",
+      "nome": "Conta Corrente"
+    },
+    {
+      "id": "30001",
+      "nome": "Caixa Principal"
+    },
+    {
+      "id": "30002",
+      "nome": "Banco Itaú"
+    },
+    {
+      "id": "30003",
+      "nome": "Carteira"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tnome\n1\tCaixa Principal\n2\tConta Corrente\n30001\tCaixa Principal\n30002\tBanco Itaú\n30003\tCarteira\n",
+  "stderr": "",
+  "execution_time_ms": 56
+}

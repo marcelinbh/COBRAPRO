@@ -92,3 +92,19 @@
 - [ ] Templates dinâmicos de cobrança com variáveis (nome, valor, data, PIX)
 - [ ] Envio de cobrança via WhatsApp direto das Parcelas
 - [ ] Preview do template antes de enviar
+
+## Fase 12: Logo + Dados Reais + Funcionalidades Cobra Fácil Completas
+- [x] Upload logo CobraPro em alta definição para CDN
+- [x] Logo no sidebar/DashboardLayout
+- [x] Logo na landing page (Home.tsx)
+- [x] Logo na tela de login
+- [x] Configurar dados da empresa (koletor3)
+- [x] Criar 5 clientes reais de teste
+- [x] Criar contratos e empréstimos reais de teste
+- [x] Simulador de Empréstimos (calculadora interativa)
+- [x] Contas a Pagar (módulo completo)
+- [ ] Desconto de Cheques (módulo completo)
+- [x] Vendas de Produtos (módulo completo)
+- [x] Empréstimos Diários (modalidade - já existia)
+- [x] Tabela Price (modalidade com cálculo PMT - já existia)
+- [ ] Testar fluxo completo de cobrança via WhatsApp

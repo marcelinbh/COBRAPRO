@@ -18,6 +18,9 @@ import PortalCliente from "./pages/PortalCliente";
 import DashboardLayout from "./components/DashboardLayout";
 import Usuarios from "./pages/Usuarios";
 import Reparcelamento from "./pages/Reparcelamento";
+import Simulador from "./pages/Simulador";
+import ContasPagar from "./pages/ContasPagar";
+import Vendas from "./pages/Vendas";
 
 function Router() {
   return (
@@ -38,6 +41,9 @@ function Router() {
       <Route path="/usuarios" component={() => <DashboardLayout><Usuarios /></DashboardLayout>} />
       <Route path="/koletores" component={() => <DashboardLayout><Usuarios /></DashboardLayout>} />
       <Route path="/reparcelamento" component={() => <DashboardLayout><Reparcelamento /></DashboardLayout>} />
+      <Route path="/simulador" component={() => <DashboardLayout><Simulador /></DashboardLayout>} />
+      <Route path="/contas-pagar" component={() => <DashboardLayout><ContasPagar /></DashboardLayout>} />
+      <Route path="/vendas" component={() => <DashboardLayout><Vendas /></DashboardLayout>} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

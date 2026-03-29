@@ -1,0 +1,45 @@
+{
+  "query": "SELECT id, cliente_id, modalidade, status, valor_principal FROM contratos ORDER BY id;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT id, cliente_id, modalidade, status, valor_principal FROM contratos ORDER BY id;",
+  "rows": [
+    {
+      "id": "1",
+      "cliente_id": "1",
+      "modalidade": "emprestimo_padrao",
+      "status": "ativo",
+      "valor_principal": "3000.00"
+    },
+    {
+      "id": "2",
+      "cliente_id": "2",
+      "modalidade": "emprestimo_diario",
+      "status": "ativo",
+      "valor_principal": "1500.00"
+    },
+    {
+      "id": "3",
+      "cliente_id": "3",
+      "modalidade": "tabela_price",
+      "status": "ativo",
+      "valor_principal": "2000.00"
+    },
+    {
+      "id": "4",
+      "cliente_id": "4",
+      "modalidade": "emprestimo_padrao",
+      "status": "quitado",
+      "valor_principal": "2000.00"
+    },
+    {
+      "id": "5",
+      "cliente_id": "5",
+      "modalidade": "emprestimo_padrao",
+      "status": "inadimplente",
+      "valor_principal": "1500.00"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tcliente_id\tmodalidade\tstatus\tvalor_principal\n1\t1\temprestimo_padrao\tativo\t3000.00\n2\t2\temprestimo_diario\tativo\t1500.00\n3\t3\ttabela_price\tativo\t2000.00\n4\t4\temprestimo_padrao\tquitado\t2000.00\n5\t5\temprestimo_padrao\tinadimplente\t1500.00\n",
+  "stderr": "",
+  "execution_time_ms": 54
+}

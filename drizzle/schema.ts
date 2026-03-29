@@ -238,3 +238,47 @@ export const configuracoes = mysqlTable("configuracoes", {
 
 export type Configuracao = typeof configuracoes.$inferSelect;
 export type InsertConfiguracao = typeof configuracoes.$inferInsert;
+
+// ─── CONTAS A PAGAR ───────────────────────────────────────────────────────────
+export const contasPagar = mysqlTable("contas_pagar", {
+  id: int("id").autoincrement().primaryKey(),
+  descricao: varchar("descricao", { length: 255 }).notNull(),
+  categoria: mysqlEnum("categoria", [
+    "aluguel",
+    "salario",
+    "servicos",
+    "impostos",
+    "fornecedores",
+    "marketing",
+    "tecnologia",
+    "outros",
+  ]).default("outros").notNull(),
+  valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
+  dataVencimento: date("data_vencimento").notNull(),
+  dataPagamento: timestamp("data_pagamento"),
+  status: mysqlEnum("status", ["pendente", "paga", "atrasada", "cancelada"]).default("pendente").notNull(),
+  contaCaixaId: int("conta_caixa_id"),
+  recorrente: boolean("recorrente").default(false).notNull(),
+  periodicidade: mysqlEnum("periodicidade", ["mensal", "semanal", "anual", "unica"]).default("unica"),
+  observacoes: text("observacoes"),
+  comprovante: varchar("comprovante", { length: 500 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ContaPagar = typeof contasPagar.$inferSelect;
+export type InsertContaPagar = typeof contasPagar.$inferInsert;
+
+// ─── PRODUTOS / VENDAS ────────────────────────────────────────────────────────
+export const produtos = mysqlTable("produtos", {
+  id: int("id").autoincrement().primaryKey(),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  descricao: text("descricao"),
+  preco: decimal("preco", { precision: 15, scale: 2 }).notNull(),
+  estoque: int("estoque").default(0).notNull(),
+  ativo: boolean("ativo").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Produto = typeof produtos.$inferSelect;
+export type InsertProduto = typeof produtos.$inferInsert;

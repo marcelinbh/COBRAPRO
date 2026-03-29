@@ -34,6 +34,9 @@ import {
   TrendingUp,
   UserCog,
   RefreshCw,
+  Calculator,
+  Receipt,
+  ShoppingBag,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -47,6 +50,9 @@ const menuItems = [
   { icon: FileText, label: "Contratos", path: "/contratos" },
   { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
   { icon: RefreshCw, label: "Reparcelamento", path: "/reparcelamento" },
+  { icon: Calculator, label: "Simulador", path: "/simulador" },
+  { icon: Receipt, label: "Contas a Pagar", path: "/contas-pagar" },
+  { icon: ShoppingBag, label: "Vendas", path: "/vendas" },
   { icon: Wallet, label: "Caixa", path: "/caixa" },
   { icon: CalendarDays, label: "Calendário", path: "/calendario" },
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
@@ -171,14 +177,19 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  <TrendingUp className="h-5 w-5 text-primary shrink-0" />
-                  <span className="font-display text-xl text-foreground tracking-wider truncate">
-                    COBRAPRO
-                  </span>
+                <div className="flex items-center min-w-0">
+                  <img
+                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
+                    alt="CobraPro"
+                    className="h-10 w-auto object-contain"
+                  />
                 </div>
               ) : (
-                <TrendingUp className="h-5 w-5 text-primary" />
+                <img
+                  src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
+                  alt="CobraPro"
+                  className="h-7 w-7 object-contain rounded"
+                />
               )}
             </div>
           </SidebarHeader>
@@ -250,15 +261,14 @@ function DashboardLayoutContent({
       <SidebarInset>
         {isMobile && (
           <div className="flex border-b border-border h-14 items-center justify-between bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-            <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-9 w-9 rounded-lg" />
               <div className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-primary" />
-                <span className="font-display text-lg tracking-wider text-foreground">
-                  COBRAPRO
-                </span>
+                <SidebarTrigger className="h-9 w-9 rounded-lg" />
+                <img
+                  src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
+                  alt="CobraPro"
+                  className="h-8 w-auto object-contain"
+                />
               </div>
-            </div>
             <span className="text-sm text-muted-foreground">{activeMenuItem?.label ?? ""}</span>
           </div>
         )}

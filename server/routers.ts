@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getDb } from "./db";
 import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
-  koletores, configuracoes
+  koletores, configuracoes, contasPagar, produtos
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
@@ -1257,6 +1257,178 @@ const reparcelamentoRouter = router({
     }),
 });
 
+// ─── CONTAS A PAGAR ──────────────────────────────────────────────────────────
+const contasPagarRouter = router({
+  listar: protectedProcedure
+    .input(z.object({
+      status: z.enum(['pendente', 'paga', 'atrasada', 'cancelada', 'todos']).optional(),
+      categoria: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      let query = db.select().from(contasPagar).$dynamic();
+      const conditions = [];
+      if (input?.status && input.status !== 'todos') {
+        conditions.push(eq(contasPagar.status, input.status as 'pendente' | 'paga' | 'atrasada' | 'cancelada'));
+      }
+      if (input?.categoria) {
+        conditions.push(eq(contasPagar.categoria, input.categoria as 'aluguel' | 'salario' | 'servicos' | 'impostos' | 'fornecedores' | 'marketing' | 'tecnologia' | 'outros'));
+      }
+      if (conditions.length > 0) {
+        query = query.where(and(...conditions));
+      }
+      return query.orderBy(desc(contasPagar.dataVencimento));
+    }),
+
+  criar: protectedProcedure
+    .input(z.object({
+      descricao: z.string().min(1),
+      categoria: z.enum(['aluguel', 'salario', 'servicos', 'impostos', 'fornecedores', 'marketing', 'tecnologia', 'outros']),
+      valor: z.number().positive(),
+      dataVencimento: z.string(),
+      recorrente: z.boolean().optional().default(false),
+      periodicidade: z.enum(['mensal', 'semanal', 'anual', 'unica']).optional().default('unica'),
+      observacoes: z.string().optional(),
+      contaCaixaId: z.number().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      const result = await db.insert(contasPagar).values({
+        descricao: input.descricao,
+        categoria: input.categoria,
+        valor: String(input.valor),
+        dataVencimento: new Date(input.dataVencimento + 'T00:00:00'),
+        recorrente: input.recorrente ?? false,
+        periodicidade: input.periodicidade ?? 'unica',
+        observacoes: input.observacoes,
+        contaCaixaId: input.contaCaixaId,
+        status: 'pendente',
+      });
+      return { success: true, id: result[0].insertId };
+    }),
+
+  pagar: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      contaCaixaId: z.number().optional(),
+      dataPagamento: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      const conta = await db.select().from(contasPagar).where(eq(contasPagar.id, input.id)).limit(1);
+      if (!conta[0]) throw new Error('Conta não encontrada');
+      const dataPag = input.dataPagamento ? new Date(input.dataPagamento) : new Date();
+      await db.update(contasPagar).set({
+        status: 'paga',
+        dataPagamento: dataPag,
+        contaCaixaId: input.contaCaixaId,
+      }).where(eq(contasPagar.id, input.id));
+      // Registrar saída no caixa
+      if (input.contaCaixaId) {
+        await db.insert(transacoesCaixa).values({
+          contaCaixaId: input.contaCaixaId,
+          tipo: 'saida',
+          categoria: 'despesa_operacional',
+          valor: conta[0].valor,
+          descricao: `Pagamento: ${conta[0].descricao}`,
+          dataTransacao: dataPag,
+        });
+      }
+      return { success: true };
+    }),
+
+  cancelar: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      await db.update(contasPagar).set({ status: 'cancelada' }).where(eq(contasPagar.id, input.id));
+      return { success: true };
+    }),
+
+  excluir: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      await db.delete(contasPagar).where(eq(contasPagar.id, input.id));
+      return { success: true };
+    }),
+
+  resumo: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) throw new Error('DB unavailable');
+    const hoje = new Date();
+    const hojeStr = hoje.toISOString().split('T')[0];
+    const pendentes = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)`, qtd: sql<number>`COUNT(*)` })
+      .from(contasPagar).where(eq(contasPagar.status, 'pendente'));
+    const atrasadas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)`, qtd: sql<number>`COUNT(*)` })
+      .from(contasPagar).where(eq(contasPagar.status, 'atrasada'));
+    const pagas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)`, qtd: sql<number>`COUNT(*)` })
+      .from(contasPagar).where(eq(contasPagar.status, 'paga'));
+    return {
+      totalPendente: parseFloat(pendentes[0]?.total ?? '0'),
+      qtdPendente: pendentes[0]?.qtd ?? 0,
+      totalAtrasado: parseFloat(atrasadas[0]?.total ?? '0'),
+      qtdAtrasado: atrasadas[0]?.qtd ?? 0,
+      totalPago: parseFloat(pagas[0]?.total ?? '0'),
+      qtdPago: pagas[0]?.qtd ?? 0,
+    };
+  }),
+});
+
+// ─── VENDAS DE PRODUTOS ──────────────────────────────────────────────────────────
+const vendasRouter = router({
+  listarProdutos: protectedProcedure.query(async () => {
+    const db = await getDb();
+    if (!db) return [];
+    return db.select().from(produtos).where(eq(produtos.ativo, true)).orderBy(desc(produtos.createdAt));
+  }),
+
+  criarProduto: protectedProcedure
+    .input(z.object({
+      nome: z.string().min(1),
+      descricao: z.string().optional(),
+      preco: z.number().positive(),
+      estoque: z.number().int().min(0).default(0),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      const result = await db.insert(produtos).values({
+        nome: input.nome,
+        descricao: input.descricao,
+        preco: input.preco.toFixed(2),
+        estoque: input.estoque,
+      });
+      return { success: true, id: result[0].insertId };
+    }),
+
+  atualizarEstoque: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      estoque: z.number().int().min(0),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      await db.update(produtos).set({ estoque: input.estoque }).where(eq(produtos.id, input.id));
+      return { success: true };
+    }),
+
+  desativarProduto: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      await db.update(produtos).set({ ativo: false }).where(eq(produtos.id, input.id));
+      return { success: true };
+    }),
+});
+
 // ─── APP ROUTER ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -1279,6 +1451,8 @@ export const appRouter = router({
   configuracoes: configuracoesRouter,
   koletores: koletoresRouter,
   reparcelamento: reparcelamentoRouter,
+  contasPagar: contasPagarRouter,
+  vendas: vendasRouter,
 });
 
 export type AppRouter = typeof appRouter;
