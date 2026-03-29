@@ -21,15 +21,34 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
-import { LayoutDashboard, LogOut, PanelLeft, Users } from "lucide-react";
+import {
+  LayoutDashboard,
+  LogOut,
+  PanelLeft,
+  Users,
+  FileText,
+  CreditCard,
+  Wallet,
+  CalendarDays,
+  BarChart3,
+  Settings,
+  TrendingUp,
+} from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { Badge } from "./ui/badge";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Page 1", path: "/" },
-  { icon: Users, label: "Page 2", path: "/some-path" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Users, label: "Clientes", path: "/clientes" },
+  { icon: FileText, label: "Contratos", path: "/contratos" },
+  { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
+  { icon: Wallet, label: "Caixa", path: "/caixa" },
+  { icon: CalendarDays, label: "Calendário", path: "/calendario" },
+  { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
+  { icon: Settings, label: "Configurações", path: "/configuracoes" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -159,7 +178,7 @@ function DashboardLayoutContent({
           className="border-r-0"
           disableTransition={isResizing}
         >
-          <SidebarHeader className="h-16 justify-center">
+          <SidebarHeader className="h-16 justify-center border-b border-sidebar-border">
             <div className="flex items-center gap-3 px-2 transition-all w-full">
               <button
                 onClick={toggleSidebar}
@@ -170,11 +189,14 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
+                  <TrendingUp className="h-5 w-5 text-primary shrink-0" />
+                  <span className="font-display text-xl text-foreground tracking-wider truncate">
+                    COBRAPRO
                   </span>
                 </div>
-              ) : null}
+              ) : (
+                <TrendingUp className="h-5 w-5 text-primary" />
+              )}
             </div>
           </SidebarHeader>
 
@@ -244,20 +266,20 @@ function DashboardLayoutContent({
 
       <SidebarInset>
         {isMobile && (
-          <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
+          <div className="flex border-b border-border h-14 items-center justify-between bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">
-              <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
-                  </span>
-                </div>
+              <SidebarTrigger className="h-9 w-9 rounded-lg" />
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                <span className="font-display text-lg tracking-wider text-foreground">
+                  COBRAPRO
+                </span>
               </div>
             </div>
+            <span className="text-sm text-muted-foreground">{activeMenuItem?.label ?? ""}</span>
           </div>
         )}
-        <main className="flex-1 p-4">{children}</main>
+        <main className="flex-1 p-4 md:p-6">{children}</main>
       </SidebarInset>
     </>
   );

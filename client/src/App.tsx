@@ -4,34 +4,47 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
+import Clientes from "./pages/Clientes";
+import ClienteDetalhe from "./pages/ClienteDetalhe";
+import Contratos from "./pages/Contratos";
+import NovoContrato from "./pages/NovoContrato";
+import Parcelas from "./pages/Parcelas";
+import Caixa from "./pages/Caixa";
+import Calendario from "./pages/Calendario";
+import Relatorios from "./pages/Relatorios";
+import Configuracoes from "./pages/Configuracoes";
+import PortalCliente from "./pages/PortalCliente";
+import DashboardLayout from "./components/DashboardLayout";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
-      <Route path={"/404"} component={NotFound} />
-      {/* Final fallback route */}
+      {/* Portal do cliente - sem layout de dashboard */}
+      <Route path="/portal/:token" component={PortalCliente} />
+      {/* Rotas autenticadas com DashboardLayout */}
+      <Route path="/" component={() => <DashboardLayout><Dashboard /></DashboardLayout>} />
+      <Route path="/clientes" component={() => <DashboardLayout><Clientes /></DashboardLayout>} />
+      <Route path="/clientes/:id" component={() => <DashboardLayout><ClienteDetalhe /></DashboardLayout>} />
+      <Route path="/contratos" component={() => <DashboardLayout><Contratos /></DashboardLayout>} />
+      <Route path="/contratos/novo" component={() => <DashboardLayout><NovoContrato /></DashboardLayout>} />
+      <Route path="/parcelas" component={() => <DashboardLayout><Parcelas /></DashboardLayout>} />
+      <Route path="/caixa" component={() => <DashboardLayout><Caixa /></DashboardLayout>} />
+      <Route path="/calendario" component={() => <DashboardLayout><Calendario /></DashboardLayout>} />
+      <Route path="/relatorios" component={() => <DashboardLayout><Relatorios /></DashboardLayout>} />
+      <Route path="/configuracoes" component={() => <DashboardLayout><Configuracoes /></DashboardLayout>} />
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );
 }
 
-// NOTE: About Theme
-// - First choose a default theme according to your design style (dark or light bg), than change color palette in index.css
-//   to keep consistent foreground/background color across components
-// - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
-
 function App() {
   return (
     <ErrorBoundary>
-      <ThemeProvider
-        defaultTheme="light"
-        // switchable
-      >
+      <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
-          <Toaster />
+          <Toaster richColors theme="dark" />
           <Router />
         </TooltipProvider>
       </ThemeProvider>
