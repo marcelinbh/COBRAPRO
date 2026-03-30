@@ -1,0 +1,28 @@
+{
+  "query": "SELECT column_name FROM information_schema.columns WHERE table_name = 'clientes' AND column_name IN ('data_nascimento', 'sexo', 'estado_civil', 'nome_mae', 'nome_pai', 'documentos_urls') ORDER BY ordinal_position;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT column_name FROM information_schema.columns WHERE table_name = 'clientes' AND column_name IN ('data_nascimento', 'sexo', 'estado_civil', 'nome_mae', 'nome_pai', 'documentos_urls') ORDER BY ordinal_position;",
+  "rows": [
+    {
+      "column_name": "data_nascimento"
+    },
+    {
+      "column_name": "sexo"
+    },
+    {
+      "column_name": "estado_civil"
+    },
+    {
+      "column_name": "nome_mae"
+    },
+    {
+      "column_name": "nome_pai"
+    },
+    {
+      "column_name": "documentos_urls"
+    }
+  ],
+  "messages": [],
+  "stdout": "column_name\ndata_nascimento\nsexo\nestado_civil\nnome_mae\nnome_pai\ndocumentos_urls\n",
+  "stderr": "",
+  "execution_time_ms": 153
+}

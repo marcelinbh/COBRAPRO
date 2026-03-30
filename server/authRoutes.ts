@@ -7,6 +7,7 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { getDb, getSupabaseClient } from "./db";
 import { sdk } from "./_core/sdk";
+import { storagePut } from "./storage";
 
 // Helper: buscar usuário por email (Drizzle ou Supabase REST)
 async function findUserByEmail(email: string): Promise<typeof users.$inferSelect | null> {
@@ -430,6 +431,27 @@ export function registerAuthRoutes(app: Express) {
     } catch (err) {
       console.error("[Auth] Seed-admin error:", err);
       res.status(500).json({ error: "Erro interno. Tente novamente." });
+    }
+  });
+
+  // ─── UPLOAD DE ARQUIVOS (foto e documentos de clientes) ─────────────────────
+  app.post("/api/upload", async (req: Request, res: Response) => {
+    try {
+      const { base64, contentType, filename, folder } = req.body;
+      if (!base64 || !contentType || !filename) {
+        res.status(400).json({ error: "base64, contentType e filename são obrigatórios" });
+        return;
+      }
+      const buffer = Buffer.from(base64, "base64");
+      const safeFolder = (folder || "clientes").replace(/[^a-zA-Z0-9_-]/g, "");
+      const timestamp = Date.now();
+      const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const key = `${safeFolder}/${timestamp}_${safeName}`;
+      const { url } = await storagePut(key, buffer, contentType);
+      res.json({ url, key });
+    } catch (err) {
+      console.error("[Upload] Error:", err);
+      res.status(500).json({ error: "Erro ao fazer upload do arquivo" });
     }
   });
 }

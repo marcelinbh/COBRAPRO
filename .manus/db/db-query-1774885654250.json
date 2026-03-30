@@ -1,0 +1,90 @@
+{
+  "query": "SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'clientes' AND ordinal_position > 20 ORDER BY ordinal_position;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'clientes' AND ordinal_position > 20 ORDER BY ordinal_position;",
+  "rows": [
+    {
+      "column_name": "limite_disponivel",
+      "data_type": "decimal"
+    },
+    {
+      "column_name": "koletor_id",
+      "data_type": "int"
+    },
+    {
+      "column_name": "banco",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "agencia",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "numero_conta",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "rg",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "cnpj",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "instagram",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "facebook",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "profissao",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "foto_url",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "bairro",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "numero",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "complemento",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "data_nascimento",
+      "data_type": "date"
+    },
+    {
+      "column_name": "sexo",
+      "data_type": "enum"
+    },
+    {
+      "column_name": "estado_civil",
+      "data_type": "enum"
+    },
+    {
+      "column_name": "nome_mae",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "nome_pai",
+      "data_type": "varchar"
+    },
+    {
+      "column_name": "documentos_urls",
+      "data_type": "text"
+    }
+  ],
+  "messages": [],
+  "stdout": "column_name\tdata_type\nlimite_disponivel\tdecimal\nkoletor_id\tint\nbanco\tvarchar\nagencia\tvarchar\nnumero_conta\tvarchar\nrg\tvarchar\ncnpj\tvarchar\ninstagram\tvarchar\nfacebook\tvarchar\nprofissao\tvarchar\nfoto_url\tvarchar\nbairro\tvarchar\nnumero\tvarchar\ncomplemento\tvarchar\ndata_nascimento\tdate\nsexo\tenum\nestado_civil\tenum\nnome_mae\tvarchar\nnome_pai\tvarchar\ndocumentos_urls\ttext\n",
+  "stderr": "",
+  "execution_time_ms": 59
+}

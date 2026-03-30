@@ -158,3 +158,16 @@
 - [x] Testes de conexão Supabase REST API passando (14 testes)
 - [ ] Deploy no Digital Ocean com novas variáveis de ambiente
 - [ ] Verificar que o app está funcionando em produção
+
+## Fase 20: Formulário de Clientes Completo + Upload de Foto/Documentos
+
+- [x] Migrar schema: adicionar colunas rg, cnpj, instagram, facebook, profissao, foto_url, documentos_urls
+- [x] Reescrever modal de cadastro de clientes com 3 abas (Dados Pessoais / Endereço / Documentos)
+- [x] Avatar automático com iniciais coloridas + upload de foto (S3)
+- [x] Campos separados: CPF, CNPJ, RG
+- [x] Campos de redes sociais: Instagram, Facebook
+- [x] Campo de Profissão
+- [x] Aba Documentos: upload de arquivos (S3) com preview
+- [x] Atualizar procedures tRPC (clientes.create, clientes.update) com novos campos
+- [x] Cadastrar 3 clientes simulados: João Carlos Silva, Ana Paula Ferreira, Roberto Oliveira Santos
+- [x] Aplicar migração das colunas faltantes no Supabase PostgreSQL (sexo, estado_civil, nome_mae, nome_pai, data_nascimento, documentos_urls)
