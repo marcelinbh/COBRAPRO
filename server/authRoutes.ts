@@ -5,8 +5,60 @@ import type { Express, Request, Response } from "express";
 import { passwordResets, users } from "../drizzle/schema";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { getDb } from "./db";
+import { getDb, getSupabaseClient } from "./db";
 import { sdk } from "./_core/sdk";
+
+// Helper: buscar usuário por email (Drizzle ou Supabase REST)
+async function findUserByEmail(email: string): Promise<typeof users.$inferSelect | null> {
+  const db = await getDb();
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      return result[0] ?? null;
+    } catch (err) {
+      console.warn("[Auth] Drizzle findUserByEmail failed, trying REST:", (err as Error).message);
+    }
+  }
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("users").select("*").eq("email", email).limit(1).maybeSingle();
+  if (error || !data) return null;
+  return mapSupabaseUser(data);
+}
+
+// Helper: buscar usuário por id (Drizzle ou Supabase REST)
+async function findUserById(id: number): Promise<typeof users.$inferSelect | null> {
+  const db = await getDb();
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      return result[0] ?? null;
+    } catch (err) {
+      console.warn("[Auth] Drizzle findUserById failed, trying REST:", (err as Error).message);
+    }
+  }
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("users").select("*").eq("id", id).limit(1).maybeSingle();
+  if (error || !data) return null;
+  return mapSupabaseUser(data);
+}
+
+// Helper: mapear linha do Supabase para o tipo do Drizzle
+function mapSupabaseUser(data: Record<string, unknown>): typeof users.$inferSelect {
+  return {
+    id: data.id as number,
+    openId: (data.openId ?? "") as string,
+    name: (data.name ?? null) as string | null,
+    email: (data.email ?? null) as string | null,
+    passwordHash: (data.passwordHash ?? null) as string | null,
+    loginMethod: (data.loginMethod ?? null) as string | null,
+    role: (data.role ?? "user") as "admin" | "user",
+    lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn as string) : new Date(),
+    createdAt: data.createdAt ? new Date(data.createdAt as string) : new Date(),
+    updatedAt: data.updatedAt ? new Date(data.updatedAt as string) : new Date(),
+  };
+}
 
 async function createSessionForUser(
   user: typeof users.$inferSelect,
@@ -35,14 +87,7 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      const db = await getDb();
-      if (!db) {
-        res.status(500).json({ error: "Banco de dados indisponível" });
-        return;
-      }
-
-      const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-      const user = result[0];
+      const user = await findUserByEmail(email);
 
       if (!user || !user.passwordHash) {
         res.status(401).json({ error: "Email ou senha incorretos" });
@@ -55,9 +100,20 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
-      await createSessionForUser(user, req, res);
+      // Atualizar lastSignedIn (best-effort)
+      try {
+        const db = await getDb();
+        if (db) {
+          await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
+        } else {
+          const supabase = getSupabaseClient();
+          if (supabase) {
+            await supabase.from("users").update({ lastSignedIn: new Date().toISOString() }).eq("id", user.id);
+          }
+        }
+      } catch (_) { /* non-critical */ }
 
+      await createSessionForUser(user, req, res);
       res.json({
         success: true,
         user: { id: user.id, name: user.name, email: user.email, role: user.role },
@@ -85,14 +141,8 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      const db = await getDb();
-      if (!db) {
-        res.status(500).json({ error: "Banco de dados indisponível" });
-        return;
-      }
-
-      const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
-      if (existing.length > 0) {
+      const existing = await findUserByEmail(email);
+      if (existing) {
         res.status(409).json({ error: "Este email já está cadastrado" });
         return;
       }
@@ -100,21 +150,52 @@ export function registerAuthRoutes(app: Express) {
       const passwordHash = await bcrypt.hash(password, 12);
       const openId = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-      // Primeiro usuário vira admin automaticamente
-      const countResult = await db.select({ count: sql<number>`count(*)` }).from(users);
-      const isFirstUser = (countResult[0]?.count ?? 0) === 0;
+      const db = await getDb();
+      let newUser: typeof users.$inferSelect | null = null;
 
-      await db.insert(users).values({
-        openId,
-        name,
-        email,
-        passwordHash,
-        loginMethod: "email",
-        role: isFirstUser ? "admin" : "user",
-        lastSignedIn: new Date(),
-      });
+      if (db) {
+        // Primeiro usuário vira admin automaticamente
+        const countResult = await db.select({ count: sql<number>`count(*)` }).from(users);
+        const isFirstUser = (countResult[0]?.count ?? 0) === 0;
 
-      const newUser = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0];
+        await db.insert(users).values({
+          openId,
+          name,
+          email,
+          passwordHash,
+          loginMethod: "email",
+          role: isFirstUser ? "admin" : "user",
+          lastSignedIn: new Date(),
+        });
+        newUser = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0] ?? null;
+      } else {
+        // Fallback: Supabase REST
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          res.status(500).json({ error: "Banco de dados indisponível" });
+          return;
+        }
+        // Verificar se é primeiro usuário
+        const { count } = await supabase.from("users").select("*", { count: "exact", head: true });
+        const isFirstUser = (count ?? 0) === 0;
+
+          const { data, error } = await supabase.from("users").insert({
+            openId,
+            name,
+            email,
+            passwordHash,
+            loginMethod: "email",
+            role: isFirstUser ? "admin" : "user",
+            lastSignedIn: new Date().toISOString(),
+          }).select().single();
+
+        if (error || !data) {
+          res.status(500).json({ error: "Erro ao criar usuário" });
+          return;
+        }
+        newUser = mapSupabaseUser(data as Record<string, unknown>);
+      }
+
       if (!newUser) {
         res.status(500).json({ error: "Erro ao criar usuário" });
         return;
@@ -140,14 +221,7 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      const db = await getDb();
-      if (!db) {
-        res.status(500).json({ error: "Banco de dados indisponível" });
-        return;
-      }
-
-      const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-      const user = result[0];
+      const user = await findUserByEmail(email);
 
       // Sempre retornar sucesso para não revelar se o email existe
       if (!user) {
@@ -159,15 +233,25 @@ export function registerAuthRoutes(app: Express) {
       const token = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
-      // Invalidar tokens anteriores do mesmo usuário
-      await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.userId, user.id));
-
-      // Inserir novo token
-      await db.insert(passwordResets).values({
-        userId: user.id,
-        token,
-        expiresAt,
-      });
+      const db = await getDb();
+      if (db) {
+        // Invalidar tokens anteriores do mesmo usuário
+        await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.userId, user.id));
+        // Inserir novo token
+        await db.insert(passwordResets).values({ userId: user.id, token, expiresAt });
+      } else {
+        // Fallback: Supabase REST
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          await supabase.from("password_resets").update({ usado: true }).eq("userId", user.id);
+          await supabase.from("password_resets").insert({
+            userId: user.id,
+            token,
+            expiresAt: expiresAt.toISOString(),
+            usado: false,
+          });
+        }
+      }
 
       // Montar URL de reset
       const origin = (req.headers.origin as string) || `https://cobrapro.online`;
@@ -234,34 +318,55 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      const db = await getDb();
-      if (!db) {
-        res.status(500).json({ error: "Banco de dados indisponível" });
-        return;
-      }
-
-      const now = new Date();
-      const resetResult = await db
-        .select()
-        .from(passwordResets)
-        .where(
-          and(
-            eq(passwordResets.token, token),
-            eq(passwordResets.usado, false),
-            gt(passwordResets.expiresAt, now)
-          )
-        )
-        .limit(1);
-
-      const reset = resetResult[0];
-      if (!reset) {
-        res.status(400).json({ error: "Token inválido ou expirado" });
-        return;
-      }
-
       const passwordHash = await bcrypt.hash(password, 12);
-      await db.update(users).set({ passwordHash }).where(eq(users.id, reset.userId));
-      await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.id, reset.id));
+      const now = new Date();
+
+      const db = await getDb();
+      if (db) {
+        const resetResult = await db
+          .select()
+          .from(passwordResets)
+          .where(
+            and(
+              eq(passwordResets.token, token),
+              eq(passwordResets.usado, false),
+              gt(passwordResets.expiresAt, now)
+            )
+          )
+          .limit(1);
+
+        const reset = resetResult[0];
+        if (!reset) {
+          res.status(400).json({ error: "Token inválido ou expirado" });
+          return;
+        }
+
+        await db.update(users).set({ passwordHash }).where(eq(users.id, reset.userId));
+        await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.id, reset.id));
+      } else {
+        // Fallback: Supabase REST
+        const supabase = getSupabaseClient();
+        if (!supabase) {
+          res.status(500).json({ error: "Banco de dados indisponível" });
+          return;
+        }
+        const { data: resetData, error: resetError } = await supabase
+          .from("password_resets")
+          .select("*")
+          .eq("token", token)
+          .eq("usado", false)
+          .gt("expiresAt", now.toISOString())
+          .limit(1)
+          .maybeSingle();
+
+        if (resetError || !resetData) {
+          res.status(400).json({ error: "Token inválido ou expirado" });
+          return;
+        }
+
+        await supabase.from("users").update({ passwordHash }).eq("id", resetData.userId);
+        await supabase.from("password_resets").update({ usado: true }).eq("id", resetData.id);
+      }
 
       res.json({ success: true, message: "Senha alterada com sucesso!" });
     } catch (err) {
@@ -271,7 +376,6 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // ── POST /api/auth/seed-admin ─────────────────────────────────────────────
-  // Rota protegida por secret para criar o admin inicial
   app.post("/api/auth/seed-admin", async (req: Request, res: Response) => {
     try {
       const { secret } = req.body as { secret?: string };
@@ -280,37 +384,49 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
+      const adminEmail = "koletor3@gmail.com";
+      const passwordHash = await bcrypt.hash("97556511", 12);
+
       const db = await getDb();
-      if (!db) {
+      if (db) {
+        const existing = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
+        if (existing.length > 0) {
+          await db.update(users).set({ passwordHash, role: "admin", loginMethod: "email" }).where(eq(users.email, adminEmail));
+          res.json({ success: true, message: "Admin atualizado com sucesso (Drizzle)" });
+          return;
+        }
+        const openId = `admin_cobrapro_${Date.now()}`;
+        await db.insert(users).values({
+          openId, name: "Administrador", email: adminEmail, passwordHash,
+          loginMethod: "email", role: "admin", lastSignedIn: new Date(),
+        });
+        res.json({ success: true, message: "Admin criado com sucesso (Drizzle)" });
+        return;
+      }
+
+      // Fallback: Supabase REST
+      const supabase = getSupabaseClient();
+      if (!supabase) {
         res.status(500).json({ error: "Banco de dados indisponível" });
         return;
       }
 
-      const adminEmail = "koletor3@gmail.com";
-      const existing = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
-
-      if (existing.length > 0) {
-        // Atualizar senha e garantir role admin
-        const passwordHash = await bcrypt.hash("97556511", 12);
-        await db.update(users).set({ passwordHash, role: "admin", loginMethod: "email" }).where(eq(users.email, adminEmail));
-        res.json({ success: true, message: "Admin atualizado com sucesso" });
+         const { data: existing } = await supabase.from("users").select("id, email").eq("email", adminEmail).limit(1).maybeSingle();
+      if (existing) {
+        await supabase.from("users").update({
+          passwordHash, role: "admin", loginMethod: "email",
+        }).eq("email", adminEmail);
+        res.json({ success: true, message: "Admin atualizado com sucesso (REST)" });
         return;
       }
 
-      const passwordHash = await bcrypt.hash("97556511", 12);
       const openId = `admin_cobrapro_${Date.now()}`;
-
-      await db.insert(users).values({
-        openId,
-        name: "Administrador",
-        email: adminEmail,
-        passwordHash,
-        loginMethod: "email",
-        role: "admin",
-        lastSignedIn: new Date(),
+      await supabase.from("users").insert({
+        openId, name: "Administrador", email: adminEmail,
+        passwordHash, loginMethod: "email", role: "admin",
+        lastSignedIn: new Date().toISOString(),
       });
-
-      res.json({ success: true, message: "Admin criado com sucesso" });
+      res.json({ success: true, message: "Admin criado com sucesso (REST)" });
     } catch (err) {
       console.error("[Auth] Seed-admin error:", err);
       res.status(500).json({ error: "Erro interno. Tente novamente." });
