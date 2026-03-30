@@ -120,16 +120,16 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     return;
   }
   const updateData: Record<string, unknown> = {
-    open_id: user.openId,
-    last_signed_in: (user.lastSignedIn ?? new Date()).toISOString(),
+    openId: user.openId,
+    lastSignedIn: (user.lastSignedIn ?? new Date()).toISOString(),
   };
   if (user.name !== undefined) updateData.name = user.name;
   if (user.email !== undefined) updateData.email = user.email;
-  if (user.loginMethod !== undefined) updateData.login_method = user.loginMethod;
+  if (user.loginMethod !== undefined) updateData.loginMethod = user.loginMethod;
   if (user.role !== undefined) updateData.role = user.role;
   else if (user.openId === ENV.ownerOpenId) updateData.role = 'admin';
 
-  const { error } = await supabase.from('users').upsert(updateData, { onConflict: 'open_id' });
+  const { error } = await supabase.from('users').upsert(updateData, { onConflict: 'openId' });
   if (error) {
     console.error("[Database] Supabase REST upsert failed:", error);
     throw new Error(error.message);
@@ -158,21 +158,21 @@ export async function getUserByOpenId(openId: string) {
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('open_id', openId)
+    .eq('openId', openId)
     .limit(1)
     .maybeSingle();
   if (error || !data) return undefined;
   return {
     id: data.id,
-    openId: data.open_id,
+    openId: data.openId ?? openId,
     name: data.name ?? null,
     email: data.email ?? null,
-    passwordHash: data.password_hash ?? null,
-    loginMethod: data.login_method ?? null,
+    passwordHash: data.passwordHash ?? null,
+    loginMethod: data.loginMethod ?? null,
     role: data.role ?? 'user',
-    lastSignedIn: data.last_signed_in ? new Date(data.last_signed_in) : null,
-    createdAt: data.created_at ? new Date(data.created_at) : new Date(),
-    updatedAt: data.updated_at ? new Date(data.updated_at) : new Date(),
+    lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn) : null,
+    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+    updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
   } as typeof users.$inferSelect;
 }
 
