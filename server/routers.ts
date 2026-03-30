@@ -166,26 +166,58 @@ const clientesRouter = router({
     .input(z.object({ busca: z.string().optional(), ativo: z.boolean().optional() }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
-      const rows = await db.select().from(clientes)
-        .where(input?.ativo !== undefined ? eq(clientes.ativo, input.ativo) : undefined)
-        .orderBy(desc(clientes.createdAt));
+      let rows: any[];
+      if (db) {
+        try {
+          rows = await db.select().from(clientes)
+            .where(input?.ativo !== undefined ? eq(clientes.ativo, input.ativo) : undefined)
+            .orderBy(desc(clientes.createdAt));
+        } catch (err) {
+          console.warn('[clientes.list] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+          rows = [];
+        }
+      } else {
+        rows = [];
+      }
+      // Fallback: Supabase REST se Drizzle falhou
+      if (rows.length === 0) {
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          let query = supabase.from('clientes').select('*').order('createdAt', { ascending: false });
+          if (input?.ativo !== undefined) query = (query as any).eq('ativo', input.ativo);
+          const { data, error } = await query;
+          if (!error && data) rows = data;
+        }
+      }
       if (input?.busca) {
         const b = input.busca.toLowerCase();
-        return rows.filter(c =>
-          c.nome.toLowerCase().includes(b) ||
-          (c.cpfCnpj ?? '').includes(b) ||
+        rows = rows.filter((c: any) =>
+          (c.nome ?? '').toLowerCase().includes(b) ||
+          (c.cpfCnpj ?? c.cpf_cnpj ?? '').includes(b) ||
           (c.telefone ?? '').includes(b)
         );
       }
-      return rows;
+      return { clientes: rows, total: rows.length };
     }),
 
   byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
     const db = await getDb();
-    if (!db) return null;
-    const rows = await db.select().from(clientes).where(eq(clientes.id, input.id)).limit(1);
-    return rows[0] ?? null;
+    if (db) {
+      try {
+        const rows = await db.select().from(clientes).where(eq(clientes.id, input.id)).limit(1);
+        if (rows.length > 0) return rows[0];
+      } catch (err) {
+        console.warn('[clientes.byId] Drizzle failed, trying REST:', (err as Error).message);
+        resetDb();
+      }
+    }
+    // Fallback: Supabase REST
+    const supabase = getSupabaseClient();
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('clientes').select('*').eq('id', input.id).single();
+    if (error) return null;
+    return data;
   }),
 
   create: protectedProcedure
