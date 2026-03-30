@@ -17,13 +17,13 @@ export const perfilEnum = pgEnum("perfil", ["admin", "gerente", "koletor"]);
 export const categoriaClienteEnum = pgEnum("categoria_cliente", ["bronze", "prata", "ouro", "prefeitura", "padrao"]);
 export const qualificacaoEnum = pgEnum("qualificacao", ["bom", "medio", "ruim"]);
 export const tipoChavePixEnum = pgEnum("tipo_chave_pix", ["cpf", "cnpj", "email", "telefone", "aleatoria"]);
-export const tipoCaixaEnum = pgEnum("tipo_caixa", ["caixa_fisico", "banco", "digital"]);
+export const tipoCaixaEnum = pgEnum("tipo_caixa", ["caixa", "banco", "digital"]);
 export const modalidadeEnum = pgEnum("modalidade", [
   "emprestimo_padrao", "emprestimo_diario", "tabela_price",
   "venda_produto", "desconto_cheque", "reparcelamento",
 ]);
 export const statusContratoEnum = pgEnum("status_contrato", ["ativo", "quitado", "inadimplente", "cancelado"]);
-export const tipoTaxaEnum = pgEnum("tipo_taxa", ["mensal", "diaria", "anual"]);
+export const tipoTaxaEnum = pgEnum("tipo_taxa", ["diaria", "semanal", "quinzenal", "mensal", "anual"]);
 export const statusParcelaEnum = pgEnum("status_parcela", ["pendente", "paga", "atrasada", "vencendo_hoje", "parcial"]);
 export const tipoTransacaoEnum = pgEnum("tipo_transacao", ["entrada", "saida", "transferencia"]);
 export const categoriaTransacaoEnum = pgEnum("categoria_transacao", [
@@ -132,7 +132,7 @@ export type InsertCliente = typeof clientes.$inferInsert;
 export const contasCaixa = pgTable("contas_caixa", {
   id: serial("id").primaryKey(),
   nome: varchar("nome", { length: 100 }).notNull(),
-  tipo: tipoCaixaEnum("tipo").default("caixa_fisico").notNull(),
+  tipo: tipoCaixaEnum("tipo").default("caixa").notNull(),
   banco: varchar("banco", { length: 100 }),
   agencia: varchar("agencia", { length: 20 }),
   numeroConta: varchar("numero_conta", { length: 30 }),
@@ -157,6 +157,7 @@ export const contratos = pgTable("contratos", {
   tipoTaxa: tipoTaxaEnum("tipo_taxa").default("mensal").notNull(),
   numeroParcelas: integer("numero_parcelas").notNull(),
   valorParcela: decimal("valor_parcela", { precision: 15, scale: 2 }).notNull(),
+  totalContrato: decimal("total_contrato", { precision: 15, scale: 2 }).notNull(),
   multaAtraso: decimal("multa_atraso", { precision: 8, scale: 4 }).default("2.00"),
   jurosMoraDiario: decimal("juros_mora_diario", { precision: 8, scale: 4 }).default("0.033"),
   dataInicio: date("data_inicio").notNull(),

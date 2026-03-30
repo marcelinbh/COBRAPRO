@@ -79,6 +79,13 @@ async function createSessionForUser(
 }
 
 export function registerAuthRoutes(app: Express) {
+  // ── GET /api/auth/logout ──────────────────────────────────────────────────
+  app.get("/api/auth/logout", (req: Request, res: Response) => {
+    const cookieOptions = getSessionCookieOptions(req);
+    res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+    res.redirect("/login");
+  });
+
   // ── POST /api/auth/login ──────────────────────────────────────────────────
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {

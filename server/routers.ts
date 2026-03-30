@@ -11,7 +11,7 @@ import {
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice } from "../shared/finance";
+import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade } from "../shared/finance";
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 const dashboardRouter = router({
@@ -403,6 +403,135 @@ const clientesRouter = router({
 });
 // ─── CONTRATOS ────────────────────────────────────────────────────────────────
 const contratosRouter = router({
+  // Lista contratos com dados agregados das parcelas para os cards de Empréstimos
+  listComParcelas: protectedProcedure
+    .input(z.object({
+      status: z.string().optional(),
+      modalidade: z.string().optional(),
+      busca: z.string().optional(),
+    }).optional())
+    .query(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return [];
+
+      // Buscar contratos
+      let cQuery = supabase
+        .from('contratos')
+        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
+        .order('createdAt', { ascending: false });
+
+      if (input?.status && input.status !== 'todos') cQuery = cQuery.eq('status', input.status);
+      if (input?.modalidade) cQuery = cQuery.eq('modalidade', input.modalidade);
+
+      const { data: contratosData, error: contratosErr } = await cQuery;
+      if (contratosErr) { console.error('[contratos.listComParcelas] error:', contratosErr.message); return []; }
+
+      const contratosList = contratosData ?? [];
+      if (contratosList.length === 0) return [];
+
+      // Filtrar por busca
+      const filtrados = input?.busca
+        ? contratosList.filter((c: any) => {
+            const nome = (c.clientes as any)?.nome ?? '';
+            return nome.toLowerCase().includes(input.busca!.toLowerCase());
+          })
+        : contratosList;
+
+      // Buscar todas as parcelas dos contratos
+      const contratoIds = filtrados.map((c: any) => c.id);
+      const { data: parcelasData } = await supabase
+        .from('parcelas')
+        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, data_vencimento, data_pagamento, status')
+        .in('contrato_id', contratoIds)
+        .order('data_vencimento');
+
+      const hoje = new Date().toISOString().split('T')[0];
+
+      // Agrupar parcelas por contrato
+      const parcelasPorContrato: Record<number, any[]> = {};
+      for (const p of (parcelasData ?? [])) {
+        if (!parcelasPorContrato[p.contrato_id]) parcelasPorContrato[p.contrato_id] = [];
+        // Atualizar status em memória
+        let statusAtual = p.status;
+        if (statusAtual !== 'paga' && statusAtual !== 'parcial') {
+          if (p.data_vencimento < hoje) statusAtual = 'atrasada';
+          else if (p.data_vencimento === hoje) statusAtual = 'vencendo_hoje';
+        }
+        parcelasPorContrato[p.contrato_id].push({ ...p, status: statusAtual });
+      }
+
+      return filtrados.map((c: any) => {
+        const cliente = c.clientes as any;
+        const parcelasContrato = parcelasPorContrato[c.id] ?? [];
+        const parcelasAbertas = parcelasContrato.filter((p: any) => !['paga'].includes(p.status));
+        const parcelasPagas = parcelasContrato.filter((p: any) => p.status === 'paga');
+        const parcelasAtrasadas = parcelasContrato.filter((p: any) => p.status === 'atrasada');
+
+        // KPIs
+        const valorPrincipal = parseFloat(c.valor_principal ?? '0');
+        const valorParcela = parseFloat(c.valor_parcela ?? '0');
+        const taxaJuros = parseFloat(c.taxa_juros ?? '0');
+        const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+
+        // Total a receber = soma das parcelas abertas
+        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+        // Total pago = soma das parcelas pagas
+        const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
+        // Lucro previsto = juros × número de parcelas abertas
+        const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
+        // Lucro realizado = total pago - capital (amortizações)
+        const lucroRealizado = Math.max(0, totalPago - (parcelasPagas.length > 0 ? 0 : 0));
+
+        // Próxima parcela em aberto
+        const proximaParcela = parcelasAbertas.length > 0 ? parcelasAbertas[0] : null;
+
+        // Calcular juros por atraso para parcelas atrasadas
+        const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
+          const venc = new Date(p.data_vencimento + 'T00:00:00');
+          const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
+          const jurosDiarios = 100; // R$100/dia conforme Cobra Fácil (configurável)
+          const jurosAtraso = diasAtraso * jurosDiarios;
+          return {
+            ...p,
+            diasAtraso,
+            jurosAtraso,
+            totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso,
+          };
+        });
+
+        return {
+          id: c.id,
+          clienteId: cliente?.id ?? c.cliente_id,
+          clienteNome: cliente?.nome ?? '',
+          clienteWhatsapp: cliente?.whatsapp ?? null,
+          clienteChavePix: cliente?.chave_pix ?? null,
+          clienteTelefone: cliente?.telefone ?? null,
+          modalidade: c.modalidade,
+          status: c.status,
+          valorPrincipal: c.valor_principal,
+          valorParcela: c.valor_parcela,
+          numeroParcelas: c.numero_parcelas,
+          taxaJuros: c.taxa_juros,
+          tipoTaxa: c.tipo_taxa,
+          dataInicio: c.data_inicio,
+          createdAt: c.createdAt,
+          // KPIs calculados
+          totalReceber,
+          totalPago,
+          lucroPrevisto,
+          lucroRealizado,
+          valorJurosParcela,
+          // Parcelas
+          parcelasAbertas: parcelasAbertas.length,
+          parcelasAtrasadas: parcelasAtrasadas.length,
+          parcelasPagas: parcelasPagas.length,
+          proximaParcela,
+          parcelasComAtraso,
+          todasParcelas: parcelasContrato,
+        };
+      });
+    }),
+
   list: protectedProcedure
     .input(z.object({
       status: z.string().optional(),
@@ -411,30 +540,62 @@ const contratosRouter = router({
     }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
-      const rows = await db.select({
-        id: contratos.id,
-        clienteId: contratos.clienteId,
-        clienteNome: clientes.nome,
-        modalidade: contratos.modalidade,
-        status: contratos.status,
-        valorPrincipal: contratos.valorPrincipal,
-        valorParcela: contratos.valorParcela,
-        numeroParcelas: contratos.numeroParcelas,
-        taxaJuros: contratos.taxaJuros,
-        tipoTaxa: contratos.tipoTaxa,
-        dataInicio: contratos.dataInicio,
-        createdAt: contratos.createdAt,
-      }).from(contratos)
-        .innerJoin(clientes, eq(contratos.clienteId, clientes.id))
-        .orderBy(desc(contratos.createdAt));
+      if (db) {
+        try {
+          const rows = await db.select({
+            id: contratos.id,
+            clienteId: contratos.clienteId,
+            clienteNome: clientes.nome,
+            modalidade: contratos.modalidade,
+            status: contratos.status,
+            valorPrincipal: contratos.valorPrincipal,
+            valorParcela: contratos.valorParcela,
+            numeroParcelas: contratos.numeroParcelas,
+            taxaJuros: contratos.taxaJuros,
+            tipoTaxa: contratos.tipoTaxa,
+            dataInicio: contratos.dataInicio,
+            createdAt: contratos.createdAt,
+          }).from(contratos)
+            .innerJoin(clientes, eq(contratos.clienteId, clientes.id))
+            .orderBy(desc(contratos.createdAt));
 
-      return rows.filter(r => {
-        if (input?.status && r.status !== input.status) return false;
-        if (input?.modalidade && r.modalidade !== input.modalidade) return false;
-        if (input?.clienteId && r.clienteId !== input.clienteId) return false;
-        return true;
-      });
+          return rows.filter(r => {
+            if (input?.status && r.status !== input.status) return false;
+            if (input?.modalidade && r.modalidade !== input.modalidade) return false;
+            if (input?.clienteId && r.clienteId !== input.clienteId) return false;
+            return true;
+          });
+        } catch (err) {
+          console.warn('[contratos.list] Drizzle failed, trying REST:', (err as Error).message);
+        }
+      }
+
+      // Fallback: Supabase REST
+      const supabase = getSupabaseClient();
+      if (!supabase) return [];
+      let query = supabase
+        .from('contratos')
+        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, "createdAt", clientes!inner(nome)')
+        .order('createdAt', { ascending: false });
+      if (input?.status) query = query.eq('status', input.status);
+      if (input?.modalidade) query = query.eq('modalidade', input.modalidade);
+      if (input?.clienteId) query = query.eq('cliente_id', input.clienteId);
+      const { data, error } = await query;
+      if (error) { console.error('[contratos.list] REST error:', error.message); return []; }
+      return (data ?? []).map((r: any) => ({
+        id: r.id,
+        clienteId: r.cliente_id,
+        clienteNome: r.clientes?.nome ?? '',
+        modalidade: r.modalidade,
+        status: r.status,
+        valorPrincipal: r.valor_principal,
+        valorParcela: r.valor_parcela,
+        numeroParcelas: r.numero_parcelas,
+        taxaJuros: r.taxa_juros,
+        tipoTaxa: r.tipo_taxa,
+        dataInicio: r.data_inicio,
+        createdAt: r.createdAt,
+      }));
     }),
 
   byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ input }) => {
@@ -454,10 +615,10 @@ const contratosRouter = router({
   create: protectedProcedure
     .input(z.object({
       clienteId: z.number(),
-      modalidade: z.enum(['emprestimo_padrao', 'emprestimo_diario', 'tabela_price', 'venda_produto', 'desconto_cheque']),
+      modalidade: z.enum(['mensal', 'diario', 'semanal', 'quinzenal', 'tabela_price', 'reparcelamento', 'venda', 'cheque']),
       valorPrincipal: z.number().positive(),
       taxaJuros: z.number().min(0),
-      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
       numeroParcelas: z.number().int().positive(),
       dataInicio: z.string(),
       dataVencimentoPrimeira: z.string(),
@@ -468,10 +629,7 @@ const contratosRouter = router({
       multaAtraso: z.number().default(2),
       jurosMoraDiario: z.number().default(0.033),
     }))
-    .mutation(async ({ input }) => {
-      const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
-
+    .mutation(async ({ ctx, input }) => {
       // Calcular valor da parcela
       let valorParcela: number;
       if (input.modalidade === 'tabela_price') {
@@ -480,67 +638,153 @@ const contratosRouter = router({
         valorParcela = calcularParcelaPadrao(input.valorPrincipal, input.taxaJuros, input.numeroParcelas);
       }
 
-      // Criar contrato
-      const result = await db.insert(contratos).values({
-        clienteId: input.clienteId,
-        modalidade: input.modalidade,
-        valorPrincipal: input.valorPrincipal.toFixed(2),
-        taxaJuros: input.taxaJuros.toFixed(4),
-        tipoTaxa: input.tipoTaxa,
-        numeroParcelas: input.numeroParcelas,
-        valorParcela: valorParcela.toFixed(2),
-        multaAtraso: input.multaAtraso.toFixed(4),
-        jurosMoraDiario: input.jurosMoraDiario.toFixed(4),
-        dataInicio: input.dataInicio,
-        dataVencimentoPrimeira: input.dataVencimentoPrimeira,
-        diaVencimento: input.diaVencimento,
-        descricao: input.descricao,
-        observacoes: input.observacoes,
-        contaCaixaId: input.contaCaixaId,
-      }).returning({ id: contratos.id });
-      const contratoId = result[0].id;
+      // Buscar koletor_id pelo user_id (pode ser null se não encontrado)
+      let koletorId: number | null = null;
+      try {
+        const supabaseForKoletor = getSupabaseClient();
+        if (supabaseForKoletor) {
+          const { data: koletorData } = await supabaseForKoletor
+            .from('koletores')
+            .select('id')
+            .eq('user_id', ctx.user.id)
+            .single();
+          koletorId = koletorData?.id ?? null;
+        }
+      } catch (_) { /* koletor_id fica null */ }
 
-      // Gerar parcelas
+      const db = await getDb();
+      let contratoId: number;
+
+      if (db) {
+        try {
+          const totalContrato = (valorParcela * input.numeroParcelas).toFixed(2);
+          const result = await db.insert(contratos).values({
+            clienteId: input.clienteId,
+            koletorId: koletorId ?? undefined,
+            modalidade: input.modalidade as any,
+            valorPrincipal: input.valorPrincipal.toFixed(2),
+            taxaJuros: input.taxaJuros.toFixed(4),
+            tipoTaxa: input.tipoTaxa as any,
+            numeroParcelas: input.numeroParcelas,
+            valorParcela: valorParcela.toFixed(2),
+            totalContrato,
+            multaAtraso: input.multaAtraso.toFixed(4),
+            jurosMoraDiario: input.jurosMoraDiario.toFixed(4),
+            dataInicio: input.dataInicio,
+            dataVencimentoPrimeira: input.dataVencimentoPrimeira,
+            diaVencimento: input.diaVencimento,
+            descricao: input.descricao,
+            observacoes: input.observacoes,
+            contaCaixaId: input.contaCaixaId,
+          }).returning({ id: contratos.id });
+          contratoId = result[0].id;
+
+          // Gerar parcelas via Drizzle
+          const primeiraData = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
+          const hoje2 = new Date(); hoje2.setHours(0, 0, 0, 0);
+          for (let i = 0; i < input.numeroParcelas; i++) {
+            const dataVenc = new Date(primeiraData);
+            if (i > 0) {
+              if (input.tipoTaxa === 'diaria') dataVenc.setDate(dataVenc.getDate() + i);
+              else if (input.tipoTaxa === 'semanal') dataVenc.setDate(dataVenc.getDate() + i * 7);
+              else if (input.tipoTaxa === 'quinzenal') dataVenc.setDate(dataVenc.getDate() + i * 15);
+              else dataVenc.setMonth(dataVenc.getMonth() + i);
+            }
+            dataVenc.setHours(0, 0, 0, 0);
+            let status: 'pendente' | 'atrasada' | 'vencendo_hoje' = 'pendente';
+            if (dataVenc.getTime() < hoje2.getTime()) status = 'atrasada';
+            else if (dataVenc.getTime() === hoje2.getTime()) status = 'vencendo_hoje';
+            await db.insert(parcelas).values({
+              contratoId,
+              clienteId: input.clienteId,
+              numeroParcela: i + 1,
+              valorOriginal: valorParcela.toFixed(2),
+              dataVencimento: dataVenc.toISOString().split('T')[0],
+              status,
+              contaCaixaId: input.contaCaixaId,
+            });
+          }
+          if (input.contaCaixaId) {
+            await db.insert(transacoesCaixa).values({
+              contaCaixaId: input.contaCaixaId,
+              tipo: 'saida',
+              categoria: 'emprestimo_liberado',
+              valor: input.valorPrincipal.toFixed(2),
+              descricao: `Empréstimo liberado - Contrato #${contratoId}`,
+              contratoId,
+              clienteId: input.clienteId,
+            });
+          }
+          return { id: contratoId, valorParcela };
+        } catch (err) {
+          console.error('[contratos.create] Drizzle failed, falling back to REST:', (err as Error).message);
+          resetDb();
+        }
+      }
+
+      // ── Fallback: Supabase REST API ──────────────────────────────────────────
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
+
+      const totalContratoRest = parseFloat((valorParcela * input.numeroParcelas).toFixed(2));
+      const { data: contratoData, error: contratoErr } = await supabase
+        .from('contratos')
+        .insert({
+          cliente_id: input.clienteId,
+          koletor_id: koletorId,
+          modalidade: input.modalidade,
+          valor_principal: parseFloat(input.valorPrincipal.toFixed(2)),
+          taxa_juros: parseFloat(input.taxaJuros.toFixed(4)),
+          tipo_taxa: input.tipoTaxa,
+          numero_parcelas: input.numeroParcelas,
+          valor_parcela: parseFloat(valorParcela.toFixed(2)),
+          total_contrato: totalContratoRest,
+          multa_atraso: parseFloat(input.multaAtraso.toFixed(4)),
+          juros_mora_diario: parseFloat(input.jurosMoraDiario.toFixed(4)),
+          data_inicio: input.dataInicio,
+          data_vencimento_primeira: input.dataVencimentoPrimeira,
+          dia_vencimento: input.diaVencimento ?? null,
+          descricao: input.descricao ?? null,
+          observacoes: input.observacoes ?? null,
+          conta_caixa_id: input.contaCaixaId ?? null,
+          status: 'ativo',
+        })
+        .select('id')
+        .single();
+      if (contratoErr || !contratoData) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoErr?.message ?? 'Erro ao criar contrato' });
+      contratoId = contratoData.id;
+
+      // Gerar parcelas via REST
       const primeiraData = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
-      const hoje2 = new Date();
-      hoje2.setHours(0, 0, 0, 0);
+      const hoje2 = new Date(); hoje2.setHours(0, 0, 0, 0);
+      const parcelasPayload = [];
       for (let i = 0; i < input.numeroParcelas; i++) {
         const dataVenc = new Date(primeiraData);
         if (i > 0) {
-          if (input.tipoTaxa === 'diaria') {
-            dataVenc.setDate(dataVenc.getDate() + i);
-          } else {
-            dataVenc.setMonth(dataVenc.getMonth() + i);
-          }
+          if (input.tipoTaxa === 'diaria') dataVenc.setDate(dataVenc.getDate() + i);
+          else if (input.tipoTaxa === 'semanal') dataVenc.setDate(dataVenc.getDate() + i * 7);
+          else if (input.tipoTaxa === 'quinzenal') dataVenc.setDate(dataVenc.getDate() + i * 15);
+          else dataVenc.setMonth(dataVenc.getMonth() + i);
         }
         dataVenc.setHours(0, 0, 0, 0);
-        let status: 'pendente' | 'atrasada' | 'vencendo_hoje' = 'pendente';
+        let status = 'pendente';
         if (dataVenc.getTime() < hoje2.getTime()) status = 'atrasada';
         else if (dataVenc.getTime() === hoje2.getTime()) status = 'vencendo_hoje';
-
-        await db.insert(parcelas).values({
-          contratoId,
-          clienteId: input.clienteId,
-          numeroParcela: i + 1,
-          valorOriginal: valorParcela.toFixed(2),
-          dataVencimento: dataVenc.toISOString().split('T')[0],
+        parcelasPayload.push({
+          contrato_id: contratoId,
+          cliente_id: input.clienteId,
+          koletor_id: koletorId ?? null,
+          numero: i + 1,
+          numero_parcela: i + 1,
+          valor: parseFloat(valorParcela.toFixed(2)),
+          valor_original: parseFloat(valorParcela.toFixed(2)),
+          data_vencimento: dataVenc.toISOString().split('T')[0],
           status,
-          contaCaixaId: input.contaCaixaId,
+          conta_caixa_id: input.contaCaixaId ?? null,
         });
       }
-
-      // Registrar saída de caixa (capital liberado)
-      if (input.contaCaixaId) {
-        await db.insert(transacoesCaixa).values({
-          contaCaixaId: input.contaCaixaId,
-          tipo: 'saida',
-          categoria: 'emprestimo_liberado',
-          valor: input.valorPrincipal.toFixed(2),
-          descricao: `Empréstimo liberado - Contrato #${contratoId}`,
-          contratoId,
-          clienteId: input.clienteId,
-        });
-      }
+      const { error: parcelasErr } = await supabase.from('parcelas').insert(parcelasPayload);
+      if (parcelasErr) console.error('[contratos.create] Erro ao criar parcelas via REST:', parcelasErr.message);
 
       return { id: contratoId, valorParcela };
     }),
@@ -693,51 +937,120 @@ const parcelasRouter = router({
     }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
-
-      // Atualizar status das parcelas atrasadas
       const hoje = new Date().toISOString().split('T')[0];
-      await db.update(parcelas)
-        .set({ status: 'atrasada' })
-        .where(and(
-          lt(sql`DATE(data_vencimento)`, hoje),
-          inArray(parcelas.status, ['pendente', 'vencendo_hoje'])
-        ));
-      await db.update(parcelas)
-        .set({ status: 'vencendo_hoje' })
-        .where(and(
-          eq(sql`DATE(data_vencimento)`, hoje),
-          eq(parcelas.status, 'pendente')
-        ));
 
-      const rows = await db.select({
-        id: parcelas.id,
-        contratoId: parcelas.contratoId,
-        clienteId: parcelas.clienteId,
-        clienteNome: clientes.nome,
-        clienteWhatsapp: clientes.whatsapp,
-        clienteChavePix: clientes.chavePix,
-        numeroParcela: parcelas.numeroParcela,
-        valorOriginal: parcelas.valorOriginal,
-        valorPago: parcelas.valorPago,
-        valorJuros: parcelas.valorJuros,
-        valorMulta: parcelas.valorMulta,
-        dataVencimento: parcelas.dataVencimento,
-        dataPagamento: parcelas.dataPagamento,
-        status: parcelas.status,
-        modalidade: contratos.modalidade,
-        numeroParcelas: contratos.numeroParcelas,
-      }).from(parcelas)
-        .innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
-        .innerJoin(contratos, eq(parcelas.contratoId, contratos.id))
-        .orderBy(parcelas.dataVencimento);
+      if (db) {
+        try {
+          // Atualizar status das parcelas atrasadas
+          await db.update(parcelas)
+            .set({ status: 'atrasada' })
+            .where(and(
+              lt(sql`DATE(data_vencimento)`, hoje),
+              inArray(parcelas.status, ['pendente', 'vencendo_hoje'])
+            ));
+          await db.update(parcelas)
+            .set({ status: 'vencendo_hoje' })
+            .where(and(
+              eq(sql`DATE(data_vencimento)`, hoje),
+              eq(parcelas.status, 'pendente')
+            ));
 
-      return rows.filter(r => {
-        if (input?.status && r.status !== input.status) return false;
-        if (input?.clienteId && r.clienteId !== input.clienteId) return false;
-        if (input?.contratoId && r.contratoId !== input.contratoId) return false;
-        return true;
-      });
+          const rows = await db.select({
+            id: parcelas.id,
+            contratoId: parcelas.contratoId,
+            clienteId: parcelas.clienteId,
+            clienteNome: clientes.nome,
+            clienteWhatsapp: clientes.whatsapp,
+            clienteChavePix: clientes.chavePix,
+            numeroParcela: parcelas.numeroParcela,
+            valorOriginal: parcelas.valorOriginal,
+            valorPago: parcelas.valorPago,
+            valorJuros: parcelas.valorJuros,
+            valorMulta: parcelas.valorMulta,
+            dataVencimento: parcelas.dataVencimento,
+            dataPagamento: parcelas.dataPagamento,
+            status: parcelas.status,
+            modalidade: contratos.modalidade,
+            numeroParcelas: contratos.numeroParcelas,
+            taxaJuros: contratos.taxaJuros,
+            tipoTaxa: contratos.tipoTaxa,
+            valorPrincipal: contratos.valorPrincipal,
+          }).from(parcelas)
+            .innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
+            .innerJoin(contratos, eq(parcelas.contratoId, contratos.id))
+            .orderBy(parcelas.dataVencimento);
+
+          return rows.filter(r => {
+            if (input?.status && r.status !== input.status) return false;
+            if (input?.clienteId && r.clienteId !== input.clienteId) return false;
+            if (input?.contratoId && r.contratoId !== input.contratoId) return false;
+            return true;
+          });
+        } catch (err) {
+          console.warn('[parcelas.list] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
+      }
+
+      // Fallback: Supabase REST
+      const supabase = getSupabaseClient();
+      if (!supabase) return [];
+
+      // Atualizar status via REST
+      await supabase.from('parcelas').update({ status: 'atrasada' })
+        .lt('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']);
+      await supabase.from('parcelas').update({ status: 'vencendo_hoje' })
+        .eq('data_vencimento', hoje).eq('status', 'pendente');
+
+      let pQuery = supabase.from('parcelas')
+        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, data_vencimento, data_pagamento, status')
+        .order('data_vencimento');
+
+      if (input?.status) pQuery = (pQuery as any).eq('status', input.status);
+      if (input?.clienteId) pQuery = (pQuery as any).eq('cliente_id', input.clienteId);
+      if (input?.contratoId) pQuery = (pQuery as any).eq('contrato_id', input.contratoId);
+
+      const { data: pData, error: pError } = await pQuery;
+      if (pError) { console.error('[parcelas.list] REST error:', pError.message); return []; }
+      const parcelasData = pData || [];
+
+      // Buscar clientes e contratos relacionados
+      const clienteIds = Array.from(new Set(parcelasData.map((r: any) => r.cliente_id).filter(Boolean)));
+      const contratoIds = Array.from(new Set(parcelasData.map((r: any) => r.contrato_id).filter(Boolean)));
+
+      const clientesMap: Record<number, any> = {};
+      const contratosMap: Record<number, any> = {};
+
+      if (clienteIds.length > 0) {
+        const { data: cData } = await supabase.from('clientes').select('id, nome, whatsapp, chave_pix').in('id', clienteIds);
+        (cData || []).forEach((c: any) => { clientesMap[c.id] = c; });
+      }
+      if (contratoIds.length > 0) {
+        const { data: ctData } = await supabase.from('contratos').select('id, modalidade, numero_parcelas, taxa_juros, tipo_taxa, valor_principal').in('id', contratoIds);
+        (ctData || []).forEach((c: any) => { contratosMap[c.id] = c; });
+      }
+
+      return parcelasData.map((r: any) => ({
+        id: r.id,
+        contratoId: r.contrato_id,
+        clienteId: r.cliente_id,
+        clienteNome: clientesMap[r.cliente_id]?.nome ?? '',
+        clienteWhatsapp: clientesMap[r.cliente_id]?.whatsapp ?? null,
+        clienteChavePix: clientesMap[r.cliente_id]?.chave_pix ?? null,
+        numeroParcela: r.numero_parcela,
+        valorOriginal: r.valor_original,
+        valorPago: r.valor_pago,
+        valorJuros: r.valor_juros,
+        valorMulta: r.valor_multa,
+        dataVencimento: r.data_vencimento,
+        dataPagamento: r.data_pagamento,
+        status: r.status,
+        modalidade: contratosMap[r.contrato_id]?.modalidade ?? null,
+        numeroParcelas: contratosMap[r.contrato_id]?.numero_parcelas ?? null,
+        taxaJuros: contratosMap[r.contrato_id]?.taxa_juros ?? null,
+        tipoTaxa: contratosMap[r.contrato_id]?.tipo_taxa ?? null,
+        valorPrincipal: contratosMap[r.contrato_id]?.valor_principal ?? null,
+      }));
     }),
 
   registrarPagamento: protectedProcedure
@@ -801,69 +1114,285 @@ const parcelasRouter = router({
 
       return { success: true, status: novoStatus };
     }),
+
+  // Pagar apenas os juros do período e renovar a parcela por mais um período
+  pagarJuros: protectedProcedure
+    .input(z.object({
+      parcelaId: z.number(),
+      valorJurosPago: z.number().positive(),
+      contaCaixaId: z.number(),
+      observacoes: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+
+      // Buscar parcela
+      const fetchParcela = async () => {
+        if (db) {
+          const rows = await db.select().from(parcelas).where(eq(parcelas.id, input.parcelaId)).limit(1);
+          return rows[0] ?? null;
+        }
+        const supabase = getSupabaseClient();
+        if (!supabase) return null;
+        const { data } = await supabase.from('parcelas').select('*').eq('id', input.parcelaId).single();
+        return data ? {
+          id: data.id, contratoId: data.contrato_id, clienteId: data.cliente_id,
+          numeroParcela: data.numero_parcela, valorOriginal: data.valor_original,
+          dataVencimento: data.data_vencimento, status: data.status,
+          contaCaixaId: data.conta_caixa_id, koletorId: data.koletor_id,
+        } : null;
+      };
+
+      const parcela = await fetchParcela();
+      if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+
+      // Buscar contrato para saber a modalidade e o intervalo
+      const fetchContrato = async () => {
+        if (db) {
+          const rows = await db.select().from(contratos).where(eq(contratos.id, parcela.contratoId)).limit(1);
+          return rows[0] ?? null;
+        }
+        const supabase = getSupabaseClient();
+        if (!supabase) return null;
+        const { data } = await supabase.from('contratos').select('*').eq('id', parcela.contratoId).single();
+        return data ? {
+          id: data.id, modalidade: data.modalidade, tipoTaxa: data.tipo_taxa,
+          taxaJuros: data.taxa_juros, valorPrincipal: data.valor_principal,
+          numeroParcelas: data.numero_parcelas, clienteId: data.cliente_id,
+          koletorId: data.koletor_id, contaCaixaId: data.conta_caixa_id,
+          multaAtraso: data.multa_atraso, jurosMoraDiario: data.juros_mora_diario,
+        } : null;
+      };
+
+      const contrato = await fetchContrato();
+      if (!contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
+
+      // Calcular nova data de vencimento (vencimento atual + intervalo da modalidade)
+      const diasIntervalo = getDiasModalidade(contrato.tipoTaxa ?? contrato.modalidade);
+      const dataVencAtual = new Date(String(parcela.dataVencimento) + 'T00:00:00');
+      const novaDataVenc = new Date(dataVencAtual);
+      novaDataVenc.setDate(novaDataVenc.getDate() + diasIntervalo);
+      const novaDataVencStr = novaDataVenc.toISOString().split('T')[0];
+
+      // Marcar parcela atual como "paga" (juros pagos = renovação)
+      const hoje = new Date();
+      if (db) {
+        await db.update(parcelas).set({
+          valorPago: input.valorJurosPago.toFixed(2),
+          dataPagamento: hoje,
+          status: 'paga' as const,
+          observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
+          contaCaixaId: input.contaCaixaId,
+        }).where(eq(parcelas.id, input.parcelaId));
+
+        // Registrar entrada no caixa
+        await db.insert(transacoesCaixa).values({
+          contaCaixaId: input.contaCaixaId,
+          tipo: 'entrada',
+          categoria: 'pagamento_parcela',
+          valor: input.valorJurosPago.toFixed(2),
+          descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
+          parcelaId: input.parcelaId,
+          contratoId: parcela.contratoId as number,
+          clienteId: parcela.clienteId as number,
+        });
+
+        // Criar nova parcela com o mesmo valor original e nova data
+        await db.insert(parcelas).values({
+          contratoId: parcela.contratoId as number,
+          clienteId: parcela.clienteId as number,
+          koletorId: parcela.koletorId ?? undefined,
+          numeroParcela: (parcela.numeroParcela as number) + 1,
+          valorOriginal: String(parcela.valorOriginal),
+          dataVencimento: novaDataVencStr,
+          status: 'pendente' as const,
+          contaCaixaId: input.contaCaixaId,
+        });
+
+        // Atualizar numeroParcelas do contrato
+        await db.update(contratos)
+          .set({ numeroParcelas: sql`numero_parcelas + 1` })
+          .where(eq(contratos.id, parcela.contratoId));
+
+      } else {
+        // Fallback REST
+        const supabase = getSupabaseClient();
+        if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+        await supabase.from('parcelas').update({
+          valor_pago: parseFloat(input.valorJurosPago.toFixed(2)),
+          data_pagamento: hoje.toISOString(),
+          status: 'paga',
+          observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
+          conta_caixa_id: input.contaCaixaId,
+        }).eq('id', input.parcelaId);
+
+        await supabase.from('transacoes_caixa').insert({
+          conta_caixa_id: input.contaCaixaId,
+          tipo: 'entrada',
+          categoria: 'pagamento_parcela',
+          valor: parseFloat(input.valorJurosPago.toFixed(2)),
+          descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
+          parcela_id: input.parcelaId,
+          contrato_id: parcela.contratoId,
+          cliente_id: parcela.clienteId,
+        });
+
+        await supabase.from('parcelas').insert({
+          contrato_id: parcela.contratoId,
+          cliente_id: parcela.clienteId,
+          koletor_id: parcela.koletorId ?? null,
+          numero_parcela: (parcela.numeroParcela as number) + 1,
+          valor_original: parseFloat(String(parcela.valorOriginal)),
+          data_vencimento: novaDataVencStr,
+          status: 'pendente',
+          conta_caixa_id: input.contaCaixaId,
+        });
+
+        await supabase.from('contratos')
+          .update({ numero_parcelas: (contrato.numeroParcelas as number) + 1 })
+          .eq('id', parcela.contratoId);
+      }
+
+      return { success: true, novaDataVencimento: novaDataVencStr };
+    }),
 });
 
 // ─── CAIXA ───────────────────────────────────────────────────────────────────
 const caixaRouter = router({
   contas: protectedProcedure.query(async () => {
     const db = await getDb();
-    if (!db) return [];
-    const contas = await db.select().from(contasCaixa).where(eq(contasCaixa.ativa, true));
-    const result = [];
-    for (const conta of contas) {
-      const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-        .from(transacoesCaixa)
-        .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada')));
-      const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-        .from(transacoesCaixa)
-        .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
-      const saldo = parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
-      result.push({ ...conta, saldoAtual: saldo });
+    if (db) {
+      try {
+        const contas = await db.select().from(contasCaixa).where(eq(contasCaixa.ativa, true));
+        const result = [];
+        for (const conta of contas) {
+          const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
+            .from(transacoesCaixa)
+            .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada')));
+          const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
+            .from(transacoesCaixa)
+            .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
+          const saldo = parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
+          result.push({ ...conta, saldoAtual: saldo });
+        }
+        return result;
+      } catch (err) {
+        console.warn('[caixa.contas] Drizzle failed:', (err as Error).message);
+        resetDb();
+      }
     }
-    return result;
+    // Fallback REST
+    const supabase = getSupabaseClient();
+    if (!supabase) return [];
+    const { data: contasData } = await supabase.from('contas_caixa').select('*').eq('ativo', true);
+    const result2 = [];
+    for (const conta of (contasData || [])) {
+      result2.push({
+        id: conta.id,
+        nome: conta.nome,
+        tipo: conta.tipo,
+        banco: conta.banco ?? null,
+        saldoInicial: conta.saldo ?? 0,
+        saldoAtual: parseFloat(conta.saldo ?? 0),
+        ativa: conta.ativo,
+      });
+    }
+    return result2;
   }),
 
   transacoes: protectedProcedure
     .input(z.object({ contaCaixaId: z.number().optional(), limit: z.number().default(50) }).optional())
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
-      const rows = await db.select({
-        id: transacoesCaixa.id,
-        contaCaixaId: transacoesCaixa.contaCaixaId,
-        contaNome: contasCaixa.nome,
-        tipo: transacoesCaixa.tipo,
-        categoria: transacoesCaixa.categoria,
-        valor: transacoesCaixa.valor,
-        descricao: transacoesCaixa.descricao,
-        clienteNome: clientes.nome,
-        dataTransacao: transacoesCaixa.dataTransacao,
-      }).from(transacoesCaixa)
-        .innerJoin(contasCaixa, eq(transacoesCaixa.contaCaixaId, contasCaixa.id))
-        .leftJoin(clientes, eq(transacoesCaixa.clienteId, clientes.id))
-        .where(input?.contaCaixaId ? eq(transacoesCaixa.contaCaixaId, input.contaCaixaId) : undefined)
-        .orderBy(desc(transacoesCaixa.dataTransacao))
+      if (db) {
+        try {
+          const rows = await db.select({
+            id: transacoesCaixa.id,
+            contaCaixaId: transacoesCaixa.contaCaixaId,
+            contaNome: contasCaixa.nome,
+            tipo: transacoesCaixa.tipo,
+            categoria: transacoesCaixa.categoria,
+            valor: transacoesCaixa.valor,
+            descricao: transacoesCaixa.descricao,
+            clienteNome: clientes.nome,
+            dataTransacao: transacoesCaixa.dataTransacao,
+          }).from(transacoesCaixa)
+            .innerJoin(contasCaixa, eq(transacoesCaixa.contaCaixaId, contasCaixa.id))
+            .leftJoin(clientes, eq(transacoesCaixa.clienteId, clientes.id))
+            .where(input?.contaCaixaId ? eq(transacoesCaixa.contaCaixaId, input.contaCaixaId) : undefined)
+            .orderBy(desc(transacoesCaixa.dataTransacao))
+            .limit(input?.limit ?? 50);
+          return rows;
+        } catch (err) {
+          console.warn('[caixa.transacoes] Drizzle failed:', (err as Error).message);
+          resetDb();
+        }
+      }
+      // Fallback REST
+      const supabase = getSupabaseClient();
+      if (!supabase) return [];
+      let txQuery = supabase
+        .from('transacoes_caixa')
+        .select('id, conta_caixa_id, tipo, categoria, valor, descricao, data_transacao')
+        .order('data_transacao', { ascending: false })
         .limit(input?.limit ?? 50);
-      return rows;
+      if (input?.contaCaixaId) txQuery = txQuery.eq('conta_caixa_id', input.contaCaixaId);
+      const { data: txData, error: txQueryErr } = await txQuery;
+      if (txQueryErr) { console.error('[caixa.transacoes] REST error:', txQueryErr.message); return []; }
+      // Buscar nomes das contas separadamente
+      const contaIdsSet = new Set<number>((txData ?? []).map((t: any) => t.conta_caixa_id).filter(Boolean));
+      const contaIds = Array.from(contaIdsSet);
+      const { data: contasData } = contaIds.length > 0
+        ? await supabase.from('contas_caixa').select('id, nome').in('id', contaIds)
+        : { data: [] };
+      const contasMap = Object.fromEntries((contasData ?? []).map((c: any) => [c.id, c.nome]));
+      return (txData ?? []).map((t: any) => ({
+        id: t.id,
+        contaCaixaId: t.conta_caixa_id,
+        contaNome: contasMap[t.conta_caixa_id] ?? '',
+        tipo: t.tipo,
+        categoria: t.categoria,
+        valor: t.valor,
+        descricao: t.descricao,
+        clienteNome: null,
+        dataTransacao: t.data_transacao,
+      }));
     }),
 
   criarConta: protectedProcedure
     .input(z.object({
       nome: z.string().min(2),
-      tipo: z.enum(['caixa_fisico', 'banco', 'digital']),
+      tipo: z.enum(['caixa', 'banco', 'digital']),
       banco: z.string().optional(),
       saldoInicial: z.number().default(0),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
-      const result = await db.insert(contasCaixa).values({
+      if (db) {
+        try {
+          const result = await db.insert(contasCaixa).values({
+            nome: input.nome,
+            tipo: input.tipo,
+            banco: input.banco,
+            saldoInicial: input.saldoInicial.toFixed(2),
+          }).returning({ id: contasCaixa.id });
+          return { id: result[0].id };
+        } catch (err) {
+          console.warn('[caixa.criarConta] Drizzle failed:', (err as Error).message);
+          resetDb();
+        }
+      }
+      // Fallback REST
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error('DB unavailable');
+      const { data, error } = await supabase.from('contas_caixa').insert({
         nome: input.nome,
         tipo: input.tipo,
-        banco: input.banco,
-        saldoInicial: input.saldoInicial.toFixed(2),
-      }).returning({ id: contasCaixa.id });
-      return { id: result[0].id };
+        saldo: input.saldoInicial,
+      }).select('id').single();
+      if (error) throw new Error(error.message);
+      return { id: data.id };
     }),
 
   registrarTransacao: protectedProcedure
@@ -876,14 +1405,48 @@ const caixaRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
-      await db.insert(transacoesCaixa).values({
-        contaCaixaId: input.contaCaixaId,
+      if (db) {
+        try {
+          await db.insert(transacoesCaixa).values({
+            contaCaixaId: input.contaCaixaId,
+            tipo: input.tipo,
+            categoria: input.categoria,
+            valor: input.valor.toFixed(2),
+            descricao: input.descricao,
+          });
+          // Atualizar saldo da conta
+          const delta = input.tipo === 'entrada' ? input.valor : -input.valor;
+          await db.execute(sql`UPDATE contas_caixa SET saldo_inicial = COALESCE(saldo_inicial::numeric, 0) + ${delta} WHERE id = ${input.contaCaixaId}`);
+          return { success: true };
+        } catch (err) {
+          console.warn('[caixa.registrarTransacao] Drizzle failed:', (err as Error).message);
+          resetDb();
+        }
+      }
+      // Fallback REST
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error('DB unavailable');
+      const { error: txErr } = await supabase.from('transacoes_caixa').insert({
+        conta_caixa_id: input.contaCaixaId,
         tipo: input.tipo,
         categoria: input.categoria,
-        valor: input.valor.toFixed(2),
-        descricao: input.descricao,
+        valor: input.valor,
+        descricao: input.descricao ?? null,
+        data_transacao: new Date().toISOString(),
       });
+      if (txErr) throw new Error(txErr.message);
+      // Atualizar saldo da conta via RPC ou update direto
+      const delta = input.tipo === 'entrada' ? input.valor : -input.valor;
+      // Atualizar saldo da conta: buscar saldo atual e somar delta
+      const { data: contaData } = await supabase
+        .from('contas_caixa')
+        .select('saldo')
+        .eq('id', input.contaCaixaId)
+        .single();
+      if (contaData) {
+        const novoSaldo = parseFloat(contaData.saldo ?? '0') + delta;
+        await supabase.from('contas_caixa').update({ saldo: novoSaldo }).eq('id', input.contaCaixaId);
+      }
       return { success: true };
     }),
 });
@@ -1225,7 +1788,7 @@ const reparcelamentoRouter = router({
       contratoId: z.number(),
       numeroParcelas: z.number().min(1),
       taxaJuros: z.number().min(0),
-      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
       dataInicio: z.string(),
       incluirMultas: z.boolean().default(true),
     }))
@@ -1280,7 +1843,7 @@ const reparcelamentoRouter = router({
       contratoId: z.number(),
       numeroParcelas: z.number().min(1),
       taxaJuros: z.number().min(0),
-      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
       dataInicio: z.string(),
       incluirMultas: z.boolean().default(true),
       observacoes: z.string().optional(),
@@ -1328,24 +1891,33 @@ const reparcelamentoRouter = router({
       const dataInicioDate = new Date(input.dataInicio);
       const dataInicioStr = dataInicioDate.toISOString().split('T')[0];
 
-      const novoContrato = await db.insert(contratos).values({
-        clienteId: contratoOriginal.clienteId,
-        koletorId: contratoOriginal.koletorId ?? undefined,
-        modalidade: 'reparcelamento',
-        status: 'ativo',
-        valorPrincipal: saldoDevedor.toFixed(2),
-        taxaJuros: input.taxaJuros.toFixed(4),
-        tipoTaxa: input.tipoTaxa,
-        numeroParcelas: input.numeroParcelas,
-        valorParcela: valorNovaParcela2.toFixed(2),
-        multaAtraso: contratoOriginal.multaAtraso ?? undefined,
-        jurosMoraDiario: contratoOriginal.jurosMoraDiario ?? undefined,
-        dataInicio: dataInicioDate.toISOString().split('T')[0],
-        dataVencimentoPrimeira: dataInicioDate.toISOString().split('T')[0],
-        contratoOrigemId: input.contratoId,
-        observacoes: input.observacoes || `Reparcelamento do contrato #${input.contratoId}`,
-      }).returning({ id: contratos.id });
-      const novoContratoId = novoContrato[0].id;;
+      // Use REST fallback for reparcelamento to avoid Drizzle TS issues
+      const supabaseRep = getSupabaseClient();
+      if (!supabaseRep) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { data: novoContrato, error: novoContratoErr } = await supabaseRep
+        .from('contratos')
+        .insert({
+          cliente_id: contratoOriginal.clienteId as number,
+          koletor_id: contratoOriginal.koletorId ?? null,
+          modalidade: 'reparcelamento',
+          status: 'ativo',
+          valor_principal: saldoDevedor.toFixed(2),
+          taxa_juros: input.taxaJuros.toFixed(4),
+          tipo_taxa: input.tipoTaxa,
+          numero_parcelas: input.numeroParcelas,
+          valor_parcela: valorNovaParcela2.toFixed(2),
+          total_contrato: (valorNovaParcela2 * input.numeroParcelas).toFixed(2),
+          multa_atraso: contratoOriginal.multaAtraso ?? '2.00',
+          juros_mora_diario: contratoOriginal.jurosMoraDiario ?? '0.033',
+          data_inicio: dataInicioDate.toISOString().split('T')[0],
+          data_vencimento_primeira: dataInicioDate.toISOString().split('T')[0],
+          contrato_origem_id: input.contratoId,
+          observacoes: input.observacoes || `Reparcelamento do contrato #${input.contratoId}`,
+        })
+        .select('id')
+        .single();
+      if (novoContratoErr || !novoContrato) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: novoContratoErr?.message ?? 'Failed to create reparcelamento' });
+      const novoContratoId = novoContrato.id;
 
       // Criar novas parcelas
       for (let i = 0; i < input.numeroParcelas; i++) {
@@ -1353,12 +1925,12 @@ const reparcelamentoRouter = router({
         venc.setMonth(venc.getMonth() + i);
         await db.insert(parcelas).values({
           contratoId: novoContratoId,
-          clienteId: contratoOriginal.clienteId,
+          clienteId: contratoOriginal.clienteId as number,
           koletorId: contratoOriginal.koletorId ?? undefined,
           numeroParcela: i + 1,
           valorOriginal: valorNovaParcela2.toFixed(2),
           dataVencimento: venc.toISOString().split('T')[0],
-          status: 'pendente',
+          status: 'pendente' as const,
         });
       }
       return { success: true, novoContratoId };;
@@ -1600,7 +2172,7 @@ const chequesRouter = router({
       valorNominal: z.number().positive(),
       dataVencimento: z.string(),
       taxaDesconto: z.number().positive(),
-      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
     }))
@@ -1633,7 +2205,7 @@ const chequesRouter = router({
         valorNominal: input.valorNominal.toFixed(2),
         dataVencimento: dataVenc.toISOString().split('T')[0],
         taxaDesconto: input.taxaDesconto.toFixed(4),
-        tipoTaxa: input.tipoTaxa,
+        tipoTaxa: input.tipoTaxa as 'diaria' | 'mensal' | 'anual',
         valorDesconto: valorDesconto.toFixed(2),
         valorLiquido: valorLiquido.toFixed(2),
         contaCaixaId: input.contaCaixaId,
@@ -1732,7 +2304,7 @@ const chequesRouter = router({
       valorNominal: z.number().positive(),
       dataVencimento: z.string(),
       taxaDesconto: z.number().positive(),
-      tipoTaxa: z.enum(['mensal', 'diaria', 'anual']).default('mensal'),
+      tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
     }))
     .query(({ input }) => {
       const dataVenc = new Date(input.dataVencimento + 'T00:00:00');

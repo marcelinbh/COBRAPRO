@@ -171,3 +171,74 @@
 - [x] Atualizar procedures tRPC (clientes.create, clientes.update) com novos campos
 - [x] Cadastrar 3 clientes simulados: João Carlos Silva, Ana Paula Ferreira, Roberto Oliveira Santos
 - [x] Aplicar migração das colunas faltantes no Supabase PostgreSQL (sexo, estado_civil, nome_mae, nome_pai, data_nascimento, documentos_urls)
+
+## Fase 21: Empréstimo Quinzenal 50% + Pagamento Parcial (Só Juros)
+- [x] Corrigir erros TypeScript no reparcelamento (totalContrato faltando)
+- [x] Corrigir parcelas.list para mostrar nome do cliente corretamente
+- [x] Criar contrato 50% quinzenal (R$500 → paga R$750 total ou R$250 só juros)
+- [x] Implementar opção de pagamento parcial (somente juros) no modal de pagamento
+- [x] Testar fluxo completo: pagamento total e somente juros
+
+## Fase 22: Periodicidades Completas + Pagamento Parcial
+- [ ] Adicionar Diário, Semanal, Quinzenal, Mensal no enum tipoTaxa (routers.ts)
+- [ ] Adicionar Diário, Semanal, Quinzenal, Mensal no select do NovoContrato
+- [ ] Adicionar Diário, Semanal, Quinzenal, Mensal no Simulador
+- [ ] Corrigir cálculo de datas: semanal = +7 dias, quinzenal = +15 dias
+- [ ] Exibir periodicidade correta na lista de contratos
+- [ ] Botões rápidos no modal de pagamento: "Pagar Total" e "Só Juros"
+- [ ] Criar contrato 50% quinzenal R$500 e testar pagamento
+
+## Fase 23: Caixa Livre + Lançamentos Manuais
+- [ ] Remover validação de saldo do caixa ao criar contratos/empréstimos
+- [ ] Adicionar botão "Adicionar Saldo" (entrada manual) na página de Caixa
+- [ ] Adicionar botão "Debitar Saldo" (saída manual) na página de Caixa
+- [ ] Fallback REST para caixa.transacoes (listagem de transações)
+- [ ] Corrigir exibição de saldo real nas contas (usar campo saldo do Supabase)
+
+## Fase 24: Correção Cálculo Pagamento Total
+- [x] Corrigir botão "Pagar Total": deve mostrar capital + juros (ex: R$500 capital + R$250 juros = R$750 total)
+- [x] Corrigir botão "Só Juros": deve mostrar apenas os juros (ex: R$250)
+- [x] O valor da parcela já inclui capital+juros? Verificar lógica de cálculo
+
+## Auditoria Cobra Fácil - Funcionalidades a Implementar
+
+- [ ] Corrigir cálculo Pagar Total: valor_parcela = capital/n + juros (ex: R$750 = R$500 capital + R$250 juros)
+- [ ] Corrigir botão Só Juros: mostrar apenas os juros do período (ex: R$250)
+- [ ] Score de clientes (0-100): bom/mau pagador baseado em histórico de pagamentos
+- [ ] Cards coloridos por status: azul=diário, amarelo=renegociado, verde=pago, vermelho=atraso
+- [ ] Calendário de cobranças com vencimentos por dia (visualização mensal)
+- [ ] Recálculo inverso de taxa: digitar valor da parcela → sistema calcula a taxa de juros
+- [ ] Pagamento parcial melhorado: opção "cliente pagou só os juros" com renegociação automática
+- [ ] Exportação PDF de contratos e relatórios
+- [ ] Exportação CSV de clientes e empréstimos
+- [ ] Contas a pagar (despesas operacionais do credor)
+- [ ] Resumo semanal no dashboard
+- [ ] Notificações WhatsApp automáticas (vencimentos, atrasos)
+- [ ] Comprovantes automáticos em PDF ao registrar pagamento
+- [ ] Gestão de funcionários/koletores
+- [ ] Backup de dados
+
+## Fase 25: Empréstimo Renovável (Bullet)
+
+- [x] Cálculo correto: valor_total = capital × (1 + taxa/100), ex: R$1.000 × 1.5 = R$1.500
+- [x] Botão "Pagar Total" no modal de parcelas: capital + juros (ex: R$1.500)
+- [x] Botão "Renovar (Só Juros)": paga apenas os juros (ex: R$500) e gera nova parcela +15 dias automaticamente
+- [x] Procedure parcelas.pagarJuros: marca parcela como paga (juros), cria nova parcela com vencimento +periodicidade
+- [x] Testar fluxo completo: criar contrato renovável, pagar total, renovar
+
+## Fase 26: Card de Empréstimo estilo Cobra Fácil
+
+- [x] Nova página /emprestimos com cards estilo Cobra Fácil
+- [x] Card: avatar com iniciais + badge status (Atrasado/Quinzenal/Mensal/Diário)
+- [x] Card: valor "Restante a receber" em destaque
+- [x] Card: grid Emprestado / Total a Receber / Lucro Previsto / Lucro Realizado (com %)
+- [x] Card: Venc: data · Pago: valor
+- [x] Card: linha "Só Juros (por parcela)"
+- [x] Card: bloco parcela em atraso com dias, vencimento, valor original, juros acumulados, total com atraso
+- [x] Card: botão "Cobrar Atraso (WhatsApp)" (abre WhatsApp com mensagem pré-formatada)
+- [x] Card: barra inferior com botões: Pagar · Pagar Juros · WhatsApp · Histórico · Novo
+- [x] Procedure contratos.listComParcelas: calcular juros de atraso em tempo real, lucro realizado, só juros por parcela
+- [x] Procedure parcelas.pagarJuros: paga só juros e gera nova parcela +periodicidade automaticamente
+- [x] KPIs no topo: Atrasados, Em Dia, Capital na Rua, Total a Receber
+- [x] Filtro por status e busca por nome de cliente
+- [x] Histórico expandível de parcelas por empréstimo

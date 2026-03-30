@@ -34,8 +34,9 @@ export default function Simulador() {
   const [diaVencimento, setDiaVencimento] = useState("5");
   const [resultado, setResultado] = useState<ResultadoSimulacao | null>(null);
   const [mostrarTabela, setMostrarTabela] = useState(false);
+  const [tipoTaxaManual, setTipoTaxaManual] = useState("mensal");
 
-  const tipoTaxa = modalidade === "emprestimo_diario" ? "diaria" : "mensal";
+  const tipoTaxa = modalidade === "emprestimo_diario" ? "diaria" : tipoTaxaManual;
 
   const calcular = useCallback(() => {
     const principal = parseFloat(valorPrincipal.replace(",", "."));
@@ -104,6 +105,12 @@ export default function Simulador() {
       if (tipoTaxa === "diaria") {
         vencimento = new Date(inicio);
         vencimento.setDate(inicio.getDate() + i);
+      } else if (tipoTaxa === "semanal") {
+        vencimento = new Date(inicio);
+        vencimento.setDate(inicio.getDate() + i * 7);
+      } else if (tipoTaxa === "quinzenal") {
+        vencimento = new Date(inicio);
+        vencimento.setDate(inicio.getDate() + i * 15);
       } else {
         vencimento = new Date(inicio);
         vencimento.setMonth(inicio.getMonth() + i);
@@ -134,7 +141,7 @@ export default function Simulador() {
     setLocation(`/contratos/novo?${params.toString()}`);
   }
 
-  const taxaLabel = tipoTaxa === "diaria" ? "Taxa Diária (%)" : "Taxa Mensal (%)";
+  const taxaLabel = tipoTaxa === "diaria" ? "Taxa Diária (%)" : tipoTaxa === "semanal" ? "Taxa Semanal (%)" : tipoTaxa === "quinzenal" ? "Taxa Quinzenal (%)" : tipoTaxa === "anual" ? "Taxa Anual (%)" : "Taxa Mensal (%)";
   const parcelasLabel = modalidade === "emprestimo_diario" ? "Prazo (dias)" : modalidade === "desconto_cheque" ? "Prazo (dias)" : "Número de Parcelas";
 
   return (
@@ -229,6 +236,25 @@ export default function Simulador() {
                 onChange={(e) => setDataInicio(e.target.value)}
               />
             </div>
+
+            {/* Periodicidade (apenas para empréstimos, não diário) */}
+            {modalidade !== "emprestimo_diario" && modalidade !== "desconto_cheque" && (
+              <div className="space-y-1.5">
+                <Label className="text-sm text-muted-foreground">Periodicidade</Label>
+                <Select value={tipoTaxaManual} onValueChange={setTipoTaxaManual}>
+                  <SelectTrigger className="bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="diaria">Diária</SelectItem>
+                    <SelectItem value="semanal">Semanal</SelectItem>
+                    <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                    <SelectItem value="mensal">Mensal</SelectItem>
+                    <SelectItem value="anual">Anual</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Dia de Vencimento (apenas para mensais) */}
             {tipoTaxa === "mensal" && modalidade !== "desconto_cheque" && (

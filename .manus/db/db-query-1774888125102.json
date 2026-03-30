@@ -1,0 +1,148 @@
+{
+  "query": "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = 'contratos' ORDER BY ordinal_position;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = 'contratos' ORDER BY ordinal_position;",
+  "rows": [
+    {
+      "column_name": "id",
+      "data_type": "int",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "cliente_id",
+      "data_type": "int",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "modalidade",
+      "data_type": "enum",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "status",
+      "data_type": "enum",
+      "is_nullable": "NO",
+      "column_default": "ativo"
+    },
+    {
+      "column_name": "valor_principal",
+      "data_type": "decimal",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "taxa_juros",
+      "data_type": "decimal",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "tipo_taxa",
+      "data_type": "enum",
+      "is_nullable": "NO",
+      "column_default": "mensal"
+    },
+    {
+      "column_name": "numero_parcelas",
+      "data_type": "int",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "valor_parcela",
+      "data_type": "decimal",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "multa_atraso",
+      "data_type": "decimal",
+      "is_nullable": "YES",
+      "column_default": "2.00"
+    },
+    {
+      "column_name": "juros_mora_diario",
+      "data_type": "decimal",
+      "is_nullable": "YES",
+      "column_default": "0.033"
+    },
+    {
+      "column_name": "data_inicio",
+      "data_type": "date",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "data_vencimento_primeira",
+      "data_type": "date",
+      "is_nullable": "NO",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "dia_vencimento",
+      "data_type": "int",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "descricao",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "observacoes",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "conta_caixa_id",
+      "data_type": "int",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "createdAt",
+      "data_type": "timestamp",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "column_name": "updatedAt",
+      "data_type": "timestamp",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "column_name": "koletor_id",
+      "data_type": "int",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "contrato_origem_id",
+      "data_type": "int",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "contrato_assinado",
+      "data_type": "tinyint",
+      "is_nullable": "YES",
+      "column_default": "0"
+    },
+    {
+      "column_name": "contrato_url",
+      "data_type": "varchar",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "column_name\tdata_type\tis_nullable\tcolumn_default\nid\tint\tNO\tNULL\ncliente_id\tint\tNO\tNULL\nmodalidade\tenum\tNO\tNULL\nstatus\tenum\tNO\tativo\nvalor_principal\tdecimal\tNO\tNULL\ntaxa_juros\tdecimal\tNO\tNULL\ntipo_taxa\tenum\tNO\tmensal\nnumero_parcelas\tint\tNO\tNULL\nvalor_parcela\tdecimal\tNO\tNULL\nmulta_atraso\tdecimal\tYES\t2.00\njuros_mora_diario\tdecimal\tYES\t0.033\ndata_inicio\tdate\tNO\tNULL\ndata_vencimento_primeira\tdate\tNO\tNULL\ndia_vencimento\tint\tYES\tNULL\ndescricao\ttext\tYES\tNULL\nobservacoes\ttext\tYES\tNULL\nconta_caixa_id\tint\tYES\tNULL\ncreatedAt\ttimestamp\tNO\tCURRENT_TIMESTAMP\nupdatedAt\ttimestamp\tNO\tCURRENT_TIMESTAMP\nkoletor_id\tint\tYES\tNULL\ncontrato_origem_id\tint\tYES\tNULL\ncontrato_assinado\ttinyint\tYES\t0\ncontrato_url\tvarchar\tYES\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 857
+}

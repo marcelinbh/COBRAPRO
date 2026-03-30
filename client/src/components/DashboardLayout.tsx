@@ -38,6 +38,7 @@ import {
   Receipt,
   ShoppingBag,
   FileCheck,
+  DollarSign,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -48,6 +49,7 @@ import { Badge } from "./ui/badge";
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Users, label: "Clientes", path: "/clientes" },
+  { icon: DollarSign, label: "Empréstimos", path: "/emprestimos" },
   { icon: FileText, label: "Contratos", path: "/contratos" },
   { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
   { icon: RefreshCw, label: "Reparcelamento", path: "/reparcelamento" },

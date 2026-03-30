@@ -21,7 +21,7 @@ export default function NovoContrato() {
 
   const [form, setForm] = useState({
     clienteId: "",
-    modalidade: urlParams.get('modalidade') || "emprestimo_padrao",
+    modalidade: urlParams.get('modalidade') || "mensal",
     valorPrincipal: urlParams.get('valorPrincipal') || "",
     taxaJuros: urlParams.get('taxaJuros') || "5",
     tipoTaxa: urlParams.get('tipoTaxa') || "mensal",
@@ -181,8 +181,10 @@ export default function NovoContrato() {
                   <Select value={form.tipoTaxa} onValueChange={v => setForm(f => ({ ...f, tipoTaxa: v }))}>
                     <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="mensal">Mensal</SelectItem>
                       <SelectItem value="diaria">Diária</SelectItem>
+                      <SelectItem value="semanal">Semanal</SelectItem>
+                      <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                      <SelectItem value="mensal">Mensal</SelectItem>
                       <SelectItem value="anual">Anual</SelectItem>
                     </SelectContent>
                   </Select>

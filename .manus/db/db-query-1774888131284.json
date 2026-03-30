@@ -1,0 +1,28 @@
+{
+  "query": "SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = 'contratos' AND ordinal_position > 20 ORDER BY ordinal_position;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_name = 'contratos' AND ordinal_position > 20 ORDER BY ordinal_position;",
+  "rows": [
+    {
+      "column_name": "contrato_origem_id",
+      "data_type": "int",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    },
+    {
+      "column_name": "contrato_assinado",
+      "data_type": "tinyint",
+      "is_nullable": "YES",
+      "column_default": "0"
+    },
+    {
+      "column_name": "contrato_url",
+      "data_type": "varchar",
+      "is_nullable": "YES",
+      "column_default": "NULL"
+    }
+  ],
+  "messages": [],
+  "stdout": "column_name\tdata_type\tis_nullable\tcolumn_default\ncontrato_origem_id\tint\tYES\tNULL\ncontrato_assinado\ttinyint\tYES\t0\ncontrato_url\tvarchar\tYES\tNULL\n",
+  "stderr": "",
+  "execution_time_ms": 143
+}

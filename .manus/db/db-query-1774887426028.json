@@ -1,0 +1,102 @@
+{
+  "query": "\n-- Verificar colunas atuais\nSELECT column_name, data_type FROM information_schema.columns \nWHERE table_name = 'contratos' ORDER BY ordinal_position;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute \n-- Verificar colunas atuais\nSELECT column_name, data_type FROM information_schema.columns \nWHERE table_name = 'contratos' ORDER BY ordinal_position;\n",
+  "rows": [
+    {
+      "column_name": "id",
+      "data_type": "int"
+    },
+    {
+      "column_name": "cliente_id",
+      "data_type": "int"
+    },
+    {
+      "column_name": "modalidade",
+      "data_type": "enum"
+    },
+    {
+      "column_name": "status",
+      "data_type": "enum"
+    },
+    {
+      "column_name": "valor_principal",
+      "data_type": "decimal"
+    },
+    {
+      "column_name": "taxa_juros",
+      "data_type": "decimal"
+    },
+    {
+      "column_name": "tipo_taxa",
+      "data_type": "enum"
+    },
+    {
+      "column_name": "numero_parcelas",
+      "data_type": "int"
+    },
+    {
+      "column_name": "valor_parcela",
+      "data_type": "decimal"
+    },
+    {
+      "column_name": "multa_atraso",
+      "data_type": "decimal"
+    },
+    {
+      "column_name": "juros_mora_diario",
+      "data_type": "decimal"
+    },
+    {
+      "column_name": "data_inicio",
+      "data_type": "date"
+    },
+    {
+      "column_name": "data_vencimento_primeira",
+      "data_type": "date"
+    },
+    {
+      "column_name": "dia_vencimento",
+      "data_type": "int"
+    },
+    {
+      "column_name": "descricao",
+      "data_type": "text"
+    },
+    {
+      "column_name": "observacoes",
+      "data_type": "text"
+    },
+    {
+      "column_name": "conta_caixa_id",
+      "data_type": "int"
+    },
+    {
+      "column_name": "createdAt",
+      "data_type": "timestamp"
+    },
+    {
+      "column_name": "updatedAt",
+      "data_type": "timestamp"
+    },
+    {
+      "column_name": "koletor_id",
+      "data_type": "int"
+    },
+    {
+      "column_name": "contrato_origem_id",
+      "data_type": "int"
+    },
+    {
+      "column_name": "contrato_assinado",
+      "data_type": "tinyint"
+    },
+    {
+      "column_name": "contrato_url",
+      "data_type": "varchar"
+    }
+  ],
+  "messages": [],
+  "stdout": "column_name\tdata_type\nid\tint\ncliente_id\tint\nmodalidade\tenum\nstatus\tenum\nvalor_principal\tdecimal\ntaxa_juros\tdecimal\ntipo_taxa\tenum\nnumero_parcelas\tint\nvalor_parcela\tdecimal\nmulta_atraso\tdecimal\njuros_mora_diario\tdecimal\ndata_inicio\tdate\ndata_vencimento_primeira\tdate\ndia_vencimento\tint\ndescricao\ttext\nobservacoes\ttext\nconta_caixa_id\tint\ncreatedAt\ttimestamp\nupdatedAt\ttimestamp\nkoletor_id\tint\ncontrato_origem_id\tint\ncontrato_assinado\ttinyint\ncontrato_url\tvarchar\n",
+  "stderr": "",
+  "execution_time_ms": 864
+}

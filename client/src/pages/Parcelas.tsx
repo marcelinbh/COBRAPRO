@@ -124,6 +124,9 @@ type ParcelaRow = {
   status: string;
   modalidade: string;
   numeroParcelas: number;
+  taxaJuros?: string | null;
+  tipoTaxa?: string | null;
+  valorPrincipalContrato?: string | null;
 };
 
 function PagamentoDialog({
@@ -145,6 +148,18 @@ function PagamentoDialog({
     new Date(parcela.dataVencimento),
     new Date()
   );
+
+  // Calcular valor dos juros do período (taxa do contrato)
+  const valorOriginal = parseFloat(parcela.valorOriginal);
+  // Para juros simples: juros = principal * (taxa/100)
+  // valorParcela = principal/n + principal * taxa/100
+  // Então: jurosParcela = valorParcela - principal/n
+  const principalContrato = parcela.valorPrincipalContrato ? parseFloat(parcela.valorPrincipalContrato) : 0;
+  const nParcelas = parcela.numeroParcelas || 1;
+  const amortizacao = principalContrato > 0 ? principalContrato / nParcelas : 0;
+  const jurosParcela = principalContrato > 0 ? Math.max(0, valorOriginal - amortizacao) : valorOriginal * 0.5;
+  // taxa real do contrato
+  const taxaContrato = parcela.taxaJuros ? parseFloat(parcela.taxaJuros) : 0;
 
   const utils = trpc.useUtils();
   const pagarMutation = trpc.parcelas.registrarPagamento.useMutation({
@@ -202,6 +217,29 @@ function PagamentoDialog({
                   </div>
                 </>
               )}
+            </div>
+
+            {/* Botões rápidos */}
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Atalhos de pagamento</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
+                  onClick={() => setValorPago(total.toFixed(2))}
+                >
+                  ✅ Pagar Total ({formatarMoeda(total)})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
+                  onClick={() => setValorPago(jurosParcela.toFixed(2))}
+                >
+                  💰 Só Juros ({formatarMoeda(jurosParcela)})
+                </Button>
+              </div>
             </div>
 
             <div>

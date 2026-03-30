@@ -41,6 +41,10 @@ export function calcularParcelasPrice(
   return Math.round(parcela * 100) / 100;
 }
 
+/**
+ * Cálculo padrão amortizado (juros simples sobre o total)
+ * Usado para parcelamentos mensais com múltiplas parcelas
+ */
 export function calcularParcelaPadrao(
   principal: number,
   taxaMensal: number,
@@ -48,6 +52,21 @@ export function calcularParcelaPadrao(
 ): number {
   const jurosTotal = principal * (taxaMensal / 100) * numParcelas;
   return Math.round(((principal + jurosTotal) / numParcelas) * 100) / 100;
+}
+
+/**
+ * Cálculo bullet/renovável (modelo Cobra Fácil)
+ * Cada parcela = principal × (1 + taxa/100)
+ * Cliente pode pagar total (capital + juros) ou só os juros e renovar
+ * Usado para empréstimos quinzenais, semanais, diários com 1 parcela
+ */
+export function calcularParcelaBullet(
+  principal: number,
+  taxa: number  // taxa do período (ex: 50 = 50%)
+): { valorParcela: number; valorJuros: number; valorTotal: number } {
+  const valorJuros = Math.round(principal * (taxa / 100) * 100) / 100;
+  const valorParcela = Math.round((principal + valorJuros) * 100) / 100;
+  return { valorParcela, valorJuros, valorTotal: valorParcela };
 }
 
 export function formatarMoeda(valor: number | string | null | undefined): string {
@@ -84,11 +103,14 @@ export function getStatusParcela(
 }
 
 export const MODALIDADE_LABELS: Record<string, string> = {
-  emprestimo_padrao: 'Empréstimo Padrão',
-  emprestimo_diario: 'Empréstimo Diário',
+  mensal: 'Empréstimo Mensal',
+  diario: 'Empréstimo Diário',
+  semanal: 'Empréstimo Semanal',
+  quinzenal: 'Empréstimo Quinzenal',
   tabela_price: 'Tabela Price',
-  venda_produto: 'Venda de Produto',
-  desconto_cheque: 'Desconto de Cheque',
+  venda: 'Venda de Produto',
+  cheque: 'Desconto de Cheque',
+  reparcelamento: 'Reparcelamento',
 };
 
 export const STATUS_CONTRATO_LABELS: Record<string, string> = {
@@ -97,3 +119,16 @@ export const STATUS_CONTRATO_LABELS: Record<string, string> = {
   inadimplente: 'Inadimplente',
   cancelado: 'Cancelado',
 };
+
+/**
+ * Retorna o intervalo em dias para cada modalidade
+ */
+export function getDiasModalidade(modalidade: string): number {
+  switch (modalidade) {
+    case 'diario': return 1;
+    case 'semanal': return 7;
+    case 'quinzenal': return 15;
+    case 'mensal': return 30;
+    default: return 30;
+  }
+}
