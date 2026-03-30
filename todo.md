@@ -149,3 +149,12 @@
 - [x] Habilitar endpoint /api/auth/seed-admin em produção (protegido por secret)
 - [x] Adicionar BREVO_API_KEY ao .do/app.yaml (Digital Ocean)
 - [x] Confirmar admin koletor3@gmail.com existente no banco de produção
+
+## Fase 19: Correção de Conexão com Banco de Dados
+- [x] Adicionar tratamento global de erros não capturados (uncaughtException/unhandledRejection)
+- [x] Adicionar try/catch em todas as rotas de autenticação (authRoutes.ts)
+- [x] Reescrever db.ts com fallback Supabase REST API (HTTPS) quando PostgreSQL direto falha
+- [x] Adicionar SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY às variáveis de ambiente
+- [x] Testes de conexão Supabase REST API passando (14 testes)
+- [ ] Deploy no Digital Ocean com novas variáveis de ambiente
+- [ ] Verificar que o app está funcionando em produção

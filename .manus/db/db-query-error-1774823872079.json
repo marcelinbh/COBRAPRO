@@ -1,0 +1,8 @@
+{
+  "query": "SELECT current_database(), current_user, inet_server_addr()::text as server_addr;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute SELECT current_database(), current_user, inet_server_addr()::text as server_addr;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 1: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 60 near \"::text as server_addr\""
+  ]
+}

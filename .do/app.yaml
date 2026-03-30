@@ -24,5 +24,5 @@ services:
         value: "BkqW4WQ4ndZHJQHLtTMfxv"
         scope: BUILD_TIME
       - key: BREVO_API_KEY
-        value: "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"
         scope: RUN_TIME
+        type: SECRET
