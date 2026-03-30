@@ -59,7 +59,8 @@ export default function Cheques() {
   const { data: listaCheques, isLoading } = trpc.cheques.listar.useQuery(
     filtroStatus !== "todos" ? { status: filtroStatus as "aguardando" | "compensado" | "devolvido" | "cancelado" } : undefined
   );
-  const { data: clientes } = trpc.clientes.list.useQuery({});
+  const { data: clientesData } = trpc.clientes.list.useQuery({});
+  const clientes = clientesData?.clientes ?? [];
   const { data: contasCaixa } = trpc.caixa.contas.useQuery();
 
   // Simulação

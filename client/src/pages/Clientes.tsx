@@ -679,14 +679,15 @@ export default function Clientes() {
   const [busca, setBusca] = useState("");
   const utils = trpc.useUtils();
 
-  const { data: clientes, isLoading } = trpc.clientes.list.useQuery({ busca: busca || undefined });
+  const { data: clientesData, isLoading } = trpc.clientes.list.useQuery({ busca: busca || undefined });
+  const clientes = clientesData?.clientes ?? [];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl text-foreground tracking-wide">CLIENTES</h1>
-          <p className="text-sm text-muted-foreground mt-1">{clientes?.length ?? 0} clientes cadastrados</p>
+          <p className="text-sm text-muted-foreground mt-1">{clientes.length} clientes cadastrados</p>
         </div>
         <div className="flex gap-2">
           <ImportarCSVDialog onSuccess={() => utils.clientes.list.invalidate()} />
@@ -705,7 +706,7 @@ export default function Clientes() {
         </div>
       )}
 
-      {!isLoading && clientes?.length === 0 && (
+      {!isLoading && clientes.length === 0 && (
         <div className="text-center py-16">
           <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">Nenhum cliente encontrado</p>

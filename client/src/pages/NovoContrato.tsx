@@ -41,7 +41,8 @@ export default function NovoContrato() {
     totalJuros: number;
   } | null>(null);
 
-  const { data: clientes } = trpc.clientes.list.useQuery({});
+  const { data: clientesData } = trpc.clientes.list.useQuery({});
+  const clientes = clientesData?.clientes ?? [];
   const { data: contas } = trpc.caixa.contas.useQuery();
 
   // Calcular preview automaticamente
