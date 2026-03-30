@@ -120,6 +120,7 @@ export const clientes = pgTable("clientes", {
   estadoCivil: estadoCivilEnum("estado_civil"),
   nomeMae: varchar("nome_mae", { length: 255 }),
   nomePai: varchar("nome_pai", { length: 255 }),
+  documentosUrls: text("documentos_urls"),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });

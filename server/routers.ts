@@ -3,7 +3,8 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { getDb } from "./db";
+import { getDb, getSupabaseClient, resetDb } from "./db";
+import { TRPCError } from "@trpc/server";
 import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
   koletores, configuracoes, contasPagar, produtos, cheques
@@ -191,43 +192,120 @@ const clientesRouter = router({
     .input(z.object({
       nome: z.string().min(2),
       cpfCnpj: z.string().optional(),
+      cnpj: z.string().optional(),
+      rg: z.string().optional(),
       telefone: z.string().optional(),
       whatsapp: z.string().optional(),
       email: z.string().email().optional().or(z.literal('')),
       chavePix: z.string().optional(),
       tipoChavePix: z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria']).optional(),
       endereco: z.string().optional(),
+      numero: z.string().optional(),
+      complemento: z.string().optional(),
+      bairro: z.string().optional(),
       cidade: z.string().optional(),
       estado: z.string().optional(),
       cep: z.string().optional(),
       observacoes: z.string().optional(),
+      instagram: z.string().optional(),
+      facebook: z.string().optional(),
+      profissao: z.string().optional(),
+      dataNascimento: z.string().optional(),
+      sexo: z.enum(['masculino', 'feminino', 'outro']).optional(),
+      estadoCivil: z.enum(['solteiro', 'casado', 'divorciado', 'viuvo', 'outro']).optional(),
+      nomeMae: z.string().optional(),
+      nomePai: z.string().optional(),
+      fotoUrl: z.string().optional(),
+      documentosUrls: z.string().optional(),
+      banco: z.string().optional(),
+      agencia: z.string().optional(),
+      numeroConta: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new Error("DB unavailable");
-      const result = await db.insert(clientes).values({
-        ...input,
-        email: input.email || undefined,
-      }).returning({ id: clientes.id });
-      return { id: result[0].id };
+      if (db) {
+        try {
+          const result = await db.insert(clientes).values({
+            ...input,
+            email: input.email || undefined,
+          }).returning({ id: clientes.id });
+          return { id: result[0].id };
+        } catch (err) {
+          console.warn('[clientes.create] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
+      }
+      // Fallback: Supabase REST
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
+      const insertData: Record<string, unknown> = { nome: input.nome };
+      if (input.cpfCnpj) insertData.cpf_cnpj = input.cpfCnpj;
+      if (input.cnpj) insertData.cnpj = input.cnpj;
+      if (input.rg) insertData.rg = input.rg;
+      if (input.telefone) insertData.telefone = input.telefone;
+      if (input.whatsapp) insertData.whatsapp = input.whatsapp;
+      if (input.email) insertData.email = input.email;
+      if (input.chavePix) insertData.chave_pix = input.chavePix;
+      if (input.tipoChavePix) insertData.tipo_chave_pix = input.tipoChavePix;
+      if (input.endereco) insertData.endereco = input.endereco;
+      if (input.numero) insertData.numero = input.numero;
+      if (input.complemento) insertData.complemento = input.complemento;
+      if (input.bairro) insertData.bairro = input.bairro;
+      if (input.cidade) insertData.cidade = input.cidade;
+      if (input.estado) insertData.estado = input.estado;
+      if (input.cep) insertData.cep = input.cep;
+      if (input.observacoes) insertData.observacoes = input.observacoes;
+      if (input.instagram) insertData.instagram = input.instagram;
+      if (input.facebook) insertData.facebook = input.facebook;
+      if (input.profissao) insertData.profissao = input.profissao;
+      if (input.dataNascimento) insertData.data_nascimento = input.dataNascimento;
+      if (input.sexo) insertData.sexo = input.sexo;
+      if (input.estadoCivil) insertData.estado_civil = input.estadoCivil;
+      if (input.nomeMae) insertData.nome_mae = input.nomeMae;
+      if (input.nomePai) insertData.nome_pai = input.nomePai;
+      if (input.fotoUrl) insertData.foto_url = input.fotoUrl;
+      if (input.documentosUrls) insertData.documentos_urls = input.documentosUrls;
+      if (input.banco) insertData.banco = input.banco;
+      if (input.agencia) insertData.agencia = input.agencia;
+      if (input.numeroConta) insertData.numero_conta = input.numeroConta;
+      const { data, error } = await supabase.from('clientes').insert(insertData).select('id').single();
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return { id: (data as any).id };
     }),
-
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
       nome: z.string().min(2).optional(),
       cpfCnpj: z.string().optional(),
+      cnpj: z.string().optional(),
+      rg: z.string().optional(),
       telefone: z.string().optional(),
       whatsapp: z.string().optional(),
       email: z.string().optional(),
       chavePix: z.string().optional(),
       tipoChavePix: z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria']).optional(),
       endereco: z.string().optional(),
+      numero: z.string().optional(),
+      complemento: z.string().optional(),
+      bairro: z.string().optional(),
       cidade: z.string().optional(),
       estado: z.string().optional(),
       cep: z.string().optional(),
       observacoes: z.string().optional(),
       score: z.number().min(0).max(1000).optional(),
+      instagram: z.string().optional(),
+      facebook: z.string().optional(),
+      profissao: z.string().optional(),
+      dataNascimento: z.string().optional(),
+      sexo: z.enum(['masculino', 'feminino', 'outro']).optional(),
+      estadoCivil: z.enum(['solteiro', 'casado', 'divorciado', 'viuvo', 'outro']).optional(),
+      nomeMae: z.string().optional(),
+      nomePai: z.string().optional(),
+      fotoUrl: z.string().optional(),
+      documentosUrls: z.string().optional(),
+      banco: z.string().optional(),
+      agencia: z.string().optional(),
+      numeroConta: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
