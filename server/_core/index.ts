@@ -65,4 +65,15 @@ async function startServer() {
   });
 }
 
+// Global error handlers to prevent server crashes
+process.on('uncaughtException', (err) => {
+  console.error('[Server] Uncaught exception:', err);
+  // Don't exit - keep server running
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('[Server] Unhandled rejection at:', promise, 'reason:', reason);
+  // Don't exit - keep server running
+});
+
 startServer().catch(console.error);
