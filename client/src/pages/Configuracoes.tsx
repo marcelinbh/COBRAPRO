@@ -99,6 +99,7 @@ export default function Configuracoes() {
   const [multaPadrao, setMultaPadrao] = useState(String(config?.multaPadrao ?? "2"));
   const [jurosMora, setJurosMora] = useState(String(config?.jurosMoraDiario ?? "0.033"));
   const [diasLembrete, setDiasLembrete] = useState(String(config?.diasLembrete ?? "3"));
+  const [multaDiaria, setMultaDiaria] = useState(String((config as any)?.multaDiaria ?? "100"));
 
    // Inserir variável na posição do cursor
   const inserirVariavel = (variavel: string) => {
@@ -158,7 +159,8 @@ export default function Configuracoes() {
       multaPadrao: parseFloat(multaPadrao) || 2,
       jurosMoraDiario: parseFloat(jurosMora) || 0.033,
       diasLembrete: parseInt(diasLembrete) || 3,
-    });
+      multaDiaria: parseFloat(multaDiaria) || 100,
+    } as any);
   };
 
   const templateAtual = abaAtiva === "atraso" ? templateAtraso : abaAtiva === "venceHoje" ? templateVenceHoje : templateAntecipada;
@@ -361,6 +363,11 @@ export default function Configuracoes() {
               <Label>Juros Mora Diário Padrão (%)</Label>
               <Input className="mt-1" type="number" step="0.001" value={jurosMora} onChange={e => setJurosMora(e.target.value)} />
               <p className="text-xs text-muted-foreground mt-1">Acumulado por dia após o vencimento</p>
+            </div>
+            <div>
+              <Label>Multa por Dia de Atraso (R$)</Label>
+              <Input className="mt-1" type="number" step="0.01" min="0" value={multaDiaria} onChange={e => setMultaDiaria(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">Valor em R$ cobrado por dia de atraso nos empréstimos</p>
             </div>
           </div>
           <Button size="sm" className="gap-2" onClick={salvarEmpresa} disabled={saveConfigMutation.isPending}>

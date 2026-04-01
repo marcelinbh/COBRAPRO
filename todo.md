@@ -242,3 +242,14 @@
 - [x] KPIs no topo: Atrasados, Em Dia, Capital na Rua, Total a Receber
 - [x] Filtro por status e busca por nome de cliente
 - [x] Histórico expandível de parcelas por empréstimo
+
+## Fase 27: Multa por Atraso Configurável + Pasta do Cliente
+
+- [x] Procedure configuracoes.get/set para salvar multa_diaria_atraso (R$/dia)
+- [x] Tabela configuracoes no banco (chave/valor por usuário)
+- [x] Campo de multa/dia na tela de Configurações
+- [x] Usar multa configurada no cálculo de juros por atraso nos cards de Empréstimos
+- [x] Pasta do Cliente: agrupar empréstimos por clienteId na página /emprestimos
+- [x] Card de Pasta: nome do cliente, total de empréstimos, capital total, total a receber
+- [x] Badge "Atrasado" para mostrar quantos empréstimos estão com atraso
+- [x] KPIs da Pasta: capital total, total a receber, parcelas atrasadas

@@ -460,6 +460,21 @@ const contratosRouter = router({
         parcelasPorContrato[p.contrato_id].push({ ...p, status: statusAtual });
       }
 
+      // Buscar configuração de multa por dia de atraso
+      let multaDiaria = 100; // padrão R$100/dia
+      try {
+        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+        if (configRows) {
+          const configMap: Record<string, string> = {};
+          for (const r of configRows) configMap[r.chave] = r.valor ?? '';
+          if (configMap['multaDiaria']) multaDiaria = parseFloat(configMap['multaDiaria']) || 100;
+          else if (configMap['jurosMoraDiario']) {
+            // jurosMoraDiario é % ao dia, converter para R$/dia baseado no valor médio
+            // mas mantemos multaDiaria como R$/dia absoluto
+          }
+        }
+      } catch (_) { /* usa padrão */ }
+
       return filtrados.map((c: any) => {
         const cliente = c.clientes as any;
         const parcelasContrato = parcelasPorContrato[c.id] ?? [];
@@ -489,7 +504,7 @@ const contratosRouter = router({
         const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
           const venc = new Date(p.data_vencimento + 'T00:00:00');
           const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
-          const jurosDiarios = 100; // R$100/dia conforme Cobra Fácil (configurável)
+          const jurosDiarios = multaDiaria; // R$/dia configurável em Configurações
           const jurosAtraso = diasAtraso * jurosDiarios;
           return {
             ...p,
@@ -1605,6 +1620,7 @@ const configuracoesRouter = router({
       multaPadrao: parseFloat(map['multaPadrao'] ?? '2'),
       jurosMoraDiario: parseFloat(map['jurosMoraDiario'] ?? '0.033'),
       diasLembrete: parseInt(map['diasLembrete'] ?? '3'),
+      multaDiaria: parseFloat(map['multaDiaria'] ?? '100'),
     };
   }),
   save: protectedProcedure
@@ -1618,6 +1634,7 @@ const configuracoesRouter = router({
       multaPadrao: z.number().optional(),
       jurosMoraDiario: z.number().optional(),
       diasLembrete: z.number().optional(),
+      multaDiaria: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();

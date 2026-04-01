@@ -702,19 +702,70 @@ export default function Emprestimos() {
         </div>
       )}
 
-      {/* Grid de cards */}
-      {!isLoading && emprestimos && emprestimos.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {emprestimos.map(emp => (
-            <EmprestimoCardComponent
-              key={emp.id}
-              emp={emp as EmprestimoCard}
-              contas={contasFormatadas}
-              onRefresh={refetch}
-            />
-          ))}
-        </div>
-      )}
+      {/* Grid de cards com agrupamento por cliente */}
+      {!isLoading && emprestimos && emprestimos.length > 0 && (() => {
+        // Agrupar empréstimos por cliente
+        const agrupadosPorCliente = emprestimos.reduce((acc: Record<number, any[]>, emp: any) => {
+          if (!acc[emp.clienteId]) acc[emp.clienteId] = [];
+          acc[emp.clienteId].push(emp);
+          return acc;
+        }, {});
+        
+        return (
+          <div className="space-y-4">
+            {Object.entries(agrupadosPorCliente).map(([clienteId, emps]) => {
+              const cliente = (emps[0] as any).clienteNome;
+              const totalCapital = emps.reduce((s: number, e: any) => s + parseFloat(e.valorPrincipal), 0);
+              const totalReceber = emps.reduce((s: number, e: any) => s + e.totalReceber, 0);
+              const totalAtrasado = emps.filter((e: any) => e.parcelasComAtraso.length > 0).length;
+              
+              return (
+                <div key={clienteId} className="space-y-2">
+                  {/* Card da Pasta do Cliente */}
+                  <div className="p-4 rounded-lg border border-border bg-card/50 hover:bg-card/80 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-foreground">{cliente}</h3>
+                        <div className="grid grid-cols-3 gap-4 mt-2 text-xs">
+                          <div>
+                            <span className="text-muted-foreground">Capital:</span>
+                            <div className="font-bold text-foreground">{formatarMoeda(totalCapital)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">A Receber:</span>
+                            <div className="font-bold text-emerald-400">{formatarMoeda(totalReceber)}</div>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Empréstimos:</span>
+                            <div className="font-bold text-foreground">{emps.length}</div>
+                          </div>
+                        </div>
+                      </div>
+                      {totalAtrasado > 0 && (
+                        <div className="text-right">
+                          <Badge variant="destructive">{totalAtrasado} Atrasado</Badge>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Cards dos empréstimos do cliente */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 ml-2">
+                    {emps.map((emp: any) => (
+                      <EmprestimoCardComponent
+                        key={emp.id}
+                        emp={emp as EmprestimoCard}
+                        contas={contasFormatadas}
+                        onRefresh={refetch}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
