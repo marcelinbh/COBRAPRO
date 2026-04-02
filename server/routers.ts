@@ -17,70 +17,115 @@ import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcul
 const dashboardRouter = router({
   kpis: protectedProcedure.query(async () => {
     const db = await getDb();
-    if (!db) throw new Error("DB unavailable");
+    const supabase = getSupabaseClient();
+    
+    if (db) {
+      // Use Drizzle ORM if available
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+      const hojeStr = hoje.toISOString().split('T')[0];
 
+      const contas = await db.select().from(contasCaixa).where(eq(contasCaixa.ativa, true));
+      let saldoTotal = 0;
+      for (const conta of contas) {
+        const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
+          .from(transacoesCaixa)
+          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada')));
+        const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
+          .from(transacoesCaixa)
+          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
+        saldoTotal += parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
+      }
+
+      const capitalResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
+        .from(contratos).where(eq(contratos.status, 'ativo'));
+      const capitalCirculacao = parseFloat(capitalResult[0]?.total ?? '0');
+
+      const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)` })
+        .from(parcelas).where(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']));
+      const totalReceber = parseFloat(receberResult[0]?.total ?? '0');
+
+      const inadResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(DISTINCT cliente_id)` })
+        .from(parcelas).where(eq(parcelas.status, 'atrasada'));
+      const totalInadimplente = parseFloat(inadResult[0]?.total ?? '0');
+      const qtdInadimplentes = inadResult[0]?.qtd ?? 0;
+
+      const jurosResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_juros), 0)` })
+        .from(parcelas).where(inArray(parcelas.status, ['atrasada', 'parcial']));
+      const jurosPendentes = parseFloat(jurosResult[0]?.total ?? '0');
+
+      const hojeResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(*)` })
+        .from(parcelas).where(and(
+          eq(sql`DATE(data_vencimento)`, hojeStr),
+          inArray(parcelas.status, ['pendente', 'vencendo_hoje'])
+        ));
+      const qtdVenceHoje = hojeResult[0]?.qtd ?? 0;
+      const valorVenceHoje = parseFloat(hojeResult[0]?.total ?? '0');
+
+      const recebidoResult = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
+        .from(transacoesCaixa).where(and(
+          eq(transacoesCaixa.tipo, 'entrada'),
+          eq(transacoesCaixa.categoria, 'pagamento_parcela'),
+          gte(transacoesCaixa.dataTransacao, hoje)
+        ));
+      const recebidoHoje = parseFloat(recebidoResult[0]?.total ?? '0');
+
+      const contratosResult = await db.select({ qtd: sql<number>`COUNT(*)` })
+        .from(contratos).where(eq(contratos.status, 'ativo'));
+      const contratosAtivos = contratosResult[0]?.qtd ?? 0;
+
+      return {
+        saldoTotal, capitalCirculacao, totalReceber, totalInadimplente,
+        qtdInadimplentes, jurosPendentes, qtdVenceHoje, valorVenceHoje,
+        recebidoHoje, contratosAtivos
+      };
+    }
+    
+    // Fallback to Supabase REST API
+    if (!supabase) return { saldoTotal: 0, capitalCirculacao: 0, totalReceber: 0, totalInadimplente: 0, qtdInadimplentes: 0, jurosPendentes: 0, qtdVenceHoje: 0, valorVenceHoje: 0, recebidoHoje: 0, contratosAtivos: 0 };
+    
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
-    const amanha = new Date(hoje);
-    amanha.setDate(amanha.getDate() + 1);
     const hojeStr = hoje.toISOString().split('T')[0];
 
-    // Saldo total das contas
-    const contas = await db.select().from(contasCaixa).where(eq(contasCaixa.ativa, true));
+    // Fetch data via Supabase REST
+    const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
+      supabase.from('contas_caixa').select('id, saldo_inicial').eq('ativa', true),
+      supabase.from('contratos').select('valor_principal').eq('status', 'ativo'),
+      supabase.from('parcelas').select('valor_original, valor_juros, status, data_vencimento, numero_parcela, cliente_id'),
+      supabase.from('transacoes_caixa').select('valor, tipo, categoria, data_transacao')
+    ]);
+
     let saldoTotal = 0;
-    for (const conta of contas) {
-      const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-        .from(transacoesCaixa)
-        .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada')));
-      const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-        .from(transacoesCaixa)
-        .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
-      saldoTotal += parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
+    if (contasRes.data) {
+      for (const conta of contasRes.data) {
+        const entradas = (transRes.data ?? []).filter((t: any) => t.tipo === 'entrada');
+        const saidas = (transRes.data ?? []).filter((t: any) => t.tipo === 'saida');
+        const totalEntradas = entradas.reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
+        const totalSaidas = saidas.reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
+        saldoTotal += parseFloat(conta.saldo_inicial ?? '0') + totalEntradas - totalSaidas;
+      }
     }
 
-    // Capital em circulação (soma dos valores principais dos contratos ativos)
-    const capitalResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
-      .from(contratos).where(eq(contratos.status, 'ativo'));
-    const capitalCirculacao = parseFloat(capitalResult[0]?.total ?? '0');
-
-    // Total a receber (parcelas pendentes + atrasadas)
-    const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)` })
-      .from(parcelas).where(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']));
-    const totalReceber = parseFloat(receberResult[0]?.total ?? '0');
-
-    // Inadimplência
-    const inadResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(DISTINCT cliente_id)` })
-      .from(parcelas).where(eq(parcelas.status, 'atrasada'));
-    const totalInadimplente = parseFloat(inadResult[0]?.total ?? '0');
-    const qtdInadimplentes = inadResult[0]?.qtd ?? 0;
-
-    // Juros pendentes acumulados
-    const jurosResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_juros), 0)` })
-      .from(parcelas).where(inArray(parcelas.status, ['atrasada', 'parcial']));
-    const jurosPendentes = parseFloat(jurosResult[0]?.total ?? '0');
-
-    // Vence hoje
-    const hojeResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(*)` })
-      .from(parcelas).where(and(
-        eq(sql`DATE(data_vencimento)`, hojeStr),
-        inArray(parcelas.status, ['pendente', 'vencendo_hoje'])
-      ));
-    const qtdVenceHoje = hojeResult[0]?.qtd ?? 0;
-    const valorVenceHoje = parseFloat(hojeResult[0]?.total ?? '0');
-
-    // Recebido hoje
-    const recebidoResult = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-      .from(transacoesCaixa).where(and(
-        eq(transacoesCaixa.tipo, 'entrada'),
-        eq(transacoesCaixa.categoria, 'pagamento_parcela'),
-        gte(transacoesCaixa.dataTransacao, hoje)
-      ));
-    const recebidoHoje = parseFloat(recebidoResult[0]?.total ?? '0');
-
-    // Contratos ativos
-    const contratosResult = await db.select({ qtd: sql<number>`COUNT(*)` })
-      .from(contratos).where(eq(contratos.status, 'ativo'));
-    const contratosAtivos = contratosResult[0]?.qtd ?? 0;
+    const capitalCirculacao = (contratosRes.data ?? []).reduce((s: number, c: any) => s + parseFloat(c.valor_principal ?? '0'), 0);
+    
+    const parcelasData = parcelasRes.data ?? [];
+    const totalReceber = parcelasData.filter((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+    
+    const atrasadas = parcelasData.filter((p: any) => p.status === 'atrasada');
+    const totalInadimplente = atrasadas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+    const qtdInadimplentes = new Set(atrasadas.map((p: any) => p.cliente_id)).size;
+    
+    const jurosPendentes = parcelasData.filter((p: any) => ['atrasada', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_juros ?? '0'), 0);
+    
+    const venceHoje = parcelasData.filter((p: any) => p.data_vencimento?.startsWith(hojeStr) && ['pendente', 'vencendo_hoje'].includes(p.status));
+    const qtdVenceHoje = venceHoje.length;
+    const valorVenceHoje = venceHoje.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+    
+    const transacoes = transRes.data ?? [];
+    const recebidoHoje = transacoes.filter((t: any) => t.tipo === 'entrada' && t.categoria === 'pagamento_parcela' && t.data_transacao?.startsWith(hojeStr)).reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
+    
+    const contratosAtivos = (contratosRes.data ?? []).length;
 
     return {
       saldoTotal, capitalCirculacao, totalReceber, totalInadimplente,
