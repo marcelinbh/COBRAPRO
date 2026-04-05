@@ -29,6 +29,8 @@ import Cheques from "./pages/Cheques";
 import RecuperarSenha from "./pages/RecuperarSenha";
 import ResetSenha from "./pages/ResetSenha";
 import Emprestimos from "./pages/Emprestimos";
+import { Scores } from "./pages/Scores";
+import Veiculos from "./pages/Veiculos";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -48,6 +50,8 @@ const ContasPagarPage = () => <DashboardLayout><ContasPagar /></DashboardLayout>
 const VendasPage = () => <DashboardLayout><Vendas /></DashboardLayout>;
 const ChequesPage = () => <DashboardLayout><Cheques /></DashboardLayout>;
 const EmprestimosPage = () => <DashboardLayout><Emprestimos /></DashboardLayout>;
+const ScoresPage = () => <DashboardLayout><Scores /></DashboardLayout>;
+const VeiculosPage = () => <DashboardLayout><Veiculos /></DashboardLayout>;
 
 function Router() {
   return (
@@ -80,6 +84,8 @@ function Router() {
       <Route path="/vendas" component={VendasPage} />
       <Route path="/cheques" component={ChequesPage} />
       <Route path="/emprestimos" component={EmprestimosPage} />
+      <Route path="/scores" component={ScoresPage} />
+      <Route path="/veiculos" component={VeiculosPage} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

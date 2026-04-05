@@ -354,3 +354,22 @@ export const veiculos = pgTable("veiculos", {
 
 export type Veiculo = typeof veiculos.$inferSelect;
 export type InsertVeiculo = typeof veiculos.$inferInsert;
+
+// ─── PARCELAS DE VEÍCULOS ─────────────────────────────────────────────────────
+export const parcelasVeiculo = pgTable("parcelas_veiculo", {
+  id: serial("id").primaryKey(),
+  veiculoId: integer("veiculo_id").notNull(),
+  numero: integer("numero").notNull(),
+  valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
+  juros: decimal("juros", { precision: 15, scale: 2 }).default("0.00"),
+  vencimento: date("vencimento").notNull(),
+  status: statusParcelaEnum("status").default("pendente").notNull(),
+  pagamentoData: date("pagamento_data"),
+  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ParcelaVeiculo = typeof parcelasVeiculo.$inferSelect;
+export type InsertParcelaVeiculo = typeof parcelasVeiculo.$inferInsert;

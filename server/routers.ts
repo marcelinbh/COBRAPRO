@@ -445,6 +445,107 @@ const clientesRouter = router({
       }
       return { importados, erros, detalhesErros };
     }),
+
+  listarComScore: protectedProcedure
+    .input(z.object({ ordenarPor: z.enum(['score', 'lucro', 'nome']).optional() }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      let rows: any[] = [];
+      
+      if (db) {
+        try {
+          rows = await db.select().from(clientes).where(eq(clientes.ativo, true));
+        } catch (err) {
+          console.warn('[clientes.listarComScore] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
+      }
+      
+      // Fallback: Supabase REST
+      if (rows.length === 0) {
+        const supabase = getSupabaseClient();
+        if (supabase) {
+          const { data, error } = await supabase.from('clientes').select('*').eq('ativo', true);
+          if (!error && data) rows = data;
+        }
+      }
+      
+      // Calcular score para cada cliente
+      const clientesComScore = await Promise.all(rows.map(async (cliente: any) => {
+        // Buscar parcelas do cliente
+        let parcelas_data: any[] = [];
+        if (db) {
+          try {
+            parcelas_data = await db.select().from(parcelas).where(eq(parcelas.clienteId, cliente.id));
+          } catch (err) {
+            resetDb();
+          }
+        }
+        
+        if (parcelas_data.length === 0) {
+          const supabase = getSupabaseClient();
+          if (supabase) {
+            const { data } = await supabase.from('parcelas').select('*').eq('cliente_id', cliente.id);
+            if (data) parcelas_data = data;
+          }
+        }
+        
+        // Calcular score
+        let score = 100; // Score inicial
+        let lucroGerado = 0;
+        let parcelasEmDia = 0;
+        let parcelasAtrasadas = 0;
+        let parcelasQuitadas = 0;
+        
+        for (const parcela of parcelas_data) {
+          if (parcela.status === 'paga') {
+            parcelasQuitadas++;
+            score += 10; // +10 por parcela paga
+            lucroGerado += parseFloat(parcela.juros || 0);
+          } else if (parcela.status === 'pendente' || parcela.status === 'vencendo_hoje') {
+            parcelasEmDia++;
+            score += 5;
+          } else if (parcela.status === 'atrasada') {
+            parcelasAtrasadas++;
+            score -= 5; // -5 por parcela atrasada
+          }
+        }
+        
+        // Bonus por lucro gerado
+        score += Math.floor(lucroGerado / 100); // +1 ponto por R$100 de lucro
+        
+        // Limitar score entre 0 e 131
+        score = Math.max(0, Math.min(131, score));
+        
+        // Determinar badge
+        let badge = '⚠️ Ruim';
+        if (score >= 100) badge = '⭐ Excelente';
+        else if (score >= 70) badge = '👍 Bom';
+        else if (score >= 40) badge = '👌 Regular';
+        
+        return {
+          ...cliente,
+          score,
+          badge,
+          lucroGerado,
+          parcelasEmDia,
+          parcelasAtrasadas,
+          parcelasQuitadas,
+        };
+      }));
+      
+      // Ordenar conforme solicitado
+      const ordenarPor = input?.ordenarPor || 'score';
+      if (ordenarPor === 'score') {
+        clientesComScore.sort((a, b) => b.score - a.score);
+      } else if (ordenarPor === 'lucro') {
+        clientesComScore.sort((a, b) => b.lucroGerado - a.lucroGerado);
+      } else if (ordenarPor === 'nome') {
+        clientesComScore.sort((a, b) => (a.nome || '').localeCompare(b.nome || ''));
+      }
+      
+      return { clientes: clientesComScore, total: clientesComScore.length };
+    }),
 });
 // ─── CONTRATOS ────────────────────────────────────────────────────────────────
 const contratosRouter = router({

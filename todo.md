@@ -253,3 +253,41 @@
 - [x] Card de Pasta: nome do cliente, total de empréstimos, capital total, total a receber
 - [x] Badge "Atrasado" para mostrar quantos empréstimos estão com atraso
 - [x] KPIs da Pasta: capital total, total a receber, parcelas atrasadas
+
+
+## Fase 28: Score de Clientes (CRÍTICA)
+- [x] Adicionar coluna score (INTEGER) na tabela clientes
+- [x] Procedure clientes.listarComScore: retorna clientes ordenados por score
+- [x] Nova página /scores com ranking visual
+- [x] Cards de cliente com score, badge (Excelente/Bom/Regular/Ruim), histórico
+- [x] Filtro por score e por lucro
+- [x] Menu lateral atualizado com "Score de Clientes"
+
+## Fase 29: Veículos Registrados (ALTA)
+- [x] Schema: tabela veiculos (marca, modelo, placa, renavam, chassi, comprador, valor, entrada, parcelas)
+- [x] Schema: tabela parcelas_veiculo (veiculoId, numero, valor, vencimento, status, pago_em)
+- [x] Nova página /veiculos com KPIs e listagem
+- [x] Formulário de novo veículo (3 abas: Dados, Comprador, Financeiro)
+- [x] Cards de veículo com status, comprador, valor, parcelas
+- [x] Menu lateral atualizado com "Veículos"
+- [ ] Procedure veiculos.criar: criar novo veículo com parcelas
+- [ ] Procedure veiculos.listar: listar veículos com filtros
+- [ ] Procedure parcelas_veiculo.pagar: registrar pagamento
+- [ ] Gerar contrato em PDF
+
+## Fase 30: Comprovante em PDF (MÉDIA)
+- [ ] Procedure parcelas.gerarComprovante: gera PDF e salva em S3
+- [ ] Integração jsPDF para geração de PDF
+- [ ] Envio automático por email via Brevo
+- [ ] Envio automático por WhatsApp
+- [ ] Armazenamento em S3 com link permanente
+- [ ] Página de histórico de comprovantes
+- [ ] Teste unitário
+
+## Fase 31: Backup de Dados (BAIXA)
+- [ ] Procedure backup.exportarCSV: exporta clientes, contratos, parcelas
+- [ ] Procedure backup.exportarJSON: exporta estrutura completa
+- [ ] Página /backup com botões de download
+- [ ] Backup automático (diário/semanal/mensal)
+- [ ] Restauração de dados (upload)
+- [ ] Teste unitário

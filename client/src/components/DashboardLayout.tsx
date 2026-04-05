@@ -39,6 +39,8 @@ import {
   ShoppingBag,
   FileCheck,
   DollarSign,
+  Star,
+  Car,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -50,6 +52,8 @@ const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Users, label: "Clientes", path: "/clientes" },
   { icon: DollarSign, label: "Empréstimos", path: "/emprestimos" },
+  { icon: Star, label: "Score de Clientes", path: "/scores" },
+  { icon: Car, label: "Veículos", path: "/veiculos" },
   { icon: FileText, label: "Contratos", path: "/contratos" },
   { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
   { icon: RefreshCw, label: "Reparcelamento", path: "/reparcelamento" },
