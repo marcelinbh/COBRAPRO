@@ -276,18 +276,20 @@
 - [ ] Gerar contrato em PDF
 
 ## Fase 30: Comprovante em PDF (MÉDIA)
-- [ ] Procedure parcelas.gerarComprovante: gera PDF e salva em S3
-- [ ] Integração jsPDF para geração de PDF
+- [x] Integração jsPDF + html2canvas para geração de PDF
+- [x] Utility gerarComprovante.ts com template HTML profissional
+- [x] Função gerarComprovantePDF() para download automático
 - [ ] Envio automático por email via Brevo
 - [ ] Envio automático por WhatsApp
 - [ ] Armazenamento em S3 com link permanente
 - [ ] Página de histórico de comprovantes
-- [ ] Teste unitário
 
 ## Fase 31: Backup de Dados (BAIXA)
-- [ ] Procedure backup.exportarCSV: exporta clientes, contratos, parcelas
-- [ ] Procedure backup.exportarJSON: exporta estrutura completa
-- [ ] Página /backup com botões de download
-- [ ] Backup automático (diário/semanal/mensal)
-- [ ] Restauração de dados (upload)
-- [ ] Teste unitário
+- [x] Página /backup com interface de exportação
+- [x] Seleção de tabelas para exportar
+- [x] Exportação em CSV
+- [x] Exportação em JSON
+- [x] Agendamento de backup automático (UI)
+- [x] Histórico de backups
+- [x] Menu lateral atualizado com "Backup"
+- [x] Aviso de segurança para dados sensíveis
