@@ -32,6 +32,8 @@ import Emprestimos from "./pages/Emprestimos";
 import { Scores } from "./pages/Scores";
 import Veiculos from "./pages/Veiculos";
 import Backup from "./pages/Backup";
+import Install from "./pages/Install";
+import AnaliseRisco from "./pages/AnaliseRisco";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -54,6 +56,8 @@ const EmprestimosPage = () => <DashboardLayout><Emprestimos /></DashboardLayout>
 const ScoresPage = () => <DashboardLayout><Scores /></DashboardLayout>;
 const VeiculosPage = () => <DashboardLayout><Veiculos /></DashboardLayout>;
 const BackupPage = () => <DashboardLayout><Backup /></DashboardLayout>;
+const InstallPage = () => <Install />;
+const AnaliseRiscoPage = () => <DashboardLayout><AnaliseRisco /></DashboardLayout>;
 
 function Router() {
   return (
@@ -89,6 +93,8 @@ function Router() {
       <Route path="/scores" component={ScoresPage} />
       <Route path="/veiculos" component={VeiculosPage} />
       <Route path="/backup" component={BackupPage} />
+      <Route path="/install" component={InstallPage} />
+      <Route path="/analise-risco" component={AnaliseRiscoPage} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
@@ -107,6 +113,13 @@ function App() {
       </ThemeProvider>
     </ErrorBoundary>
   );
+}
+
+// Registrar Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch((err) => {
+    console.warn('[SW] Registration failed:', err);
+  });
 }
 
 export default App;

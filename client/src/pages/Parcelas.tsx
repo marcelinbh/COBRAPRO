@@ -15,6 +15,7 @@ import {
   Search, MessageCircle, CheckCircle, Clock, AlertTriangle, Filter
 } from "lucide-react";
 import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
+import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 
 // Templates padrão (mesmos do Cobra Fácil)
 const TEMPLATE_ATRASO = `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━
@@ -285,16 +286,41 @@ function PagamentoDialog({
               <Button
                 className="flex-1"
                 disabled={!valorPago || !contaCaixaId || pagarMutation.isPending}
-                onClick={() => pagarMutation.mutate({
-                  parcelaId: parcela.id,
-                  valorPago: parseFloat(valorPago),
-                  contaCaixaId: parseInt(contaCaixaId),
-                  desconto: parseFloat(desconto),
-                })}
+                onClick={() => {
+                  const valorFinal = parseFloat(valorPago) - parseFloat(desconto);
+                  pagarMutation.mutate({
+                    parcelaId: parcela.id,
+                    valorPago: parseFloat(valorPago),
+                    contaCaixaId: parseInt(contaCaixaId),
+                    desconto: parseFloat(desconto),
+                  });
+                  // Gerar comprovante após sucesso (será feito no onSuccess)
+                }}
               >
                 {pagarMutation.isPending ? "Salvando..." : "Confirmar Pagamento"}
               </Button>
             </div>
+            
+            {/* Botão de Baixar Comprovante (após pagamento) */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs border-blue-500/40 text-blue-400 hover:bg-blue-500/10"
+              onClick={() => {
+                gerarComprovantePDF({
+                  clienteNome: parcela.clienteNome,
+                  parcelaNumero: parcela.numeroParcela,
+                  valorOriginal: parseFloat(String(parcela.valorOriginal)),
+                  juros: 0,
+                  valorPago: parseFloat(valorPago),
+                  dataPagamento: new Date().toISOString(),
+                  contratoId: parcela.contratoId,
+                  modalidade: 'Padrão',
+                })
+              }}
+            >
+              📄 Baixar Comprovante
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

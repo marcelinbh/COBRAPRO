@@ -42,6 +42,7 @@ import {
   Star,
   Car,
   Database,
+  AlertTriangle,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -56,6 +57,7 @@ const menuItems = [
   { icon: Star, label: "Score de Clientes", path: "/scores" },
   { icon: Car, label: "Veículos", path: "/veiculos" },
   { icon: Database, label: "Backup", path: "/backup" },
+  { icon: AlertTriangle, label: "Análise de Risco", path: "/analise-risco" },
   { icon: FileText, label: "Contratos", path: "/contratos" },
   { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
   { icon: RefreshCw, label: "Reparcelamento", path: "/reparcelamento" },
