@@ -28,7 +28,11 @@ export default function AnaliseRisco() {
     if (clientesComScore && Array.isArray(clientesComScore.clientes)) {
       const clientesComRisco = clientesComScore.clientes.map((cliente: any) => {
         const score = cliente.score || 0;
-        const taxaAdimplencia = cliente.parcelas > 0 ? ((cliente.parcelas - cliente.atrasadas) / cliente.parcelas) * 100 : 100;
+        const capitalTotal = cliente.capitalTotal || 0;
+        const totalReceber = cliente.totalReceber || 0;
+        const parcelas = cliente.parcelas || 0;
+        const atrasadas = cliente.atrasadas || 0;
+        const taxaAdimplencia = parcelas > 0 ? ((parcelas - atrasadas) / parcelas) * 100 : 100;
         
         // Calcular limite sugerido baseado em Score
         let limiteSugerido = 0;
@@ -36,26 +40,30 @@ export default function AnaliseRisco() {
         let recomendacao = "";
 
         if (score >= 100) {
-          limiteSugerido = cliente.capitalTotal * 3; // 300% do capital atual
+          limiteSugerido = capitalTotal * 3; // 300% do capital atual
           risco = "baixo";
           recomendacao = "Excelente cliente. Pode aumentar limite e oferecer melhores taxas.";
         } else if (score >= 75) {
-          limiteSugerido = cliente.capitalTotal * 2; // 200% do capital atual
+          limiteSugerido = capitalTotal * 2; // 200% do capital atual
           risco = "medio";
           recomendacao = "Bom cliente. Monitorar regularmente.";
         } else if (score >= 50) {
-          limiteSugerido = cliente.capitalTotal * 1.5; // 150% do capital atual
+          limiteSugerido = capitalTotal * 1.5; // 150% do capital atual
           risco = "alto";
           recomendacao = "Cliente com histórico de atrasos. Aumentar frequência de cobranças.";
         } else {
-          limiteSugerido = cliente.capitalTotal * 0.5; // 50% do capital atual
+          limiteSugerido = capitalTotal * 0.5; // 50% do capital atual
           risco = "critico";
           recomendacao = "Alto risco. Considerar suspender novos empréstimos até regularização.";
         }
 
         return {
           ...cliente,
-          limiteSugerido,
+          capitalTotal: capitalTotal || 0,
+          totalReceber: totalReceber || 0,
+          parcelas: parcelas || 0,
+          atrasadas: atrasadas || 0,
+          limiteSugerido: limiteSugerido || 0,
           risco,
           recomendacao,
         };
