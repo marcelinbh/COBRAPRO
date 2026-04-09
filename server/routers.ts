@@ -9,7 +9,7 @@ import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
   koletores, configuracoes, contasPagar, produtos, cheques
 } from "../drizzle/schema";
-import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade } from "../shared/finance";
 
@@ -545,6 +545,27 @@ const clientesRouter = router({
       }
       
       return { clientes: clientesComScore, total: clientesComScore.length };
+    }),
+
+  deletar: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      
+      const contratosAtivos = await db.select().from(contratos).where(
+        and(eq(contratos.clienteId, input.id), eq(contratos.status, 'ativo'))
+      );
+      
+      if (contratosAtivos.length > 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `Nao eh possivel deletar cliente com ${contratosAtivos.length} contrato(s) ativo(s).`
+        });
+      }
+      
+      await db.delete(clientes).where(eq(clientes.id, input.id));
+      return { success: true };
     }),
 });
 // ─── CONTRATOS ────────────────────────────────────────────────────────────────
@@ -1084,6 +1105,28 @@ const contratosRouter = router({
         </div>
         </body></html>`;
       return { html, contratoId: c.id, clienteNome: row.clienteNome };
+    }),
+
+  deletar: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      
+      const parcelasNaoPagas = await db.select().from(parcelas).where(
+        and(eq(parcelas.contratoId, input.id), ne(parcelas.status, 'paga'))
+      );
+      
+      if (parcelasNaoPagas.length > 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: `Nao eh possivel deletar contrato com ${parcelasNaoPagas.length} parcela(s) nao paga(s).`
+        });
+      }
+      
+      await db.delete(contratos).where(eq(contratos.id, input.id));
+      await db.delete(parcelas).where(eq(parcelas.contratoId, input.id));
+      return { success: true };
     }),
 });
 // ─── PARCELAS ────────────────────────────────────────────────────────────────

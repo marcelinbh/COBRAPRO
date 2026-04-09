@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 import {
   Plus, Search, User, Phone, CreditCard, ChevronRight, Star, Upload, Download,
-  AlertCircle, CheckCircle2, Camera, FileText, X, MapPin, Instagram, Facebook
+  AlertCircle, CheckCircle2, Camera, FileText, X, MapPin, Instagram, Facebook, Trash2
 } from "lucide-react";
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -677,10 +677,21 @@ function NovoClienteDialog({ onSuccess }: { onSuccess: () => void }) {
 export default function Clientes() {
   const [, setLocation] = useLocation();
   const [busca, setBusca] = useState("");
+  const [deleteClienteId, setDeleteClienteId] = useState<number | null>(null);
+  const [deleteClienteNome, setDeleteClienteNome] = useState("");
   const utils = trpc.useUtils();
 
   const { data: clientesData, isLoading } = trpc.clientes.list.useQuery({ busca: busca || undefined });
   const clientes = clientesData?.clientes ?? [];
+
+  const deleteClienteMutation = trpc.clientes.deletar.useMutation({
+    onSuccess: () => {
+      toast.success("Cliente deletado com sucesso");
+      utils.clientes.list.invalidate();
+      setDeleteClienteId(null);
+    },
+    onError: (e) => toast.error(e.message || "Erro ao deletar cliente"),
+  });
 
   return (
     <div className="space-y-6">
@@ -723,7 +734,7 @@ export default function Clientes() {
           >
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0 flex-1" onClick={() => setLocation(`/clientes/${cliente.id}`)}>
                   {cliente.fotoUrl ? (
                     <img src={cliente.fotoUrl} alt={cliente.nome} className="h-10 w-10 rounded-full object-cover shrink-0" />
                   ) : (
@@ -731,13 +742,27 @@ export default function Clientes() {
                       <span className="text-white font-semibold text-sm">{getInitials(cliente.nome)}</span>
                     </div>
                   )}
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="font-medium text-foreground truncate">{cliente.nome}</div>
                     {cliente.cpfCnpj && <div className="text-xs text-muted-foreground">{cliente.cpfCnpj}</div>}
                     {cliente.profissao && <div className="text-xs text-muted-foreground italic">{cliente.profissao}</div>}
                   </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                <div className="flex gap-1 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 w-6 p-0 text-destructive hover:bg-destructive/10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteClienteId(cliente.id);
+                      setDeleteClienteNome(cliente.nome);
+                    }}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -760,6 +785,35 @@ export default function Clientes() {
           </Card>
         ))}
       </div>
+
+      {/* Modal de confirmação de exclusão */}
+      <Dialog open={deleteClienteId !== null} onOpenChange={(open) => !open && setDeleteClienteId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-destructive">Deletar Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+              <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-foreground">Tem certeza que deseja deletar este cliente?</p>
+                <p className="text-sm text-muted-foreground mt-1">Cliente: <strong>{deleteClienteNome}</strong></p>
+                <p className="text-sm text-muted-foreground mt-2">Esta ação não pode ser desfeita. Todos os dados do cliente serão removidos.</p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <Button variant="outline" onClick={() => setDeleteClienteId(null)}>Cancelar</Button>
+              <Button
+                variant="destructive"
+                onClick={() => deleteClienteMutation.mutate({ id: deleteClienteId! })}
+                disabled={deleteClienteMutation.isPending}
+              >
+                {deleteClienteMutation.isPending ? "Deletando..." : "Deletar"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
