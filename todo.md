@@ -298,9 +298,9 @@
 - [x] Botões de ação no rodapé: Pagar, Pagar Juros, Histórico, Editar Juros, Aplicar Multa, Deletar
 - [x] Botão "Cobrar Atraso (WhatsApp)" em destaque
 - [x] Botão "Enviar Cobrança" em vermelho
-- [ ] Modal "Editar Empréstimo" com formulário completo
+- [x] Modal "Editar Empréstimo" com formulário completo
 - [x] Filtros: Filtros, Etiqueta
 - [x] Botões de visualização: Grid/Lista
-- [ ] Responsividade mobile (ajustes finos)
+- [x] Responsividade mobile (ajustes finos)
 - [x] TypeScript 0 erros
-- [ ] Deploy
+- [x] Deploy

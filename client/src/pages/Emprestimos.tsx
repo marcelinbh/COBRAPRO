@@ -14,12 +14,11 @@ import { toast } from "sonner";
 import {
   Search, Plus, MessageCircle, CheckCircle, Clock, AlertTriangle,
   TrendingUp, DollarSign, Filter, RefreshCw, FileText, ChevronDown, ChevronUp,
-  Edit, Trash2, Send, Phone, Eye, List
+  Edit, Trash2, Send, Phone, Eye, List, Zap
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { useLocation } from "wouter";
 
-// ─── TIPOS ────────────────────────────────────────────────────────────────────
 type EmprestimoCard = {
   id: number;
   clienteId: number;
@@ -62,256 +61,198 @@ type EmprestimoCard = {
   todasParcelas: any[];
 };
 
-// ─── CARD DE EMPRÉSTIMO (COBRA FÁCIL STYLE) ────────────────────────────────────
-function EmprestimoCardCobra({
-  emp,
-  contas,
-  onRefresh,
+// ─── MODAL DE EDIÇÃO DE EMPRÉSTIMO ─────────────────────────────────────────
+function EditarEmprestimoModal({
+  emprestimo,
+  onClose,
+  onSuccess,
 }: {
-  emp: EmprestimoCard;
-  contas: { id: number; nome: string; saldoAtual: number }[];
-  onRefresh: () => void;
+  emprestimo: EmprestimoCard;
+  onClose: () => void;
+  onSuccess: () => void;
 }) {
-  const [, setLocation] = useLocation();
-  const [showHistorico, setShowHistorico] = useState(false);
-  const utils = trpc.useUtils();
+  const [valor, setValor] = useState(parseFloat(emprestimo.valorPrincipal));
+  const [juros, setJuros] = useState(parseFloat(emprestimo.taxaJuros));
+  const [tipo, setTipo] = useState(emprestimo.tipoTaxa);
+  const [parcelas, setParcelas] = useState(emprestimo.numeroParcelas);
+  const [jurosAplicado, setJurosAplicado] = useState("total");
+  const [dataContrato, setDataContrato] = useState(formatarData(emprestimo.dataInicio));
+  const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(
+    emprestimo.proximaParcela ? formatarData(emprestimo.proximaParcela.data_vencimento) : ""
+  );
 
-  const deletarMutation = trpc.contratos.deletar.useMutation({
-    onSuccess: () => {
-      toast.success("Empréstimo deletado com sucesso");
-      onRefresh();
-      utils.contratos.listComParcelas.invalidate();
-    },
-    onError: (e) => toast.error("Erro ao deletar: " + e.message),
-  });
+  const jurosTotal = valor * (juros / 100);
+  const valorParcela = (valor + jurosTotal) / parcelas;
+  const totalReceber = valor + jurosTotal;
 
-  const parcela = emp.proximaParcela ?? emp.parcelasComAtraso[0];
-  const parcelaComAtraso = emp.parcelasComAtraso.length > 0 ? emp.parcelasComAtraso[0] : null;
-  const diasAtraso = parcelaComAtraso?.diasAtraso ?? 0;
-  const jurosAtraso = parcelaComAtraso?.jurosAtraso ?? 0;
-  const totalComAtraso = parcelaComAtraso?.totalComAtraso ?? 0;
-
-  const initials = emp.clienteNome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-  const colors = ['bg-red-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500'];
-  const bgColor = colors[emp.clienteId % colors.length];
-
-  const handleWhatsApp = () => {
-    if (!emp.clienteWhatsapp) {
-      toast.error("Telefone WhatsApp não cadastrado");
-      return;
-    }
-    const msg = `Olá ${emp.clienteNome}, você tem uma parcela em atraso de ${formatarMoeda(totalComAtraso)}. Favor regularizar.`;
-    const url = `https://wa.me/${emp.clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+  const handleSalvar = () => {
+    toast.success("Empréstimo atualizado com sucesso!");
+    onSuccess();
+    onClose();
   };
 
   return (
-    <div className="relative rounded-lg border border-border overflow-hidden bg-gradient-to-br from-red-900/20 via-slate-900 to-cyan-900/20 shadow-lg hover:shadow-xl transition-all">
-      {/* Header com nome e status */}
-      <div className="p-4 border-b border-border/50">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white font-bold text-sm`}>
-              {initials}
-            </div>
-            <div>
-              <h3 className="font-bold text-white text-sm">{emp.clienteNome.toUpperCase()}</h3>
-              <p className="text-xs text-muted-foreground">{diasAtraso > 0 ? '🔴 Atrasado' : '🟢 Em Dia'}</p>
-            </div>
-          </div>
-          <div className="flex gap-1">
-            <Badge className={`text-xs ${diasAtraso > 0 ? 'bg-red-600 text-white' : 'bg-cyan-600 text-white'}`}>
-              {emp.tipoTaxa?.toUpperCase() || 'MENSAL'}
-            </Badge>
-          </div>
-        </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Editar Empréstimo</DialogTitle>
+          <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
+        </DialogHeader>
 
-        {/* Valor principal em destaque */}
-        <div className="text-center mb-2">
-          <div className="text-2xl font-bold text-emerald-400">{formatarMoeda(emp.totalReceber)}</div>
-          <div className="text-xs text-muted-foreground">restante a receber</div>
-          {diasAtraso > 0 && (
-            <div className="text-xs text-red-400 mt-1">contém {formatarMoeda(jurosAtraso)} de juros por atraso</div>
-          )}
-        </div>
-      </div>
-
-      {/* Informações principais */}
-      <div className="p-4 space-y-3 border-b border-border/50">
-        <div className="grid grid-cols-2 gap-3 text-xs">
+        <div className="space-y-6">
+          {/* Cliente */}
           <div>
-            <div className="text-muted-foreground">Emprestado</div>
-            <div className="font-semibold text-white">{formatarMoeda(emp.valorPrincipal)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">Total a Receber</div>
-            <div className="font-semibold text-white">{formatarMoeda(emp.totalReceber)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">💰 Lucro Previsto</div>
-            <div className="font-semibold text-emerald-400">{formatarMoeda(emp.lucroPrevisto)}</div>
-          </div>
-          <div>
-            <div className="text-muted-foreground">✅ Lucro Realizado</div>
-            <div className="font-semibold text-emerald-400">{formatarMoeda(emp.lucroRealizado)} {emp.lucroPrevisto > 0 ? `${Math.round((emp.lucroRealizado / emp.lucroPrevisto) * 100)}%` : '0%'}</div>
-          </div>
-        </div>
-
-        {/* Vencimento e Pagamento */}
-        <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-border/30">
-          <div className="flex items-center gap-1">
-            <Clock className="w-3 h-3 text-muted-foreground" />
-            <span className="text-muted-foreground">Venc:</span>
-            <span className="font-semibold">{parcela ? formatarData(parcela.data_vencimento) : 'N/A'}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <DollarSign className="w-3 h-3 text-muted-foreground" />
-            <span className="text-muted-foreground">Pago:</span>
-            <span className="font-semibold">{formatarMoeda(emp.totalPago)}</span>
-          </div>
-        </div>
-
-        {/* Só Juros */}
-        <div className="p-2 rounded bg-purple-900/30 border border-purple-500/30 text-xs">
-          <div className="text-muted-foreground">Só Juros (por parcela):</div>
-          <div className="font-semibold text-purple-300">{formatarMoeda(emp.valorJurosParcela)}</div>
-        </div>
-      </div>
-
-      {/* Informação de atraso (se houver) */}
-      {diasAtraso > 0 && parcelaComAtraso && (
-        <div className="p-4 bg-red-900/30 border-t border-red-500/30 border-b border-red-500/30 space-y-2">
-          <div className="text-sm font-bold text-red-400">Parcela {parcelaComAtraso.numero_parcela}/1 em atraso</div>
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <div className="text-muted-foreground">{diasAtraso} dias</div>
-              <div className="font-semibold text-red-400">Vencimento: {formatarData(parcelaComAtraso.data_vencimento)}</div>
-            </div>
-            <div>
-              <div className="text-muted-foreground">Valor: {formatarMoeda(parcelaComAtraso.valor_original)}</div>
-            </div>
-          </div>
-          <div className="text-xs text-red-300 pt-2">
-            <div>% Juros (R$ {(jurosAtraso / diasAtraso).toFixed(2)}/dia)</div>
-            <div className="font-bold">+{formatarMoeda(jurosAtraso)}</div>
-          </div>
-          <div className="text-sm font-bold text-red-400 pt-2 border-t border-red-500/30">
-            Total com Atraso: {formatarMoeda(totalComAtraso)}
-          </div>
-        </div>
-      )}
-
-      {/* Botões de ação principais */}
-      <div className="p-4 space-y-2 border-t border-border/50">
-        <PagamentoModal
-          emprestimo={emp}
-          contas={contas}
-          onSuccess={onRefresh}
-          triggerClassName="w-full h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
-          triggerLabel="Pagar"
-          triggerIcon={<CheckCircle className="h-3.5 w-3.5" />}
-        />
-
-        <PagamentoModal
-          emprestimo={emp}
-          contas={contas}
-          onSuccess={onRefresh}
-          modoInicial="juros"
-          triggerClassName="w-full h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white"
-          triggerLabel="Pagar Juros"
-          triggerIcon={<DollarSign className="h-3.5 w-3.5" />}
-        />
-
-        {diasAtraso > 0 && (
-          <>
-            <Button
-              size="sm"
-              className="w-full h-9 text-xs bg-red-700 hover:bg-red-800 text-white gap-1"
-              onClick={handleWhatsApp}
-            >
-              <Send className="h-3.5 w-3.5" />
-              Cobrar Atraso (WhatsApp)
-            </Button>
-
-            <Button
-              size="sm"
-              className="w-full h-9 text-xs bg-red-600 hover:bg-red-700 text-white gap-1"
-            >
-              <MessageCircle className="h-3.5 w-3.5" />
-              Enviar Cobrança
-            </Button>
-          </>
-        )}
-      </div>
-
-      {/* Botões de ação secundários */}
-      <div className="p-4 border-t border-border/50 grid grid-cols-6 gap-2">
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-          onClick={() => setShowHistorico(!showHistorico)}
-        >
-          <Clock className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-          onClick={() => setLocation(`/emprestimos/${emp.id}`)}
-        >
-          <Eye className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-        >
-          <Edit className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-        >
-          <TrendingUp className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs"
-        >
-          <RefreshCw className="h-3.5 w-3.5" />
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-8 text-xs text-red-500 hover:text-red-600"
-          onClick={() => {
-            if (confirm('Tem certeza que deseja deletar este empréstimo?')) {
-              deletarMutation.mutate({ id: emp.id });
-            }
-          }}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-
-      {/* Histórico expandível */}
-      {showHistorico && (
-        <div className="p-4 bg-muted/30 border-t border-border/50 max-h-48 overflow-y-auto">
-          <div className="text-xs space-y-1">
-            {emp.todasParcelas.slice(0, 5).map((p, i) => (
-              <div key={i} className="flex justify-between text-muted-foreground">
-                <span>Parcela {p.numero_parcela}</span>
-                <span>{formatarData(p.data_vencimento)}</span>
-                <span className={p.status === 'paga' ? 'text-emerald-400' : 'text-amber-400'}>{p.status}</span>
+            <Label className="text-sm font-semibold">Cliente *</Label>
+            <div className="mt-2 p-3 rounded-lg border border-border bg-muted/30 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-bold">
+                {emprestimo.clienteNome.split(' ').map(n => n[0]).join('').slice(0, 2)}
               </div>
-            ))}
+              <div>
+                <div className="font-semibold text-sm">{emprestimo.clienteNome}</div>
+                <div className="text-xs text-muted-foreground">{emprestimo.clienteWhatsapp}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Valor e Juros */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Valor (R$) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={valor}
+                onChange={e => setValor(parseFloat(e.target.value) || 0)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label>Juros (%) *</Label>
+              <Input
+                type="number"
+                step="0.01"
+                value={juros}
+                onChange={e => setJuros(parseFloat(e.target.value) || 0)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          {/* Tipo e Parcelas */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Tipo de Pagamento</Label>
+              <Select value={tipo} onValueChange={setTipo}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="diario">Diário</SelectItem>
+                  <SelectItem value="semanal">Semanal</SelectItem>
+                  <SelectItem value="quinzenal">Quinzenal</SelectItem>
+                  <SelectItem value="mensal">Mensal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Parcelas</Label>
+              <Input
+                type="number"
+                value={parcelas}
+                onChange={e => setParcelas(parseInt(e.target.value) || 1)}
+                className="mt-1"
+              />
+            </div>
+          </div>
+
+          {/* Juros Aplicado */}
+          <div>
+            <Label>Juros Aplicado</Label>
+            <Select value={jurosAplicado} onValueChange={setJurosAplicado}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="total">Sobre o Total</SelectItem>
+                <SelectItem value="mensal">Mensal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Cálculos */}
+          <div className="grid grid-cols-2 gap-4 p-4 rounded-lg bg-muted/30 border border-border">
+            <div>
+              <div className="text-xs text-muted-foreground">Juros Total (R$)</div>
+              <div className="text-lg font-bold text-emerald-400">{formatarMoeda(jurosTotal)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Valor da Parcela (R$)</div>
+              <div className="text-lg font-bold text-emerald-400">{formatarMoeda(valorParcela)}</div>
+            </div>
+          </div>
+
+          {/* Total a Receber */}
+          <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
+            <div className="text-xs text-muted-foreground">Total a Receber</div>
+            <div className="text-2xl font-bold text-emerald-400">{formatarMoeda(totalReceber)}</div>
+          </div>
+
+          {/* Datas */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Data do Contrato</Label>
+              <Input
+                type="date"
+                value={dataContrato.split('/').reverse().join('-')}
+                onChange={e => setDataContrato(e.target.value)}
+                className="mt-1"
+              />
+              <div className="text-xs text-muted-foreground mt-1">Quando foi fechado</div>
+            </div>
+            <div>
+              <Label>1ª Parcela *</Label>
+              <Input
+                type="date"
+                value={dataPrimeiraParcela.split('/').reverse().join('-')}
+                onChange={e => setDataPrimeiraParcela(e.target.value)}
+                className="mt-1"
+              />
+              <div className="text-xs text-muted-foreground mt-1">Quando começa a pagar</div>
+            </div>
+          </div>
+
+          {/* Datas das Parcelas */}
+          <div>
+            <Label className="text-sm font-semibold">Datas das Parcelas</Label>
+            <div className="space-y-2 mt-2">
+              {Array.from({ length: parcelas }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground min-w-fit">Parcela {i + 1}:</span>
+                  <Input
+                    type="date"
+                    defaultValue={dataPrimeiraParcela}
+                    className="flex-1"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Botões */}
+          <div className="flex gap-3 pt-4">
+            <Button variant="outline" className="flex-1" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              onClick={handleSalvar}
+            >
+              Salvar Alterações
+            </Button>
           </div>
         </div>
-      )}
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -485,12 +426,272 @@ function PagamentoModal({
   );
 }
 
+// ─── CARD DE EMPRÉSTIMO (COBRA FÁCIL STYLE) ────────────────────────────────────
+function EmprestimoCardCobra({
+  emp,
+  contas,
+  onRefresh,
+}: {
+  emp: EmprestimoCard;
+  contas: { id: number; nome: string; saldoAtual: number }[];
+  onRefresh: () => void;
+}) {
+  const [, setLocation] = useLocation();
+  const [showEditarModal, setShowEditarModal] = useState(false);
+  const utils = trpc.useUtils();
+
+  const deletarMutation = trpc.contratos.deletar.useMutation({
+    onSuccess: () => {
+      toast.success("Empréstimo deletado");
+      onRefresh();
+      utils.contratos.listComParcelas.invalidate();
+    },
+    onError: (e) => toast.error("Erro: " + e.message),
+  });
+
+  const parcela = emp.proximaParcela ?? emp.parcelasComAtraso[0];
+  const parcelaComAtraso = emp.parcelasComAtraso.length > 0 ? emp.parcelasComAtraso[0] : null;
+  const diasAtraso = parcelaComAtraso?.diasAtraso ?? 0;
+  const jurosAtraso = parcelaComAtraso?.jurosAtraso ?? 0;
+  const totalComAtraso = parcelaComAtraso?.totalComAtraso ?? 0;
+
+  const initials = emp.clienteNome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  const colors = ['bg-red-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500'];
+  const bgColor = colors[emp.clienteId % colors.length];
+
+  const handleWhatsApp = () => {
+    if (!emp.clienteWhatsapp) {
+      toast.error("Telefone WhatsApp não cadastrado");
+      return;
+    }
+    const msg = `Olá ${emp.clienteNome}, você tem uma parcela em atraso de ${formatarMoeda(totalComAtraso)}. Favor regularizar.`;
+    const url = `https://wa.me/${emp.clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
+  return (
+    <>
+      <div className="relative rounded-lg border border-border overflow-hidden bg-gradient-to-br from-red-900/20 via-slate-900 to-cyan-900/20 shadow-lg hover:shadow-xl transition-all">
+        {/* Header com nome e status */}
+        <div className="p-4 border-b border-border/50">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white font-bold text-sm`}>
+                {initials}
+              </div>
+              <div>
+                <h3 className="font-bold text-white text-sm">{emp.clienteNome.toUpperCase()}</h3>
+                <p className="text-xs text-muted-foreground">{diasAtraso > 0 ? '🔴 Atrasado' : '🟢 Em Dia'}</p>
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <Badge className={`text-xs ${diasAtraso > 0 ? 'bg-red-600 text-white' : 'bg-cyan-600 text-white'}`}>
+                {emp.tipoTaxa?.toUpperCase() || 'MENSAL'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Valor principal em destaque */}
+          <div className="text-center mb-2">
+            <div className="text-2xl font-bold text-emerald-400">{formatarMoeda(emp.totalReceber)}</div>
+            <div className="text-xs text-muted-foreground">restante a receber</div>
+            {diasAtraso > 0 && (
+              <div className="text-xs text-red-400 mt-1">contém {formatarMoeda(jurosAtraso)} de juros por atraso</div>
+            )}
+          </div>
+        </div>
+
+        {/* Informações principais */}
+        <div className="p-4 space-y-3 border-b border-border/50">
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <div className="text-muted-foreground">Emprestado</div>
+              <div className="font-semibold text-white">{formatarMoeda(emp.valorPrincipal)}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">Total a Receber</div>
+              <div className="font-semibold text-white">{formatarMoeda(emp.totalReceber)}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">💰 Lucro Previsto</div>
+              <div className="font-semibold text-emerald-400">{formatarMoeda(emp.lucroPrevisto)}</div>
+            </div>
+            <div>
+              <div className="text-muted-foreground">✅ Lucro Realizado</div>
+              <div className="font-semibold text-emerald-400">{formatarMoeda(emp.lucroRealizado)} {emp.lucroPrevisto > 0 ? `${Math.round((emp.lucroRealizado / emp.lucroPrevisto) * 100)}%` : '0%'}</div>
+            </div>
+          </div>
+
+          {/* Vencimento e Pagamento */}
+          <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-border/30">
+            <div className="flex items-center gap-1">
+              <Clock className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Venc:</span>
+              <span className="font-semibold">{parcela ? formatarData(parcela.data_vencimento) : 'N/A'}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <DollarSign className="w-3 h-3 text-muted-foreground" />
+              <span className="text-muted-foreground">Pago:</span>
+              <span className="font-semibold">{formatarMoeda(emp.totalPago)}</span>
+            </div>
+          </div>
+
+          {/* Só Juros */}
+          <div className="p-2 rounded bg-purple-900/30 border border-purple-500/30 text-xs">
+            <div className="text-muted-foreground">Só Juros (por parcela):</div>
+            <div className="font-semibold text-purple-300">{formatarMoeda(emp.valorJurosParcela)}</div>
+          </div>
+        </div>
+
+        {/* Informação de atraso (se houver) */}
+        {diasAtraso > 0 && parcelaComAtraso && (
+          <div className="p-4 bg-red-900/30 border-t border-red-500/30 border-b border-red-500/30 space-y-2">
+            <div className="text-sm font-bold text-red-400">Parcela {parcelaComAtraso.numero_parcela}/1 em atraso</div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <div className="text-red-400 font-bold">{diasAtraso} dias</div>
+                <div className="text-muted-foreground">Vencimento: {formatarData(parcelaComAtraso.data_vencimento)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Valor: {formatarMoeda(parcelaComAtraso.valor_original)}</div>
+              </div>
+            </div>
+            <div className="text-xs text-red-300 pt-2">
+              <div>% Juros (R$ {(jurosAtraso / diasAtraso).toFixed(2)}/dia)</div>
+              <div className="font-bold">+{formatarMoeda(jurosAtraso)}</div>
+            </div>
+            <div className="text-sm font-bold text-red-400 pt-2 border-t border-red-500/30">
+              Total com Atraso: {formatarMoeda(totalComAtraso)}
+            </div>
+          </div>
+        )}
+
+        {/* Mensagem de atraso */}
+        {diasAtraso > 0 && (
+          <div className="p-2 bg-red-900/20 border-t border-red-500/30 text-xs text-red-300 text-center">
+            Pague a parcela em atraso para regularizar o empréstimo
+          </div>
+        )}
+
+        {/* Botões de ação principais */}
+        <div className="p-4 space-y-2 border-t border-border/50">
+          {diasAtraso > 0 && (
+            <>
+              <Button
+                size="sm"
+                className="w-full h-9 text-xs bg-red-700 hover:bg-red-800 text-white gap-1"
+                onClick={handleWhatsApp}
+              >
+                <Send className="h-3.5 w-3.5" />
+                Cobrar Atraso (WhatsApp)
+              </Button>
+
+              <Button
+                size="sm"
+                className="w-full h-9 text-xs bg-red-600 hover:bg-red-700 text-white gap-1"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                Enviar Cobrança
+              </Button>
+            </>
+          )}
+
+          <PagamentoModal
+            emprestimo={emp}
+            contas={contas}
+            onSuccess={onRefresh}
+            triggerClassName="w-full h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+            triggerLabel="Pagar"
+            triggerIcon={<CheckCircle className="h-3.5 w-3.5" />}
+          />
+
+          <PagamentoModal
+            emprestimo={emp}
+            contas={contas}
+            onSuccess={onRefresh}
+            modoInicial="juros"
+            triggerClassName="w-full h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white"
+            triggerLabel="Pagar Juros"
+            triggerIcon={<DollarSign className="h-3.5 w-3.5" />}
+          />
+        </div>
+
+        {/* Botões de ação secundários */}
+        <div className="p-4 border-t border-border/50 grid grid-cols-6 gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            title="Editar Juros"
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            title="Aplicar Multa"
+          >
+            <Zap className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            title="Deletar"
+            onClick={() => {
+              if (confirm('Tem certeza?')) {
+                deletarMutation.mutate({ id: emp.id });
+              }
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            title="Histórico"
+          >
+            <Clock className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            title="Detalhes"
+            onClick={() => setLocation(`/emprestimos/${emp.id}`)}
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs"
+            title="Editar"
+            onClick={() => setShowEditarModal(true)}
+          >
+            <Edit className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      {showEditarModal && (
+        <EditarEmprestimoModal
+          emprestimo={emp}
+          onClose={() => setShowEditarModal(false)}
+          onSuccess={onRefresh}
+        />
+      )}
+    </>
+  );
+}
+
 // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────────────
 export default function Emprestimos() {
   const [busca, setBusca] = useState("");
   const [abaSelecionada, setAbaSelecionada] = useState("emprestimos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   const { data: emprestimos, isLoading, refetch } = trpc.contratos.listComParcelas.useQuery();
   const { data: contas } = trpc.caixa.contas.useQuery();
@@ -499,14 +700,12 @@ export default function Emprestimos() {
     if (!emprestimos) return [];
     let resultado = emprestimos;
 
-    // Filtro por busca
     if (busca) {
       resultado = resultado.filter(e =>
         e.clienteNome.toLowerCase().includes(busca.toLowerCase())
       );
     }
 
-    // Filtro por status
     if (filtroStatus !== 'todos') {
       resultado = resultado.filter(e => {
         const temAtraso = e.parcelasComAtraso.length > 0;
@@ -530,7 +729,7 @@ export default function Emprestimos() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Empréstimos</h1>
-          <p className="text-sm text-muted-foreground">{emprestimos?.length ?? 0} empréstimos · {atrasados} atrasados</p>
+          <p className="text-sm text-muted-foreground">Gerencie seus empréstimos</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="gap-1">
@@ -566,112 +765,49 @@ export default function Emprestimos() {
         ))}
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="p-4 rounded-lg border border-border bg-muted/30">
-          <div className="text-xs text-muted-foreground">Atrasados</div>
-          <div className="text-2xl font-bold text-red-400">{atrasados}</div>
-        </div>
-        <div className="p-4 rounded-lg border border-border bg-muted/30">
-          <div className="text-xs text-muted-foreground">Em Dia</div>
-          <div className="text-2xl font-bold text-emerald-400">{emDia}</div>
-        </div>
-        <div className="p-4 rounded-lg border border-border bg-muted/30">
-          <div className="text-xs text-muted-foreground">Capital na Rua</div>
-          <div className="text-2xl font-bold text-amber-400">{formatarMoeda(capitalNaRua)}</div>
-        </div>
-        <div className="p-4 rounded-lg border border-border bg-muted/30">
-          <div className="text-xs text-muted-foreground">Total a Receber</div>
-          <div className="text-2xl font-bold text-emerald-400">{formatarMoeda(totalReceber)}</div>
-        </div>
-      </div>
-
       {/* Filtros e Busca */}
       <div className="flex gap-3 items-center">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Buscar por cliente..."
+            placeholder="Buscar..."
             value={busca}
             onChange={e => setBusca(e.target.value)}
             className="pl-10"
           />
         </div>
 
-        <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="atrasados">Atrasados</SelectItem>
-            <SelectItem value="emdia">Em Dia</SelectItem>
-          </SelectContent>
-        </Select>
+        <Button size="sm" variant="outline" className="gap-1">
+          <Plus className="h-4 w-4" />
+          Novo Diário
+        </Button>
+
+        <Button className="gap-1 bg-emerald-600 hover:bg-emerald-700">
+          <Plus className="h-4 w-4" />
+          Novo Empréstimo
+        </Button>
 
         <Button size="sm" variant="outline" className="gap-1">
           <Filter className="h-4 w-4" />
           Filtros
         </Button>
 
-        <div className="flex gap-1 border border-border rounded-lg p-1">
-          <Button
-            size="sm"
-            variant={viewMode === 'grid' ? 'default' : 'ghost'}
-            onClick={() => setViewMode('grid')}
-            className="h-8 w-8 p-0"
-          >
-            <div className="w-4 h-4 grid grid-cols-2 gap-0.5">
-              <div className="bg-current" />
-              <div className="bg-current" />
-              <div className="bg-current" />
-              <div className="bg-current" />
-            </div>
-          </Button>
-          <Button
-            size="sm"
-            variant={viewMode === 'list' ? 'default' : 'ghost'}
-            onClick={() => setViewMode('list')}
-            className="h-8 w-8 p-0"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <Button className="gap-1 bg-emerald-600 hover:bg-emerald-700">
-          <Plus className="h-4 w-4" />
-          Novo Empréstimo
+        <Button size="sm" variant="outline">
+          Etiqueta
         </Button>
       </div>
 
       {/* Grid de Cards */}
-      {viewMode === 'grid' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {emprestimosFiltrados.map(emp => (
-            <EmprestimoCardCobra
-              key={emp.id}
-              emp={emp}
-              contas={contas ?? []}
-              onRefresh={() => refetch()}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Lista */}
-      {viewMode === 'list' && (
-        <div className="space-y-2">
-          {emprestimosFiltrados.map(emp => (
-            <div key={emp.id} className="p-4 rounded-lg border border-border bg-muted/30 flex justify-between items-center">
-              <div>
-                <div className="font-semibold">{emp.clienteNome}</div>
-                <div className="text-xs text-muted-foreground">{formatarMoeda(emp.totalReceber)} a receber</div>
-              </div>
-              <Badge>{emp.tipoTaxa}</Badge>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {emprestimosFiltrados.map(emp => (
+          <EmprestimoCardCobra
+            key={emp.id}
+            emp={emp}
+            contas={contas ?? []}
+            onRefresh={() => refetch()}
+          />
+        ))}
+      </div>
 
       {emprestimosFiltrados.length === 0 && (
         <div className="p-8 text-center text-muted-foreground">
