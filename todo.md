@@ -287,3 +287,20 @@
 - [x] UI: Botao "Cobrar Atraso (WhatsApp)" com integracao
 - [x] Testes de todas as acoes
 - [x] Deploy
+
+## Fase 42: Redesenho da Página de Empréstimos (Cobra Fácil Style)
+- [x] Layout de cards em grid 3 colunas (responsivo)
+- [x] Cards com gradient vermelho/azul (background)
+- [x] Abas na página: Empréstimos (80), Diário (0), Tabela Price, Recebimentos
+- [x] Informações de atraso: "Parcela 1/1 em atraso - 92 dias - Vencimento: 08/01/2028"
+- [x] Juros diários: "% Juros (R$ 100,00/dia) +R$ 9.200,00"
+- [x] Total com Atraso em destaque
+- [x] Botões de ação no rodapé: Pagar, Pagar Juros, Histórico, Editar Juros, Aplicar Multa, Deletar
+- [x] Botão "Cobrar Atraso (WhatsApp)" em destaque
+- [x] Botão "Enviar Cobrança" em vermelho
+- [ ] Modal "Editar Empréstimo" com formulário completo
+- [x] Filtros: Filtros, Etiqueta
+- [x] Botões de visualização: Grid/Lista
+- [ ] Responsividade mobile (ajustes finos)
+- [x] TypeScript 0 erros
+- [ ] Deploy
