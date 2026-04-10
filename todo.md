@@ -238,9 +238,15 @@
 - [x] Testes de exclusão
 - [x] Deploy com nova funcionalidade
 
+## Fase 38: Procedures Backend para Veículos
+- [x] Procedure criar veículo
+- [x] Procedure listar veículos
+- [x] Procedure deletar veículo
+- [x] Procedure pagar parcela de veículo
+- [x] Deploy com novas procedures
+
 ## Próximas Fases (Futuro)
 - [ ] Notificações automáticas por email (lembretes, cobranças, relatórios)
-- [ ] Procedures backend para veículos (criar, listar, pagar)
 - [ ] Integração de email em registrarPagamento
 - [ ] Importação em lote via CSV (clientes)
 - [ ] Geração de contrato em PDF

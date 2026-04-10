@@ -1,6 +1,7 @@
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
+import { veiculosRouter } from "./routers/veiculos";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClient, resetDb } from "./db";
@@ -2562,6 +2563,7 @@ export const appRouter = router({
   contasPagar: contasPagarRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,
+  veiculos: veiculosRouter,
 });
 
 export type AppRouter = typeof appRouter;
