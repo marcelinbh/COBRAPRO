@@ -233,10 +233,10 @@
 - [x] Procedure backend para deletar cliente (com validações)
 - [x] Procedure backend para deletar empréstimo/contrato
 - [x] Botão de exclusão nos cards de clientes
-- [ ] Botão de exclusão nos empréstimos
+- [x] Botão de exclusão nos empréstimos
 - [x] Modal de confirmação com aviso de segurança
-- [ ] Testes de exclusão
-- [ ] Deploy com nova funcionalidade
+- [x] Testes de exclusão
+- [x] Deploy com nova funcionalidade
 
 ## Próximas Fases (Futuro)
 - [ ] Notificações automáticas por email (lembretes, cobranças, relatórios)
