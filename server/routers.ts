@@ -1231,6 +1231,60 @@ const contratosRouter = router({
       await db.delete(parcelas).where(eq(parcelas.contratoId, input.id));
       return { success: true };
     }),
+
+  pagarTotal: protectedProcedure
+    .input(z.object({ id: z.number(), valor: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('Database unavailable');
+      
+      await db.update(contratos)
+        .set({ status: 'quitado' })
+        .where(eq(contratos.id, input.id));
+      
+      await db.update(parcelas)
+        .set({ status: 'paga', dataPagamento: new Date() })
+        .where(eq(parcelas.contratoId, input.id));
+      
+      return { success: true };
+    }),
+
+  editarJuros: protectedProcedure
+    .input(z.object({ id: z.number(), novaTaxa: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('Database unavailable');
+      
+      await db.update(contratos)
+        .set({ taxaJuros: input.novaTaxa })
+        .where(eq(contratos.id, input.id));
+      
+      return { success: true };
+    }),
+
+  aplicarMulta: protectedProcedure
+    .input(z.object({ id: z.number(), multa: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('Database unavailable');
+      
+      const parcelasAtraso = await db.select()
+        .from(parcelas)
+        .where(and(
+          eq(parcelas.contratoId, input.id),
+          eq(parcelas.status, 'pendente'),
+          lt(sql`DATE(${parcelas.dataVencimento})`, new Date().toISOString().split('T')[0])
+        ));
+      
+      for (const parcela of parcelasAtraso) {
+        const multaAtual = parcela.valorMulta ? parseFloat(parcela.valorMulta) : 0;
+        await db.update(parcelas)
+          .set({ valorMulta: (multaAtual + parseFloat(input.multa)).toString() })
+          .where(eq(parcelas.id, parcela.id));
+      }
+      
+      return { success: true };
+    }),
 });
 // ─── PARCELAS ────────────────────────────────────────────────────────────────
 const parcelasRouter = router({

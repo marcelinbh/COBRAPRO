@@ -16,6 +16,12 @@ export default function EmprestimoDetalhes() {
   const [aba, setAba] = useState<'etiqueta' | 'detalhes' | 'comprovante'>('etiqueta');
   const { id } = useParams<{ id: string }>();
   const emprestimoId = parseInt(id || '0');
+  const [modalAcao, setModalAcao] = useState<'pagar' | 'juros' | 'editar' | 'multa' | null>(null);
+  const [valor, setValor] = useState<string>('');
+
+  const pagarTotalMutation = trpc.contratos.pagarTotal.useMutation();
+  const editarJurosMutation = trpc.contratos.editarJuros.useMutation();
+  const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation();
 
   // Query para buscar empréstimo detalhado
   const { data: emprestimo, isLoading } = trpc.contratos.obterDetalhes.useQuery(

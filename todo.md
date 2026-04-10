@@ -273,3 +273,17 @@
 - [x] Modal de confirmacao para acoes criticas
 - [x] Testes de interface
 - [x] Deploy
+
+## Fase 41: Botoes de Acao de Emprestimos
+- [x] Procedure pagar emprestimo (registrar pagamento completo)
+- [x] Procedure pagar juros (registrar pagamento de juros)
+- [x] Procedure editar juros (alterar taxa de juros)
+- [x] Procedure aplicar multa (adicionar multa por atraso)
+- [x] Procedure cobrar atraso WhatsApp (enviar mensagem pre-formatada)
+- [x] UI: Botao "Pagar" com estado e mutation
+- [x] UI: Botao "Pagar Juros" com estado e mutation
+- [x] UI: Botao "Editar Juros" com estado e mutation
+- [x] UI: Botao "Aplicar Multa" com estado e mutation
+- [x] UI: Botao "Cobrar Atraso (WhatsApp)" com integracao
+- [x] Testes de todas as acoes
+- [x] Deploy
