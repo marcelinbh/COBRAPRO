@@ -254,22 +254,22 @@
 - [ ] Caixa: transferência entre contas
 - [ ] Caixa: ajuste manual de saldo
 
-## Fase 39: Interface Completa de Clientes (Cobra Fácil Style)
-- [ ] Tabela de clientes com colunas: Cliente, Telefone, Tipo, Status, Score, Cadastrado em, Ações
-- [ ] Busca por nome/CPF/telefone
-- [ ] Contador de clientes totais
-- [ ] Ícones de avatar com iniciais
-- [ ] Badges de tipo (Empréstimo, etc)
-- [ ] Badges de status (Ativo, Inativo)
-- [ ] Score visual com ícone
-- [ ] Botões de ação: Editar, Deletar
-- [ ] Clique na linha para abrir detalhes do cliente
+## Fase 39: Interface Completa de Clientes (Cobra Facil Style)
+- [x] Tabela de clientes com colunas: Cliente, Telefone, Tipo, Status, Score, Cadastrado em, Acoes
+- [x] Busca por nome/CPF/telefone
+- [x] Contador de clientes totais
+- [x] Icones de avatar com iniciais
+- [x] Badges de tipo (Emprestimo, etc)
+- [x] Badges de status (Ativo, Inativo)
+- [x] Score visual com icone
+- [x] Botoes de acao: Editar, Deletar
+- [x] Clique na linha para abrir detalhes do cliente
 
-## Fase 40: Interface Completa de Empréstimos (Cobra Fácil Style)
-- [ ] Abas: Etiqueta, Detalhes, Comprovante
-- [ ] Informações principais: Emprestado, Lucro Previsto, Lucro Realizado, Vencimento, Pago
-- [ ] Seção de parcelas com atraso: dias, juros diários, total com atraso
-- [ ] Botões de ação: Pagar, Pagar Juros, Editar Juros, Aplicar Multa, Cobrar Atraso (WhatsApp), Enviar Cobrança, Deletar
-- [ ] Modal de confirmação para ações críticas
-- [ ] Testes de interface
-- [ ] Deploy
+## Fase 40: Interface Completa de Emprestimos (Cobra Facil Style)
+- [x] Abas: Etiqueta, Detalhes, Comprovante
+- [x] Informacoes principais: Emprestado, Lucro Previsto, Lucro Realizado, Vencimento, Pago
+- [x] Secao de parcelas com atraso: dias, juros diarios, total com atraso
+- [x] Botoes de acao: Pagar, Pagar Juros, Editar Juros, Aplicar Multa, Cobrar Atraso (WhatsApp), Enviar Cobranca, Deletar
+- [x] Modal de confirmacao para acoes criticas
+- [x] Testes de interface
+- [x] Deploy

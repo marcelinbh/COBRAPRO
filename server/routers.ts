@@ -715,6 +715,108 @@ const contratosRouter = router({
       });
     }),
 
+  obterDetalhes: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return null;
+
+      // Buscar contrato
+      const { data: contratoData, error: contratoErr } = await supabase
+        .from('contratos')
+        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
+        .eq('id', input.id)
+        .single();
+
+      if (contratoErr || !contratoData) return null;
+
+      // Buscar parcelas
+      const { data: parcelasData } = await supabase
+        .from('parcelas')
+        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, data_vencimento, data_pagamento, status')
+        .eq('contrato_id', input.id)
+        .order('data_vencimento');
+
+      const hoje = new Date().toISOString().split('T')[0];
+      const cliente = contratoData.clientes as any;
+      const parcelas = (parcelasData ?? []).map((p: any) => {
+        let statusAtual = p.status;
+        if (statusAtual !== 'paga' && statusAtual !== 'parcial') {
+          if (p.data_vencimento < hoje) statusAtual = 'atrasada';
+          else if (p.data_vencimento === hoje) statusAtual = 'vencendo_hoje';
+        }
+        return { ...p, status: statusAtual };
+      });
+
+      // Buscar configuração de multa
+      let multaDiaria = 100;
+      try {
+        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+        if (configRows) {
+          const configMap: Record<string, string> = {};
+          for (const r of configRows) configMap[r.chave] = r.valor ?? '';
+          if (configMap['multaDiaria']) multaDiaria = parseFloat(configMap['multaDiaria']) || 100;
+        }
+      } catch (_) { /* usa padrão */ }
+
+      // Calcular KPIs
+      const parcelasAbertas = parcelas.filter((p: any) => !['paga'].includes(p.status));
+      const parcelasPagas = parcelas.filter((p: any) => p.status === 'paga');
+      const parcelasAtrasadas = parcelas.filter((p: any) => p.status === 'atrasada');
+
+      const valorPrincipal = parseFloat(contratoData.valor_principal ?? '0');
+      const valorParcela = parseFloat(contratoData.valor_parcela ?? '0');
+      const taxaJuros = parseFloat(contratoData.taxa_juros ?? '0');
+      const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+
+      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+      const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
+      const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
+      const lucroRealizado = Math.max(0, totalPago - (parcelasPagas.length > 0 ? 0 : 0));
+
+      const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
+        const venc = new Date(p.data_vencimento + 'T00:00:00');
+        const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
+        const jurosDiarios = multaDiaria;
+        const jurosAtraso = diasAtraso * jurosDiarios;
+        return {
+          ...p,
+          diasAtraso,
+          jurosAtraso,
+          totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso,
+        };
+      });
+
+      return {
+        id: contratoData.id,
+        clienteId: cliente?.id ?? contratoData.cliente_id,
+        clienteNome: cliente?.nome ?? '',
+        clienteWhatsapp: cliente?.whatsapp ?? null,
+        clienteChavePix: cliente?.chave_pix ?? null,
+        clienteTelefone: cliente?.telefone ?? null,
+        modalidade: contratoData.modalidade,
+        status: contratoData.status,
+        valorPrincipal: contratoData.valor_principal,
+        valorParcela: contratoData.valor_parcela,
+        numeroParcelas: contratoData.numero_parcelas,
+        taxaJuros: contratoData.taxa_juros,
+        tipoTaxa: contratoData.tipo_taxa,
+        dataInicio: contratoData.data_inicio,
+        dataVencimento: contratoData.data_vencimento_primeira,
+        dataCriacao: contratoData.createdAt,
+        totalReceber,
+        totalPago,
+        lucroPrevisto,
+        lucroRealizado,
+        valorJurosParcela,
+        parcelasAbertas: parcelasAbertas.length,
+        parcelasAtrasadas: parcelasAtrasadas.length,
+        parcelasPagas: parcelasPagas.length,
+        parcelasComAtraso,
+        todasParcelas: parcelas,
+      };
+    }),
+
   list: protectedProcedure
     .input(z.object({
       status: z.string().optional(),
