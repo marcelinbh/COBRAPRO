@@ -101,6 +101,18 @@ export default function Clientes() {
     c.telefone?.includes(busca)
   );
 
+  const createClienteMutation = trpc.clientes.create.useMutation({
+    onSuccess: () => {
+      toast.success("Cliente criado com sucesso!");
+      setShowNovoClienteModal(false);
+      setNovoClienteNome("");
+      setNovoClienteTelefone("");
+      setNovoClienteTipo("");
+      utils.clientes.list.invalidate();
+    },
+    onError: (e) => toast.error("Erro ao criar: " + e.message),
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -293,12 +305,18 @@ export default function Clientes() {
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setShowNovoClienteModal(false)}>Cancelar</Button>
               <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => {
-                toast.success("Cliente criado com sucesso!");
-                setShowNovoClienteModal(false);
-                setNovoClienteNome("");
-                setNovoClienteTelefone("");
-                setNovoClienteTipo("");
-              }}>Criar</Button>
+                if (!novoClienteNome.trim()) {
+                  toast.error("Nome é obrigatório");
+                  return;
+                }
+                createClienteMutation.mutate({
+                  nome: novoClienteNome,
+                  telefone: novoClienteTelefone,
+                  profissao: novoClienteTipo,
+                });
+              }} disabled={createClienteMutation.isPending}>
+                {createClienteMutation.isPending ? "Criando..." : "Criar"}
+              </Button>
             </div>
           </div>
         </DialogContent>
