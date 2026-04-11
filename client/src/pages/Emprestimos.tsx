@@ -440,7 +440,33 @@ function EmprestimoCardCobra({
   const [showEditarModal, setShowEditarModal] = useState(false);
   const [showEditarJurosModal, setShowEditarJurosModal] = useState<number | null>(null);
   const [showAplicarMultaModal, setShowAplicarMultaModal] = useState<number | null>(null);
+  const [novasTaxaJuros, setNovasTaxaJuros] = useState<string>("");
+  const [valorMulta, setValorMulta] = useState<string>("");
+  const [motivoMulta, setMotivoMulta] = useState<string>("");
   const utils = trpc.useUtils();
+
+  const editarJurosMutation = trpc.contratos.editarJuros.useMutation({
+    onSuccess: () => {
+      toast.success("Taxa de juros atualizada!");
+      setShowEditarJurosModal(null);
+      setNovasTaxaJuros("");
+      onRefresh();
+      utils.contratos.listComParcelas.invalidate();
+    },
+    onError: (e) => toast.error("Erro: " + e.message),
+  });
+
+  const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation({
+    onSuccess: () => {
+      toast.success("Multa aplicada com sucesso!");
+      setShowAplicarMultaModal(null);
+      setValorMulta("");
+      setMotivoMulta("");
+      onRefresh();
+      utils.contratos.listComParcelas.invalidate();
+    },
+    onError: (e) => toast.error("Erro: " + e.message),
+  });
 
   const deletarMutation = trpc.contratos.deletar.useMutation({
     onSuccess: () => {
@@ -698,15 +724,31 @@ function EmprestimoCardCobra({
             <div className="space-y-4">
               <div>
                 <Label>Taxa de Juros Atual (%)</Label>
-                <Input type="number" defaultValue={emp.taxaJuros} placeholder="Ex: 5" />
+                <Input 
+                  type="number" 
+                  defaultValue={emp.taxaJuros} 
+                  placeholder="Ex: 5"
+                  onChange={(e) => setNovasTaxaJuros(e.target.value)}
+                />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setShowEditarJurosModal(null)}>Cancelar</Button>
-                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => {
-                  toast.success("Taxa de juros atualizada!");
-                  setShowEditarJurosModal(null);
-                  onRefresh();
-                }}>Salvar</Button>
+                <Button 
+                  className="flex-1 bg-blue-600 hover:bg-blue-700" 
+                  onClick={() => {
+                    if (!novasTaxaJuros.trim()) {
+                      toast.error("Digite a nova taxa de juros");
+                      return;
+                    }
+                    editarJurosMutation.mutate({
+                      id: emp.id,
+                      novaTaxa: novasTaxaJuros,
+                    });
+                  }}
+                  disabled={editarJurosMutation.isPending}
+                >
+                  {editarJurosMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -723,19 +765,40 @@ function EmprestimoCardCobra({
             <div className="space-y-4">
               <div>
                 <Label>Valor da Multa (R$)</Label>
-                <Input type="number" placeholder="Ex: 100.00" />
+                <Input 
+                  type="number" 
+                  placeholder="Ex: 100.00"
+                  value={valorMulta}
+                  onChange={(e) => setValorMulta(e.target.value)}
+                />
               </div>
               <div>
                 <Label>Motivo</Label>
-                <Input type="text" placeholder="Ex: Atraso de 30 dias" />
+                <Input 
+                  type="text" 
+                  placeholder="Ex: Atraso de 30 dias"
+                  value={motivoMulta}
+                  onChange={(e) => setMotivoMulta(e.target.value)}
+                />
               </div>
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setShowAplicarMultaModal(null)}>Cancelar</Button>
-                <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={() => {
-                  toast.success("Multa aplicada com sucesso!");
-                  setShowAplicarMultaModal(null);
-                  onRefresh();
-                }}>Aplicar</Button>
+                <Button 
+                  className="flex-1 bg-red-600 hover:bg-red-700" 
+                  onClick={() => {
+                    if (!valorMulta.trim()) {
+                      toast.error("Digite o valor da multa");
+                      return;
+                    }
+                    aplicarMultaMutation.mutate({
+                      id: emp.id,
+                      multa: valorMulta,
+                    });
+                  }}
+                  disabled={aplicarMultaMutation.isPending}
+                >
+                  {aplicarMultaMutation.isPending ? "Aplicando..." : "Aplicar"}
+                </Button>
               </div>
             </div>
           </DialogContent>
