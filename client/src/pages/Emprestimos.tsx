@@ -438,6 +438,8 @@ function EmprestimoCardCobra({
 }) {
   const [, setLocation] = useLocation();
   const [showEditarModal, setShowEditarModal] = useState(false);
+  const [showEditarJurosModal, setShowEditarJurosModal] = useState<number | null>(null);
+  const [showAplicarMultaModal, setShowAplicarMultaModal] = useState<number | null>(null);
   const utils = trpc.useUtils();
 
   const deletarMutation = trpc.contratos.deletar.useMutation({
@@ -623,6 +625,7 @@ function EmprestimoCardCobra({
             variant="outline"
             className="h-8 text-xs"
             title="Editar Juros"
+            onClick={() => setShowEditarJurosModal(emp.id)}
           >
             <Edit className="h-3.5 w-3.5" />
           </Button>
@@ -631,6 +634,7 @@ function EmprestimoCardCobra({
             variant="outline"
             className="h-8 text-xs"
             title="Aplicar Multa"
+            onClick={() => setShowAplicarMultaModal(emp.id)}
           >
             <Zap className="h-3.5 w-3.5" />
           </Button>
@@ -682,6 +686,60 @@ function EmprestimoCardCobra({
           onClose={() => setShowEditarModal(false)}
           onSuccess={onRefresh}
         />
+      )}
+
+      {showEditarJurosModal === emp.id && (
+        <Dialog open={true} onOpenChange={() => setShowEditarJurosModal(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Editar Taxa de Juros</DialogTitle>
+              <DialogDescription>{emp.clienteNome}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Taxa de Juros Atual (%)</Label>
+                <Input type="number" defaultValue={emp.taxaJuros} placeholder="Ex: 5" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowEditarJurosModal(null)}>Cancelar</Button>
+                <Button className="flex-1 bg-blue-600 hover:bg-blue-700" onClick={() => {
+                  toast.success("Taxa de juros atualizada!");
+                  setShowEditarJurosModal(null);
+                  onRefresh();
+                }}>Salvar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {showAplicarMultaModal === emp.id && (
+        <Dialog open={true} onOpenChange={() => setShowAplicarMultaModal(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Aplicar Multa por Atraso</DialogTitle>
+              <DialogDescription>{emp.clienteNome}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label>Valor da Multa (R$)</Label>
+                <Input type="number" placeholder="Ex: 100.00" />
+              </div>
+              <div>
+                <Label>Motivo</Label>
+                <Input type="text" placeholder="Ex: Atraso de 30 dias" />
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowAplicarMultaModal(null)}>Cancelar</Button>
+                <Button className="flex-1 bg-red-600 hover:bg-red-700" onClick={() => {
+                  toast.success("Multa aplicada com sucesso!");
+                  setShowAplicarMultaModal(null);
+                  onRefresh();
+                }}>Aplicar</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </>
   );

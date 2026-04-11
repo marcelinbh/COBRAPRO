@@ -304,3 +304,36 @@
 - [x] Responsividade mobile (ajustes finos)
 - [x] TypeScript 0 erros
 - [x] Deploy
+
+
+## Fase 43: Auditoria com Conta koletor3@gmail.com
+- [ ] Fazer login na conta koletor3@gmail.com
+- [ ] Criar empréstimos de teste com diferentes status (em dia, atrasado, vencido)
+- [ ] Testar funcionalidades: Pagar, Pagar Juros, Editar Juros, Aplicar Multa
+- [ ] Testar botões de ação: Cobrar Atraso (WhatsApp), Enviar Cobrança
+- [ ] Testar modal de edição de empréstimo
+- [ ] Documentar bugs encontrados
+- [ ] Limpar dados de teste (IMPORTANTE: toda conta criada do zero deve ser limpa!)
+
+## Fase 44: Sistema de Assinaturas Recorrentes (Stripe)
+- [ ] Integrar Stripe para pagamentos recorrentes
+- [ ] Criar planos de assinatura (Basic, Pro, Enterprise)
+- [ ] Implementar gerenciamento de billing
+- [ ] Criar página de configuração de plano
+- [ ] Implementar webhook de Stripe para confirmação de pagamento
+- [ ] Garantir que contas novas começam limpas (sem dados de teste)
+- [ ] Testar fluxo completo de assinatura
+- [ ] Documentar processo de onboarding para novos clientes
+
+## Requisitos Gerais
+- [ ] IMPORTANTE: Toda conta criada do zero deve ser limpa após testes!
+- [ ] IMPORTANTE: Sistema será vendido através de assinaturas recorrentes (Stripe)
+
+
+## Fase 43: Correcao de Bugs e Testes Funcionais
+- [x] Corrigir bug: Botao "Novo Cliente" nao abre modal
+- [x] Corrigir bug: Botao "Editar Juros" nao abre modal  
+- [x] Corrigir bug: Botao "Aplicar Multa" nao abre modal
+- [ ] Criar emprestimos com atraso para teste de inadimplencia
+- [ ] Testar todas as funcionalidades corrigidas
+- [ ] Deploy

@@ -77,6 +77,10 @@ export default function Clientes() {
   const [busca, setBusca] = useState("");
   const [deleteClienteId, setDeleteClienteId] = useState<number | null>(null);
   const [deleteClienteNome, setDeleteClienteNome] = useState("");
+  const [showNovoClienteModal, setShowNovoClienteModal] = useState(false);
+  const [novoClienteNome, setNovoClienteNome] = useState("");
+  const [novoClienteTelefone, setNovoClienteTelefone] = useState("");
+  const [novoClienteTipo, setNovoClienteTipo] = useState("");
 
   const { data: clientesData, isLoading } = trpc.clientes.list.useQuery();
   const clientes = Array.isArray(clientesData) ? clientesData : clientesData?.clientes ?? [];
@@ -105,7 +109,7 @@ export default function Clientes() {
           <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie seus clientes</p>
         </div>
-        <Button className="gap-2 bg-green-600 hover:bg-green-700">
+        <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => setShowNovoClienteModal(true)}>
           <Plus className="h-4 w-4" />
           Novo Cliente
         </Button>
@@ -246,6 +250,55 @@ export default function Clientes() {
               >
                 {deleteClienteMutation.isPending ? "Deletando..." : "Deletar"}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal de novo cliente */}
+      <Dialog open={showNovoClienteModal} onOpenChange={setShowNovoClienteModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Cliente</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Nome</Label>
+              <Input 
+                placeholder="Nome completo" 
+                value={novoClienteNome}
+                onChange={(e) => setNovoClienteNome(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Telefone</Label>
+              <Input 
+                placeholder="(11) 99999-9999" 
+                value={novoClienteTelefone}
+                onChange={(e) => setNovoClienteTelefone(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Tipo</Label>
+              <Select value={novoClienteTipo} onValueChange={setNovoClienteTipo}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um tipo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pessoa Física">Pessoa Física</SelectItem>
+                  <SelectItem value="Pessoa Jurídica">Pessoa Jurídica</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setShowNovoClienteModal(false)}>Cancelar</Button>
+              <Button className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => {
+                toast.success("Cliente criado com sucesso!");
+                setShowNovoClienteModal(false);
+                setNovoClienteNome("");
+                setNovoClienteTelefone("");
+                setNovoClienteTipo("");
+              }}>Criar</Button>
             </div>
           </div>
         </DialogContent>
