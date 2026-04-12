@@ -813,6 +813,7 @@ export default function Emprestimos() {
   const [busca, setBusca] = useState("");
   const [abaSelecionada, setAbaSelecionada] = useState("emprestimos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [showNovoEmprestimoModal, setShowNovoEmprestimoModal] = useState(false);
 
   const { data: emprestimos, isLoading, refetch } = trpc.contratos.listComParcelas.useQuery();
   const { data: contas } = trpc.caixa.contas.useQuery();
@@ -903,7 +904,10 @@ export default function Emprestimos() {
           Novo Diário
         </Button>
 
-        <Button className="gap-1 bg-emerald-600 hover:bg-emerald-700">
+        <Button 
+          onClick={() => setShowNovoEmprestimoModal(true)}
+          className="gap-1 bg-emerald-600 hover:bg-emerald-700"
+        >
           <Plus className="h-4 w-4" />
           Novo Empréstimo
         </Button>
@@ -935,6 +939,23 @@ export default function Emprestimos() {
           Nenhum empréstimo encontrado
         </div>
       )}
+
+      {/* Modal Novo Empréstimo */}
+      <Dialog open={showNovoEmprestimoModal} onOpenChange={setShowNovoEmprestimoModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Novo Empréstimo</DialogTitle>
+            <DialogDescription>
+              Crie um novo empréstimo para um cliente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Funcionalidade em desenvolvimento. Use a página de Contratos para criar novos empréstimos.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

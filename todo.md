@@ -337,3 +337,13 @@
 - [ ] Criar emprestimos com atraso para teste de inadimplencia
 - [ ] Testar todas as funcionalidades corrigidas
 - [ ] Deploy
+
+
+## Fase 45: Auditoria Completa e Correcao de Bugs Criticos
+- [ ] BUG CRITICO: Baixa de pagamentos nao funciona - INVESTIGAR E CORRIGIR
+- [ ] BUG CRITICO: Botao de criar emprestimo nao funciona - INVESTIGAR E CORRIGIR
+- [ ] Auditar TODAS as paginas e funcionalidades ferramenta por ferramenta
+- [ ] Garantir que contas novas vem com base limpa (sem dados de teste)
+- [ ] Testar TUDO novamente apos correcoes
+- [ ] Fazer checkpoint final
+- [ ] Push para Git
