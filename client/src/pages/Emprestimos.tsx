@@ -298,22 +298,32 @@ function PagamentoModal({
     onSuccess: () => {
       toast.success("Pagamento registrado!");
       setOpen(false);
-      onSuccess();
-      utils.contratos.listComParcelas.invalidate();
-      utils.dashboard.kpis.invalidate();
+      setTimeout(() => {
+        onSuccess();
+        utils.contratos.listComParcelas.invalidate();
+        utils.dashboard.kpis.invalidate();
+      }, 300);
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => {
+      toast.error("Erro ao registrar pagamento: " + e.message);
+      setOpen(false);
+    },
   });
 
   const pagarJurosMutation = trpc.parcelas.pagarJuros.useMutation({
     onSuccess: () => {
       toast.success("Juros pagos! Empréstimo renovado.");
       setOpen(false);
-      onSuccess();
-      utils.contratos.listComParcelas.invalidate();
-      utils.dashboard.kpis.invalidate();
+      setTimeout(() => {
+        onSuccess();
+        utils.contratos.listComParcelas.invalidate();
+        utils.dashboard.kpis.invalidate();
+      }, 300);
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => {
+      toast.error("Erro ao pagar juros: " + e.message);
+      setOpen(false);
+    },
   });
 
   const isPending = pagarTotalMutation.isPending || pagarJurosMutation.isPending;

@@ -347,3 +347,12 @@
 - [ ] Testar TUDO novamente apos correcoes
 - [ ] Fazer checkpoint final
 - [ ] Push para Git
+
+## Fase 42: Correção Crítica do Bug de Pagamento
+- [x] Diagnosticar causa raiz: constraint parcelas_status_check incompatível com código TypeScript
+- [x] Corrigir constraint no Supabase: aceitar 'paga', 'atrasada', 'cancelada', 'pendente', 'parcial', 'vencendo_hoje'
+- [x] Remover coluna inexistente cliente_id das inserções em transacoes_caixa
+- [x] Adicionar data_transacao obrigatório nas inserções em transacoes_caixa
+- [x] Reescrever procedure registrarPagamento para usar apenas Supabase REST API
+- [x] Corrigir conflito de DOM (removeChild) no PagamentoModal com setTimeout
+- [x] Testar fluxo completo: pagamento registrado com sucesso, UI atualizada

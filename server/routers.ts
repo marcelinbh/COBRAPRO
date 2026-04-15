@@ -1423,11 +1423,22 @@ const parcelasRouter = router({
       desconto: z.number().default(0),
     }))
     .mutation(async ({ input }) => {
-      const db = await getDb();
+      // Usar sempre Supabase REST API (PostgreSQL direto está indisponível neste ambiente)
+      const sb = getSupabaseClient();
+      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
 
-      const parcelaRows = await db.select().from(parcelas).where(eq(parcelas.id, input.parcelaId)).limit(1);
-      const parcela = parcelaRows[0];
-      if (!parcela) throw new Error("Parcela não encontrada");
+      // Buscar parcela
+      const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).single();
+      if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+
+      const parcela = {
+        id: parcelaData.id,
+        contratoId: parcelaData.contrato_id,
+        clienteId: parcelaData.cliente_id,
+        numeroParcela: parcelaData.numero_parcela,
+        valorOriginal: parcelaData.valor_original,
+        dataVencimento: parcelaData.data_vencimento,
+      };
 
       const { juros, multa } = calcularJurosMora(
         parseFloat(parcela.valorOriginal),
@@ -1438,38 +1449,39 @@ const parcelasRouter = router({
       const valorOriginal = parseFloat(parcela.valorOriginal);
       const novoStatus = input.valorPago >= valorOriginal ? 'paga' : 'parcial';
 
-      await db.update(parcelas).set({
-        valorPago: input.valorPago.toFixed(2),
-        valorJuros: juros.toFixed(2),
-        valorMulta: multa.toFixed(2),
-        valorDesconto: input.desconto.toFixed(2),
-        dataPagamento: new Date(),
+      // Atualizar parcela
+      const { error: updateErr } = await sb.from('parcelas').update({
+        valor_pago: input.valorPago.toFixed(2),
+        valor_juros: juros.toFixed(2),
+        valor_multa: multa.toFixed(2),
+        valor_desconto: input.desconto.toFixed(2),
+        data_pagamento: new Date().toISOString(),
         status: novoStatus,
-        contaCaixaId: input.contaCaixaId,
-        observacoes: input.observacoes,
-      }).where(eq(parcelas.id, input.parcelaId));
+        conta_caixa_id: input.contaCaixaId,
+        observacoes: input.observacoes ?? null,
+      }).eq('id', input.parcelaId);
+      if (updateErr) console.error('[registrarPagamento] Update parcela error:', updateErr.message);
 
       // Registrar entrada no caixa
-      await db.insert(transacoesCaixa).values({
-        contaCaixaId: input.contaCaixaId,
+      const { error: txErr } = await sb.from('transacoes_caixa').insert({
+        conta_caixa_id: input.contaCaixaId,
         tipo: 'entrada',
         categoria: 'pagamento_parcela',
         valor: input.valorPago.toFixed(2),
         descricao: `Pagamento parcela #${parcela.numeroParcela} - Contrato #${parcela.contratoId}`,
-        parcelaId: input.parcelaId,
-        contratoId: parcela.contratoId,
-        clienteId: parcela.clienteId,
+        parcela_id: input.parcelaId,
+        contrato_id: parcela.contratoId,
+        data_transacao: new Date().toISOString().split('T')[0],
       });
+      if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
 
       // Verificar se contrato foi quitado
-      const parcelasPendentes = await db.select({ qtd: sql<number>`COUNT(*)` })
-        .from(parcelas)
-        .where(and(
-          eq(parcelas.contratoId, parcela.contratoId),
-          inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
-        ));
-      if ((parcelasPendentes[0]?.qtd ?? 0) === 0) {
-        await db.update(contratos).set({ status: 'quitado' }).where(eq(contratos.id, parcela.contratoId));
+      const { data: pendentes } = await sb.from('parcelas')
+        .select('id')
+        .eq('contrato_id', parcela.contratoId)
+        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
+      if ((pendentes?.length ?? 0) === 0) {
+        await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcela.contratoId);
       }
 
       return { success: true, status: novoStatus };
@@ -1595,12 +1607,12 @@ const parcelasRouter = router({
           descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
           parcela_id: input.parcelaId,
           contrato_id: parcela.contratoId,
-          cliente_id: parcela.clienteId,
+          data_transacao: new Date().toISOString().split('T')[0],
         });
 
         await supabase.from('parcelas').insert({
           contrato_id: parcela.contratoId,
-          cliente_id: parcela.clienteId,
+          data_transacao: new Date().toISOString().split('T')[0],
           koletor_id: parcela.koletorId ?? null,
           numero_parcela: (parcela.numeroParcela as number) + 1,
           valor_original: parseFloat(String(parcela.valorOriginal)),

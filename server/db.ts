@@ -25,7 +25,7 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 // Lazily create the drizzle instance. Tries direct PostgreSQL first.
-// Falls back to null (callers then use Supabase REST API via getSupabaseClient).
+// Falls back to a wrapper that uses Supabase REST API.
 export async function getDb() {
   if (_dbInitialized) return _db;
   _dbInitialized = true;
@@ -33,7 +33,7 @@ export async function getDb() {
   const dbUrl = process.env.DATABASE_URL;
   if (!dbUrl) {
     console.warn("[Database] DATABASE_URL not set, using Supabase REST API");
-    return null;
+    return null; // Will be handled by callers
   }
 
   try {
