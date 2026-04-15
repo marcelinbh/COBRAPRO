@@ -43,6 +43,7 @@ import {
   Car,
   Database,
   AlertTriangle,
+  Smartphone,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -70,6 +71,7 @@ const menuItems = [
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
   { icon: UserCog, label: "Cobradores", path: "/cobradores" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
+  { icon: Smartphone, label: "Instalar App", path: "/install" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";

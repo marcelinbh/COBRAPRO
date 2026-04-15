@@ -395,3 +395,20 @@
 - [x] Verificar Relatórios com dados reais (Capital R$ 23.500, Total a Receber R$ 38.673)
 - [x] Verificar Reparcelamento funcionando (contrato #3, simulação de 6x R$ 756,13)
 - [x] Fazer push para GitHub
+
+## Fase 44b: PWA + Página /install + Renomeação Cobradores
+
+- [x] Criar página /install idêntica ao Cobra Fácil (abas iPhone, Android, Xiaomi, Samsung)
+- [x] Gerar ícones PWA em todos os tamanhos (72, 96, 128, 144, 152, 192, 384, 512px)
+- [x] Fazer upload dos ícones para CDN do Manus
+- [x] Atualizar manifest.json com URLs CDN para ícones
+- [x] Atualizar index.html com meta tags PWA completas (apple, mobile, msapplication)
+- [x] Adicionar "Instalar App" no menu lateral do DashboardLayout
+- [x] Renomear Koletores → Cobradores em todo o sistema (menu, páginas, router)
+- [x] Corrigir botão "Novo Empréstimo" para redirecionar para /contratos/novo
+- [x] Corrigir 15+ procedures com fallback Supabase REST (DB unavailable)
+- [x] Corrigir reparcelamento (procedure preview/executar)
+- [x] Corrigir relatórios (resumoGeral)
+- [x] Corrigir WhatsApp (templates, gerarMensagem)
+- [x] Corrigir configurações (templates, updateTemplate)
+- [x] Corrigir performance de cobradores
