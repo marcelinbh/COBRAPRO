@@ -671,7 +671,7 @@ const contratosRouter = router({
       // Buscar contratos
       let cQuery = supabase
         .from('contratos')
-        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
+        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas, clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
         .order('createdAt', { ascending: false });
 
       if (input?.status && input.status !== 'todos') cQuery = cQuery.eq('status', input.status);
@@ -797,10 +797,10 @@ const contratosRouter = router({
           proximaParcela,
           parcelasComAtraso,
           todasParcelas: parcelasContrato,
+          etiquetas: (() => { try { return JSON.parse(c.etiquetas ?? '[]'); } catch { return []; } })(),
         };
       });
     }),
-
   obterDetalhes: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
@@ -810,7 +810,7 @@ const contratosRouter = router({
       // Buscar contrato
       const { data: contratoData, error: contratoErr } = await supabase
         .from('contratos')
-        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
+        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas, clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
         .eq('id', input.id)
         .single();
 
@@ -2364,6 +2364,7 @@ const configuracoesRouter = router({
       pixKey: map['pixKey'] ?? '',
       nomeCobranca: map['nomeCobranca'] ?? '',
       linkPagamento: map['linkPagamento'] ?? '',
+      logoUrl: map['logoUrl'] ?? '',
       templateAtraso: map['templateAtraso'] ?? '',
       templateVenceHoje: map['templateVenceHoje'] ?? '',
       templateAntecipada: map['templateAntecipada'] ?? '',
@@ -2377,7 +2378,7 @@ const configuracoesRouter = router({
       multaPadrao: z.number().optional(), jurosMoraDiario: z.number().optional(),
       diasLembrete: z.number().optional(), multaDiaria: z.number().optional(),
       pixKey: z.string().optional(), nomeCobranca: z.string().optional(),
-      linkPagamento: z.string().optional(),
+      linkPagamento: z.string().optional(), logoUrl: z.string().optional(),
       templateAtraso: z.string().optional(), templateVenceHoje: z.string().optional(),
       templateAntecipada: z.string().optional(),
     }))
@@ -3429,6 +3430,42 @@ const vendasTelefoneRouter = router({
   }),
 });
 
+// ─── ETIQUETAS ROUTER ───────────────────────────────────────────────────────
+const etiquetasRouter = router({
+  listar: protectedProcedure.query(async () => {
+    const sb = getSupabaseClient();
+    if (!sb) return [];
+    const { data } = await sb.from('etiquetas_contratos').select('*').order('nome');
+    return (data ?? []) as { id: number; nome: string; cor: string }[];
+  }),
+  criar: protectedProcedure
+    .input(z.object({ nome: z.string().min(1), cor: z.string().default('#6366f1') }))
+    .mutation(async ({ input }) => {
+      const sb = getSupabaseClient();
+      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { data, error } = await sb.from('etiquetas_contratos').insert({ nome: input.nome, cor: input.cor }).select().single();
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return data;
+    }),
+  remover: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const sb = getSupabaseClient();
+      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      await sb.from('etiquetas_contratos').delete().eq('id', input.id);
+      return { success: true };
+    }),
+  aplicarContrato: protectedProcedure
+    .input(z.object({ contratoId: z.number(), etiquetas: z.array(z.string()) }))
+    .mutation(async ({ input }) => {
+      const sb = getSupabaseClient();
+      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { error } = await sb.from('contratos').update({ etiquetas: JSON.stringify(input.etiquetas) }).eq('id', input.contratoId);
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return { success: true };
+    }),
+});
+
 // ─── APP ROUTER ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -3456,6 +3493,7 @@ export const appRouter = router({
   cheques: chequesRouter,
   veiculos: veiculosRouter,
   vendasTelefone: vendasTelefoneRouter,
+  etiquetas: etiquetasRouter,
 });
 
 export type AppRouter = typeof appRouter;

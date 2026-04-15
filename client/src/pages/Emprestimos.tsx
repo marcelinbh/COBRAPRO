@@ -14,10 +14,11 @@ import { toast } from "sonner";
 import {
   Search, Plus, MessageCircle, CheckCircle, Clock, AlertTriangle,
   TrendingUp, DollarSign, Filter, RefreshCw, FileText, ChevronDown, ChevronUp,
-  Edit, Trash2, Send, Phone, Eye, List, Zap, Users, ExternalLink, Loader2
+  Edit, Trash2, Send, Phone, Eye, List, Zap, Users, ExternalLink, Loader2, Tag, X, Check, FolderOpen, LayoutGrid
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { useLocation } from "wouter";
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
 type EmprestimoCard = {
   id: number;
@@ -59,6 +60,7 @@ type EmprestimoCard = {
     totalComAtraso: number;
   }[];
   todasParcelas: any[];
+  etiquetas?: string[];
 };
 
 // ─── MODAL DE EDIÇÃO DE EMPRÉSTIMO ─────────────────────────────────────────
@@ -450,10 +452,28 @@ function EmprestimoCardCobra({
   const [showEditarModal, setShowEditarModal] = useState(false);
   const [showEditarJurosModal, setShowEditarJurosModal] = useState<number | null>(null);
   const [showAplicarMultaModal, setShowAplicarMultaModal] = useState<number | null>(null);
+  const [showEtiquetasModal, setShowEtiquetasModal] = useState(false);
   const [novasTaxaJuros, setNovasTaxaJuros] = useState<string>("");
   const [valorMulta, setValorMulta] = useState<string>("");
   const [motivoMulta, setMotivoMulta] = useState<string>("");
+  const [novaEtiquetaNome, setNovaEtiquetaNome] = useState("");
+  const [novaEtiquetaCor, setNovaEtiquetaCor] = useState("#6366f1");
   const utils = trpc.useUtils();
+
+  const { data: todasEtiquetas = [] } = trpc.etiquetas.listar.useQuery();
+  const [etiquetasSelecionadas, setEtiquetasSelecionadas] = useState<string[]>(emp.etiquetas ?? []);
+
+  const criarEtiquetaMutation = trpc.etiquetas.criar.useMutation({
+    onSuccess: () => { toast.success("Etiqueta criada!"); setNovaEtiquetaNome(""); utils.etiquetas.listar.invalidate(); },
+    onError: (e) => toast.error("Erro: " + e.message),
+  });
+  const removerEtiquetaMutation = trpc.etiquetas.remover.useMutation({
+    onSuccess: () => { utils.etiquetas.listar.invalidate(); },
+  });
+  const aplicarEtiquetasMutation = trpc.etiquetas.aplicarContrato.useMutation({
+    onSuccess: () => { toast.success("Etiquetas salvas!"); setShowEtiquetasModal(false); onRefresh(); utils.contratos.listComParcelas.invalidate(); },
+    onError: (e) => toast.error("Erro: " + e.message),
+  });
 
   const editarJurosMutation = trpc.contratos.editarJuros.useMutation({
     onSuccess: () => {
@@ -548,6 +568,20 @@ function EmprestimoCardCobra({
               </Badge>
             </div>
           </div>
+
+          {/* Etiquetas */}
+          {etiquetasSelecionadas.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-2">
+              {etiquetasSelecionadas.map((nome) => {
+                const et = todasEtiquetas.find((e: any) => e.nome === nome);
+                return (
+                  <span key={nome} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: et?.cor ?? '#6366f1' }}>
+                    <Tag className="w-2.5 h-2.5" />{nome}
+                  </span>
+                );
+              })}
+            </div>
+          )}
 
           {/* Valor principal em destaque */}
           <div className="text-center mb-2">
@@ -734,6 +768,15 @@ function EmprestimoCardCobra({
           >
             <Edit className="h-3.5 w-3.5" />
           </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 text-xs col-span-3 sm:col-span-1"
+            title="Etiquetas"
+            onClick={() => setShowEtiquetasModal(true)}
+          >
+            <Tag className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
 
@@ -835,6 +878,58 @@ function EmprestimoCardCobra({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Modal de Etiquetas */}
+      {showEtiquetasModal && (
+        <Dialog open={true} onOpenChange={() => setShowEtiquetasModal(false)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2"><Tag className="w-4 h-4" /> Etiquetas</DialogTitle>
+              <DialogDescription>{emp.clienteNome}</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Criar nova etiqueta */}
+              <div className="flex gap-2">
+                <Input placeholder="Nome da etiqueta" value={novaEtiquetaNome} onChange={(e) => setNovaEtiquetaNome(e.target.value)} className="flex-1" />
+                <input type="color" value={novaEtiquetaCor} onChange={(e) => setNovaEtiquetaCor(e.target.value)} className="w-10 h-10 rounded border border-border cursor-pointer" />
+                <Button size="sm" onClick={() => { if (novaEtiquetaNome.trim()) criarEtiquetaMutation.mutate({ nome: novaEtiquetaNome.trim(), cor: novaEtiquetaCor }); }} disabled={criarEtiquetaMutation.isPending}>
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              {/* Lista de etiquetas disponíveis */}
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {todasEtiquetas.map((et: any) => {
+                  const selecionada = etiquetasSelecionadas.includes(et.nome);
+                  return (
+                    <div key={et.id} className="flex items-center justify-between p-2 rounded border border-border hover:bg-accent/30">
+                      <div className="flex items-center gap-2">
+                        <button onClick={() => setEtiquetasSelecionadas(selecionada ? etiquetasSelecionadas.filter(n => n !== et.nome) : [...etiquetasSelecionadas, et.nome])} className="flex items-center gap-2">
+                          <div className="w-4 h-4 rounded border flex items-center justify-center" style={{ backgroundColor: selecionada ? et.cor : 'transparent', borderColor: et.cor }}>
+                            {selecionada && <Check className="w-3 h-3 text-white" />}
+                          </div>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: et.cor }}>
+                            <Tag className="w-2.5 h-2.5" />{et.nome}
+                          </span>
+                        </button>
+                      </div>
+                      <button onClick={() => removerEtiquetaMutation.mutate({ id: et.id })} className="text-muted-foreground hover:text-red-400 transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {todasEtiquetas.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhuma etiqueta criada ainda</p>}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setShowEtiquetasModal(false)}>Cancelar</Button>
+                <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={() => aplicarEtiquetasMutation.mutate({ contratoId: emp.id, etiquetas: etiquetasSelecionadas })} disabled={aplicarEtiquetasMutation.isPending}>
+                  {aplicarEtiquetasMutation.isPending ? "Salvando..." : "Salvar Etiquetas"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }
@@ -848,6 +943,7 @@ export default function Emprestimos() {
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [loadingLote, setLoadingLote] = useState(false);
   const [periodoRecebimentos, setPeriodoRecebimentos] = useState<'hoje' | 'semana' | 'mes' | 'todos'>('mes');
+  const [modoVisualizacao, setModoVisualizacao] = useState<'cards' | 'pasta'>('cards');
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
@@ -906,6 +1002,40 @@ export default function Emprestimos() {
 
     return resultado;
   }, [emprestimos, busca, filtroStatus]);
+
+  // Agrupar empréstimos por cliente
+  const emprestimosAgrupados = useMemo(() => {
+    const grupos: Record<number, {
+      clienteId: number;
+      clienteNome: string;
+      clienteWhatsapp: string | null;
+      emprestimos: typeof emprestimosFiltrados;
+      totalCapital: number;
+      totalReceber: number;
+      totalAtrasados: number;
+      totalEmDia: number;
+    }> = {};
+    emprestimosFiltrados.forEach(e => {
+      if (!grupos[e.clienteId]) {
+        grupos[e.clienteId] = {
+          clienteId: e.clienteId,
+          clienteNome: e.clienteNome,
+          clienteWhatsapp: e.clienteWhatsapp,
+          emprestimos: [],
+          totalCapital: 0,
+          totalReceber: 0,
+          totalAtrasados: 0,
+          totalEmDia: 0,
+        };
+      }
+      grupos[e.clienteId].emprestimos.push(e);
+      grupos[e.clienteId].totalCapital += parseFloat(e.valorPrincipal);
+      grupos[e.clienteId].totalReceber += e.totalReceber;
+      if (e.parcelasComAtraso.length > 0) grupos[e.clienteId].totalAtrasados += 1;
+      else grupos[e.clienteId].totalEmDia += 1;
+    });
+    return Object.values(grupos).sort((a, b) => a.clienteNome.localeCompare(b.clienteNome));
+  }, [emprestimosFiltrados]);
 
   const atrasados = emprestimos?.filter(e => e.parcelasComAtraso.length > 0).length ?? 0;
   const emDia = (emprestimos?.length ?? 0) - atrasados;
@@ -1032,6 +1162,16 @@ export default function Emprestimos() {
               Lote
             </Button>
             <Button
+              size="sm"
+              variant={modoVisualizacao === 'pasta' ? 'default' : 'outline'}
+              className="gap-1"
+              title={modoVisualizacao === 'pasta' ? 'Ver como cards' : 'Ver por cliente (pasta)'}
+              onClick={() => setModoVisualizacao(v => v === 'cards' ? 'pasta' : 'cards')}
+            >
+              {modoVisualizacao === 'pasta' ? <LayoutGrid className="h-4 w-4" /> : <FolderOpen className="h-4 w-4" />}
+              {modoVisualizacao === 'pasta' ? 'Cards' : 'Pasta'}
+            </Button>
+            <Button
               onClick={() => setLocation('/contratos/novo')}
               className="gap-1 bg-emerald-600 hover:bg-emerald-700"
             >
@@ -1040,35 +1180,115 @@ export default function Emprestimos() {
             </Button>
           </div>
 
-          {/* Grid de Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {emprestimosFiltrados.map(emp => (
-              <div key={emp.id} className="relative">
-                {modoSelecao && (
-                  <div
-                    className={`absolute top-2 left-2 z-10 w-6 h-6 rounded border-2 cursor-pointer flex items-center justify-center ${
-                      selecionados.includes(emp.id)
-                        ? 'bg-blue-500 border-blue-500 text-white'
-                        : 'bg-background border-border'
-                    }`}
-                    onClick={() => toggleSelecao(emp.id)}
-                  >
-                    {selecionados.includes(emp.id) && <CheckCircle className="h-4 w-4" />}
+          {/* Modo Cards (padrão) */}
+          {modoVisualizacao === 'cards' && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {emprestimosFiltrados.map(emp => (
+                  <div key={emp.id} className="relative">
+                    {modoSelecao && (
+                      <div
+                        className={`absolute top-2 left-2 z-10 w-6 h-6 rounded border-2 cursor-pointer flex items-center justify-center ${
+                          selecionados.includes(emp.id)
+                            ? 'bg-blue-500 border-blue-500 text-white'
+                            : 'bg-background border-border'
+                        }`}
+                        onClick={() => toggleSelecao(emp.id)}
+                      >
+                        {selecionados.includes(emp.id) && <CheckCircle className="h-4 w-4" />}
+                      </div>
+                    )}
+                    <EmprestimoCardCobra
+                      emp={emp}
+                      contas={contas ?? []}
+                      onRefresh={() => refetch()}
+                    />
                   </div>
-                )}
-                <EmprestimoCardCobra
-                  emp={emp}
-                  contas={contas ?? []}
-                  onRefresh={() => refetch()}
-                />
+                ))}
               </div>
-            ))}
-          </div>
+              {emprestimosFiltrados.length === 0 && (
+                <div className="p-8 text-center text-muted-foreground">
+                  Nenhum empréstimo encontrado
+                </div>
+              )}
+            </>
+          )}
 
-          {emprestimosFiltrados.length === 0 && (
-            <div className="p-8 text-center text-muted-foreground">
-              Nenhum empréstimo encontrado
-            </div>
+          {/* Modo Pasta (agrupado por cliente) */}
+          {modoVisualizacao === 'pasta' && (
+            <>
+              {emprestimosAgrupados.length === 0 ? (
+                <div className="p-8 text-center text-muted-foreground">
+                  Nenhum empréstimo encontrado
+                </div>
+              ) : (
+                <Accordion type="multiple" className="space-y-3">
+                  {emprestimosAgrupados.map(grupo => {
+                    const iniciais = grupo.clienteNome.split(' ').map(n => n[0]).slice(0, 2).join('').toUpperCase();
+                    const temAtraso = grupo.totalAtrasados > 0;
+                    return (
+                      <AccordionItem
+                        key={grupo.clienteId}
+                        value={String(grupo.clienteId)}
+                        className="border border-border rounded-xl overflow-hidden bg-card last:border-b"
+                      >
+                        <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-accent/10">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            {/* Avatar */}
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0 ${
+                              temAtraso ? 'bg-red-600' : 'bg-emerald-600'
+                            }`}>
+                              {iniciais}
+                            </div>
+                            {/* Info do cliente */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold text-foreground truncate">{grupo.clienteNome.toUpperCase()}</span>
+                                {temAtraso ? (
+                                  <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full shrink-0">🔴 {grupo.totalAtrasados} atrasado{grupo.totalAtrasados > 1 ? 's' : ''}</span>
+                                ) : (
+                                  <span className="text-xs bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full shrink-0">🟢 Em Dia</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
+                                <span>{grupo.emprestimos.length} contrato{grupo.emprestimos.length > 1 ? 's' : ''}</span>
+                                <span>Capital: <span className="text-foreground font-medium">{formatarMoeda(grupo.totalCapital)}</span></span>
+                                <span>A receber: <span className="text-warning font-medium">{formatarMoeda(grupo.totalReceber)}</span></span>
+                              </div>
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-4 pb-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                            {grupo.emprestimos.map(emp => (
+                              <div key={emp.id} className="relative">
+                                {modoSelecao && (
+                                  <div
+                                    className={`absolute top-2 left-2 z-10 w-6 h-6 rounded border-2 cursor-pointer flex items-center justify-center ${
+                                      selecionados.includes(emp.id)
+                                        ? 'bg-blue-500 border-blue-500 text-white'
+                                        : 'bg-background border-border'
+                                    }`}
+                                    onClick={() => toggleSelecao(emp.id)}
+                                  >
+                                    {selecionados.includes(emp.id) && <CheckCircle className="h-4 w-4" />}
+                                  </div>
+                                )}
+                                <EmprestimoCardCobra
+                                  emp={emp}
+                                  contas={contas ?? []}
+                                  onRefresh={() => refetch()}
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              )}
+            </>
           )}
         </>
       )}

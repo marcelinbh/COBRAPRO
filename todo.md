@@ -454,3 +454,15 @@
 - [x] Adicionar Taxa de Inadimplência (%) no Relatório (ao lado da Taxa de Recebimento)
 - [x] Expandir grid de KPIs do período para 4 colunas
 - [x] Salvar checkpoint e push para GitHub
+
+## Fase 49: Média Prioridade — Filtro Modalidade + Pasta de Empréstimos
+
+- [x] Filtro por modalidade/tipo de pagamento no Relatório (Empréstimo Padrão, Diário, Tabela Price, etc.)
+- [x] Gráfico de recebimentos por modalidade no Relatório (barras + tabela resumo)
+- [x] Pasta de empréstimos agrupada por cliente (modo de visualização alternativo)
+- [x] Botão "Pasta" / "Cards" para alternar entre visualização agrupada e grid de cards
+- [x] Cabeçalho da pasta: avatar colorido, nome do cliente, contagem de contratos, capital total, total a receber, badge de atraso
+- [x] Accordion expansível: ao clicar no cliente, exibe os cards de empréstimo dentro da pasta
+- [x] Modo Pasta compatível com seleção em lote (checkboxes funcionam dentro das pastas)
+- [x] TypeScript 0 erros
+- [x] Salvar checkpoint e push para GitHub

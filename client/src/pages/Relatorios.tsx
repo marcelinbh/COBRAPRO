@@ -1,14 +1,23 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { BarChart2, TrendingUp, AlertTriangle, DollarSign } from "lucide-react";
+import { BarChart2, TrendingUp, AlertTriangle, DollarSign, Filter } from "lucide-react";
 import { formatarMoeda } from "../../../shared/finance";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-const CORES = ['#ef4444', '#22c55e', '#f59e0b', '#3b82f6', '#8b5cf6'];
+const CORES = ['#ef4444', '#22c55e', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899'];
+
+const MODALIDADE_LABELS: Record<string, string> = {
+  'emprestimo_padrao': 'Empréstimo Padrão',
+  'emprestimo_diario': 'Empréstimo Diário',
+  'tabela_price': 'Tabela Price',
+  'venda_produto': 'Venda de Produto',
+  'desconto_cheque': 'Desconto de Cheque',
+  'reparcelamento': 'Reparcelamento',
+};
 
 export default function Relatorios() {
   const hoje = new Date();
@@ -16,20 +25,52 @@ export default function Relatorios() {
     new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]
   );
   const [dataFim, setDataFim] = useState(hoje.toISOString().split('T')[0]);
+  const [filtroModalidade, setFiltroModalidade] = useState('todas');
 
   const { data: kpis } = trpc.dashboard.kpis.useQuery();
   const { data: parcelas } = trpc.parcelas.list.useQuery({});
   const { data: transacoes } = trpc.caixa.transacoes.useQuery({});
 
-  // Dados para gráfico de status de parcelas
+  // Filtrar parcelas por período e modalidade
+  const parcelasPeriodo = (parcelas ?? []).filter(p => {
+    const d = new Date(p.dataVencimento).toISOString().split('T')[0];
+    const dentroDoperiodo = d >= dataInicio && d <= dataFim;
+    const modalidadeOk = filtroModalidade === 'todas' || p.modalidade === filtroModalidade;
+    return dentroDoperiodo && modalidadeOk;
+  });
+
+  const totalPeriodo = parcelasPeriodo.reduce((sum, p) => sum + parseFloat(p.valorOriginal), 0);
+  const recebidoPeriodo = parcelasPeriodo.filter(p => p.status === 'paga').reduce((sum, p) => sum + parseFloat(p.valorPago ?? p.valorOriginal), 0);
+  const inadimplentePeriodo = parcelasPeriodo.filter(p => p.status === 'atrasada').reduce((sum, p) => sum + parseFloat(p.valorOriginal), 0);
+
+  // Dados para gráfico de status de parcelas (filtrado)
   const statusData = [
-    { name: 'Pagas', value: parcelas?.filter(p => p.status === 'paga').length ?? 0, color: '#22c55e' },
-    { name: 'Pendentes', value: parcelas?.filter(p => p.status === 'pendente').length ?? 0, color: '#6b7280' },
-    { name: 'Atrasadas', value: parcelas?.filter(p => p.status === 'atrasada').length ?? 0, color: '#ef4444' },
-    { name: 'Vence Hoje', value: parcelas?.filter(p => p.status === 'vencendo_hoje').length ?? 0, color: '#f59e0b' },
+    { name: 'Pagas', value: parcelasPeriodo.filter(p => p.status === 'paga').length, color: '#22c55e' },
+    { name: 'Pendentes', value: parcelasPeriodo.filter(p => p.status === 'pendente').length, color: '#6b7280' },
+    { name: 'Atrasadas', value: parcelasPeriodo.filter(p => p.status === 'atrasada').length, color: '#ef4444' },
+    { name: 'Vence Hoje', value: parcelasPeriodo.filter(p => p.status === 'vencendo_hoje').length, color: '#f59e0b' },
   ].filter(d => d.value > 0);
 
-  // Entradas e saídas por dia (últimos 7 dias)
+  // Dados para gráfico de modalidades (distribuição do valor recebido por modalidade)
+  const modalidadesMap: Record<string, { recebido: number; total: number; count: number }> = {};
+  parcelasPeriodo.forEach(p => {
+    const mod = p.modalidade ?? 'outros';
+    if (!modalidadesMap[mod]) modalidadesMap[mod] = { recebido: 0, total: 0, count: 0 };
+    modalidadesMap[mod].total += parseFloat(p.valorOriginal);
+    modalidadesMap[mod].count += 1;
+    if (p.status === 'paga') {
+      modalidadesMap[mod].recebido += parseFloat(p.valorPago ?? p.valorOriginal);
+    }
+  });
+  const modalidadesData = Object.entries(modalidadesMap).map(([key, val], idx) => ({
+    name: MODALIDADE_LABELS[key] ?? key,
+    recebido: val.recebido,
+    total: val.total,
+    parcelas: val.count,
+    color: CORES[idx % CORES.length],
+  }));
+
+  // Entradas e saídas por dia (últimos 7 dias) — filtrado por modalidade se possível
   const ultimos7Dias = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -38,12 +79,12 @@ export default function Relatorios() {
 
   const fluxoData = ultimos7Dias.map(d => {
     const dayKey = d.toISOString().split('T')[0];
-    const entradas = transacoes
-      ?.filter(t => t.tipo === 'entrada' && new Date(t.dataTransacao).toISOString().split('T')[0] === dayKey)
-      .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0) ?? 0;
-    const saidas = transacoes
-      ?.filter(t => t.tipo === 'saida' && new Date(t.dataTransacao).toISOString().split('T')[0] === dayKey)
-      .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0) ?? 0;
+    const entradas = (transacoes ?? [])
+      .filter(t => t.tipo === 'entrada' && new Date(t.dataTransacao).toISOString().split('T')[0] === dayKey)
+      .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
+    const saidas = (transacoes ?? [])
+      .filter(t => t.tipo === 'saida' && new Date(t.dataTransacao).toISOString().split('T')[0] === dayKey)
+      .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
     return {
       dia: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
       entradas,
@@ -51,15 +92,8 @@ export default function Relatorios() {
     };
   });
 
-  // Total a receber no período
-  const parcelasPeriodo = parcelas?.filter(p => {
-    const d = new Date(p.dataVencimento).toISOString().split('T')[0];
-    return d >= dataInicio && d <= dataFim;
-  }) ?? [];
-
-  const totalPeriodo = parcelasPeriodo.reduce((sum, p) => sum + parseFloat(p.valorOriginal), 0);
-  const recebidoPeriodo = parcelasPeriodo.filter(p => p.status === 'paga').reduce((sum, p) => sum + parseFloat(p.valorPago ?? p.valorOriginal), 0);
-  const inadimplentePeriodo = parcelasPeriodo.filter(p => p.status === 'atrasada').reduce((sum, p) => sum + parseFloat(p.valorOriginal), 0);
+  // Modalidades disponíveis (para o seletor)
+  const modalidadesDisponiveis = Array.from(new Set((parcelas ?? []).map(p => p.modalidade).filter(Boolean)));
 
   return (
     <div className="space-y-6">
@@ -68,7 +102,7 @@ export default function Relatorios() {
         <p className="text-sm text-muted-foreground mt-1">Análise financeira e desempenho</p>
       </div>
 
-      {/* Filtro de período */}
+      {/* Filtros */}
       <Card className="border-border">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
@@ -80,7 +114,39 @@ export default function Relatorios() {
               <Label className="text-xs text-muted-foreground uppercase tracking-wide">Data Fim</Label>
               <Input type="date" className="mt-1" value={dataFim} onChange={e => setDataFim(e.target.value)} />
             </div>
+            <div className="flex-1">
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                <Filter className="h-3 w-3" /> Modalidade
+              </Label>
+              <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="Todas as modalidades" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas as Modalidades</SelectItem>
+                  {modalidadesDisponiveis.map(mod => (
+                    <SelectItem key={mod} value={mod!}>
+                      {MODALIDADE_LABELS[mod!] ?? mod}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          {filtroModalidade !== 'todas' && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Filtrando por:</span>
+              <span className="text-xs bg-primary/20 text-primary px-2 py-0.5 rounded-full font-medium">
+                {MODALIDADE_LABELS[filtroModalidade] ?? filtroModalidade}
+              </span>
+              <button
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+                onClick={() => setFiltroModalidade('todas')}
+              >
+                Limpar filtro
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -166,7 +232,7 @@ export default function Relatorios() {
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
-              Status das Parcelas
+              Status das Parcelas {filtroModalidade !== 'todas' ? `— ${MODALIDADE_LABELS[filtroModalidade] ?? filtroModalidade}` : ''}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -196,12 +262,73 @@ export default function Relatorios() {
               </ResponsiveContainer>
             ) : (
               <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
-                Nenhuma parcela cadastrada
+                Nenhuma parcela no período selecionado
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Gráfico por Modalidade */}
+      {modalidadesData.length > 0 && (
+        <Card className="border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <BarChart2 className="h-4 w-4" />
+              Recebimentos por Modalidade — Período Selecionado
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={modalidadesData} margin={{ top: 0, right: 0, left: -10, bottom: 40 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis
+                  dataKey="name"
+                  tick={{ fontSize: 10, fill: '#6b7280' }}
+                  angle={-30}
+                  textAnchor="end"
+                  interval={0}
+                />
+                <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+                  formatter={(v: number, name: string) => [formatarMoeda(v), name === 'recebido' ? 'Recebido' : 'Total Previsto']}
+                />
+                <Bar dataKey="total" fill="#3b82f6" radius={[4, 4, 0, 0]} name="total" opacity={0.5} />
+                <Bar dataKey="recebido" fill="#22c55e" radius={[4, 4, 0, 0]} name="recebido" />
+              </BarChart>
+            </ResponsiveContainer>
+            {/* Tabela resumo por modalidade */}
+            <div className="mt-4 space-y-2">
+              {modalidadesData.map((m, idx) => (
+                <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border border-border">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ background: m.color }} />
+                    <span className="text-sm font-medium text-foreground">{m.name}</span>
+                    <span className="text-xs text-muted-foreground">({m.parcelas} parcelas)</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">Recebido</div>
+                      <div className="text-sm font-medium text-success">{formatarMoeda(m.recebido)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-muted-foreground">Total</div>
+                      <div className="text-sm font-medium text-foreground">{formatarMoeda(m.total)}</div>
+                    </div>
+                    <div className="text-right min-w-[50px]">
+                      <div className="text-xs text-muted-foreground">%</div>
+                      <div className="text-sm font-medium text-warning">
+                        {m.total > 0 ? ((m.recebido / m.total) * 100).toFixed(0) : 0}%
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* KPIs Globais */}
       <Card className="border-border">

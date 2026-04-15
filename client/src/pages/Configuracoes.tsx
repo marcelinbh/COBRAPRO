@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Settings, MessageCircle, Bell, Building2, Save, RotateCcw,
-  CheckCircle2, Info
+  CheckCircle2, Info, Upload, ImageIcon, X
 } from "lucide-react";
 
 // Variáveis disponíveis — idênticas ao Cobra Fácil
@@ -91,6 +91,7 @@ export default function Configuracoes() {
     if ((config as any).pixKey !== undefined) setPixKey((config as any).pixKey);
     if ((config as any).nomeCobranca !== undefined) setNomeCobranca((config as any).nomeCobranca);
     if ((config as any).linkPagamento !== undefined) setLinkPagamento((config as any).linkPagamento);
+    if ((config as any).logoUrl !== undefined) setLogoUrl((config as any).logoUrl);
     if (config.nomeEmpresa) setNomeEmpresa(config.nomeEmpresa);
     if (config.cnpjEmpresa) setCnpj(config.cnpjEmpresa);
     if (config.telefoneEmpresa) setTelefone(config.telefoneEmpresa);
@@ -114,6 +115,8 @@ export default function Configuracoes() {
   const [pixKey, setPixKey] = useState((config as any)?.pixKey ?? "");
   const [nomeCobranca, setNomeCobranca] = useState((config as any)?.nomeCobranca ?? "");
   const [linkPagamento, setLinkPagamento] = useState((config as any)?.linkPagamento ?? "");
+  const [logoUrl, setLogoUrl] = useState((config as any)?.logoUrl ?? "");
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   // Parâmetros financeiros
   const [multaPadrao, setMultaPadrao] = useState(String(config?.multaPadrao ?? "2"));
@@ -185,6 +188,35 @@ export default function Configuracoes() {
     } as any);
   };
 
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { toast.error('Logo deve ter no máximo 2MB'); return; }
+    setUploadingLogo(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload-logo', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Falha no upload');
+      const { url } = await res.json();
+      setLogoUrl(url);
+      await saveConfigMutation.mutateAsync({ logoUrl: url } as any);
+      toast.success('Logo salva com sucesso!');
+    } catch {
+      // Fallback: usar base64 local
+      const reader = new FileReader();
+      reader.onload = async (ev) => {
+        const b64 = ev.target?.result as string;
+        setLogoUrl(b64);
+        await saveConfigMutation.mutateAsync({ logoUrl: b64 } as any);
+        toast.success('Logo salva com sucesso!');
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
   const salvarEmpresa = () => {
     saveConfigMutation.mutate({
       nomeEmpresa,
@@ -200,10 +232,10 @@ export default function Configuracoes() {
       pixKey,
       nomeCobranca,
       linkPagamento,
+      logoUrl,
     } as any);
   };
-
-  const templateAtual = abaAtiva === "atraso" ? templateAtraso : abaAtiva === "venceHoje" ? templateVenceHoje : templateAntecipada;
+  const templateAtuall = abaAtiva === "atraso" ? templateAtraso : abaAtiva === "venceHoje" ? templateVenceHoje : templateAntecipada;
   const setTemplateAtual = abaAtiva === "atraso" ? setTemplateAtraso : abaAtiva === "venceHoje" ? setTemplateVenceHoje : setTemplateAntecipada;
   const refAtual = abaAtiva === "atraso" ? refAtraso : abaAtiva === "venceHoje" ? refVenceHoje : refAntecipada;
 
@@ -253,6 +285,35 @@ export default function Configuracoes() {
               <Label>Mensagem de Fechamento</Label>
               <Input className="mt-1" value={fechamento} onChange={e => setFechamento(e.target.value)} placeholder="Ex: Regularize hoje e evite juros!" />
               <p className="text-xs text-muted-foreground mt-1">Aparece como {"{"}FECHAMENTO{"}"}nos templates</p>
+            </div>
+          </div>
+
+          {/* Logo da Empresa */}
+          <div className="pt-2 border-t border-border">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Logo da Empresa</p>
+            <div className="flex items-center gap-4">
+              <div className="h-16 w-32 rounded-lg border border-border bg-muted/20 flex items-center justify-center overflow-hidden">
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Logo" className="h-full w-full object-contain p-1" />
+                ) : (
+                  <ImageIcon className="h-6 w-6 text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="cursor-pointer">
+                  <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploadingLogo} />
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-muted/20 hover:bg-muted/40 text-sm transition-colors">
+                    <Upload className="h-3.5 w-3.5" />
+                    {uploadingLogo ? 'Enviando...' : 'Enviar Logo'}
+                  </div>
+                </label>
+                {logoUrl && (
+                  <button onClick={() => { setLogoUrl(''); saveConfigMutation.mutate({ logoUrl: '' } as any); }} className="flex items-center gap-1.5 text-xs text-destructive hover:text-destructive/80">
+                    <X className="h-3 w-3" /> Remover logo
+                  </button>
+                )}
+                <p className="text-xs text-muted-foreground">PNG, JPG ou SVG. Máx 2MB.<br/>Aparece no cabeçalho dos PDFs.</p>
+              </div>
             </div>
           </div>
 
