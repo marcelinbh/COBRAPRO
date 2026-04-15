@@ -126,7 +126,7 @@ export function Scores() {
                 </div>
 
                 {/* Estatísticas */}
-                <div className="flex gap-6 ml-6 text-sm">
+                <div className="flex gap-4 ml-6 text-sm">
                   <div className="text-center">
                     <div className="text-emerald-400 font-semibold">{cliente.parcelasQuitadas}</div>
                     <div className="text-slate-400 text-xs">Quitadas</div>
@@ -143,6 +143,16 @@ export function Scores() {
                     <div className="text-yellow-400 font-semibold">R$ {(cliente.lucroGerado || 0).toFixed(2)}</div>
                     <div className="text-slate-400 text-xs">Lucro</div>
                   </div>
+                  <div className="text-center">
+                    <div className="text-purple-400 font-semibold">{cliente.taxaAdimplencia ?? 0}%</div>
+                    <div className="text-slate-400 text-xs">Adimpl.</div>
+                  </div>
+                  {(cliente.pontosRecuperacao ?? 0) > 0 && (
+                    <div className="text-center">
+                      <div className="text-orange-400 font-semibold">+{cliente.pontosRecuperacao}</div>
+                      <div className="text-slate-400 text-xs">Recup.</div>
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>

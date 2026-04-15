@@ -177,3 +177,20 @@ export async function getUserByOpenId(openId: string) {
 }
 
 // TODO: add feature queries here as your schema grows.
+
+/**
+ * Retorna o koletor_id vinculado ao user_id informado.
+ * Retorna null se o usuário não tiver um koletor vinculado (admin ou sem vínculo).
+ */
+export async function getKoletorIdForUser(userId: number): Promise<number | null> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+  const { data } = await supabase
+    .from('koletores')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('ativo', true)
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? null;
+}

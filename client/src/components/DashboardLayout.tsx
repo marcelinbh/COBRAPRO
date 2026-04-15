@@ -44,6 +44,7 @@ import {
   Database,
   AlertTriangle,
   Smartphone,
+  Tv2,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -72,6 +73,7 @@ const menuItems = [
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
   { icon: UserCog, label: "Cobradores", path: "/cobradores" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
+  { icon: Tv2, label: "Assinaturas", path: "/assinaturas" },
   { icon: Smartphone, label: "Instalar App", path: "/install" },
 ];
 

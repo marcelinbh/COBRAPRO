@@ -441,7 +441,7 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // ─── UPLOAD DE ARQUIVOS (foto e documentos de clientes) ─────────────────────
+  // ─── UPLOAD DE ARQUIVOS (foto e documentos de clientes) ─────────────
   app.post("/api/upload", async (req: Request, res: Response) => {
     try {
       const { base64, contentType, filename, folder } = req.body;

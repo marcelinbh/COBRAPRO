@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { BarChart2, TrendingUp, AlertTriangle, DollarSign, Filter } from "lucide-react";
+import { BarChart2, TrendingUp, AlertTriangle, DollarSign, Filter, ArrowDownCircle, Plus, Minus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { formatarMoeda } from "../../../shared/finance";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -30,6 +32,7 @@ export default function Relatorios() {
   const { data: kpis } = trpc.dashboard.kpis.useQuery();
   const { data: parcelas } = trpc.parcelas.list.useQuery({});
   const { data: transacoes } = trpc.caixa.transacoes.useQuery({});
+  const { data: contasCaixa } = trpc.caixa.contas.useQuery();
 
   // Filtrar parcelas por período e modalidade
   const parcelasPeriodo = (parcelas ?? []).filter(p => {
@@ -94,6 +97,58 @@ export default function Relatorios() {
 
   // Modalidades disponíveis (para o seletor)
   const modalidadesDisponiveis = Array.from(new Set((parcelas ?? []).map(p => p.modalidade).filter(Boolean)));
+
+  // Saídas no período (empréstimos concedidos)
+  const saidasPeriodo = (transacoes ?? [])
+    .filter(t => {
+      const d = new Date(t.dataTransacao).toISOString().split('T')[0];
+      return t.tipo === 'saida' && d >= dataInicio && d <= dataFim;
+    })
+    .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
+
+  const entradasPeriodo = (transacoes ?? [])
+    .filter(t => {
+      const d = new Date(t.dataTransacao).toISOString().split('T')[0];
+      return t.tipo === 'entrada' && d >= dataInicio && d <= dataFim;
+    })
+    .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
+
+  // Distribuição de vendas por modalidade (gráfico de pizza)
+  const distribuicaoVendas = Object.entries(modalidadesMap).map(([key, val], idx) => ({
+    name: MODALIDADE_LABELS[key] ?? key,
+    value: val.total,
+    color: CORES[idx % CORES.length],
+  })).filter(d => d.value > 0);
+
+  // Caixa Extra manual
+  const [caixaExtraValor, setCaixaExtraValor] = useState('');
+  const [caixaExtraDesc, setCaixaExtraDesc] = useState('');
+  const [caixaExtraTipo, setCaixaExtraTipo] = useState<'entrada' | 'saida'>('entrada');
+  const utils = trpc.useUtils();
+  const caixaExtraMutation = trpc.caixa.registrarTransacao.useMutation({
+    onSuccess: () => {
+      toast.success('Lançamento registrado no caixa!');
+      setCaixaExtraValor('');
+      setCaixaExtraDesc('');
+      utils.caixa.transacoes.invalidate();
+    },
+    onError: (e: any) => toast.error('Erro: ' + e.message),
+  });
+
+  function handleCaixaExtra() {
+    const valor = parseFloat(caixaExtraValor.replace(',', '.'));
+    if (!valor || valor <= 0) { toast.error('Informe um valor válido'); return; }
+    if (!caixaExtraDesc.trim()) { toast.error('Informe uma descrição'); return; }
+    const contaId = contasCaixa?.[0]?.id;
+    if (!contaId) { toast.error('Nenhuma conta caixa encontrada. Crie uma conta no módulo Caixa.'); return; }
+    caixaExtraMutation.mutate({
+      contaCaixaId: contaId,
+      tipo: caixaExtraTipo,
+      valor,
+      descricao: caixaExtraDesc,
+      categoria: caixaExtraTipo === 'entrada' ? 'ajuste_manual' : 'despesa_operacional',
+    });
+  }
 
   return (
     <div className="space-y-6">
@@ -329,6 +384,144 @@ export default function Relatorios() {
           </CardContent>
         </Card>
       )}
+
+      {/* Saídas e Entradas do Período */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-border">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-success/15"><DollarSign className="h-4 w-4 text-success" /></div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">Entradas no Período</span>
+            </div>
+            <div className="font-display text-2xl text-success">{formatarMoeda(entradasPeriodo)}</div>
+            <div className="text-xs text-muted-foreground mt-1">Total recebido no caixa</div>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-destructive/15"><ArrowDownCircle className="h-4 w-4 text-destructive" /></div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">Saídas no Período</span>
+            </div>
+            <div className="font-display text-2xl text-destructive">{formatarMoeda(saidasPeriodo)}</div>
+            <div className="text-xs text-muted-foreground mt-1">Empréstimos e despesas</div>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-primary/15"><TrendingUp className="h-4 w-4 text-primary" /></div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">Saldo do Período</span>
+            </div>
+            <div className={`font-display text-2xl ${entradasPeriodo - saidasPeriodo >= 0 ? 'text-success' : 'text-destructive'}`}>
+              {formatarMoeda(entradasPeriodo - saidasPeriodo)}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">Entradas − Saídas</div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Distribuição de Vendas por Modalidade */}
+      {distribuicaoVendas.length > 0 && (
+        <Card className="border-border">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Distribuição de Vendas por Modalidade
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie
+                    data={distribuicaoVendas}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {distribuicaoVendas.map((entry, index) => (
+                      <Cell key={index} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+                    formatter={(v: number) => formatarMoeda(v)}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12, color: '#9ca3af' }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2 flex flex-col justify-center">
+                {distribuicaoVendas.map((d, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2.5 rounded-lg bg-muted/20 border border-border">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ background: d.color }} />
+                      <span className="text-sm font-medium text-foreground">{d.name}</span>
+                    </div>
+                    <div className="text-sm font-semibold text-foreground">{formatarMoeda(d.value)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Caixa Extra Manual */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Lançamento Manual no Caixa
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Tipo</Label>
+              <Select value={caixaExtraTipo} onValueChange={(v: any) => setCaixaExtraTipo(v)}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="entrada">Entrada (Recebimento)</SelectItem>
+                  <SelectItem value="saida">Saída (Despesa)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Valor (R$)</Label>
+              <input
+                className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="0,00"
+                value={caixaExtraValor}
+                onChange={e => setCaixaExtraValor(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Descrição</Label>
+              <input
+                className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                placeholder="Ex: Aluguel, Combustível..."
+                value={caixaExtraDesc}
+                onChange={e => setCaixaExtraDesc(e.target.value)}
+              />
+            </div>
+            <Button
+              onClick={handleCaixaExtra}
+              disabled={caixaExtraMutation.isPending}
+              className={caixaExtraTipo === 'entrada' ? 'bg-success hover:bg-success/90 text-white' : 'bg-destructive hover:bg-destructive/90 text-white'}
+            >
+              {caixaExtraTipo === 'entrada' ? <Plus className="h-4 w-4 mr-1" /> : <Minus className="h-4 w-4 mr-1" />}
+              {caixaExtraMutation.isPending ? 'Salvando...' : 'Lançar no Caixa'}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground mt-2">O lançamento será registrado no caixa do dia atual e aparecerá no fluxo de caixa.</p>
+        </CardContent>
+      </Card>
 
       {/* KPIs Globais */}
       <Card className="border-border">

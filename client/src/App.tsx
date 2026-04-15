@@ -36,6 +36,7 @@ import Install from "./pages/Install";
 import AnaliseRisco from "./pages/AnaliseRisco";
 import EmprestimoDetalhes from "./pages/EmprestimoDetalhes";
 import VendasTelefone from "./pages/VendasTelefone";
+import Assinaturas from "./pages/Assinaturas";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -62,6 +63,7 @@ const InstallPage = () => <Install />;
 const AnaliseRiscoPage = () => <DashboardLayout><AnaliseRisco /></DashboardLayout>;
 const EmprestimoDetalhesPage = () => <DashboardLayout><EmprestimoDetalhes /></DashboardLayout>;
 const VendasTelefonePage = () => <VendasTelefone />;
+const AssinaturasPage = () => <DashboardLayout><Assinaturas /></DashboardLayout>;
 
 function Router() {
   return (
@@ -101,6 +103,7 @@ function Router() {
       <Route path="/install" component={InstallPage} />
       <Route path="/analise-risco" component={AnaliseRiscoPage} />
       <Route path="/vendas-telefone" component={VendasTelefonePage} />
+      <Route path="/assinaturas" component={AssinaturasPage} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

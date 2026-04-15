@@ -466,3 +466,16 @@
 - [x] Modo Pasta compatível com seleção em lote (checkboxes funcionam dentro das pastas)
 - [x] TypeScript 0 erros
 - [x] Salvar checkpoint e push para GitHub
+
+## Fase 50: Baixa Prioridade — Assinaturas/IPTV + Permissões + Relatório Diário
+
+- [x] Módulo de Assinaturas/IPTV: tabela `assinaturas` no Supabase (SQL gerado - executar no Dashboard)
+- [x] Módulo de Assinaturas/IPTV: router tRPC (criar, listar, pagar, deletar)
+- [x] Módulo de Assinaturas/IPTV: página /assinaturas com KPIs, lista e formulário
+- [x] Módulo de Assinaturas/IPTV: integração com Caixa ao registrar pagamento
+- [ ] Permissões granulares: campo `permissoes` na tabela koletores/users
+- [ ] Permissões granulares: funcionário vê apenas seus próprios empréstimos
+- [ ] Permissões granulares: dashboard bloqueado para funcionários (sem totais financeiros)
+- [ ] Relatório Diário via WhatsApp: procedure gerarRelatorioDiario
+- [ ] Relatório Diário via WhatsApp: botão "Enviar Relatório Diário" nas Configurações
+- [ ] Caixa Extra manual no Relatório: campo para adicionar valor extra ao caixa

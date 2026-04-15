@@ -2,6 +2,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { veiculosRouter } from "./routers/veiculos";
+import { assinaturasRouter } from "./routers/assinaturas";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClient, resetDb } from "./db";
@@ -569,12 +570,21 @@ const clientesRouter = router({
         let parcelasEmDia = 0;
         let parcelasAtrasadas = 0;
         let parcelasQuitadas = 0;
+        let pontosRecuperacao = 0;
+        const totalParcelas = parcelas_data.length;
         
         for (const parcela of parcelas_data) {
           if (parcela.status === 'paga') {
             parcelasQuitadas++;
             score += 10; // +10 por parcela paga
-            lucroGerado += parseFloat(parcela.juros || 0);
+            lucroGerado += parseFloat(parcela.juros || parcela.valor_juros || 0);
+            // Bônus de recuperação: pagou após atraso
+            const dataPag = parcela.data_pagamento || parcela.dataPagamento;
+            const dataVenc = parcela.data_vencimento || parcela.dataVencimento;
+            if (dataPag && dataVenc && new Date(dataPag) > new Date(dataVenc)) {
+              pontosRecuperacao += 3;
+              score += 3;
+            }
           } else if (parcela.status === 'pendente' || parcela.status === 'vencendo_hoje') {
             parcelasEmDia++;
             score += 5;
@@ -587,8 +597,15 @@ const clientesRouter = router({
         // Bonus por lucro gerado
         score += Math.floor(lucroGerado / 100); // +1 ponto por R$100 de lucro
         
-        // Limitar score entre 0 e 131
-        score = Math.max(0, Math.min(131, score));
+        // Bônus por alta taxa de adimplência
+        if (totalParcelas > 0) {
+          const taxaAdimplencia = (parcelasQuitadas + parcelasEmDia) / totalParcelas;
+          if (taxaAdimplencia >= 0.9) score += 20;
+          else if (taxaAdimplencia >= 0.8) score += 10;
+        }
+        
+        // Limitar score entre 0 e 200
+        score = Math.max(0, Math.min(200, score));
         
         // Determinar badge
         let badge = '⚠️ Ruim';
@@ -604,6 +621,9 @@ const clientesRouter = router({
           parcelasEmDia,
           parcelasAtrasadas,
           parcelasQuitadas,
+          pontosRecuperacao,
+          totalParcelas,
+          taxaAdimplencia: totalParcelas > 0 ? Math.round(((parcelasQuitadas + parcelasEmDia) / totalParcelas) * 100) : 0,
         };
       }));
       
@@ -3494,6 +3514,7 @@ export const appRouter = router({
   veiculos: veiculosRouter,
   vendasTelefone: vendasTelefoneRouter,
   etiquetas: etiquetasRouter,
+  assinaturas: assinaturasRouter,
 });
 
 export type AppRouter = typeof appRouter;

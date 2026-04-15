@@ -431,3 +431,42 @@ export const parcelas_venda_telefone = pgTable("parcelas_venda_telefone", {
   valor_pago: decimal("valor_pago", { precision: 12, scale: 2 }),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ─── ASSINATURAS / IPTV ───────────────────────────────────────────────────────
+export const statusAssinaturaEnum = pgEnum("status_assinatura", [
+  "ativa", "cancelada", "suspensa", "inadimplente"
+]);
+
+export const assinaturas = pgTable("assinaturas", {
+  id: serial("id").primaryKey(),
+  clienteId: integer("cliente_id").notNull(),
+  servico: varchar("servico", { length: 200 }).notNull(),
+  descricao: text("descricao"),
+  valorMensal: decimal("valor_mensal", { precision: 15, scale: 2 }).notNull(),
+  diaVencimento: integer("dia_vencimento").notNull().default(10),
+  status: statusAssinaturaEnum("status").default("ativa").notNull(),
+  dataInicio: date("data_inicio").notNull(),
+  dataCancelamento: date("data_cancelamento"),
+  contaCaixaId: integer("conta_caixa_id"),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Assinatura = typeof assinaturas.$inferSelect;
+export type InsertAssinatura = typeof assinaturas.$inferInsert;
+
+export const pagamentosAssinatura = pgTable("pagamentos_assinatura", {
+  id: serial("id").primaryKey(),
+  assinaturaId: integer("assinatura_id").notNull(),
+  clienteId: integer("cliente_id").notNull(),
+  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }).notNull(),
+  dataPagamento: timestamp("data_pagamento", { withTimezone: true }).defaultNow().notNull(),
+  mesReferencia: varchar("mes_referencia", { length: 7 }).notNull(),
+  contaCaixaId: integer("conta_caixa_id"),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type PagamentoAssinatura = typeof pagamentosAssinatura.$inferSelect;
+export type InsertPagamentoAssinatura = typeof pagamentosAssinatura.$inferInsert;
