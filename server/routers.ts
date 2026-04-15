@@ -3180,6 +3180,30 @@ const vendasTelefoneRouter = router({
       } catch (caixaErr) {
         console.warn('[vendasTelefone.pagarParcela] Erro ao registrar no caixa:', caixaErr);
       }
+      // ── Verificar se todas as parcelas foram pagas → marcar venda como quitada ──
+      try {
+        if (parcela) {
+          const vendaId = (parcela as any).venda_id;
+          const { data: todasParcelas } = await supabase
+            .from('parcelas_venda_telefone')
+            .select('id, status')
+            .eq('venda_id', vendaId);
+          if (todasParcelas && todasParcelas.length > 0) {
+            const todasPagas = todasParcelas.every((p: any) =>
+              p.id === input.parcelaId ? true : p.status === 'paga'
+            );
+            if (todasPagas) {
+              await supabase
+                .from('vendas_telefone')
+                .update({ status: 'quitado' })
+                .eq('id', vendaId);
+              console.log(`[vendasTelefone] Venda #${vendaId} marcada como QUITADA automaticamente`);
+            }
+          }
+        }
+      } catch (quitadoErr) {
+        console.warn('[vendasTelefone.pagarParcela] Erro ao verificar quitado:', quitadoErr);
+      }
       return { success: true };
     }),
 

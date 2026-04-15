@@ -385,6 +385,10 @@ export default function VendasTelefone() {
   const [vendaSelecionada, setVendaSelecionada] = useState<any>(null);
   const [showParcelas, setShowParcelas] = useState(false);
 
+  // ── Filtros da lista ──
+  const [busca, setBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState("todos");
+
   // ── Queries & Mutations ──
   const { data: vendas = [], refetch } = trpc.vendasTelefone.listar.useQuery();
   const { data: kpis } = trpc.vendasTelefone.kpis.useQuery();
@@ -459,6 +463,21 @@ export default function VendasTelefone() {
     cancelado: "bg-gray-100 text-gray-500",
   };
 
+  // ── Vendas filtradas ──
+  const vendasFiltradas = useMemo(() => {
+    let lista = vendas as any[];
+    if (filtroStatus !== "todos") lista = lista.filter((v) => v.status === filtroStatus);
+    if (busca.trim()) {
+      const q = busca.toLowerCase();
+      lista = lista.filter((v) =>
+        (v.comprador_nome ?? "").toLowerCase().includes(q) ||
+        (v.marca ?? "").toLowerCase().includes(q) ||
+        (v.modelo ?? "").toLowerCase().includes(q)
+      );
+    }
+    return lista;
+  }, [vendas, filtroStatus, busca]);
+
   // ─────────────────────────────────────────────────────────────────────────────
   // TELA: LISTA
   // ─────────────────────────────────────────────────────────────────────────────
@@ -509,6 +528,50 @@ export default function VendasTelefone() {
             ))}
           </div>
 
+          {/* Barra de filtros */}
+          {(vendas as any[]).length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                  <Input
+                    placeholder="Buscar por comprador, marca ou modelo..."
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    className="pl-9 bg-gray-50 border-gray-200"
+                  />
+                </div>
+                <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+                  <SelectTrigger className="w-full sm:w-44 bg-gray-50 border-gray-200">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="todos">Todos os status</SelectItem>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="quitado">Quitado</SelectItem>
+                    <SelectItem value="inadimplente">Inadimplente</SelectItem>
+                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                  </SelectContent>
+                </Select>
+                {(busca || filtroStatus !== "todos") && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-500 hover:text-gray-700 whitespace-nowrap"
+                    onClick={() => { setBusca(""); setFiltroStatus("todos"); }}
+                  >
+                    Limpar filtros
+                  </Button>
+                )}
+              </div>
+              {(busca || filtroStatus !== "todos") && (
+                <p className="text-xs text-gray-400 mt-2">
+                  {vendasFiltradas.length} resultado{vendasFiltradas.length !== 1 ? "s" : ""} encontrado{vendasFiltradas.length !== 1 ? "s" : ""}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Lista de vendas */}
           {vendas.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
@@ -519,9 +582,15 @@ export default function VendasTelefone() {
                 <Plus className="w-4 h-4 mr-2" /> Criar primeira venda
               </Button>
             </div>
+          ) : vendasFiltradas.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
+              <Smartphone className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+              <h3 className="text-base font-semibold text-gray-600 mb-1">Nenhum resultado encontrado</h3>
+              <p className="text-gray-400 text-sm">Tente ajustar os filtros ou limpar a busca.</p>
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-              {vendas.map((v: any) => (
+              {vendasFiltradas.map((v: any) => (
                 <div key={v.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                   {/* Cabeçalho do card */}
                   <div className="bg-gradient-to-r from-gray-900 to-gray-800 p-4 flex items-center justify-between">

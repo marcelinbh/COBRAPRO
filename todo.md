@@ -427,3 +427,11 @@
 - [ ] Corrigir todos os bugs encontrados
 - [ ] Verificar responsividade mobile em todas as páginas
 - [ ] Salvar checkpoint e push para GitHub
+
+## Fase 47: Melhorias Venda de Telefone
+
+- [x] Status "Quitado" automático ao pagar última parcela (procedure pagarParcela)
+- [x] Filtro por status (ativo/quitado/inadimplente) na lista de vendas
+- [x] Busca por nome do comprador ou modelo do aparelho
+- [x] Auditoria de fluxo completo: criar venda → verificar entrada no Caixa
+- [x] Salvar checkpoint e push para GitHub
