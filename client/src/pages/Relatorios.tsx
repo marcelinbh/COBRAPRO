@@ -85,7 +85,7 @@ export default function Relatorios() {
       </Card>
 
       {/* KPIs do período */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="border-border">
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-3">
@@ -116,6 +116,20 @@ export default function Relatorios() {
               {totalPeriodo > 0 ? ((recebidoPeriodo / totalPeriodo) * 100).toFixed(1) : 0}%
             </div>
             <div className="text-xs text-muted-foreground mt-1">do total previsto</div>
+          </CardContent>
+        </Card>
+        <Card className="border-border">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-lg bg-destructive/15"><AlertTriangle className="h-4 w-4 text-destructive" /></div>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">Taxa de Inadimplência</span>
+            </div>
+            <div className="font-display text-2xl text-destructive">
+              {totalPeriodo > 0 ? ((inadimplentePeriodo / totalPeriodo) * 100).toFixed(1) : 0}%
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              {parcelasPeriodo.filter(p => p.status === 'atrasada').length} parcelas em atraso
+            </div>
           </CardContent>
         </Card>
       </div>

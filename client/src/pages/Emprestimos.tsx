@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Search, Plus, MessageCircle, CheckCircle, Clock, AlertTriangle,
   TrendingUp, DollarSign, Filter, RefreshCw, FileText, ChevronDown, ChevronUp,
-  Edit, Trash2, Send, Phone, Eye, List, Zap
+  Edit, Trash2, Send, Phone, Eye, List, Zap, Users, ExternalLink, Loader2
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { useLocation } from "wouter";
@@ -497,14 +497,34 @@ function EmprestimoCardCobra({
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500'];
   const bgColor = colors[emp.clienteId % colors.length];
 
-  const handleWhatsApp = () => {
+  const [loadingWpp, setLoadingWpp] = useState(false);
+
+  const handleWhatsApp = async (tipo: 'atraso' | 'preventivo' = 'atraso') => {
     if (!emp.clienteWhatsapp) {
       toast.error("Telefone WhatsApp não cadastrado");
       return;
     }
-    const msg = `Olá ${emp.clienteNome}, você tem uma parcela em atraso de ${formatarMoeda(totalComAtraso)}. Favor regularizar.`;
-    const url = `https://wa.me/${emp.clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    setLoadingWpp(true);
+    try {
+      const result = await utils.client.whatsapp.gerarMensagemContrato.query({
+        contratoId: emp.id,
+        tipo,
+      });
+      if (result.whatsappUrl) {
+        window.open(result.whatsappUrl, '_blank');
+      } else {
+        toast.error("Não foi possível gerar o link do WhatsApp");
+      }
+    } catch {
+      // Fallback para mensagem simples
+      const msg = tipo === 'atraso'
+        ? `⚠️ Olá ${emp.clienteNome}, você tem parcela(s) em atraso. Favor regularizar o quanto antes.`
+        : `🟢 Olá ${emp.clienteNome}! Lembrete: você tem parcela vencendo em breve. Fique em dia!`;
+      const url = `https://wa.me/55${emp.clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`;
+      window.open(url, '_blank');
+    } finally {
+      setLoadingWpp(false);
+    }
   };
 
   return (
@@ -613,25 +633,26 @@ function EmprestimoCardCobra({
 
         {/* Botões de ação principais */}
         <div className="p-4 space-y-2 border-t border-border/50">
-          {diasAtraso > 0 && (
-            <>
-              <Button
-                size="sm"
-                className="w-full h-9 text-xs bg-red-700 hover:bg-red-800 text-white gap-1"
-                onClick={handleWhatsApp}
-              >
-                <Send className="h-3.5 w-3.5" />
-                Cobrar Atraso (WhatsApp)
-              </Button>
-
-              <Button
-                size="sm"
-                className="w-full h-9 text-xs bg-red-600 hover:bg-red-700 text-white gap-1"
-              >
-                <MessageCircle className="h-3.5 w-3.5" />
-                Enviar Cobrança
-              </Button>
-            </>
+          {diasAtraso > 0 ? (
+            <Button
+              size="sm"
+              className="w-full h-9 text-xs bg-red-700 hover:bg-red-800 text-white gap-1"
+              onClick={() => handleWhatsApp('atraso')}
+              disabled={loadingWpp}
+            >
+              {loadingWpp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+              Cobrar Atraso (WhatsApp)
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              className="w-full h-9 text-xs bg-green-700 hover:bg-green-800 text-white gap-1"
+              onClick={() => handleWhatsApp('preventivo')}
+              disabled={loadingWpp}
+            >
+              {loadingWpp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
+              Cobrança Preventiva
+            </Button>
           )}
 
           <PagamentoModal
@@ -823,10 +844,48 @@ export default function Emprestimos() {
   const [busca, setBusca] = useState("");
   const [abaSelecionada, setAbaSelecionada] = useState("emprestimos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [modoSelecao, setModoSelecao] = useState(false);
+  const [selecionados, setSelecionados] = useState<number[]>([]);
+  const [loadingLote, setLoadingLote] = useState(false);
+  const [periodoRecebimentos, setPeriodoRecebimentos] = useState<'hoje' | 'semana' | 'mes' | 'todos'>('mes');
   const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
 
   const { data: emprestimos, isLoading, refetch } = trpc.contratos.listComParcelas.useQuery();
   const { data: contas } = trpc.caixa.contas.useQuery();
+  const { data: recebimentosData, isLoading: loadingRecebimentos } = trpc.whatsapp.recebimentos.useQuery(
+    { periodo: periodoRecebimentos },
+    { enabled: abaSelecionada === 'recebimentos' }
+  );
+
+  const cobrarLoteMutation = trpc.whatsapp.cobrarLote.useMutation({
+    onSuccess: (data) => {
+      const urls = data.resultados.filter(r => r.whatsappUrl && r.sucesso);
+      if (urls.length === 0) {
+        toast.error('Nenhum cliente tem WhatsApp cadastrado');
+        return;
+      }
+      toast.success(`Abrindo ${urls.length} cobranças...`);
+      // Abrir uma por uma com delay para não bloquear popups
+      urls.forEach((r, i) => {
+        setTimeout(() => {
+          if (r.whatsappUrl) window.open(r.whatsappUrl, '_blank');
+        }, i * 800);
+      });
+      setSelecionados([]);
+      setModoSelecao(false);
+    },
+    onError: (e) => toast.error('Erro na cobrança em lote: ' + e.message),
+  });
+
+  const toggleSelecao = (id: number) => {
+    setSelecionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const selecionarTodosAtrasados = () => {
+    const atrasadosIds = (emprestimos ?? []).filter(e => e.parcelasComAtraso.length > 0).map(e => e.id);
+    setSelecionados(atrasadosIds);
+  };
 
   const emprestimosFiltrados = useMemo(() => {
     if (!emprestimos) return [];
@@ -881,7 +940,7 @@ export default function Emprestimos() {
           { id: 'emprestimos', label: 'Empréstimos', count: emprestimos?.length ?? 0 },
           { id: 'diario', label: 'Diário', count: 0 },
           { id: 'price', label: 'Tabela Price', count: 0 },
-          { id: 'recebimentos', label: 'Recebimentos', count: 0 },
+          { id: 'recebimentos', label: 'Recebimentos', count: recebimentosData?.total ?? 0 },
         ].map(aba => (
           <button
             key={aba.id}
@@ -897,56 +956,181 @@ export default function Emprestimos() {
         ))}
       </div>
 
-      {/* Filtros e Busca */}
-      <div className="flex gap-3 items-center">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar..."
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            className="pl-10"
-          />
+      {abaSelecionada === 'emprestimos' && (
+        <>
+          {/* Barra de Cobrança em Lote */}
+          {modoSelecao && (
+            <div className="flex items-center gap-3 p-3 bg-blue-900/30 border border-blue-500/40 rounded-lg">
+              <span className="text-sm font-medium text-blue-300">
+                {selecionados.length} selecionado(s)
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs gap-1"
+                onClick={selecionarTodosAtrasados}
+              >
+                Selecionar Atrasados
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1 bg-red-700 hover:bg-red-800 text-white text-xs"
+                disabled={selecionados.length === 0 || cobrarLoteMutation.isPending}
+                onClick={() => cobrarLoteMutation.mutate({ contratoIds: selecionados, tipo: 'atraso' })}
+              >
+                {cobrarLoteMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                Cobrar Selecionados
+              </Button>
+              <Button
+                size="sm"
+                className="gap-1 bg-green-700 hover:bg-green-800 text-white text-xs"
+                disabled={selecionados.length === 0 || cobrarLoteMutation.isPending}
+                onClick={() => cobrarLoteMutation.mutate({ contratoIds: selecionados, tipo: 'preventivo' })}
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+                Preventivo em Lote
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto text-xs"
+                onClick={() => { setModoSelecao(false); setSelecionados([]); }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          )}
+
+          {/* Filtros e Busca */}
+          <div className="flex gap-3 items-center">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por cliente..."
+                value={busca}
+                onChange={e => setBusca(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={filtroStatus} onValueChange={setFiltroStatus}>
+              <SelectTrigger className="w-36">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos</SelectItem>
+                <SelectItem value="atrasados">Atrasados</SelectItem>
+                <SelectItem value="emdia">Em Dia</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant={modoSelecao ? 'default' : 'outline'}
+              className="gap-1"
+              onClick={() => { setModoSelecao(!modoSelecao); setSelecionados([]); }}
+            >
+              <Users className="h-4 w-4" />
+              Lote
+            </Button>
+            <Button
+              onClick={() => setLocation('/contratos/novo')}
+              className="gap-1 bg-emerald-600 hover:bg-emerald-700"
+            >
+              <Plus className="h-4 w-4" />
+              Novo
+            </Button>
+          </div>
+
+          {/* Grid de Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {emprestimosFiltrados.map(emp => (
+              <div key={emp.id} className="relative">
+                {modoSelecao && (
+                  <div
+                    className={`absolute top-2 left-2 z-10 w-6 h-6 rounded border-2 cursor-pointer flex items-center justify-center ${
+                      selecionados.includes(emp.id)
+                        ? 'bg-blue-500 border-blue-500 text-white'
+                        : 'bg-background border-border'
+                    }`}
+                    onClick={() => toggleSelecao(emp.id)}
+                  >
+                    {selecionados.includes(emp.id) && <CheckCircle className="h-4 w-4" />}
+                  </div>
+                )}
+                <EmprestimoCardCobra
+                  emp={emp}
+                  contas={contas ?? []}
+                  onRefresh={() => refetch()}
+                />
+              </div>
+            ))}
+          </div>
+
+          {emprestimosFiltrados.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground">
+              Nenhum empréstimo encontrado
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Aba Recebimentos */}
+      {abaSelecionada === 'recebimentos' && (
+        <div className="space-y-4">
+          {/* Filtro de período */}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium">Período:</span>
+            {(['hoje', 'semana', 'mes', 'todos'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => setPeriodoRecebimentos(p)}
+                className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                  periodoRecebimentos === p
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {p === 'hoje' ? 'Hoje' : p === 'semana' ? '7 dias' : p === 'mes' ? 'Este Mês' : 'Todos'}
+              </button>
+            ))}
+            {recebimentosData && (
+              <span className="ml-auto text-sm font-bold text-emerald-400">
+                Total: {recebimentosData.totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </span>
+            )}
+          </div>
+
+          {/* Lista de recebimentos */}
+          {loadingRecebimentos ? (
+            <div className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+          ) : recebimentosData?.recebimentos.length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground">Nenhum recebimento no período</div>
+          ) : (
+            <div className="space-y-2">
+              {recebimentosData?.recebimentos.map(r => (
+                <div key={r.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-card">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600/20 flex items-center justify-center">
+                      <CheckCircle className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium">{r.descricao}</div>
+                      <div className="text-xs text-muted-foreground">{r.contaNome} · {new Date(r.dataTransacao).toLocaleDateString('pt-BR')}</div>
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold text-emerald-400">
+                    +{r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+      )}
 
-        <Button size="sm" variant="outline" className="gap-1">
-          <Plus className="h-4 w-4" />
-          Novo Diário
-        </Button>
-
-        <Button 
-          onClick={() => setLocation('/contratos/novo')}
-          className="gap-1 bg-emerald-600 hover:bg-emerald-700"
-        >
-          <Plus className="h-4 w-4" />
-          Novo Empréstimo
-        </Button>
-
-        <Button size="sm" variant="outline" className="gap-1">
-          <Filter className="h-4 w-4" />
-          Filtros
-        </Button>
-
-        <Button size="sm" variant="outline">
-          Etiqueta
-        </Button>
-      </div>
-
-      {/* Grid de Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {emprestimosFiltrados.map(emp => (
-          <EmprestimoCardCobra
-            key={emp.id}
-            emp={emp}
-            contas={contas ?? []}
-            onRefresh={() => refetch()}
-          />
-        ))}
-      </div>
-
-      {emprestimosFiltrados.length === 0 && (
+      {/* Abas placeholder */}
+      {(abaSelecionada === 'diario' || abaSelecionada === 'price') && (
         <div className="p-8 text-center text-muted-foreground">
-          Nenhum empréstimo encontrado
+          Em breve: {abaSelecionada === 'diario' ? 'Empréstimos Diários' : 'Tabela Price'}
         </div>
       )}
 

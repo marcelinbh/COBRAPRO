@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -76,11 +76,28 @@ export default function Configuracoes() {
     onError: (e: { message: string }) => toast.error("Erro: " + e.message),
   });
 
-  // Templates de mensagem
-  const [templateAtraso, setTemplateAtraso] = useState(TEMPLATES_PADRAO.atraso);
-  const [templateVenceHoje, setTemplateVenceHoje] = useState(TEMPLATES_PADRAO.venceHoje);
-  const [templateAntecipada, setTemplateAntecipada] = useState(TEMPLATES_PADRAO.antecipada);
+  // Templates de mensagem — carrega do backend se existir, senão usa padrão
+  const [templateAtraso, setTemplateAtraso] = useState(() => (config as any)?.templateAtraso || TEMPLATES_PADRAO.atraso);
+  const [templateVenceHoje, setTemplateVenceHoje] = useState(() => (config as any)?.templateVenceHoje || TEMPLATES_PADRAO.venceHoje);
+  const [templateAntecipada, setTemplateAntecipada] = useState(() => (config as any)?.templateAntecipada || TEMPLATES_PADRAO.antecipada);
   const [abaAtiva, setAbaAtiva] = useState<"atraso" | "venceHoje" | "antecipada">("atraso");
+
+  // Sincronizar todos os campos quando config carregar do backend
+  useEffect(() => {
+    if (!config) return;
+    if ((config as any).templateAtraso) setTemplateAtraso((config as any).templateAtraso);
+    if ((config as any).templateVenceHoje) setTemplateVenceHoje((config as any).templateVenceHoje);
+    if ((config as any).templateAntecipada) setTemplateAntecipada((config as any).templateAntecipada);
+    if ((config as any).pixKey !== undefined) setPixKey((config as any).pixKey);
+    if ((config as any).nomeCobranca !== undefined) setNomeCobranca((config as any).nomeCobranca);
+    if ((config as any).linkPagamento !== undefined) setLinkPagamento((config as any).linkPagamento);
+    if (config.nomeEmpresa) setNomeEmpresa(config.nomeEmpresa);
+    if (config.cnpjEmpresa) setCnpj(config.cnpjEmpresa);
+    if (config.telefoneEmpresa) setTelefone(config.telefoneEmpresa);
+    if (config.enderecoEmpresa) setEndereco(config.enderecoEmpresa);
+    if (config.assinaturaWhatsapp) setAssinatura(config.assinaturaWhatsapp);
+    if (config.fechamentoWhatsapp) setFechamento(config.fechamentoWhatsapp);
+  }, [config]);
 
   // Refs para posição do cursor nos textareas
   const refAtraso = useRef<HTMLTextAreaElement>(null);
@@ -94,6 +111,9 @@ export default function Configuracoes() {
   const [endereco, setEndereco] = useState(config?.enderecoEmpresa ?? "");
   const [assinatura, setAssinatura] = useState(config?.assinaturaWhatsapp ?? "");
   const [fechamento, setFechamento] = useState(config?.fechamentoWhatsapp ?? "");
+  const [pixKey, setPixKey] = useState((config as any)?.pixKey ?? "");
+  const [nomeCobranca, setNomeCobranca] = useState((config as any)?.nomeCobranca ?? "");
+  const [linkPagamento, setLinkPagamento] = useState((config as any)?.linkPagamento ?? "");
 
   // Parâmetros financeiros
   const [multaPadrao, setMultaPadrao] = useState(String(config?.multaPadrao ?? "2"));
@@ -145,7 +165,24 @@ export default function Configuracoes() {
   };
 
   const salvarTemplates = () => {
-    toast.success("Templates salvos com sucesso!");
+    saveConfigMutation.mutate({
+      nomeEmpresa,
+      cnpjEmpresa: cnpj,
+      telefoneEmpresa: telefone,
+      enderecoEmpresa: endereco,
+      assinaturaWhatsapp: assinatura,
+      fechamentoWhatsapp: fechamento,
+      multaPadrao: parseFloat(multaPadrao) || 2,
+      jurosMoraDiario: parseFloat(jurosMora) || 0.033,
+      diasLembrete: parseInt(diasLembrete) || 3,
+      multaDiaria: parseFloat(multaDiaria) || 100,
+      pixKey,
+      nomeCobranca,
+      linkPagamento,
+      templateAtraso,
+      templateVenceHoje,
+      templateAntecipada,
+    } as any);
   };
 
   const salvarEmpresa = () => {
@@ -160,6 +197,9 @@ export default function Configuracoes() {
       jurosMoraDiario: parseFloat(jurosMora) || 0.033,
       diasLembrete: parseInt(diasLembrete) || 3,
       multaDiaria: parseFloat(multaDiaria) || 100,
+      pixKey,
+      nomeCobranca,
+      linkPagamento,
     } as any);
   };
 
@@ -207,12 +247,33 @@ export default function Configuracoes() {
             <div>
               <Label>Assinatura WhatsApp</Label>
               <Input className="mt-1" value={assinatura} onChange={e => setAssinatura(e.target.value)} placeholder="Ex: Equipe CobraPro" />
-              <p className="text-xs text-muted-foreground mt-1">Aparece como {"{ASSINATURA}"} nos templates</p>
+              <p className="text-xs text-muted-foreground mt-1">Aparece como {"{"}ASSINATURA{"}"}nos templates</p>
             </div>
             <div>
               <Label>Mensagem de Fechamento</Label>
               <Input className="mt-1" value={fechamento} onChange={e => setFechamento(e.target.value)} placeholder="Ex: Regularize hoje e evite juros!" />
-              <p className="text-xs text-muted-foreground mt-1">Aparece como {"{FECHAMENTO}"} nos templates</p>
+              <p className="text-xs text-muted-foreground mt-1">Aparece como {"{"}FECHAMENTO{"}"}nos templates</p>
+            </div>
+          </div>
+
+          {/* Campos de Cobrança */}
+          <div className="pt-2 border-t border-border">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-3">Dados de Cobrança</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Chave PIX</Label>
+                <Input className="mt-1" value={pixKey} onChange={e => setPixKey(e.target.value)} placeholder="CPF, CNPJ, email ou chave aleatória" />
+                <p className="text-xs text-muted-foreground mt-1">Aparece como {"{"}PIX{"}"}nas mensagens</p>
+              </div>
+              <div>
+                <Label>Nome no PIX / Cobrança</Label>
+                <Input className="mt-1" value={nomeCobranca} onChange={e => setNomeCobranca(e.target.value)} placeholder="Nome que aparece no PIX" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <Label>Link de Pagamento (opcional)</Label>
+              <Input className="mt-1" value={linkPagamento} onChange={e => setLinkPagamento(e.target.value)} placeholder="https://nubank.com.br/cobrar/..." />
+              <p className="text-xs text-muted-foreground mt-1">Link do Nubank, Mercado Pago ou outro. Enviado nas mensagens de cobrança.</p>
             </div>
           </div>
           <Button size="sm" className="gap-2" onClick={salvarEmpresa} disabled={saveConfigMutation.isPending}>

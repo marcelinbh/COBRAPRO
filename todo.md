@@ -435,3 +435,22 @@
 - [x] Busca por nome do comprador ou modelo do aparelho
 - [x] Auditoria de fluxo completo: criar venda → verificar entrada no Caixa
 - [x] Salvar checkpoint e push para GitHub
+
+## Fase 48: Alta Prioridade — Funcionalidades Cobra Fácil
+
+- [x] Melhorar whatsappRouter: gerarMensagemContrato com variáveis dinâmicas ({CLIENTE}, {VALOR}, {PIX}, {ASSINATURA}, {FECHAMENTO}, {LINK}, {DATA}, {PARCELA}, {TOTAL_ATRASO}, {DIAS_ATRASO})
+- [x] Adicionar procedure cobrarLote (cobrar múltiplos empréstimos de uma vez)
+- [x] Adicionar procedure recebimentos (listar pagamentos recebidos com filtro de período)
+- [x] Adicionar campos pixKey, nomeCobranca, linkPagamento no configuracoesRouter (get + save)
+- [x] Adicionar campos templateAtraso, templateVenceHoje, templateAntecipada no configuracoesRouter (get + save)
+- [x] Atualizar página Configurações: campos Chave PIX, Nome no PIX, Link de Pagamento
+- [x] Atualizar salvarTemplates para persistir templates no Supabase (não apenas toast)
+- [x] Sincronizar todos os campos (templates + PIX + nome + link) quando config carrega do backend
+- [x] Atualizar handleWhatsApp no Empréstimos para usar gerarMensagemContrato do backend
+- [x] Adicionar botão "Cobrar Preventivo" (WhatsApp) nos empréstimos
+- [x] Adicionar seleção em lote com checkboxes nos cards de empréstimos
+- [x] Adicionar barra de cobrança em lote (selecionar todos / cobrar selecionados)
+- [x] Preencher aba Recebimentos com dados reais do backend
+- [x] Adicionar Taxa de Inadimplência (%) no Relatório (ao lado da Taxa de Recebimento)
+- [x] Expandir grid de KPIs do período para 4 colunas
+- [x] Salvar checkpoint e push para GitHub

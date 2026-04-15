@@ -2066,6 +2066,16 @@ const portalRouter = router({
 });
 
 // ─── TEMPLATES WHATSAPP ───────────────────────────────────────────────────────
+// Helper para substituir variáveis nos templates
+function aplicarVariaveisTemplate(template: string, vars: Record<string, string>): string {
+  let msg = template;
+  for (const [key, val] of Object.entries(vars)) {
+    msg = msg.replace(new RegExp(`\\{${key}\\}`, 'g'), val);
+    msg = msg.replace(new RegExp(`\\{\\{${key.toLowerCase()}\\}\\}`, 'g'), val);
+  }
+  return msg;
+}
+
 const whatsappRouter = router({
   templates: protectedProcedure.query(async () => {
     const supabase = getSupabaseClient();
@@ -2074,6 +2084,99 @@ const whatsappRouter = router({
     return (data ?? []).map((r: any) => ({ ...r, ativo: r.ativo }));
   }),
 
+  // Gerar mensagem a partir de contrato (para botão Cobrar no card de empréstimo)
+  gerarMensagemContrato: protectedProcedure
+    .input(z.object({
+      contratoId: z.number(),
+      tipo: z.enum(['atraso', 'preventivo', 'vence_hoje']).default('atraso'),
+    }))
+    .query(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error('DB unavailable');
+      const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+      const cfg: Record<string, string> = {};
+      for (const r of (configRows ?? [])) cfg[r.chave] = r.valor ?? '';
+      const pixEmpresa = cfg['pixKey'] ?? cfg['pix_key'] ?? cfg['chave_pix'] ?? '';
+      const assinatura = cfg['assinaturaWhatsapp'] ?? cfg['assinatura_whatsapp'] ?? '';
+      const fechamento = cfg['fechamentoWhatsapp'] ?? cfg['fechamento_whatsapp'] ?? '';
+      const linkPagamento = cfg['linkPagamento'] ?? cfg['link_pagamento'] ?? '';
+      const tipoTemplate = input.tipo === 'atraso' ? 'cobranca' : 'lembrete';
+      const { data: templates } = await supabase.from('templates_whatsapp').select('*').eq('ativo', true).eq('tipo', tipoTemplate).limit(1);
+      const { data: contrato } = await supabase
+        .from('contratos')
+        .select('*, clientes(nome, whatsapp, telefone, chave_pix)')
+        .eq('id', input.contratoId)
+        .single();
+      if (!contrato) throw new Error('Contrato não encontrado');
+      const { data: parcelasArr } = await supabase
+        .from('parcelas')
+        .select('*')
+        .eq('contrato_id', input.contratoId)
+        .order('numero_parcela', { ascending: true });
+      const hoje = new Date();
+      const parcelasAtraso = (parcelasArr ?? []).filter((p: any) => {
+        const venc = new Date(p.data_vencimento + 'T00:00:00');
+        return p.status !== 'paga' && venc < hoje;
+      });
+      const proximaParcela = (parcelasArr ?? []).find((p: any) => p.status !== 'paga');
+      const parcelaRef = parcelasAtraso[0] ?? proximaParcela;
+      const diasAtraso = parcelaRef
+        ? Math.max(0, Math.floor((hoje.getTime() - new Date(parcelaRef.data_vencimento + 'T00:00:00').getTime()) / 86400000))
+        : 0;
+      const diasParaVencer = parcelaRef && diasAtraso === 0
+        ? Math.max(0, Math.floor((new Date(parcelaRef.data_vencimento + 'T00:00:00').getTime() - hoje.getTime()) / 86400000))
+        : 0;
+      const totalParcelas = contrato.numero_parcelas ?? (parcelasArr ?? []).length;
+      const parcelaNum = parcelaRef?.numero_parcela ?? 1;
+      const valorOriginal = parseFloat(parcelaRef?.valor_original ?? contrato.valor_parcela ?? '0');
+      const { juros, multa, total } = calcularJurosMora(valorOriginal, parcelaRef ? new Date(parcelaRef.data_vencimento + 'T00:00:00') : hoje, hoje);
+      const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const dataVenc = parcelaRef ? new Date(parcelaRef.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '';
+      const clienteNome = contrato.clientes?.nome ?? '';
+      const clienteWhatsapp = contrato.clientes?.whatsapp ?? contrato.clientes?.telefone ?? null;
+      const clienteChavePix = contrato.clientes?.chave_pix ?? pixEmpresa;
+      const pagas = (parcelasArr ?? []).filter((p: any) => p.status === 'paga').length;
+      const progressoBar = `${pagas}/${totalParcelas} parcelas pagas`;
+      const parcelasStatus = (parcelasArr ?? []).slice(0, 6).map((p: any) => {
+        const v = new Date(p.data_vencimento + 'T00:00:00');
+        const emoji = p.status === 'paga' ? '✅' : v < hoje ? '🔴' : '🟡';
+        return `${emoji} Parcela ${p.numero_parcela}/${totalParcelas} — ${fmt(parseFloat(p.valor_original ?? '0'))} — ${new Date(p.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}`;
+      }).join('\n');
+      const blocoMulta = multa > 0 ? `💸 *Multa:* ${fmt(multa)}\n` : '';
+      const blocoJuros = juros > 0 ? `📈 *Juros:* ${fmt(juros)}\n` : '';
+      const blocoTotal = (multa > 0 || juros > 0) ? `💰 *Total com Juros:* ${fmt(total)}\n` : '';
+      const blocoPix = clienteChavePix ? `\n💳 *PIX:* ${clienteChavePix}\n` : '';
+      const blocoLink = linkPagamento ? `🔗 *Link:* ${linkPagamento}\n` : '';
+      const templatePadrao = input.tipo === 'atraso'
+        ? `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━\n🚨 *PARCELA EM ATRASO*\n💵 *Valor:* {VALOR}\n📊 *{PARCELA}*\n📅 *Vencimento:* {DATA}\n⏰ *Dias em Atraso:* {DIAS_ATRASO}\n{MULTA}{JUROS}{TOTAL}{PROGRESSO}\n{PIX}{LINK}{FECHAMENTO}\n{ASSINATURA}`
+        : `🟢 *Olá {CLIENTE}!* ━━━━━━━━━━━━━━━━\n📋 *LEMBRETE DE PARCELA*\n💵 *Valor:* {VALOR}\n📊 *{PARCELA}*\n📅 *Vencimento:* {DATA}\n⏳ *Faltam:* {DIAS_PARA_VENCER} dias\n{PROGRESSO}\n{PIX}{LINK}{FECHAMENTO}\n{ASSINATURA}`;
+      const templateMsg = templates?.[0]?.mensagem ?? templatePadrao;
+      const vars: Record<string, string> = {
+        CLIENTE: clienteNome, nome: clienteNome,
+        VALOR: fmt(valorOriginal), valor: fmt(valorOriginal),
+        PARCELA: `Parcela ${parcelaNum}/${totalParcelas}`,
+        DATA: dataVenc, vencimento: dataVenc,
+        DIAS_ATRASO: String(diasAtraso),
+        DIAS_PARA_VENCER: String(diasParaVencer),
+        JUROS_CONTRATO: `${contrato.taxa_juros}%`,
+        MULTA: blocoMulta, JUROS: blocoJuros,
+        JUROS_MULTA: multa + juros > 0 ? `💸 *Juros+Multa:* ${fmt(multa + juros)}\n` : '',
+        TOTAL: blocoTotal,
+        PROGRESSO: progressoBar,
+        PARCELAS_STATUS: parcelasStatus,
+        PIX: blocoPix, chave_pix: clienteChavePix ?? '',
+        LINK: blocoLink,
+        ASSINATURA: assinatura ? `\n${assinatura}` : '',
+        FECHAMENTO: fechamento ? `${fechamento}\n` : '',
+      };
+      const mensagem = aplicarVariaveisTemplate(templateMsg, vars);
+      const whatsappUrl = clienteWhatsapp
+        ? `https://wa.me/55${clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(mensagem)}`
+        : null;
+      return { mensagem, whatsappUrl, whatsapp: clienteWhatsapp, clienteNome };
+    }),
+
+  // Gerar mensagem por parcela (legado)
   gerarMensagem: protectedProcedure
     .input(z.object({
       templateId: z.number(),
@@ -2082,39 +2185,117 @@ const whatsappRouter = router({
     .query(async ({ input }) => {
       const supabase = getSupabaseClient();
       if (!supabase) throw new Error('DB unavailable');
-
       const { data: templateData } = await supabase.from('templates_whatsapp').select('*').eq('id', input.templateId).single();
       if (!templateData) throw new Error('Template não encontrado');
-
       const { data: parcelaData } = await supabase.from('parcelas').select('*, clientes(nome, whatsapp, chave_pix), contratos(numero_parcelas)').eq('id', input.parcelaId).single();
       if (!parcelaData) throw new Error('Parcela não encontrada');
-
-      const { total } = calcularJurosMora(
+      const { total, juros, multa } = calcularJurosMora(
         parseFloat(parcelaData.valor_original),
         new Date(parcelaData.data_vencimento + 'T00:00:00'),
         new Date()
       );
-
       const dataFormatada = new Date(parcelaData.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR');
-      const valorFormatado = parseFloat(parcelaData.valor_original).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      const valorAtualizado = total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      const fmt2 = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
       const clienteNome = parcelaData.clientes?.nome ?? '';
       const clienteWhatsapp = parcelaData.clientes?.whatsapp ?? null;
       const clienteChavePix = parcelaData.clientes?.chave_pix ?? null;
-
-      const mensagem = templateData.mensagem
-        .replace(/\{\{nome\}\}/g, clienteNome)
-        .replace(/\{\{valor\}\}/g, valorFormatado)
-        .replace(/\{\{valor_atualizado\}\}/g, valorAtualizado)
-        .replace(/\{\{data_vencimento\}\}/g, dataFormatada)
-        .replace(/\{\{chave_pix\}\}/g, clienteChavePix ?? 'Consulte o credor')
-        .replace(/\{\{numero_parcela\}\}/g, String(parcelaData.numero));
-
+      const vars2: Record<string, string> = {
+        CLIENTE: clienteNome, nome: clienteNome,
+        VALOR: fmt2(parseFloat(parcelaData.valor_original)), valor: fmt2(parseFloat(parcelaData.valor_original)),
+        valor_atualizado: fmt2(total),
+        DATA: dataFormatada, vencimento: dataFormatada, data_vencimento: dataFormatada,
+        PIX: clienteChavePix ? `💳 *PIX:* ${clienteChavePix}\n` : '',
+        chave_pix: clienteChavePix ?? 'Consulte o credor',
+        MULTA: multa > 0 ? `💸 *Multa:* ${fmt2(multa)}\n` : '',
+        JUROS: juros > 0 ? `📈 *Juros:* ${fmt2(juros)}\n` : '',
+        TOTAL: (multa + juros) > 0 ? `💰 *Total:* ${fmt2(total)}\n` : '',
+        numero_parcela: String(parcelaData.numero ?? parcelaData.numero_parcela ?? 1),
+      };
+      const mensagem = aplicarVariaveisTemplate(templateData.mensagem, vars2);
       const whatsappUrl = clienteWhatsapp
         ? `https://wa.me/55${clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(mensagem)}`
         : null;
-
       return { mensagem, whatsappUrl, whatsapp: clienteWhatsapp };
+    }),
+
+  // Cobrança em lote
+  cobrarLote: protectedProcedure
+    .input(z.object({
+      contratoIds: z.array(z.number()),
+      tipo: z.enum(['atraso', 'preventivo']).default('atraso'),
+    }))
+    .mutation(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error('DB unavailable');
+      const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+      const cfg: Record<string, string> = {};
+      for (const r of (configRows ?? [])) cfg[r.chave] = r.valor ?? '';
+      const pixEmpresa = cfg['pixKey'] ?? cfg['pix_key'] ?? '';
+      const assinatura = cfg['assinaturaWhatsapp'] ?? '';
+      const resultados: Array<{ contratoId: number; clienteNome: string; whatsappUrl: string | null; sucesso: boolean }> = [];
+      for (const contratoId of input.contratoIds) {
+        try {
+          const { data: contrato } = await supabase
+            .from('contratos')
+            .select('*, clientes(nome, whatsapp, telefone, chave_pix)')
+            .eq('id', contratoId)
+            .single();
+          if (!contrato) { resultados.push({ contratoId, clienteNome: '', whatsappUrl: null, sucesso: false }); continue; }
+          const clienteNome = contrato.clientes?.nome ?? '';
+          const clienteWhatsapp = contrato.clientes?.whatsapp ?? contrato.clientes?.telefone ?? null;
+          const clienteChavePix = contrato.clientes?.chave_pix ?? pixEmpresa;
+          const valorParcela = parseFloat(contrato.valor_parcela ?? '0');
+          const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+          const msg = input.tipo === 'atraso'
+            ? `⚠️ *Atenção ${clienteNome}*\n🚨 Você possui parcela(s) em atraso no valor de *${fmt(valorParcela)}*.\nPor favor, regularize o quanto antes.${clienteChavePix ? `\n\n💳 *PIX:* ${clienteChavePix}` : ''}${assinatura ? `\n\n${assinatura}` : ''}`
+            : `🟢 *Olá ${clienteNome}!*\n📋 Lembrete: você tem parcela vencendo em breve no valor de *${fmt(valorParcela)}*.\nFique em dia!${clienteChavePix ? `\n\n💳 *PIX:* ${clienteChavePix}` : ''}${assinatura ? `\n\n${assinatura}` : ''}`;
+          const whatsappUrl = clienteWhatsapp
+            ? `https://wa.me/55${clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`
+            : null;
+          resultados.push({ contratoId, clienteNome, whatsappUrl, sucesso: true });
+        } catch { resultados.push({ contratoId, clienteNome: '', whatsappUrl: null, sucesso: false }); }
+      }
+      return { resultados, total: resultados.length, sucesso: resultados.filter(r => r.sucesso).length };
+    }),
+
+  // Recebimentos (histórico de pagamentos)
+  recebimentos: protectedProcedure
+    .input(z.object({
+      periodo: z.enum(['hoje', 'semana', 'mes', 'todos']).default('mes'),
+    }))
+    .query(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return { recebimentos: [], total: 0, totalValor: 0 };
+      const hoje = new Date();
+      let dataInicio: string | null = null;
+      if (input.periodo === 'hoje') {
+        dataInicio = hoje.toISOString().split('T')[0];
+      } else if (input.periodo === 'semana') {
+        const d = new Date(hoje); d.setDate(d.getDate() - 7);
+        dataInicio = d.toISOString().split('T')[0];
+      } else if (input.periodo === 'mes') {
+        const d = new Date(hoje); d.setDate(1);
+        dataInicio = d.toISOString().split('T')[0];
+      }
+      let query = supabase
+        .from('transacoes_caixa')
+        .select('*, contas_caixa(nome)')
+        .eq('tipo', 'entrada')
+        .in('categoria', ['pagamento_parcela', 'pagamento_juros', 'pagamento_total'])
+        .order('data_transacao', { ascending: false })
+        .limit(100);
+      if (dataInicio) query = (query as any).gte('data_transacao', dataInicio);
+      const { data } = await query;
+      const recebimentos = (data ?? []).map((r: any) => ({
+        id: r.id,
+        descricao: r.descricao ?? 'Pagamento',
+        valor: parseFloat(r.valor ?? '0'),
+        dataTransacao: r.data_transacao,
+        categoria: r.categoria,
+        contaNome: r.contas_caixa?.nome ?? 'Caixa',
+      }));
+      const totalValor = recebimentos.reduce((s, r) => s + r.valor, 0);
+      return { recebimentos, total: recebimentos.length, totalValor };
     }),
 });
 
@@ -2180,6 +2361,12 @@ const configuracoesRouter = router({
       jurosMoraDiario: parseFloat(map['jurosMoraDiario'] ?? '0.033'),
       diasLembrete: parseInt(map['diasLembrete'] ?? '3'),
       multaDiaria: parseFloat(map['multaDiaria'] ?? '100'),
+      pixKey: map['pixKey'] ?? '',
+      nomeCobranca: map['nomeCobranca'] ?? '',
+      linkPagamento: map['linkPagamento'] ?? '',
+      templateAtraso: map['templateAtraso'] ?? '',
+      templateVenceHoje: map['templateVenceHoje'] ?? '',
+      templateAntecipada: map['templateAntecipada'] ?? '',
     };
   }),
   save: protectedProcedure
@@ -2189,6 +2376,10 @@ const configuracoesRouter = router({
       assinaturaWhatsapp: z.string().optional(), fechamentoWhatsapp: z.string().optional(),
       multaPadrao: z.number().optional(), jurosMoraDiario: z.number().optional(),
       diasLembrete: z.number().optional(), multaDiaria: z.number().optional(),
+      pixKey: z.string().optional(), nomeCobranca: z.string().optional(),
+      linkPagamento: z.string().optional(),
+      templateAtraso: z.string().optional(), templateVenceHoje: z.string().optional(),
+      templateAntecipada: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
