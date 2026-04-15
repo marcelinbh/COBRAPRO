@@ -373,3 +373,61 @@ export const parcelasVeiculo = pgTable("parcelas_veiculo", {
 
 export type ParcelaVeiculo = typeof parcelasVeiculo.$inferSelect;
 export type InsertParcelaVeiculo = typeof parcelasVeiculo.$inferInsert;
+
+// ─── VENDA DE TELEFONE ────────────────────────────────────────────────────────
+export const statusVendaTelefoneEnum = pgEnum("status_venda_telefone", [
+  "ativo", "quitado", "inadimplente", "cancelado"
+]);
+
+export const vendas_telefone = pgTable("vendas_telefone", {
+  id: serial("id").primaryKey(),
+  // Produto
+  marca: varchar("marca", { length: 100 }).notNull(),
+  modelo: varchar("modelo", { length: 200 }).notNull(),
+  imei: varchar("imei", { length: 20 }),
+  cor: varchar("cor", { length: 50 }),
+  armazenamento: varchar("armazenamento", { length: 20 }),
+  custo: decimal("custo", { precision: 12, scale: 2 }).notNull(),
+  preco_venda: decimal("preco_venda", { precision: 12, scale: 2 }).notNull(),
+  // Financiamento
+  entrada_percentual: decimal("entrada_percentual", { precision: 5, scale: 2 }).notNull(),
+  entrada_valor: decimal("entrada_valor", { precision: 12, scale: 2 }).notNull(),
+  num_parcelas: integer("num_parcelas").notNull(),
+  juros_mensal: decimal("juros_mensal", { precision: 5, scale: 2 }).notNull(),
+  valor_parcela: decimal("valor_parcela", { precision: 12, scale: 2 }).notNull(),
+  total_juros: decimal("total_juros", { precision: 12, scale: 2 }).notNull(),
+  total_a_receber: decimal("total_a_receber", { precision: 12, scale: 2 }).notNull(),
+  lucro_bruto: decimal("lucro_bruto", { precision: 12, scale: 2 }).notNull(),
+  roi: decimal("roi", { precision: 8, scale: 2 }),
+  payback_meses: decimal("payback_meses", { precision: 5, scale: 2 }),
+  // Comprador
+  comprador_nome: varchar("comprador_nome", { length: 200 }).notNull(),
+  comprador_cpf: varchar("comprador_cpf", { length: 14 }),
+  comprador_rg: varchar("comprador_rg", { length: 20 }),
+  comprador_telefone: varchar("comprador_telefone", { length: 20 }),
+  comprador_email: varchar("comprador_email", { length: 320 }),
+  comprador_estado_civil: varchar("comprador_estado_civil", { length: 30 }),
+  comprador_profissao: varchar("comprador_profissao", { length: 100 }),
+  comprador_instagram: varchar("comprador_instagram", { length: 100 }),
+  comprador_cep: varchar("comprador_cep", { length: 9 }),
+  comprador_cidade: varchar("comprador_cidade", { length: 100 }),
+  comprador_estado: varchar("comprador_estado", { length: 2 }),
+  comprador_endereco: varchar("comprador_endereco", { length: 300 }),
+  comprador_local_trabalho: varchar("comprador_local_trabalho", { length: 200 }),
+  // Status
+  status: statusVendaTelefoneEnum("status").default("ativo").notNull(),
+  data_venda: timestamp("data_venda", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const parcelas_venda_telefone = pgTable("parcelas_venda_telefone", {
+  id: serial("id").primaryKey(),
+  venda_id: integer("venda_id").notNull(),
+  numero: integer("numero").notNull(),
+  valor: decimal("valor", { precision: 12, scale: 2 }).notNull(),
+  vencimento: timestamp("vencimento", { withTimezone: true }).notNull(),
+  status: statusParcelaEnum("status").default("pendente").notNull(),
+  pago_em: timestamp("pago_em", { withTimezone: true }),
+  valor_pago: decimal("valor_pago", { precision: 12, scale: 2 }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});

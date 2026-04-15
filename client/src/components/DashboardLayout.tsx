@@ -57,6 +57,7 @@ const menuItems = [
   { icon: DollarSign, label: "Empréstimos", path: "/emprestimos" },
   { icon: Star, label: "Score de Clientes", path: "/scores" },
   { icon: Car, label: "Veículos", path: "/veiculos" },
+  { icon: Smartphone, label: "Venda de Telefone", path: "/vendas-telefone" },
   { icon: Database, label: "Backup", path: "/backup" },
   { icon: AlertTriangle, label: "Análise de Risco", path: "/analise-risco" },
   { icon: FileText, label: "Contratos", path: "/contratos" },

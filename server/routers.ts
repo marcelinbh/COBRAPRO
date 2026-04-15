@@ -2961,6 +2961,192 @@ const chequesRouter = router({
     }),
 });
 
+// ─── VENDAS DE TELEFONE ─────────────────────────────────────────────────────
+const vendasTelefoneRouter = router({
+  listar: protectedProcedure.query(async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from('vendas_telefone')
+      .select('*')
+      .order('createdAt', { ascending: false });
+    if (error) { console.error('[vendasTelefone.listar]', error); return []; }
+    return data ?? [];
+  }),
+
+  buscarPorId: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return null;
+      const { data } = await supabase
+        .from('vendas_telefone')
+        .select('*')
+        .eq('id', input.id)
+        .single();
+      return data;
+    }),
+
+  parcelas: protectedProcedure
+    .input(z.object({ vendaId: z.number() }))
+    .query(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) return [];
+      const { data } = await supabase
+        .from('parcelas_venda_telefone')
+        .select('*')
+        .eq('venda_id', input.vendaId)
+        .order('numero', { ascending: true });
+      return data ?? [];
+    }),
+
+  criar: protectedProcedure
+    .input(z.object({
+      marca: z.string().min(1),
+      modelo: z.string().min(1),
+      imei: z.string().optional(),
+      cor: z.string().optional(),
+      armazenamento: z.string().optional(),
+      custo: z.number().positive(),
+      precoVenda: z.number().positive(),
+      entradaPercentual: z.number().min(0).max(100),
+      entradaValor: z.number().min(0),
+      numParcelas: z.number().int().min(1).max(60),
+      jurosMensal: z.number().min(0),
+      valorParcela: z.number().min(0),
+      totalJuros: z.number().min(0),
+      totalAReceber: z.number().min(0),
+      lucroBruto: z.number(),
+      roi: z.number().optional(),
+      paybackMeses: z.number().optional(),
+      compradorNome: z.string().min(1),
+      compradorCpf: z.string().optional(),
+      compradorRg: z.string().optional(),
+      compradorTelefone: z.string().optional(),
+      compradorEmail: z.string().optional(),
+      compradorEstadoCivil: z.string().optional(),
+      compradorProfissao: z.string().optional(),
+      compradorInstagram: z.string().optional(),
+      compradorCep: z.string().optional(),
+      compradorCidade: z.string().optional(),
+      compradorEstado: z.string().optional(),
+      compradorEndereco: z.string().optional(),
+      compradorLocalTrabalho: z.string().optional(),
+      dataPrimeiraParcela: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+      const { data: venda, error } = await supabase
+        .from('vendas_telefone')
+        .insert({
+          marca: input.marca,
+          modelo: input.modelo,
+          imei: input.imei ?? null,
+          cor: input.cor ?? null,
+          armazenamento: input.armazenamento ?? null,
+          custo: input.custo,
+          preco_venda: input.precoVenda,
+          entrada_percentual: input.entradaPercentual,
+          entrada_valor: input.entradaValor,
+          num_parcelas: input.numParcelas,
+          juros_mensal: input.jurosMensal,
+          valor_parcela: input.valorParcela,
+          total_juros: input.totalJuros,
+          total_a_receber: input.totalAReceber,
+          lucro_bruto: input.lucroBruto,
+          roi: input.roi ?? null,
+          payback_meses: input.paybackMeses ?? null,
+          comprador_nome: input.compradorNome,
+          comprador_cpf: input.compradorCpf ?? null,
+          comprador_rg: input.compradorRg ?? null,
+          comprador_telefone: input.compradorTelefone ?? null,
+          comprador_email: input.compradorEmail ?? null,
+          comprador_estado_civil: input.compradorEstadoCivil ?? null,
+          comprador_profissao: input.compradorProfissao ?? null,
+          comprador_instagram: input.compradorInstagram ?? null,
+          comprador_cep: input.compradorCep ?? null,
+          comprador_cidade: input.compradorCidade ?? null,
+          comprador_estado: input.compradorEstado ?? null,
+          comprador_endereco: input.compradorEndereco ?? null,
+          comprador_local_trabalho: input.compradorLocalTrabalho ?? null,
+          status: 'ativo',
+        })
+        .select()
+        .single();
+
+      if (error || !venda) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error?.message ?? 'Erro ao criar venda' });
+
+      // Gerar parcelas
+      const primeiraParcela = input.dataPrimeiraParcela ? new Date(input.dataPrimeiraParcela + 'T00:00:00') : (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d; })();
+      const parcelasData = Array.from({ length: input.numParcelas }, (_, i) => {
+        const venc = new Date(primeiraParcela);
+        venc.setMonth(venc.getMonth() + i);
+        return {
+          venda_id: venda.id,
+          numero: i + 1,
+          valor: input.valorParcela,
+          vencimento: venc.toISOString(),
+          status: 'pendente',
+        };
+      });
+
+      await supabase.from('parcelas_venda_telefone').insert(parcelasData);
+
+      return venda;
+    }),
+
+  pagarParcela: protectedProcedure
+    .input(z.object({
+      parcelaId: z.number(),
+      valorPago: z.number().positive(),
+    }))
+    .mutation(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+      const { error } = await supabase
+        .from('parcelas_venda_telefone')
+        .update({ status: 'paga', pago_em: new Date().toISOString(), valor_pago: input.valorPago })
+        .eq('id', input.parcelaId);
+
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+
+      return { success: true };
+    }),
+
+  deletar: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+      const { error } = await supabase
+        .from('vendas_telefone')
+        .delete()
+        .eq('id', input.id);
+
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return { success: true };
+    }),
+
+  kpis: protectedProcedure.query(async () => {
+    const supabase = getSupabaseClient();
+    if (!supabase) return { totalVendas: 0, capitalInvestido: 0, totalAReceber: 0, lucroBruto: 0, vendasAtivas: 0, vendasQuitadas: 0 };
+    const { data } = await supabase.from('vendas_telefone').select('status, custo, total_a_receber, lucro_bruto, entrada_valor');
+    const all = data ?? [];
+    return {
+      totalVendas: all.length,
+      capitalInvestido: all.reduce((s: number, v: any) => s + parseFloat(v.custo ?? 0), 0),
+      totalAReceber: all.filter((v: any) => v.status === 'ativo').reduce((s: number, v: any) => s + parseFloat(v.total_a_receber ?? 0), 0),
+      lucroBruto: all.reduce((s: number, v: any) => s + parseFloat(v.lucro_bruto ?? 0), 0),
+      vendasAtivas: all.filter((v: any) => v.status === 'ativo').length,
+      vendasQuitadas: all.filter((v: any) => v.status === 'quitado').length,
+    };
+  }),
+});
+
 // ─── APP ROUTER ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -2987,6 +3173,7 @@ export const appRouter = router({
   vendas: vendasRouter,
   cheques: chequesRouter,
   veiculos: veiculosRouter,
+  vendasTelefone: vendasTelefoneRouter,
 });
 
 export type AppRouter = typeof appRouter;

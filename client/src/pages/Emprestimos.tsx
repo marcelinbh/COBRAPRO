@@ -655,7 +655,7 @@ function EmprestimoCardCobra({
         </div>
 
         {/* Botões de ação secundários */}
-        <div className="p-4 border-t border-border/50 grid grid-cols-6 gap-2">
+        <div className="p-4 border-t border-border/50 grid grid-cols-3 sm:grid-cols-6 gap-2">
           <Button
             size="sm"
             variant="outline"
