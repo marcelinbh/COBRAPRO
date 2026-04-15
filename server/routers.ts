@@ -91,20 +91,19 @@ const dashboardRouter = router({
 
     // Fetch data via Supabase REST
     const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
-      supabase.from('contas_caixa').select('id, saldo_inicial').eq('ativa', true),
+      supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true),
       supabase.from('contratos').select('valor_principal').eq('status', 'ativo'),
       supabase.from('parcelas').select('valor_original, valor_juros, status, data_vencimento, numero_parcela, cliente_id'),
-      supabase.from('transacoes_caixa').select('valor, tipo, categoria, data_transacao')
+      supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao')
     ]);
 
     let saldoTotal = 0;
     if (contasRes.data) {
       for (const conta of contasRes.data) {
-        const entradas = (transRes.data ?? []).filter((t: any) => t.tipo === 'entrada');
-        const saidas = (transRes.data ?? []).filter((t: any) => t.tipo === 'saida');
-        const totalEntradas = entradas.reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-        const totalSaidas = saidas.reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-        saldoTotal += parseFloat(conta.saldo_inicial ?? '0') + totalEntradas - totalSaidas;
+        const transacoesConta = (transRes.data ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
+        const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
+        const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
+        saldoTotal += parseFloat(conta.saldo ?? '0') + totalEntradas - totalSaidas;
       }
     }
 
@@ -1610,12 +1609,15 @@ const parcelasRouter = router({
           data_transacao: new Date().toISOString().split('T')[0],
         });
 
+        const novoNumero = (parcela.numeroParcela as number) + 1;
+        const novoValor = parseFloat(String(parcela.valorOriginal));
         await supabase.from('parcelas').insert({
           contrato_id: parcela.contratoId,
-          data_transacao: new Date().toISOString().split('T')[0],
           koletor_id: parcela.koletorId ?? null,
-          numero_parcela: (parcela.numeroParcela as number) + 1,
-          valor_original: parseFloat(String(parcela.valorOriginal)),
+          numero: novoNumero,
+          numero_parcela: novoNumero,
+          valor: novoValor,
+          valor_original: novoValor,
           data_vencimento: novaDataVencStr,
           status: 'pendente',
           conta_caixa_id: input.contaCaixaId,
@@ -1658,15 +1660,20 @@ const caixaRouter = router({
     const supabase = getSupabaseClient();
     if (!supabase) return [];
     const { data: contasData } = await supabase.from('contas_caixa').select('*').eq('ativo', true);
+    const { data: transData } = await supabase.from('transacoes_caixa').select('conta_caixa_id, tipo, valor');
     const result2 = [];
     for (const conta of (contasData || [])) {
+      const transacoesConta = (transData ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
+      const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
+      const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
+      const saldoAtual = parseFloat(conta.saldo ?? '0') + totalEntradas - totalSaidas;
       result2.push({
         id: conta.id,
         nome: conta.nome,
         tipo: conta.tipo,
         banco: conta.banco ?? null,
-        saldoInicial: conta.saldo ?? 0,
-        saldoAtual: parseFloat(conta.saldo ?? 0),
+        saldoInicial: parseFloat(conta.saldo ?? '0'),
+        saldoAtual,
         ativa: conta.ativo,
       });
     }

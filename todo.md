@@ -356,3 +356,9 @@
 - [x] Reescrever procedure registrarPagamento para usar apenas Supabase REST API
 - [x] Corrigir conflito de DOM (removeChild) no PagamentoModal com setTimeout
 - [x] Testar fluxo completo: pagamento registrado com sucesso, UI atualizada
+
+## Fase 43: Correção pagarJuros + KPI Saldo em Contas + Push GitHub
+- [x] Testar procedure pagarJuros (pagar só juros e gerar nova parcela)
+- [x] Corrigir erros de schema na procedure pagarJuros (status, cliente_id, data_transacao)
+- [x] Corrigir KPI "Saldo em Contas" para somar transacoes_caixa corretamente
+- [x] Fazer push para GitHub
