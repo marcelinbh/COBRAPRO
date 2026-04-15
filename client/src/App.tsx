@@ -85,7 +85,7 @@ function Router() {
       <Route path="/relatorios" component={RelatoriosPage} />
       <Route path="/configuracoes" component={ConfiguracoesPage} />
       <Route path="/usuarios" component={UsuariosPage} />
-      <Route path="/koletores" component={UsuariosPage} />
+      <Route path="/cobradores" component={UsuariosPage} />
       <Route path="/reparcelamento" component={ReparcelamentoPage} />
       <Route path="/simulador" component={SimuladorPage} />
       <Route path="/contas-pagar" component={ContasPagarPage} />

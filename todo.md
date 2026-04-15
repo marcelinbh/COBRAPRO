@@ -362,3 +362,36 @@
 - [x] Corrigir erros de schema na procedure pagarJuros (status, cliente_id, data_transacao)
 - [x] Corrigir KPI "Saldo em Contas" para somar transacoes_caixa corretamente
 - [x] Fazer push para GitHub
+
+## Fase 44: Renomeação + Auditoria Completa de Fluxo
+- [ ] Renomear "Koletores" para "Cobradores" em todo o frontend (menus, labels, páginas, títulos)
+- [ ] Corrigir bugs DB unavailable: deletar cliente, atualizar cliente, importar CSV
+- [ ] Corrigir bugs DB unavailable: contratos (updateStatus, gerarPDF, deletar, pagarTotal, editarJuros, aplicarMulta)
+- [ ] Corrigir bugs DB unavailable: contas a pagar, cheques, vendas, configurações, cobradores, reparcelamento
+- [ ] Corrigir página de Contratos mostrando 0 contratos (bug na query REST)
+- [ ] Corrigir botão "Novo Empréstimo" na página de Empréstimos (era placeholder)
+- [ ] Testar fluxo completo: criar cliente, criar contrato, pagar parcela, deletar
+- [ ] Fazer push para GitHub
+
+## Fase 44: Auditoria Completa + Correções de Bugs
+
+- [x] Renomear "Koletores" para "Cobradores" em todo o frontend (menus, labels, páginas, router)
+- [x] Corrigir botão "Novo Empréstimo" — redireciona para /contratos/novo
+- [x] Corrigir procedure dashboard.parcelasHoje com fallback Supabase REST
+- [x] Corrigir procedure dashboard.parcelasAtrasadas com fallback Supabase REST
+- [x] Corrigir procedure dashboard.fluxoMensal com fallback Supabase REST
+- [x] Corrigir procedure clientes.contratosByCliente com fallback Supabase REST
+- [x] Corrigir procedure contratos.byId com fallback Supabase REST
+- [x] Corrigir procedure whatsapp.templates com fallback Supabase REST
+- [x] Corrigir procedure whatsapp.gerarMensagem com fallback Supabase REST
+- [x] Corrigir procedure configuracoes.templates com fallback Supabase REST
+- [x] Corrigir procedure configuracoes.updateTemplate com fallback Supabase REST
+- [x] Corrigir procedure cobradores.performance com fallback Supabase REST
+- [x] Corrigir procedure vendas.listarProdutos com fallback Supabase REST
+- [x] Corrigir procedure cheques.listar com fallback Supabase REST
+- [x] Corrigir procedure relatorios.resumoGeral com Supabase REST
+- [x] Testar fluxo completo: criar cliente, criar contrato, pagar parcela, deletar cliente
+- [x] Verificar Dashboard KPIs atualizados em tempo real após pagamento
+- [x] Verificar Relatórios com dados reais (Capital R$ 23.500, Total a Receber R$ 38.673)
+- [x] Verificar Reparcelamento funcionando (contrato #3, simulação de 6x R$ 756,13)
+- [x] Fazer push para GitHub

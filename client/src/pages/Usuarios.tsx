@@ -14,13 +14,15 @@ import { Users, Plus, Edit, TrendingUp, DollarSign, AlertTriangle, Award } from 
 const PERFIL_LABELS: Record<string, string> = {
   admin: "Admin",
   gerente: "Gerente",
-  koletor: "Usuário",
+  koletor: "Cobrador",
+  cobrador: "Cobrador",
 };
 
 const PERFIL_COLORS: Record<string, string> = {
   admin: "bg-red-500/20 text-red-400 border-red-500/30",
   gerente: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   koletor: "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  cobrador: "bg-blue-500/20 text-blue-400 border-blue-500/30",
 };
 
 function formatMoeda(v: number | string | null | undefined) {
@@ -35,24 +37,24 @@ export default function Usuarios() {
   const [mesSelecionado] = useState(new Date().getMonth() + 1);
   const [anoSelecionado] = useState(new Date().getFullYear());
 
-  const { data: koletores = [], refetch } = trpc.koletores.list.useQuery();
-  const { data: performance = [] } = trpc.koletores.performance.useQuery({
+  const { data: cobradores = [], refetch } = trpc.cobradores.list.useQuery();
+  const { data: performance = [] } = trpc.cobradores.performance.useQuery({
     mes: mesSelecionado,
     ano: anoSelecionado,
   });
 
-  const createMutation = trpc.koletores.create.useMutation({
-    onSuccess: () => { toast.success("Usuário criado com sucesso!"); refetch(); setModalOpen(false); setEditando(null); },
+  const createMutation = trpc.cobradores.create.useMutation({
+    onSuccess: () => { toast.success("Cobrador criado com sucesso!"); refetch(); setModalOpen(false); setEditando(null); },
     onError: (e) => toast.error(e.message),
   });
 
-  const updateMutation = trpc.koletores.update.useMutation({
-    onSuccess: () => { toast.success("Usuário atualizado!"); refetch(); setModalOpen(false); setEditando(null); },
+  const updateMutation = trpc.cobradores.update.useMutation({
+    onSuccess: () => { toast.success("Cobrador atualizado!"); refetch(); setModalOpen(false); setEditando(null); },
     onError: (e) => toast.error(e.message),
   });
 
-  const deleteMutation = trpc.koletores.delete.useMutation({
-    onSuccess: () => { toast.success("Usuário desativado!"); refetch(); },
+  const deleteMutation = trpc.cobradores.delete.useMutation({
+    onSuccess: () => { toast.success("Cobrador desativado!"); refetch(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -94,12 +96,12 @@ export default function Usuarios() {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Users className="w-6 h-6 text-primary" />
-            Koletores
+            Cobradores
           </h1>
           <p className="text-muted-foreground text-sm mt-1">Gerencie sua equipe de cobrança</p>
         </div>
         <Button onClick={abrirNovo} className="bg-primary hover:bg-primary/90">
-          <Plus className="w-4 h-4 mr-2" /> Novo Usuário
+          <Plus className="w-4 h-4 mr-2" /> Novo Cobrador
         </Button>
       </div>
 
@@ -109,7 +111,7 @@ export default function Usuarios() {
           onClick={() => setTab("lista")}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${tab === "lista" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"}`}
         >
-          Lista de Usuários
+          Lista de Cobradores
         </button>
         <button
           onClick={() => setTab("performance")}
@@ -121,14 +123,14 @@ export default function Usuarios() {
 
       {tab === "lista" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {koletores.length === 0 && (
+          {cobradores.length === 0 && (
             <div className="col-span-full text-center py-12 text-muted-foreground">
               <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>Nenhum usuário cadastrado ainda.</p>
-              <Button onClick={abrirNovo} variant="outline" className="mt-4">Adicionar primeiro usuário</Button>
+              <p>Nenhum cobrador cadastrado ainda.</p>
+              <Button onClick={abrirNovo} variant="outline" className="mt-4">Adicionar primeiro cobrador</Button>
             </div>
           )}
-          {koletores.map((k) => (
+          {cobradores.map((k) => (
             <Card key={k.id} className={`border-border bg-card ${!k.ativo ? "opacity-50" : ""}`}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
@@ -286,7 +288,7 @@ export default function Usuarios() {
                   <SelectContent>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="gerente">Gerente</SelectItem>
-                    <SelectItem value="koletor">Koletor</SelectItem>
+                    <SelectItem value="koletor">Cobrador</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

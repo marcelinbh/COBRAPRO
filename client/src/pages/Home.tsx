@@ -241,7 +241,7 @@ export default function Home() {
               { icon: <Users className="w-6 h-6" />, title: "Gestão de Clientes", desc: "Cadastro completo com CPF, PIX, score de crédito interno e histórico unificado de contratos.", color: "red" },
               { icon: <Shield className="w-6 h-6" />, title: "Múltiplas Modalidades", desc: "Empréstimos padrão, diários, Tabela Price, venda de produtos e desconto de cheques.", color: "green" },
               { icon: <Star className="w-6 h-6" />, title: "Cobrança via WhatsApp", desc: "Envie cobranças com templates dinâmicos: nome, valor, data e chave PIX automáticos.", color: "red" },
-              { icon: <CheckCircle2 className="w-6 h-6" />, title: "Relatórios Completos", desc: "Fluxo de caixa, inadimplência, performance por koletor e fechamento diário em PDF.", color: "green" },
+              { icon: <CheckCircle2 className="w-6 h-6" />, title: "Relatórios Completos", desc: "Fluxo de caixa, inadimplência, performance por cobrador e fechamento diário em PDF.", color: "green" },
             ].map((f) => (
               <div key={f.title} className="bg-white/[0.03] border border-white/5 rounded-2xl p-6 hover:border-white/10 transition-colors">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${f.color === "red" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"}`}>

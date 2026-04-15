@@ -68,7 +68,7 @@ const menuItems = [
   { icon: Wallet, label: "Caixa", path: "/caixa" },
   { icon: CalendarDays, label: "Calendário", path: "/calendario" },
   { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
-  { icon: UserCog, label: "Usuários", path: "/usuarios" },
+  { icon: UserCog, label: "Cobradores", path: "/cobradores" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
 ];
 
