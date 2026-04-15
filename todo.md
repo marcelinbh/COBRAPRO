@@ -412,3 +412,18 @@
 - [x] Corrigir WhatsApp (templates, gerarMensagem)
 - [x] Corrigir configurações (templates, updateTemplate)
 - [x] Corrigir performance de cobradores
+
+## Fase 46: PDF Contrato Venda + Integração Caixa + Auditoria Completa
+
+- [x] Criar tabelas vendas_telefone e parcelas_venda_telefone no Supabase PostgreSQL
+- [x] Corrigir procedures vendasTelefone (listar, buscarPorId, parcelas) para usar Supabase REST API
+- [x] Gerar PDF do contrato de Venda de Telefone (jsPDF client-side) com dados do aparelho, comprador, financeiro e parcelas
+- [x] Botão PDF no card de cada venda e no modal de parcelas
+- [x] Integrar Venda de Telefone com Caixa (registrar entrada ao confirmar venda)
+- [x] Integrar pagarParcela de Venda de Telefone com Caixa (registrar pagamento_parcela)
+- [x] Corrigir botão Parcelas com texto visível
+- [ ] Testar fluxo completo: Dashboard, Clientes, Empréstimos, Contratos, Parcelas, Caixa
+- [ ] Testar fluxo completo: Venda de Telefone, Reparcelamento, Relatórios, Cobradores, Cheques, Contas a Pagar
+- [ ] Corrigir todos os bugs encontrados
+- [ ] Verificar responsividade mobile em todas as páginas
+- [ ] Salvar checkpoint e push para GitHub

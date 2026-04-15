@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
+import jsPDF from "jspdf";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +14,7 @@ import { toast } from "sonner";
 import {
   Smartphone, TrendingUp, DollarSign, Clock, BarChart3, Plus, Trash2,
   ChevronRight, ArrowLeft, Eye, Users, Package, CheckCircle2, AlertCircle,
-  Banknote, Calendar, Phone, Mail, MapPin, Briefcase, Instagram, X
+  Banknote, Calendar, Phone, Mail, MapPin, Briefcase, Instagram, X, FileText
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell
@@ -25,6 +26,200 @@ function fmt(v: number) {
 }
 function fmtN(v: number, dec = 2) {
   return v.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+// ─── Geração de PDF do Contrato ─────────────────────────────────────────────
+function gerarPDFContrato(venda: any, parcelas: any[]) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = 210;
+  const margin = 15;
+  let y = 20;
+
+  // Helpers internos
+  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const line = (text: string, x: number, yPos: number, size = 10, bold = false, color: [number,number,number] = [30,30,30]) => {
+    doc.setFontSize(size);
+    doc.setFont("helvetica", bold ? "bold" : "normal");
+    doc.setTextColor(...color);
+    doc.text(text, x, yPos);
+  };
+  const hline = (yPos: number, color: [number,number,number] = [220,220,220]) => {
+    doc.setDrawColor(...color);
+    doc.setLineWidth(0.3);
+    doc.line(margin, yPos, W - margin, yPos);
+  };
+
+  // ── Cabeçalho ──
+  doc.setFillColor(17, 24, 39);
+  doc.rect(0, 0, W, 30, "F");
+  line("CONTRATO DE VENDA PARCELADA", margin, 13, 14, true, [255,255,255]);
+  line("CobraPro · Sistema de Gestão de Cobranças", margin, 21, 9, false, [156,163,175]);
+  const dataHoje = new Date().toLocaleDateString("pt-BR");
+  line(`Emitido em: ${dataHoje}`, W - margin - 40, 21, 9, false, [156,163,175]);
+  y = 40;
+
+  // ── Dados do Aparelho ──
+  doc.setFillColor(240, 253, 244);
+  doc.rect(margin, y, W - margin * 2, 8, "F");
+  line("DADOS DO APARELHO", margin + 3, y + 5.5, 10, true, [5,150,105]);
+  y += 12;
+
+  const aparelhoItems = [
+    ["Marca", venda.marca ?? "-"],
+    ["Modelo", venda.modelo ?? "-"],
+    ["Armazenamento", venda.armazenamento ?? "-"],
+    ["Cor", venda.cor ?? "-"],
+    ["IMEI", venda.imei ?? "-"],
+  ];
+  aparelhoItems.forEach(([label, value], i) => {
+    const col = i % 2 === 0 ? margin : W / 2 + 5;
+    if (i % 2 === 0 && i > 0) y += 7;
+    line(`${label}:`, col, y, 9, true, [100,100,100]);
+    line(value, col + 28, y, 9, false, [30,30,30]);
+  });
+  y += 10;
+  hline(y); y += 6;
+
+  // ── Dados do Comprador ──
+  doc.setFillColor(240, 253, 244);
+  doc.rect(margin, y, W - margin * 2, 8, "F");
+  line("DADOS DO COMPRADOR", margin + 3, y + 5.5, 10, true, [5,150,105]);
+  y += 12;
+
+  const compradorItems: [string, string][] = [
+    ["Nome", venda.comprador_nome ?? "-"],
+    ["CPF", venda.comprador_cpf ?? "-"],
+    ["RG", venda.comprador_rg ?? "-"],
+    ["Estado Civil", venda.comprador_estado_civil ?? "-"],
+    ["Profissão", venda.comprador_profissao ?? "-"],
+    ["Telefone", venda.comprador_telefone ?? "-"],
+    ["E-mail", venda.comprador_email ?? "-"],
+    ["Instagram", venda.comprador_instagram ?? "-"],
+    ["Local Trabalho", venda.comprador_local_trabalho ?? "-"],
+    ["Endereço", [venda.comprador_endereco, venda.comprador_cidade, venda.comprador_estado].filter(Boolean).join(", ") || "-"],
+  ];
+  compradorItems.forEach(([label, value], i) => {
+    const col = i % 2 === 0 ? margin : W / 2 + 5;
+    if (i % 2 === 0 && i > 0) y += 7;
+    line(`${label}:`, col, y, 9, true, [100,100,100]);
+    const maxW = W / 2 - margin - 35;
+    const truncated = doc.getStringUnitWidth(value) * 9 / doc.internal.scaleFactor > maxW
+      ? value.substring(0, 30) + "..."
+      : value;
+    line(truncated, col + 32, y, 9, false, [30,30,30]);
+  });
+  y += 10;
+  hline(y); y += 6;
+
+  // ── Condições Financeiras ──
+  doc.setFillColor(240, 253, 244);
+  doc.rect(margin, y, W - margin * 2, 8, "F");
+  line("CONDIÇÕES FINANCEIRAS", margin + 3, y + 5.5, 10, true, [5,150,105]);
+  y += 12;
+
+  const finItems: [string, string][] = [
+    ["Preço de Venda", fmtBRL(parseFloat(venda.preco_venda))],
+    ["Entrada", `${fmtBRL(parseFloat(venda.entrada_valor))} (${parseFloat(venda.entrada_percentual).toFixed(0)}%)`],
+    ["Nº de Parcelas", `${venda.num_parcelas}x de ${fmtBRL(parseFloat(venda.valor_parcela))}`],
+    ["Juros Mensal", `${parseFloat(venda.juros_mensal).toFixed(0)}% a.m.`],
+    ["Total de Juros", fmtBRL(parseFloat(venda.total_juros ?? 0))],
+    ["Total a Receber", fmtBRL(parseFloat(venda.total_a_receber))],
+  ];
+  finItems.forEach(([label, value], i) => {
+    const col = i % 2 === 0 ? margin : W / 2 + 5;
+    if (i % 2 === 0 && i > 0) y += 7;
+    line(`${label}:`, col, y, 9, true, [100,100,100]);
+    line(value, col + 36, y, 9, false, [30,30,30]);
+  });
+  y += 10;
+  hline(y); y += 6;
+
+  // ── Tabela de Parcelas ──
+  if (parcelas.length > 0) {
+    doc.setFillColor(240, 253, 244);
+    doc.rect(margin, y, W - margin * 2, 8, "F");
+    line("TABELA DE PARCELAS", margin + 3, y + 5.5, 10, true, [5,150,105]);
+    y += 12;
+
+    // Cabeçalho da tabela
+    doc.setFillColor(17, 24, 39);
+    doc.rect(margin, y - 4, W - margin * 2, 7, "F");
+    line("Nº", margin + 3, y + 1, 8, true, [255,255,255]);
+    line("Vencimento", margin + 15, y + 1, 8, true, [255,255,255]);
+    line("Valor", margin + 60, y + 1, 8, true, [255,255,255]);
+    line("Status", margin + 100, y + 1, 8, true, [255,255,255]);
+    y += 7;
+
+    parcelas.forEach((p, idx) => {
+      if (y > 270) {
+        doc.addPage();
+        y = 20;
+      }
+      if (idx % 2 === 0) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(margin, y - 3, W - margin * 2, 6, "F");
+      }
+      const venc = new Date(p.vencimento).toLocaleDateString("pt-BR");
+      const statusLabel = p.status === "paga" ? "PAGA" : p.status === "atrasada" ? "ATRASADA" : "PENDENTE";
+      const statusColor: [number,number,number] = p.status === "paga" ? [5,150,105] : p.status === "atrasada" ? [220,38,38] : [107,114,128];
+      line(`${p.numero}`, margin + 3, y + 1, 8, false, [30,30,30]);
+      line(venc, margin + 15, y + 1, 8, false, [30,30,30]);
+      line(fmtBRL(parseFloat(p.valor)), margin + 60, y + 1, 8, false, [30,30,30]);
+      line(statusLabel, margin + 100, y + 1, 8, true, statusColor);
+      y += 6;
+    });
+    y += 6;
+    hline(y); y += 8;
+  }
+
+  // ── Termos e Assinaturas ──
+  if (y > 230) { doc.addPage(); y = 20; }
+  doc.setFillColor(240, 253, 244);
+  doc.rect(margin, y, W - margin * 2, 8, "F");
+  line("TERMOS E CONDIÇÕES", margin + 3, y + 5.5, 10, true, [5,150,105]);
+  y += 12;
+
+  const termos = [
+    "1. O comprador se compromete a pagar as parcelas nas datas acordadas.",
+    "2. O atraso no pagamento implicará em juros de mora de 2% ao mês.",
+    "3. O aparelho permanece como garantia até a quitação total do contrato.",
+    "4. Em caso de inadimplência, o vendedor poderá retomar o aparelho.",
+    "5. Este contrato é válido como instrumento particular de compra e venda.",
+  ];
+  termos.forEach(t => {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(80, 80, 80);
+    doc.text(t, margin, y, { maxWidth: W - margin * 2 });
+    y += 6;
+  });
+  y += 8;
+
+  // Assinaturas
+  if (y > 250) { doc.addPage(); y = 20; }
+  hline(y); y += 10;
+  const sigY = y + 15;
+  doc.setDrawColor(100, 100, 100);
+  doc.setLineWidth(0.3);
+  doc.line(margin, sigY, margin + 75, sigY);
+  doc.line(W / 2 + 5, sigY, W - margin, sigY);
+  line("Vendedor", margin + 25, sigY + 5, 8, false, [100,100,100]);
+  line(venda.comprador_nome ?? "Comprador", W / 2 + 20, sigY + 5, 8, false, [100,100,100]);
+  line(`CPF: ${venda.comprador_cpf ?? "-"}`, W / 2 + 15, sigY + 10, 7, false, [150,150,150]);
+
+  // Rodapé
+  const totalPages = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFillColor(17, 24, 39);
+    doc.rect(0, 287, W, 10, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(156, 163, 175);
+    doc.text(`CobraPro · Contrato gerado em ${dataHoje} · Página ${i} de ${totalPages}`, margin, 293);
+  }
+
+  doc.save(`contrato-${venda.comprador_nome?.replace(/\s+/g, "-").toLowerCase() ?? "venda"}-${venda.id}.pdf`);
 }
 
 // ─── Cálculo financeiro ───────────────────────────────────────────────────────
@@ -380,10 +575,22 @@ export default function VendasTelefone() {
                   <div className="border-t border-gray-100 p-3 flex gap-2">
                     <Button
                       size="sm" variant="outline"
-                      className="flex-1 text-xs gap-1"
+                      className="flex-1 text-xs gap-1 text-gray-700 hover:text-gray-900 bg-white hover:bg-gray-50"
                       onClick={() => { setVendaSelecionada(v); setShowParcelas(true); }}
                     >
                       <Eye className="w-3 h-3" /> Parcelas
+                    </Button>
+                    <Button
+                      size="sm" variant="outline"
+                      className="text-xs gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                      onClick={() => {
+                        // Buscar parcelas via query para o PDF
+                        const parcelasDoCard = parcelasVenda.length > 0 && vendaSelecionada?.id === v.id ? parcelasVenda : [];
+                        gerarPDFContrato(v, parcelasDoCard);
+                        toast.success("PDF gerado com sucesso!");
+                      }}
+                    >
+                      <FileText className="w-3 h-3" /> PDF
                     </Button>
                     <Button
                       size="sm" variant="outline"
@@ -410,6 +617,19 @@ export default function VendasTelefone() {
                 Parcelas — {vendaSelecionada?.comprador_nome}
               </DialogTitle>
             </DialogHeader>
+            <div className="flex justify-end mb-3">
+              <Button
+                size="sm"
+                variant="outline"
+                className="gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
+                onClick={() => {
+                  gerarPDFContrato(vendaSelecionada, parcelasVenda);
+                  toast.success("PDF do contrato gerado!");
+                }}
+              >
+                <FileText className="w-3.5 h-3.5" /> Baixar Contrato PDF
+              </Button>
+            </div>
             <div className="space-y-2">
               {parcelasVenda.map((p: any) => (
                 <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border ${p.status === 'paga' ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}>

@@ -2966,12 +2966,14 @@ const vendasTelefoneRouter = router({
   listar: protectedProcedure.query(async () => {
     const supabase = getSupabaseClient();
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('vendas_telefone')
-      .select('*')
-      .order('createdAt', { ascending: false });
-    if (error) { console.error('[vendasTelefone.listar]', error); return []; }
-    return data ?? [];
+    try {
+      const { data, error } = await supabase
+        .from('vendas_telefone')
+        .select('*')
+        .order('createdAt', { ascending: false });
+      if (error) { console.error('[vendasTelefone.listar]', error); return []; }
+      return data ?? [];
+    } catch (e) { console.error('[vendasTelefone.listar]', e); return []; }
   }),
 
   buscarPorId: protectedProcedure
@@ -2979,12 +2981,15 @@ const vendasTelefoneRouter = router({
     .query(async ({ input }) => {
       const supabase = getSupabaseClient();
       if (!supabase) return null;
-      const { data } = await supabase
-        .from('vendas_telefone')
-        .select('*')
-        .eq('id', input.id)
-        .single();
-      return data;
+      try {
+        const { data, error } = await supabase
+          .from('vendas_telefone')
+          .select('*')
+          .eq('id', input.id)
+          .maybeSingle();
+        if (error) return null;
+        return data ?? null;
+      } catch (e) { return null; }
     }),
 
   parcelas: protectedProcedure
@@ -2992,12 +2997,15 @@ const vendasTelefoneRouter = router({
     .query(async ({ input }) => {
       const supabase = getSupabaseClient();
       if (!supabase) return [];
-      const { data } = await supabase
-        .from('parcelas_venda_telefone')
-        .select('*')
-        .eq('venda_id', input.vendaId)
-        .order('numero', { ascending: true });
-      return data ?? [];
+      try {
+        const { data, error } = await supabase
+          .from('parcelas_venda_telefone')
+          .select('*')
+          .eq('venda_id', input.vendaId)
+          .order('numero', { ascending: true });
+        if (error) return [];
+        return data ?? [];
+      } catch (e) { return []; }
     }),
 
   criar: protectedProcedure
@@ -3092,12 +3100,41 @@ const vendasTelefoneRouter = router({
         };
       });
 
-      await supabase.from('parcelas_venda_telefone').insert(parcelasData);
+        await supabase.from('parcelas_venda_telefone').insert(parcelasData);
+
+      // ── Integração com Caixa: registrar entrada da entrada (valor inicial) ──
+      if (input.entradaValor > 0) {
+        try {
+          // Buscar a primeira conta ativa do caixa
+          const { data: contas } = await supabase
+            .from('contas_caixa')
+            .select('id, nome, saldo')
+            .order('id', { ascending: true })
+            .limit(1);
+          if (contas && contas.length > 0) {
+            const conta = contas[0];
+            // Registrar entrada no caixa
+            await supabase.from('transacoes_caixa').insert({
+              conta_caixa_id: conta.id,
+              tipo: 'entrada',
+              categoria: 'outros',
+              valor: input.entradaValor,
+              descricao: `Entrada venda ${input.marca} ${input.modelo} - ${input.compradorNome}`,
+              data_transacao: new Date().toISOString(),
+            });
+            // Atualizar saldo da conta
+            const novoSaldo = parseFloat(conta.saldo ?? '0') + input.entradaValor;
+            await supabase.from('contas_caixa').update({ saldo: novoSaldo }).eq('id', conta.id);
+          }
+        } catch (caixaErr) {
+          console.warn('[vendasTelefone.criar] Erro ao registrar no caixa:', caixaErr);
+          // Não falhar a criação da venda por erro no caixa
+        }
+      }
 
       return venda;
     }),
-
-  pagarParcela: protectedProcedure
+   pagarParcela: protectedProcedure
     .input(z.object({
       parcelaId: z.number(),
       valorPago: z.number().positive(),
@@ -3105,14 +3142,44 @@ const vendasTelefoneRouter = router({
     .mutation(async ({ input }) => {
       const supabase = getSupabaseClient();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-
+      // Buscar dados da parcela para obter informações da venda
+      const { data: parcela } = await supabase
+        .from('parcelas_venda_telefone')
+        .select('*, vendas_telefone(marca, modelo, comprador_nome)')
+        .eq('id', input.parcelaId)
+        .maybeSingle();
       const { error } = await supabase
         .from('parcelas_venda_telefone')
         .update({ status: 'paga', pago_em: new Date().toISOString(), valor_pago: input.valorPago })
         .eq('id', input.parcelaId);
-
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-
+      // ── Integração com Caixa: registrar pagamento da parcela ──
+      try {
+        const { data: contas } = await supabase
+          .from('contas_caixa')
+          .select('id, saldo')
+          .order('id', { ascending: true })
+          .limit(1);
+        if (contas && contas.length > 0) {
+          const conta = contas[0];
+          const venda = (parcela as any)?.vendas_telefone;
+          const descricao = venda
+            ? `Parcela ${(parcela as any)?.numero} - ${venda.marca} ${venda.modelo} - ${venda.comprador_nome}`
+            : `Parcela venda telefone #${input.parcelaId}`;
+          await supabase.from('transacoes_caixa').insert({
+            conta_caixa_id: conta.id,
+            tipo: 'entrada',
+            categoria: 'pagamento_parcela',
+            valor: input.valorPago,
+            descricao,
+            data_transacao: new Date().toISOString(),
+          });
+          const novoSaldo = parseFloat(conta.saldo ?? '0') + input.valorPago;
+          await supabase.from('contas_caixa').update({ saldo: novoSaldo }).eq('id', conta.id);
+        }
+      } catch (caixaErr) {
+        console.warn('[vendasTelefone.pagarParcela] Erro ao registrar no caixa:', caixaErr);
+      }
       return { success: true };
     }),
 
