@@ -3,6 +3,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { veiculosRouter } from "./routers/veiculos";
 import { assinaturasRouter } from "./routers/assinaturas";
+import { backupRouter } from "./routers/backup";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClient, resetDb } from "./db";
@@ -2317,9 +2318,79 @@ const whatsappRouter = router({
       const totalValor = recebimentos.reduce((s, r) => s + r.valor, 0);
       return { recebimentos, total: recebimentos.length, totalValor };
     }),
-});
 
-// ─── RELATÓRIOS ───────────────────────────────────────────────────────────────
+  relatorioDiario: protectedProcedure
+    .input(z.object({ telefone: z.string().optional() }).optional())
+    .mutation(async ({ input }) => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const hoje = new Date().toISOString().split('T')[0];
+      const { data: parcelasHoje } = await supabase
+        .from('parcelas')
+        .select('id, valor, valor_pago, status, data_vencimento, contratos(clientes(nome))')
+        .eq('data_vencimento', hoje);
+      const { data: pagamentosHoje } = await supabase
+        .from('parcelas')
+        .select('id, valor_pago, data_pagamento, contratos(clientes(nome))')
+        .eq('data_pagamento', hoje)
+        .eq('status', 'paga');
+      const { data: atrasadas } = await supabase
+        .from('parcelas')
+        .select('id, valor, data_vencimento, contratos(clientes(nome))')
+        .eq('status', 'atrasada')
+        .order('data_vencimento', { ascending: true })
+        .limit(10);
+      const totalRecebidoHoje = (pagamentosHoje || []).reduce((s: number, p: any) => s + parseFloat(p.valor_pago || 0), 0);
+      const totalVencendoHoje = (parcelasHoje || []).filter((p: any) => p.status !== 'paga').length;
+      const totalAtrasadas = (atrasadas || []).length;
+      const { data: cfgData } = await supabase.from('configuracoes').select('chave, valor');
+      const cfg: Record<string, string> = {};
+      (cfgData || []).forEach((r: any) => { cfg[r.chave] = r.valor; });
+      const nomeEmpresa = cfg['nomeEmpresa'] || 'CobraPro';
+      const assinatura = cfg['assinaturaWhatsapp'] || nomeEmpresa;
+      const dataFormatada = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
+      let msg = `\uD83D\uDCCA *RELAT\u00D3RIO DO DIA \u2014 ${dataFormatada.toUpperCase()}*\n`;
+      msg += `_${nomeEmpresa}_\n\n`;
+      msg += `\uD83D\uDCB0 *RECEBIMENTOS HOJE*\n`;
+      msg += `Total recebido: *R$ ${totalRecebidoHoje.toFixed(2).replace('.', ',')}*\n`;
+      if ((pagamentosHoje || []).length > 0) {
+        (pagamentosHoje || []).slice(0, 5).forEach((p: any) => {
+          const nome = (p.contratos as any)?.clientes?.nome || 'Cliente';
+          msg += `  \u2705 ${nome}: R$ ${parseFloat(p.valor_pago || 0).toFixed(2).replace('.', ',')}\n`;
+        });
+        if ((pagamentosHoje || []).length > 5) msg += `  ... e mais ${(pagamentosHoje || []).length - 5} pagamentos\n`;
+      } else {
+        msg += `  Nenhum pagamento registrado hoje\n`;
+      }
+      msg += `\n\uD83D\uDCC5 *VENCIMENTOS HOJE*\n`;
+      if (totalVencendoHoje > 0) {
+        msg += `${totalVencendoHoje} parcela(s) vencem hoje\n`;
+        (parcelasHoje || []).filter((p: any) => p.status !== 'paga').slice(0, 5).forEach((p: any) => {
+          const nome = (p.contratos as any)?.clientes?.nome || 'Cliente';
+          msg += `  \u23F0 ${nome}: R$ ${parseFloat(p.valor || 0).toFixed(2).replace('.', ',')}\n`;
+        });
+      } else {
+        msg += `  Nenhum vencimento hoje\n`;
+      }
+      if (totalAtrasadas > 0) {
+        msg += `\n\uD83D\uDD34 *INADIMPLENTES (${totalAtrasadas})*\n`;
+        (atrasadas || []).slice(0, 5).forEach((p: any) => {
+          const nome = (p.contratos as any)?.clientes?.nome || 'Cliente';
+          const venc = new Date(p.data_vencimento).toLocaleDateString('pt-BR');
+          msg += `  \u274C ${nome} \u2014 venceu ${venc}\n`;
+        });
+        if (totalAtrasadas > 5) msg += `  ... e mais ${totalAtrasadas - 5} inadimplentes\n`;
+      }
+      msg += `\n_Enviado pelo ${assinatura}_`;
+      const telefone = input?.telefone || cfg['telefoneEmpresa'] || '';
+      const telefoneNumeros = telefone.replace(/\D/g, '');
+      const whatsappUrl = telefoneNumeros
+        ? `https://wa.me/55${telefoneNumeros}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+      return { mensagem: msg, whatsappUrl, totalRecebidoHoje, totalVencendoHoje, totalAtrasadas, pagamentosCount: (pagamentosHoje || []).length };
+    }),
+});
+// ─── RELATÓRIOS ────────────────────────────────────────────────────────────────
 const relatoriosRouter = router({
   resumoGeral: protectedProcedure.query(async () => {
     const supabase = getSupabaseClient();
@@ -2453,6 +2524,7 @@ const configuracoesRouter = router({
       await supabase.from('templates_whatsapp').update(data).eq('id', id);
       return { success: true };
     }),
+
 });
 
 // ─── KOLETORES ──────────────────────────────────────────────────────────────
@@ -3515,6 +3587,7 @@ export const appRouter = router({
   vendasTelefone: vendasTelefoneRouter,
   etiquetas: etiquetasRouter,
   assinaturas: assinaturasRouter,
+  backup: backupRouter,
 });
 
 export type AppRouter = typeof appRouter;

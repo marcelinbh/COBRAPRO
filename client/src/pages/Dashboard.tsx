@@ -3,8 +3,9 @@ import { formatarMoeda } from "../../../shared/finance";
 import {
   TrendingUp, TrendingDown, Wallet, Users, AlertTriangle,
   Clock, DollarSign, CalendarClock, ArrowUpRight, ArrowDownRight,
-  Plus, ChevronRight
+  Plus, ChevronRight, Send
 } from "lucide-react";
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -89,6 +90,13 @@ export default function Dashboard() {
   const { data: parcelasHoje } = trpc.dashboard.parcelasHoje.useQuery();
   const { data: atrasadas } = trpc.dashboard.parcelasAtrasadas.useQuery();
   const { data: fluxoMensal } = trpc.dashboard.fluxoMensal.useQuery();
+  const relatorioDiarioMutation = trpc.whatsapp.relatorioDiario.useMutation({
+    onSuccess: (data) => {
+      window.open(data.whatsappUrl, '_blank');
+      toast.success(`Relatório gerado! Recebido hoje: R$ ${data.totalRecebidoHoje.toFixed(2).replace('.', ',')}`);
+    },
+    onError: () => toast.error('Erro ao gerar relatório diário'),
+  });
 
   const chartData = fluxoMensal ?? [];
 
@@ -112,10 +120,21 @@ export default function Dashboard() {
             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
         </div>
-        <Button onClick={() => setLocation('/contratos/novo')} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Contrato
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => relatorioDiarioMutation.mutate({})}
+            disabled={relatorioDiarioMutation.isPending}
+            className="gap-2 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+          >
+            <Send className="h-4 w-4" />
+            {relatorioDiarioMutation.isPending ? 'Gerando...' : 'Relatório Diário'}
+          </Button>
+          <Button onClick={() => setLocation('/contratos/novo')} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Contrato
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
