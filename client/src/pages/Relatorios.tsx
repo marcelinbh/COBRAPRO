@@ -33,6 +33,7 @@ export default function Relatorios() {
   const { data: parcelas } = trpc.parcelas.list.useQuery({});
   const { data: transacoes } = trpc.caixa.transacoes.useQuery({});
   const { data: contasCaixa } = trpc.caixa.contas.useQuery();
+  const { data: contasPagarData } = trpc.contasPagar.listar.useQuery({ status: 'paga' });
 
   // Filtrar parcelas por período e modalidade
   const parcelasPeriodo = (parcelas ?? []).filter(p => {
@@ -98,13 +99,24 @@ export default function Relatorios() {
   // Modalidades disponíveis (para o seletor)
   const modalidadesDisponiveis = Array.from(new Set((parcelas ?? []).map(p => p.modalidade).filter(Boolean)));
 
-  // Saídas no período (empréstimos concedidos)
-  const saidasPeriodo = (transacoes ?? [])
+  // Saídas no período (empréstimos concedidos + contas a pagar pagas)
+  const saidasCaixaPeriodo = (transacoes ?? [])
     .filter(t => {
       const d = new Date(t.dataTransacao).toISOString().split('T')[0];
       return t.tipo === 'saida' && d >= dataInicio && d <= dataFim;
     })
     .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
+
+  // Contas a pagar pagas no período
+  const contasPagarPagas = (contasPagarData ?? []).filter((c: any) => {
+    const dataPag = c.dataPagamento || c.data_pagamento;
+    if (!dataPag) return false;
+    const d = new Date(dataPag).toISOString().split('T')[0];
+    return d >= dataInicio && d <= dataFim;
+  });
+  const totalContasPagarPeriodo = contasPagarPagas.reduce((sum: number, c: any) =>
+    sum + parseFloat(String(c.valor ?? c.valorPago ?? 0)), 0);
+  const saidasPeriodo = saidasCaixaPeriodo + totalContasPagarPeriodo;
 
   const entradasPeriodo = (transacoes ?? [])
     .filter(t => {
@@ -404,7 +416,9 @@ export default function Relatorios() {
               <span className="text-xs text-muted-foreground uppercase tracking-wide">Saídas no Período</span>
             </div>
             <div className="font-display text-2xl text-destructive">{formatarMoeda(saidasPeriodo)}</div>
-            <div className="text-xs text-muted-foreground mt-1">Empréstimos e despesas</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Caixa: {formatarMoeda(saidasCaixaPeriodo)}{totalContasPagarPeriodo > 0 ? ` + Contas: ${formatarMoeda(totalContasPagarPeriodo)}` : ''}
+            </div>
           </CardContent>
         </Card>
         <Card className="border-border">

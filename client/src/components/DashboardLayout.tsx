@@ -45,6 +45,7 @@ import {
   AlertTriangle,
   Smartphone,
   Tv2,
+  MessageCircle,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -74,6 +75,7 @@ const menuItems = [
   { icon: UserCog, label: "Cobradores", path: "/cobradores" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
   { icon: Tv2, label: "Assinaturas", path: "/assinaturas" },
+  { icon: MessageCircle, label: "WhatsApp QR", path: "/whatsapp" },
   { icon: Smartphone, label: "Instalar App", path: "/install" },
 ];
 

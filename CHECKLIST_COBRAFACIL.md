@@ -143,7 +143,7 @@ Comparação completa das funcionalidades do Cobra Fácil com o estado atual do 
 
 | Funcionalidade | Status | Observação |
 |---|---|---|
-| Conexão WhatsApp via QR Code | ❌ | Cobra Fácil conecta WhatsApp próprio via QR Code para enviar mensagens |
+| Conexão WhatsApp via QR Code | ✅ | Página /whatsapp com Evolution API: configura URL/ApiKey, gera QR Code, mostra status de conexão |
 | Envio de cobrança via WhatsApp | ✅ | Abre WhatsApp Web com mensagem pré-formatada |
 | Envio de comprovante via WhatsApp | ✅ | Botão de compartilhamento via WhatsApp |
 | Botão "Cobrar Atraso (WhatsApp)" | ✅ | Implementado em cada empréstimo |
@@ -219,25 +219,25 @@ Comparação completa das funcionalidades do Cobra Fácil com o estado atual do 
 | Empréstimos | 17 | 17 | 0 | 0 |
 | Score de Clientes | 9 | 9 | 0 | 0 |
 | Calendário | 4 | 4 | 0 | 0 |
-| Relatório Operacional | 17 | 16 | 1 | 0 |
+| Relatório Operacional | 17 | 17 | 0 | 0 |
 | Relatório de Vendas | 10 | 8 | 2 | 0 |
 | Simulador | 9 | 9 | 0 | 0 |
 | Configurações/Perfil | 11 | 11 | 0 | 0 |
-| WhatsApp | 5 | 4 | 0 | 1 |
+| WhatsApp | 5 | 5 | 0 | 0 |
 | Relatório Diário WhatsApp | 4 | 4 | 0 | 0 |
 | Funcionários | 5 | 1 | 0 | 4 |
 | Backup | 7 | 7 | 0 | 0 |
 | Módulos Exclusivos | 2 | 1 | 1 | 0 |
-| **TOTAL** | **100** | **91 (91%)** | **4 (4%)** | **5 (5%)** |
+| **TOTAL** | **100** | **93 (93%)** | **3 (3%)** | **4 (4%)** |
 
 ---
 
 ## Itens Pendentes (Baixa Prioridade)
 
-1. ❌ Conexão WhatsApp via QR Code (próprio) — integração complexa, requer servidor externo
+1. ✅ Conexão WhatsApp via QR Code — página /whatsapp com Evolution API integrada (QR Code, status, envio de mensagens)
 2. ✅ Relatório diário — botão no Dashboard + configuração de horário nas Configurações
 3. ✅ Configurar horário de envio do relatório diário
-4. ❌ Módulo de Assinaturas — aguarda execução do SQL no Supabase Dashboard
+4. 🔶 Módulo de Assinaturas — código completo, aguarda execução do SQL no Supabase Dashboard (SQL disponível na página Assinaturas)
 
 ---
 

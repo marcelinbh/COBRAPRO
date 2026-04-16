@@ -37,6 +37,7 @@ import AnaliseRisco from "./pages/AnaliseRisco";
 import EmprestimoDetalhes from "./pages/EmprestimoDetalhes";
 import VendasTelefone from "./pages/VendasTelefone";
 import Assinaturas from "./pages/Assinaturas";
+import WhatsAppConfig from "./pages/WhatsAppConfig";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -64,6 +65,7 @@ const AnaliseRiscoPage = () => <DashboardLayout><AnaliseRisco /></DashboardLayou
 const EmprestimoDetalhesPage = () => <DashboardLayout><EmprestimoDetalhes /></DashboardLayout>;
 const VendasTelefonePage = () => <VendasTelefone />;
 const AssinaturasPage = () => <DashboardLayout><Assinaturas /></DashboardLayout>;
+const WhatsAppConfigPage = () => <DashboardLayout><WhatsAppConfig /></DashboardLayout>;
 
 function Router() {
   return (
@@ -104,6 +106,7 @@ function Router() {
       <Route path="/analise-risco" component={AnaliseRiscoPage} />
       <Route path="/vendas-telefone" component={VendasTelefonePage} />
       <Route path="/assinaturas" component={AssinaturasPage} />
+      <Route path="/whatsapp" component={WhatsAppConfigPage} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

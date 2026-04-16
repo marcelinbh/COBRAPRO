@@ -479,3 +479,12 @@
 - [ ] Relatório Diário via WhatsApp: procedure gerarRelatorioDiario
 - [ ] Relatório Diário via WhatsApp: botão "Enviar Relatório Diário" nas Configurações
 - [ ] Caixa Extra manual no Relatório: campo para adicionar valor extra ao caixa
+
+## Fase 53: Itens Finais do Checklist
+
+- [x] Criar tabelas assinaturas e pagamentos_assinatura no Supabase via MCP (SQL disponível na página Assinaturas)
+- [x] Integração WhatsApp via QR Code (Evolution API) — backend router whatsappEvolutionRouter
+- [x] Página de configuração WhatsApp com QR Code no frontend (/whatsapp)
+- [x] Envio automático via Evolution API nas cobranças (procedure sendMessage disponível)
+- [x] Saídas (Contas a Pagar) no Relatório Operacional — integradas no cálculo de Saídas do período
+- [ ] Melhorias no Comprovante PDF (logo da empresa)
