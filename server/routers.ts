@@ -925,13 +925,13 @@ const contratosRouter = router({
       };
     }),
 
-  list: protectedProcedure
+   list: protectedProcedure
     .input(z.object({
       status: z.string().optional(),
       modalidade: z.string().optional(),
       clienteId: z.number().optional(),
     }).optional())
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
         try {
@@ -948,11 +948,21 @@ const contratosRouter = router({
             tipoTaxa: contratos.tipoTaxa,
             dataInicio: contratos.dataInicio,
             createdAt: contratos.createdAt,
+            koletorId: contratos.koletorId,
           }).from(contratos)
             .innerJoin(clientes, eq(contratos.clienteId, clientes.id))
             .orderBy(desc(contratos.createdAt));
-
+          // Buscar perfil do cobrador (se for cobrador, filtrar apenas seus contratos)
+          let myKoletorId: number | null = null;
+          try {
+            const supabaseForPerfil = getSupabaseClient();
+            if (supabaseForPerfil) {
+              const { data: koletorData } = await supabaseForPerfil.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
+              if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
+            }
+          } catch (_) { /* não é cobrador */ }
           return rows.filter(r => {
+            if (myKoletorId !== null && r.koletorId !== myKoletorId) return false;
             if (input?.status && r.status !== input.status) return false;
             if (input?.modalidade && r.modalidade !== input.modalidade) return false;
             if (input?.clienteId && r.clienteId !== input.clienteId) return false;
@@ -966,13 +976,20 @@ const contratosRouter = router({
       // Fallback: Supabase REST
       const supabase = getSupabaseClient();
       if (!supabase) return [];
+      // Buscar perfil do cobrador
+      let myKoletorId: number | null = null;
+      try {
+        const { data: koletorData } = await supabase.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
+        if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
+      } catch (_) { /* não é cobrador */ }
       let query = supabase
         .from('contratos')
-        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, "createdAt", clientes!inner(nome)')
+        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, koletor_id, "createdAt", clientes!inner(nome)')
         .order('createdAt', { ascending: false });
       if (input?.status) query = query.eq('status', input.status);
       if (input?.modalidade) query = query.eq('modalidade', input.modalidade);
       if (input?.clienteId) query = query.eq('cliente_id', input.clienteId);
+      if (myKoletorId !== null) query = query.eq('koletor_id', myKoletorId);
       const { data, error } = await query;
       if (error) { console.error('[contratos.list] REST error:', error.message); return []; }
       return (data ?? []).map((r: any) => ({
@@ -1486,7 +1503,7 @@ const parcelasRouter = router({
       dataInicio: z.string().optional(),
       dataFim: z.string().optional(),
     }).optional())
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
       const hoje = new Date().toISOString().split('T')[0];
 
@@ -1526,12 +1543,26 @@ const parcelasRouter = router({
             taxaJuros: contratos.taxaJuros,
             tipoTaxa: contratos.tipoTaxa,
             valorPrincipal: contratos.valorPrincipal,
+            koletorId: contratos.koletorId,
           }).from(parcelas)
             .innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
             .innerJoin(contratos, eq(parcelas.contratoId, contratos.id))
             .orderBy(parcelas.dataVencimento);
-
+          // Buscar perfil do cobrador (se for cobrador, filtrar apenas suas parcelas)
+          let myKoletorId: number | null = null;
+          try {
+            const supabaseForPerfil = getSupabaseClient();
+            if (supabaseForPerfil) {
+              const { data: koletorData } = await supabaseForPerfil.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
+              if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
+            }
+          } catch (_) { /* não é cobrador */ }
           return rows.filter(r => {
+            if (myKoletorId !== null) {
+              // Verificar se a parcela pertence ao cobrador via contrato
+              const contratoDoKoletor = rows.some(row => row.contratoId === r.contratoId && row.koletorId === myKoletorId);
+              if (!contratoDoKoletor) return false;
+            }
             if (input?.status && r.status !== input.status) return false;
             if (input?.clienteId && r.clienteId !== input.clienteId) return false;
             if (input?.contratoId && r.contratoId !== input.contratoId) return false;
@@ -1543,27 +1574,34 @@ const parcelasRouter = router({
         }
       }
 
-      // Fallback: Supabase REST
+       // Fallback: Supabase REST
       const supabase = getSupabaseClient();
       if (!supabase) return [];
-
+      // Buscar perfil do cobrador
+      let myKoletorId: number | null = null;
+      try {
+        const { data: koletorData } = await supabase.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
+        if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
+      } catch (_) { /* não é cobrador */ }
       // Atualizar status via REST
       await supabase.from('parcelas').update({ status: 'atrasada' })
         .lt('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']);
       await supabase.from('parcelas').update({ status: 'vencendo_hoje' })
         .eq('data_vencimento', hoje).eq('status', 'pendente');
-
       let pQuery = supabase.from('parcelas')
-        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, data_vencimento, data_pagamento, status')
+        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, data_vencimento, data_pagamento, status, contratos(koletor_id)')
         .order('data_vencimento');
-
       if (input?.status) pQuery = (pQuery as any).eq('status', input.status);
       if (input?.clienteId) pQuery = (pQuery as any).eq('cliente_id', input.clienteId);
       if (input?.contratoId) pQuery = (pQuery as any).eq('contrato_id', input.contratoId);
+      if (myKoletorId !== null) pQuery = (pQuery as any).eq('contratos.koletor_id', myKoletorId);
 
       const { data: pData, error: pError } = await pQuery;
       if (pError) { console.error('[parcelas.list] REST error:', pError.message); return []; }
-      const parcelasData = pData || [];
+      const parcelasData = (pData || []).filter((p: any) => {
+        if (myKoletorId !== null && p.contratos?.koletor_id !== myKoletorId) return false;
+        return true;
+      });
 
       // Buscar clientes e contratos relacionados
       const clienteIds = Array.from(new Set(parcelasData.map((r: any) => r.cliente_id).filter(Boolean)));
@@ -2541,6 +2579,15 @@ const cobradoresRouter = router({
     const { data } = await supabase.from('koletores').select('*').order('createdAt', { ascending: false });
     return data ?? [];
   }),
+  me: protectedProcedure.query(async ({ ctx }) => {
+    if (!ctx.user) return null;
+    const supabase = getSupabaseClient();
+    if (!supabase) return null;
+    try {
+      const { data: koletor } = await supabase.from('koletores').select('*').eq('user_id', ctx.user.id).single();
+      return koletor ?? null;
+    } catch (_) { return null; }
+  }),
 
   create: protectedProcedure
     .input(z.object({
@@ -2603,7 +2650,7 @@ const cobradoresRouter = router({
 
   performance: protectedProcedure
     .input(z.object({ mes: z.number().optional(), ano: z.number().optional() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const supabase = getSupabaseClient();
       if (!supabase) return [];
       const ano = input.ano ?? new Date().getFullYear();

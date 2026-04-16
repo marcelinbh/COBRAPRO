@@ -52,6 +52,7 @@ import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { trpc } from "@/lib/trpc";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -142,7 +143,24 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  const [myPerfil, setMyPerfil] = useState<string | null>(null);
+  const { data: myKoletor } = (trpc as any).cobradores?.me?.useQuery?.() ?? { data: null };
+  
+  useEffect(() => {
+    if (myKoletor?.perfil) setMyPerfil(myKoletor.perfil);
+  }, [myKoletor]);
+  
+  // Filtrar menu para cobradores
+  const filteredMenuItems = menuItems.filter(item => {
+    if (myPerfil === 'koletor') {
+      // Cobradores só veem: Dashboard, Clientes, Empréstimos, Parcelas, Calendário, WhatsApp QR, Configurações
+      const allowedPaths = ['/dashboard', '/clientes', '/emprestimos', '/parcelas', '/calendario', '/whatsapp', '/configuracoes'];
+      return allowedPaths.includes(item.path);
+    }
+    return true; // Admins e gerentes veem tudo
+  });
+  
+  const activeMenuItem = filteredMenuItems.find(item => item.path === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -218,7 +236,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
+              {filteredMenuItems.map(item => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
