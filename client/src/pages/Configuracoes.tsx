@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Settings, MessageCircle, Bell, Building2, Save, RotateCcw,
-  CheckCircle2, Info, Upload, ImageIcon, X
+  CheckCircle2, Info, Upload, ImageIcon, X, Clock, Send
 } from "lucide-react";
 
 // Variáveis disponíveis — idênticas ao Cobra Fácil
@@ -123,6 +123,13 @@ export default function Configuracoes() {
   const [jurosMora, setJurosMora] = useState(String(config?.jurosMoraDiario ?? "0.033"));
   const [diasLembrete, setDiasLembrete] = useState(String(config?.diasLembrete ?? "3"));
   const [multaDiaria, setMultaDiaria] = useState(String((config as any)?.multaDiaria ?? "100"));
+
+  // Relatório Diário
+  const [horarioRelatorio, setHorarioRelatorio] = useState((config as any)?.horarioRelatorio ?? "08:00");
+  const [telefoneRelatorio, setTelefoneRelatorio] = useState((config as any)?.telefoneRelatorio ?? "");
+  const [relatorioDiarioAtivo, setRelatorioDiarioAtivo] = useState((config as any)?.relatorioDiarioAtivo ?? false);
+
+  const relatorioDiarioMutation = trpc.whatsapp.relatorioDiario.useMutation();
 
    // Inserir variável na posição do cursor
   const inserirVariavel = (variavel: string) => {
@@ -467,6 +474,67 @@ export default function Configuracoes() {
       </Card>
 
       {/* Parâmetros Financeiros */}
+      {/* Relatório Diário Automático */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <Clock className="h-4 w-4 text-primary" />
+            Relatório Diário via WhatsApp
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-primary">
+            Configure o horário para receber o resumo diário (recebimentos, vencimentos e inadimplentes) via WhatsApp.
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Horário de Envio</Label>
+              <Input className="mt-1" type="time" value={horarioRelatorio} onChange={e => setHorarioRelatorio(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">Horário preferido para receber o relatório</p>
+            </div>
+            <div>
+              <Label>Número WhatsApp (com DDD)</Label>
+              <Input className="mt-1" type="tel" placeholder="11999999999" value={telefoneRelatorio} onChange={e => setTelefoneRelatorio(e.target.value)} />
+              <p className="text-xs text-muted-foreground mt-1">Número que receberá o relatório diário</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <input type="checkbox" id="relatorioDiarioAtivo" checked={relatorioDiarioAtivo} onChange={e => setRelatorioDiarioAtivo(e.target.checked)} className="w-4 h-4 rounded border-border" />
+            <Label htmlFor="relatorioDiarioAtivo" className="cursor-pointer">Ativar lembrete de horário no navegador</Label>
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" className="gap-2" onClick={() => {
+              const saveData = { horarioRelatorio, telefoneRelatorio, relatorioDiarioAtivo: String(relatorioDiarioAtivo) };
+              Promise.all(Object.entries(saveData).map(([k, v]) =>
+                (trpc as any).configuracoes?.salvar?.mutate?.({ chave: k, valor: v })
+              ));
+              toast.success("Configurações do relatório diário salvas!");
+            }}>
+              <Save className="h-3 w-3" /> Salvar
+            </Button>
+            <Button size="sm" variant="outline" className="gap-2" onClick={() => {
+              relatorioDiarioMutation.mutate({ telefone: telefoneRelatorio }, {
+                onSuccess: (data) => {
+                  if (data?.whatsappUrl) {
+                    window.open(data.whatsappUrl, '_blank');
+                    toast.success("Relatório gerado! WhatsApp aberto.");
+                  }
+                },
+                onError: () => toast.error("Erro ao gerar relatório")
+              });
+            }} disabled={relatorioDiarioMutation.isPending}>
+              <Send className="h-3 w-3" /> Enviar Agora
+            </Button>
+          </div>
+          {relatorioDiarioAtivo && horarioRelatorio && (
+            <div className="p-3 rounded-lg bg-success/10 border border-success/20 text-xs text-success">
+              ✅ Lembrete ativo: acesse o CobraPro às <strong>{horarioRelatorio}</strong> para enviar o relatório diário.
+              {telefoneRelatorio && <> O relatório será enviado para <strong>{telefoneRelatorio}</strong>.</>}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">

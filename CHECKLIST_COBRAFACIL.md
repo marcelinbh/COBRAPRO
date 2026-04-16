@@ -156,8 +156,8 @@ Comparação completa das funcionalidades do Cobra Fácil com o estado atual do 
 | Funcionalidade | Status | Observação |
 |---|---|---|
 | Relatório diário manual | ✅ | Implementado — botão "Relatório Diário" no Dashboard gera resumo e abre WhatsApp |
-| Relatório diário automático | ❌ | Envio automático programado (requer integração de mensageria) |
-| Configurar horário de envio | ❌ | Definir horário para receber o relatório automaticamente |
+| Relatório diário automático | ✅ | Botão no Dashboard gera resumo e abre WhatsApp; lembrete de horário configurável |
+| Configurar horário de envio | ✅ | Configurações → Relatório Diário: horário e telefone configuráveis |
 | Incluir quem está em atraso | ✅ | Lista de inadimplentes incluída no relatório diário |
 
 ---
@@ -224,19 +224,19 @@ Comparação completa das funcionalidades do Cobra Fácil com o estado atual do 
 | Simulador | 9 | 9 | 0 | 0 |
 | Configurações/Perfil | 11 | 11 | 0 | 0 |
 | WhatsApp | 5 | 4 | 0 | 1 |
-| Relatório Diário WhatsApp | 4 | 2 | 0 | 2 |
+| Relatório Diário WhatsApp | 4 | 4 | 0 | 0 |
 | Funcionários | 5 | 1 | 0 | 4 |
 | Backup | 7 | 7 | 0 | 0 |
 | Módulos Exclusivos | 2 | 1 | 1 | 0 |
-| **TOTAL** | **100** | **89 (89%)** | **4 (4%)** | **7 (7%)** |
+| **TOTAL** | **100** | **91 (91%)** | **4 (4%)** | **5 (5%)** |
 
 ---
 
 ## Itens Pendentes (Baixa Prioridade)
 
 1. ❌ Conexão WhatsApp via QR Code (próprio) — integração complexa, requer servidor externo
-2. ❌ Relatório diário automático — envio programado (requer integração de mensageria)
-3. ❌ Configurar horário de envio do relatório diário
+2. ✅ Relatório diário — botão no Dashboard + configuração de horário nas Configurações
+3. ✅ Configurar horário de envio do relatório diário
 4. ❌ Módulo de Assinaturas — aguarda execução do SQL no Supabase Dashboard
 
 ---

@@ -153,8 +153,23 @@ export default function Assinaturas() {
     return assinaturas.find((a: any) => a.id === modalPagar);
   }, [modalPagar, assinaturas]);
 
+  // Verificar se as tabelas existem (se der erro de relação, mostrar banner)
+  const tabelasNaoExistem = isLoading === false && (assinaturas as any)?.error?.message?.includes('relation') || false;
+
   return (
     <div className="space-y-6">
+      {/* Banner de configuração inicial */}
+      {tabelasNaoExistem && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
+          <AlertCircle className="text-amber-400 shrink-0 mt-0.5" size={20} />
+          <div>
+            <p className="text-amber-300 font-medium text-sm">Configuração necessária</p>
+            <p className="text-amber-400/80 text-xs mt-1">Para usar o módulo de Assinaturas, execute o SQL abaixo no <strong>Supabase Dashboard → SQL Editor</strong>:</p>
+            <pre className="mt-2 text-[10px] bg-black/30 rounded p-2 text-amber-300 overflow-x-auto whitespace-pre-wrap">CREATE TABLE IF NOT EXISTS assinaturas (id BIGSERIAL PRIMARY KEY, cliente_id BIGINT NOT NULL REFERENCES clientes(id) ON DELETE CASCADE, servico TEXT NOT NULL, descricao TEXT, valor_mensal NUMERIC(10,2) NOT NULL, dia_vencimento INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'ativa', data_inicio DATE NOT NULL DEFAULT CURRENT_DATE, data_fim DATE, observacoes TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assinatura_id BIGINT NOT NULL REFERENCES assinaturas(id) ON DELETE CASCADE, valor_pago NUMERIC(10,2) NOT NULL, data_pagamento TIMESTAMPTZ DEFAULT NOW(), mes_referencia TEXT NOT NULL, forma_pagamento TEXT DEFAULT 'dinheiro', observacoes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());</pre>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
