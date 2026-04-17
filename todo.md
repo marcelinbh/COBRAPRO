@@ -545,3 +545,19 @@
 - [ ] Página MeuPerfil.tsx: alterar senha
 - [ ] Rota /perfil no App.tsx
 - [ ] Item "Meu Perfil" no topo do menu lateral e bottom nav
+
+## Fase 57: WhatsApp Business API Oficial (Meta)
+- [ ] Substituir Evolution API por WhatsApp Cloud API (Meta)
+- [ ] Criar router whatsapp-meta.ts com enviarMensagem e enviarTemplate
+- [ ] Atualizar UI para configuração via token/phone_id (sem QR Code)
+- [ ] Configurar secrets WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, WHATSAPP_BUSINESS_ID
+- [ ] Testar envio real de mensagem via API Meta
+- [ ] Salvar checkpoint e push para GitHub
+
+## Fase 37: Evolution API no Digital Ocean + Filtro de Cobrador
+- [x] Criar Droplet no Digital Ocean (IP: 147.182.191.118, s-1vcpu-2gb, nyc1)
+- [x] Instalar Docker e Evolution API v1.8.2 via cloud-init
+- [x] Configurar Evolution API: URL, API Key e instância no banco Supabase
+- [x] Testar QR Code: instância "cobrapro" gerando QR Code corretamente
+- [x] Filtro de cobrador na página de Empréstimos (Select por cobrador)
+- [x] Testes: 40 testes passando (incluindo novos testes de Evolution API e filtro)

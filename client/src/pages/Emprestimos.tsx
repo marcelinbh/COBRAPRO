@@ -939,6 +939,7 @@ export default function Emprestimos() {
   const [busca, setBusca] = useState("");
   const [abaSelecionada, setAbaSelecionada] = useState("emprestimos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroKoletor, setFiltroKoletor] = useState("todos");
   const [modoSelecao, setModoSelecao] = useState(false);
   const [selecionados, setSelecionados] = useState<number[]>([]);
   const [loadingLote, setLoadingLote] = useState(false);
@@ -949,6 +950,7 @@ export default function Emprestimos() {
 
   const { data: emprestimos, isLoading, refetch } = trpc.contratos.listComParcelas.useQuery();
   const { data: contas } = trpc.caixa.contas.useQuery();
+  const { data: koletores } = trpc.cobradores.list.useQuery();
   const { data: recebimentosData, isLoading: loadingRecebimentos } = trpc.whatsapp.recebimentos.useQuery(
     { periodo: periodoRecebimentos },
     { enabled: abaSelecionada === 'recebimentos' }
@@ -1000,8 +1002,13 @@ export default function Emprestimos() {
       });
     }
 
+    if (filtroKoletor !== 'todos') {
+      const koletorId = parseInt(filtroKoletor);
+      resultado = resultado.filter(e => (e as any).koletorId === koletorId);
+    }
+
     return resultado;
-  }, [emprestimos, busca, filtroStatus]);
+  }, [emprestimos, busca, filtroStatus, filtroKoletor]);
 
   // Agrupar empréstimos por cliente
   const emprestimosAgrupados = useMemo(() => {
@@ -1160,6 +1167,19 @@ export default function Emprestimos() {
                 <SelectItem value="emdia">Em Dia</SelectItem>
               </SelectContent>
             </Select>
+            {koletores && koletores.length > 0 && (
+              <Select value={filtroKoletor} onValueChange={setFiltroKoletor}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Cobrador" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos Cobradores</SelectItem>
+                  {koletores.map((k: any) => (
+                    <SelectItem key={k.id} value={String(k.id)}>{k.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button
               size="sm"
               variant={modoSelecao ? 'default' : 'outline'}
