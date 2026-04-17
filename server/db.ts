@@ -24,40 +24,11 @@ export function getSupabaseClient(): SupabaseClient | null {
   return _supabase;
 }
 
-// Lazily create the drizzle instance. Tries direct PostgreSQL first.
-// Falls back to a wrapper that uses Supabase REST API.
-export async function getDb() {
-  if (_dbInitialized) return _db;
-  _dbInitialized = true;
-
-  const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    console.warn("[Database] DATABASE_URL not set, using Supabase REST API");
-    return null; // Will be handled by callers
-  }
-
-  try {
-    _client = postgres(dbUrl, {
-      max: 5,
-      ssl: 'require',
-      connect_timeout: 8,
-      idle_timeout: 20,
-    });
-    // Test connection with timeout
-    await Promise.race([
-      _client`SELECT 1`,
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Connection timeout")), 8000)),
-    ]);
-    _db = drizzle(_client);
-    console.log("[Database] Connected via PostgreSQL direct");
-  } catch (error) {
-    console.warn("[Database] Direct PostgreSQL unavailable, using Supabase REST API:", (error as Error).message);
-    try { _client?.end(); } catch (_) {}
-    _client = null;
-    _db = null;
-  }
-
-  return _db;
+// Always use Supabase REST API as the primary database.
+// MySQL/TiDB (DATABASE_URL) is no longer used — all data lives in Supabase.
+export async function getDb(): Promise<ReturnType<typeof drizzle> | null> {
+  // Always return null to force all callers to use Supabase REST API
+  return null;
 }
 
 // Reset connection state (useful for reconnect after errors)
