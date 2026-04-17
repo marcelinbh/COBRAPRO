@@ -38,6 +38,36 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Auth própria (email/senha)
   registerAuthRoutes(app);
+  // Diagnostic endpoint to test Supabase connectivity
+  app.get('/api/diag', async (req, res) => {
+    const results: Record<string, string> = {};
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+    
+    // Test 1: DNS resolution
+    try {
+      const dns = await import('dns').then(m => m.promises);
+      const addresses = await dns.lookup(new URL(supabaseUrl).hostname, { all: true });
+      results.dns = addresses.map((a: {address: string}) => a.address).join(', ');
+    } catch (e) { results.dns = 'FAILED: ' + (e as Error).message; }
+    
+    // Test 2: fetch with IPv4
+    try {
+      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+        headers: { 'apikey': supabaseKey },
+        signal: AbortSignal.timeout(5000)
+      });
+      results.fetch = `${response.status} ${response.statusText}`;
+    } catch (e) { results.fetch = 'FAILED: ' + (e as Error).message; }
+    
+    // Test 3: NODE_OPTIONS and dns order
+    results.nodeVersion = process.version;
+    results.nodeOptions = process.env.NODE_OPTIONS || 'not set';
+    results.platform = process.platform;
+    
+    res.json(results);
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",
