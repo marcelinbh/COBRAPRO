@@ -102,17 +102,39 @@ export function getSupabaseClient(): SupabaseClient | null {
 }
 
 // Use PostgreSQL direct connection (DATABASE_URL) as primary database.
-// Falls back to Supabase REST API if DATABASE_URL is not available.
+// Falls back to Supabase REST API if DATABASE_URL is not available or unreachable.
 export async function getDb(): Promise<ReturnType<typeof drizzle> | null> {
   if (_db) return _db;
   if (_dbInitialized) return null;
   _dbInitialized = true;
 
   const dbUrl = ENV.databaseUrl || process.env.DATABASE_URL;
-  if (!dbUrl || !dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://')) {
+  if (!dbUrl || (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://'))) {
     console.log('[Database] No PostgreSQL DATABASE_URL found, using Supabase REST API');
     return null;
   }
+
+  // Check if this is a Supabase-hosted PostgreSQL URL (*.supabase.co)
+  // On some hosting environments (e.g., DigitalOcean ATL1), the Supabase PostgreSQL
+  // hostname does not resolve via system DNS. In that case, skip direct connection
+  // and use the Supabase REST API (which works via undici with public DNS).
+  try {
+    const urlObj = new URL(dbUrl);
+    const hostname = urlObj.hostname;
+    if (hostname.includes('supabase.co') || hostname.includes('supabase.com')) {
+      // Test DNS resolution via public DNS resolver
+      const canResolve = await new Promise<boolean>((resolve) => {
+        const testResolver = new dns.Resolver();
+        testResolver.setServers(['8.8.8.8', '1.1.1.1']);
+        testResolver.resolve4(hostname, (err) => resolve(!err));
+      });
+      if (!canResolve) {
+        console.log('[Database] Supabase PostgreSQL hostname not resolvable via public DNS, using REST API');
+        _dbInitialized = false; // Allow retry later
+        return null;
+      }
+    }
+  } catch (_) { /* ignore URL parse errors */ }
 
   try {
     _client = postgres(dbUrl, {
