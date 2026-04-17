@@ -21,12 +21,8 @@ async function findUserByEmail(email: string): Promise<typeof users.$inferSelect
     }
   }
   const supabase = getSupabaseClient();
-  console.log("[Auth DEBUG] getSupabaseClient returned:", supabase ? "client" : "null");
-  console.log("[Auth DEBUG] SUPABASE_URL:", process.env.SUPABASE_URL ? process.env.SUPABASE_URL.substring(0, 30) + "..." : "NOT SET");
-  console.log("[Auth DEBUG] SUPABASE_SERVICE_ROLE_KEY:", process.env.SUPABASE_SERVICE_ROLE_KEY ? process.env.SUPABASE_SERVICE_ROLE_KEY.substring(0, 20) + "..." : "NOT SET");
   if (!supabase) return null;
   const { data, error } = await supabase.from("users").select("*").eq("email", email).limit(1).maybeSingle();
-  console.log("[Auth DEBUG] Supabase query result - data:", data ? "found" : "null", "error:", error ? error.message : "none");
   if (error || !data) return null;
   return mapSupabaseUser(data);
 }
