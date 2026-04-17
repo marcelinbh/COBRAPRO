@@ -529,3 +529,19 @@
 - [x] Comprovante PDF: nome, endereço e telefone da empresa no cabeçalho
 - [x] Corrigir TypeError clientes.map na página Assinaturas (clientes.list retorna objeto)
 - [x] Push completo para o GitHub
+
+## Fase 56: Módulo Meu Perfil (igual CobraFácil)
+
+- [ ] Procedure perfil.get (estatísticas: clientes, emprestado, recebido)
+- [ ] Procedure perfil.update (nome, empresa, whatsapp, chave_pix, logo_url)
+- [ ] Procedure perfil.alterarSenha
+- [ ] Procedure perfil.assinatura (plano, validade, dias restantes)
+- [ ] Página MeuPerfil.tsx: informações pessoais
+- [ ] Página MeuPerfil.tsx: estatísticas da conta
+- [ ] Página MeuPerfil.tsx: seção assinatura (plano, válido até, dias restantes, renovar)
+- [ ] Página MeuPerfil.tsx: conexão WhatsApp com QR Code (igual imagem)
+- [ ] Página MeuPerfil.tsx: nome da empresa + upload de logo
+- [ ] Página MeuPerfil.tsx: chave PIX
+- [ ] Página MeuPerfil.tsx: alterar senha
+- [ ] Rota /perfil no App.tsx
+- [ ] Item "Meu Perfil" no topo do menu lateral e bottom nav

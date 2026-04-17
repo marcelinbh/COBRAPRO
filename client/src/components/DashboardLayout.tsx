@@ -46,6 +46,7 @@ import {
   Smartphone,
   Tv2,
   MessageCircle,
+  User,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -78,6 +79,7 @@ const menuItems = [
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
   { icon: Tv2, label: "Assinaturas", path: "/assinaturas" },
   { icon: MessageCircle, label: "WhatsApp QR", path: "/whatsapp" },
+  { icon: User, label: "Meu Perfil", path: "/perfil" },
   { icon: Smartphone, label: "Instalar App", path: "/install" },
 ];
 
@@ -317,11 +319,18 @@ function DashboardLayoutContent({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem
+                  onClick={() => setLocation('/perfil')}
+                  className="cursor-pointer"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Meu Perfil</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign out</span>
+                  <span>Sair</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
