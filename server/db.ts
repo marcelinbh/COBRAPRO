@@ -6,9 +6,15 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-// Force IPv4 DNS resolution to avoid IPv6 connectivity issues in some hosting environments
-// (e.g., DigitalOcean App Platform ATL1 blocks IPv6 connections to Supabase)
+// Force IPv4 DNS resolution and use public DNS servers to avoid connectivity issues
+// in some hosting environments (e.g., DigitalOcean App Platform ATL1 blocks Supabase DNS)
 dns.setDefaultResultOrder("ipv4first");
+// Use public DNS servers (Google + Cloudflare) as fallback for better resolution
+try {
+  dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1"]);
+} catch (e) {
+  // Ignore errors - DNS servers may already be set
+}
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _client: ReturnType<typeof postgres> | null = null;
