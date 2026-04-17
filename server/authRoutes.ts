@@ -18,11 +18,16 @@ async function findUserByEmail(email: string): Promise<typeof users.$inferSelect
       return result[0] ?? null;
     } catch (err) {
       console.warn("[Auth] Drizzle findUserByEmail failed, trying REST:", (err as Error).message);
+      console.warn("[Auth] Full error:", JSON.stringify(err, Object.getOwnPropertyNames(err as object)));
     }
   }
   const supabase = getSupabaseClient();
-  if (!supabase) return null;
+  if (!supabase) {
+    console.error("[Auth] No Supabase client available");
+    return null;
+  }
   const { data, error } = await supabase.from("users").select("*").eq("email", email).limit(1).maybeSingle();
+  console.log("[Auth] Supabase findUserByEmail - data:", data ? "found" : "null", "error:", error ? error.message : "none");
   if (error || !data) return null;
   return mapSupabaseUser(data);
 }
