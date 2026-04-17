@@ -11,6 +11,8 @@ import {
   Share2, Trash2, FileText, Copy, Send
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
+import { trpc } from '@/lib/trpc';
+import { gerarComprovantePDF } from '@/lib/gerarComprovante';
 
 interface EmprestimoDetalhesModalProps {
   emprestimo: any;
@@ -28,8 +30,40 @@ export function EmprestimoDetalhesModal({
   onRefresh,
 }: EmprestimoDetalhesModalProps) {
   const [aba, setAba] = useState<'etiqueta' | 'detalhes' | 'comprovante'>('etiqueta');
+  const [gerandoPDF, setGerandoPDF] = useState(false);
+  const { data: config } = trpc.configuracoes.get.useQuery();
 
   if (!emprestimo) return null;
+
+  const handleGerarComprovante = async () => {
+    setGerandoPDF(true);
+    try {
+      // Pegar a parcela mais recente paga ou a primeira em aberto
+      const parcelaPaga = emprestimo.todasParcelas?.find((p: any) => p.status === 'paga') ||
+        emprestimo.todasParcelas?.[0];
+      await gerarComprovantePDF({
+        clienteNome: emprestimo.clienteNome,
+        clienteCPF: emprestimo.clienteCPF,
+        clienteTelefone: emprestimo.clienteTelefone,
+        contratoId: emprestimo.id,
+        parcelaNumero: parcelaPaga?.numero_parcela ?? 1,
+        valorOriginal: parcelaPaga?.valor_original ?? emprestimo.valorPrincipal,
+        juros: parcelaPaga?.valor_juros ?? 0,
+        valorPago: parcelaPaga?.valor_pago ?? parcelaPaga?.valor_original ?? emprestimo.valorPrincipal,
+        dataPagamento: parcelaPaga?.data_pagamento ?? new Date().toISOString(),
+        modalidade: emprestimo.modalidade,
+        nomeEmpresa: config?.nomeEmpresa || 'CobraPro',
+        logoUrl: config?.logoUrl || undefined,
+        enderecoEmpresa: config?.enderecoEmpresa || undefined,
+        telefoneEmpresa: config?.telefoneEmpresa || undefined,
+      });
+      toast.success('Comprovante gerado com sucesso!');
+    } catch (e) {
+      toast.error('Erro ao gerar comprovante');
+    } finally {
+      setGerandoPDF(false);
+    }
+  };
 
   const diasAtraso = emprestimo.parcelasComAtraso?.[0]?.diasAtraso ?? 0;
   const totalComAtraso = emprestimo.parcelasComAtraso?.[0]?.totalComAtraso ?? 0;
@@ -218,10 +252,22 @@ export function EmprestimoDetalhesModal({
 
           {aba === 'comprovante' && (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Comprovante do empréstimo</p>
-              <Button className="w-full gap-2" variant="outline">
+              <p className="text-sm text-muted-foreground">Gera o comprovante de pagamento com os dados da empresa configurados em Configurações.</p>
+              {config?.nomeEmpresa && (
+                <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm">
+                  <p className="font-medium text-foreground">{config.nomeEmpresa}</p>
+                  {config.enderecoEmpresa && <p className="text-muted-foreground text-xs mt-1">{config.enderecoEmpresa}</p>}
+                  {config.telefoneEmpresa && <p className="text-muted-foreground text-xs">{config.telefoneEmpresa}</p>}
+                </div>
+              )}
+              <Button
+                className="w-full gap-2"
+                variant="outline"
+                onClick={handleGerarComprovante}
+                disabled={gerandoPDF}
+              >
                 <FileText className="h-4 w-4" />
-                Gerar Comprovante em PDF
+                {gerandoPDF ? 'Gerando PDF...' : 'Gerar Comprovante em PDF'}
               </Button>
             </div>
           )}

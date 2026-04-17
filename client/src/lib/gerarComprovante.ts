@@ -13,6 +13,11 @@ export interface DadosComprovante {
   dataPagamento: string;
   modalidade: string;
   proximoVencimento?: string;
+  // Dados da empresa (das configurações)
+  nomeEmpresa?: string;
+  logoUrl?: string;
+  enderecoEmpresa?: string;
+  telefoneEmpresa?: string;
 }
 
 export async function gerarComprovanteHTML(dados: DadosComprovante): Promise<string> {
@@ -20,13 +25,17 @@ export async function gerarComprovanteHTML(dados: DadosComprovante): Promise<str
   const proximaData = dados.proximoVencimento 
     ? new Date(dados.proximoVencimento).toLocaleDateString('pt-BR')
     : 'N/A';
+  const nomeEmpresa = dados.nomeEmpresa || 'CobraPro';
 
   return `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: white;">
       <!-- Header -->
       <div style="text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px;">
-        <h1 style="margin: 0; color: #1a1a1a; font-size: 24px;">COMPROVANTE DE PAGAMENTO</h1>
-        <p style="margin: 5px 0; color: #666; font-size: 12px;">CobraPro - Sistema de Gestão de Cobranças</p>
+        ${dados.logoUrl ? `<img src="${dados.logoUrl}" alt="Logo" style="max-height: 60px; max-width: 200px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;" />` : ''}
+        <h1 style="margin: 0; color: #1a1a1a; font-size: 22px;">${nomeEmpresa}</h1>
+        <h2 style="margin: 5px 0; color: #333; font-size: 16px; font-weight: normal;">COMPROVANTE DE PAGAMENTO</h2>
+        ${dados.enderecoEmpresa ? `<p style="margin: 3px 0; color: #666; font-size: 11px;">${dados.enderecoEmpresa}</p>` : ''}
+        ${dados.telefoneEmpresa ? `<p style="margin: 3px 0; color: #666; font-size: 11px;">Tel: ${dados.telefoneEmpresa}</p>` : ''}
       </div>
 
       <!-- Dados do Pagamento -->

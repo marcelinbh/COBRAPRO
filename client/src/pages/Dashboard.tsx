@@ -1,4 +1,5 @@
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
 import { formatarMoeda } from "../../../shared/finance";
 import {
   TrendingUp, TrendingDown, Wallet, Users, AlertTriangle,
@@ -86,6 +87,9 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
+  const { data: meuKoletor } = trpc.cobradores.me.useQuery();
+  // Perfil koletor = funcionário com acesso restrito (sem KPIs financeiros globais)
+  const isKoletor = meuKoletor?.perfil === 'koletor';
   const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
   const { data: parcelasHoje } = trpc.dashboard.parcelasHoje.useQuery();
   const { data: atrasadas } = trpc.dashboard.parcelasAtrasadas.useQuery();
@@ -137,8 +141,16 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      {/* Banner de acesso restrito para koletores */}
+      {isKoletor && (
+        <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 flex items-center gap-3">
+          <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
+          <p className="text-sm text-warning">Você está visualizando apenas seus próprios empréstimos e parcelas.</p>
+        </div>
+      )}
+
+      {/* KPI Cards — ocultos para koletores */}
+      {!isKoletor && <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         <KPICard
           title="Saldo em Contas"
           value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)}
@@ -181,10 +193,10 @@ export default function Dashboard() {
           variant={kpis?.qtdVenceHoje ? "warning" : "default"}
           subtitle={formatarMoeda(kpis?.valorVenceHoje ?? 0)}
         />
-      </div>
+      </div>}
 
-      {/* Barra de saúde financeira */}
-      {kpis && kpis.capitalCirculacao > 0 && (
+      {/* Barra de saúde financeira — oculta para koletores */}
+      {!isKoletor && kpis && kpis.capitalCirculacao > 0 && (
         <Card className="border-border">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -205,7 +217,7 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-      )}
+       )}
 
       {/* Charts + Lists */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">

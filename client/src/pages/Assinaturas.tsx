@@ -68,7 +68,10 @@ export default function Assinaturas() {
     busca: busca || undefined,
   });
   const { data: kpis } = trpc.assinaturas.kpis.useQuery();
-  const { data: clientes = [] } = trpc.clientes.list.useQuery({ ativo: true, busca: '' });
+  const { data: clientesData } = trpc.clientes.list.useQuery({ ativo: true, busca: '' });
+  const clientes: any[] = Array.isArray((clientesData as any)?.clientes)
+    ? (clientesData as any).clientes
+    : Array.isArray(clientesData) ? clientesData as any[] : [];
   const { data: contas = [] } = trpc.caixa.contas.useQuery();
   const { data: pagamentosExpanded } = trpc.assinaturas.pagamentos.useQuery(
     { assinaturaId: expandedId! },

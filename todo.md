@@ -501,3 +501,31 @@
 - [x] Teste prático Cobranças: Pagamento da parcela 83 registrado + transação no caixa (id=11)
 - [x] Teste prático Contas a Pagar: Conta a pagar teste criada (id=2)
 - [x] Teste prático Assinaturas: Assinatura teste criada (id=2) + pagamento registrado (id=2)
+
+## Fase 55: Resolver Todos os Itens Pendentes
+- [ ] Permissões granulares: campo `permissoes` na tabela koletores/users
+- [ ] Permissões granulares: funcionário vê apenas seus próprios empréstimos
+- [ ] Permissões granulares: dashboard bloqueado para funcionários (sem totais financeiros)
+- [ ] Relatório Diário via WhatsApp: procedure gerarRelatorioDiario
+- [ ] Relatório Diário via WhatsApp: botão "Enviar Relatório Diário" nas Configurações
+- [ ] Caixa Extra manual no Relatório: campo para adicionar valor extra ao caixa
+- [ ] Melhorias no Comprovante PDF: logo da empresa no cabeçalho
+- [ ] Push completo para o GitHub
+
+## Fase 55: Resolver Todos os Itens Pendentes
+- [ ] Permissoes granulares: campo permissoes na tabela koletores
+- [ ] Permissoes granulares: funcionario ve apenas seus proprios emprestimos
+- [ ] Permissoes granulares: dashboard bloqueado para funcionarios
+- [ ] Relatorio Diario via WhatsApp: procedure gerarRelatorioDiario
+- [ ] Relatorio Diario via WhatsApp: botao nas Configuracoes
+- [ ] Caixa Extra manual no Relatorio
+- [ ] Comprovante PDF com logo da empresa
+- [ ] Push completo para o GitHub
+
+## Fase 55b: Conclusão dos Itens Pendentes (Abril 2026)
+- [x] Permissões granulares: Dashboard oculta KPIs financeiros para perfil koletor
+- [x] Permissões granulares: Banner de aviso para koletores no Dashboard
+- [x] Comprovante PDF: logo da empresa no cabeçalho (usa logoUrl das Configurações)
+- [x] Comprovante PDF: nome, endereço e telefone da empresa no cabeçalho
+- [x] Corrigir TypeError clientes.map na página Assinaturas (clientes.list retorna objeto)
+- [x] Push completo para o GitHub
