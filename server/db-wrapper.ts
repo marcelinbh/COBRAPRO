@@ -26,9 +26,14 @@ export function getSupabaseClient(): SupabaseClient {
   }
 }
 
+// Async version for backward compatibility
+async function getSupabaseClientAsync(): Promise<SupabaseClient> {
+  return getSupabaseClient();
+}
+
 // Wrapper that mimics Drizzle interface but uses Supabase
 export async function getDb() {
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClientAsync();
   
   return {
     select: () => ({
@@ -142,7 +147,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     throw new Error("User openId is required for upsert");
   }
 
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClientAsync();
   const updateData: Record<string, unknown> = {
     openId: user.openId,
     lastSignedIn: (user.lastSignedIn ?? new Date()).toISOString(),
@@ -161,7 +166,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 }
 
 export async function getUserByOpenId(openId: string) {
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClientAsync();
   const { data, error } = await supabase
     .from('users')
     .select('*')

@@ -1,11 +1,11 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { getSupabaseClient } from "../db";
+import { getSupabaseClientAsync } from "../db";
 
 // ─── EVOLUTION API HELPER ─────────────────────────────────────────────────────
 async function getEvolutionConfig(): Promise<{ url: string; apiKey: string; instanceName: string } | null> {
-  const sb = getSupabaseClient();
+  const sb = await getSupabaseClientAsync();
   if (!sb) return null;
   
   const { data } = await sb.from('configuracoes').select('chave, valor').in('chave', [
@@ -61,7 +61,7 @@ export const whatsappEvolutionRouter = router({
       instanceName: z.string().min(1),
     }))
     .mutation(async ({ input }) => {
-      const sb = getSupabaseClient();
+      const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       
       const configs = [
@@ -84,7 +84,7 @@ export const whatsappEvolutionRouter = router({
 
   // Obter configurações salvas
   getConfig: protectedProcedure.query(async () => {
-    const sb = getSupabaseClient();
+    const sb = await getSupabaseClientAsync();
     if (!sb) return null;
     
     const { data } = await sb.from('configuracoes').select('chave, valor').in('chave', [

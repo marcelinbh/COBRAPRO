@@ -5,7 +5,7 @@ import type { Express, Request, Response } from "express";
 import { passwordResets, users } from "../drizzle/schema";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
-import { getDb, getSupabaseClient } from "./db";
+import { getDb, getSupabaseClientAsync } from "./db";
 import { sdk } from "./_core/sdk";
 import { storagePut } from "./storage";
 
@@ -21,7 +21,7 @@ async function findUserByEmail(email: string): Promise<typeof users.$inferSelect
       console.warn("[Auth] Full error:", JSON.stringify(err, Object.getOwnPropertyNames(err as object)));
     }
   }
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClientAsync();
   if (!supabase) {
     console.error("[Auth] No Supabase client available");
     return null;
@@ -43,7 +43,7 @@ async function findUserById(id: number): Promise<typeof users.$inferSelect | nul
       console.warn("[Auth] Drizzle findUserById failed, trying REST:", (err as Error).message);
     }
   }
-  const supabase = getSupabaseClient();
+  const supabase = await getSupabaseClientAsync();
   if (!supabase) return null;
   const { data, error } = await supabase.from("users").select("*").eq("id", id).limit(1).maybeSingle();
   if (error || !data) return null;
@@ -119,7 +119,7 @@ export function registerAuthRoutes(app: Express) {
         if (db) {
           await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
         } else {
-          const supabase = getSupabaseClient();
+          const supabase = await getSupabaseClientAsync();
           if (supabase) {
             await supabase.from("users").update({ lastSignedIn: new Date().toISOString() }).eq("id", user.id);
           }
@@ -183,7 +183,7 @@ export function registerAuthRoutes(app: Express) {
         newUser = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0] ?? null;
       } else {
         // Fallback: Supabase REST
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (!supabase) {
           res.status(500).json({ error: "Banco de dados indisponível" });
           return;
@@ -254,7 +254,7 @@ export function registerAuthRoutes(app: Express) {
         await db.insert(passwordResets).values({ userId: user.id, token, expiresAt });
       } else {
         // Fallback: Supabase REST
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (supabase) {
           await supabase.from("password_resets").update({ usado: true }).eq("userId", user.id);
           await supabase.from("password_resets").insert({
@@ -358,7 +358,7 @@ export function registerAuthRoutes(app: Express) {
         await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.id, reset.id));
       } else {
         // Fallback: Supabase REST
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (!supabase) {
           res.status(500).json({ error: "Banco de dados indisponível" });
           return;
@@ -418,7 +418,7 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Fallback: Supabase REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) {
         res.status(500).json({ error: "Banco de dados indisponível" });
         return;

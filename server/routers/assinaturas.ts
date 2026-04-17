@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
-import { getSupabaseClient } from "../db";
+import { getSupabaseClientAsync } from "../db";
 import { TRPCError } from "@trpc/server";
 
 export const assinaturasRouter = router({
@@ -12,7 +12,7 @@ export const assinaturasRouter = router({
       busca: z.string().optional(),
     }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
       let query = supabase
@@ -43,7 +43,7 @@ export const assinaturasRouter = router({
 
   // KPIs do módulo de assinaturas
   kpis: protectedProcedure.query(async () => {
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
     const { data: todas, error } = await supabase
@@ -80,7 +80,7 @@ export const assinaturasRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
       const { data, error } = await supabase
@@ -116,7 +116,7 @@ export const assinaturasRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
       const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
@@ -155,7 +155,7 @@ export const assinaturasRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
       // Registrar pagamento
@@ -209,7 +209,7 @@ export const assinaturasRouter = router({
   pagamentos: protectedProcedure
     .input(z.object({ assinaturaId: z.number() }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
       const { data, error } = await supabase
@@ -226,7 +226,7 @@ export const assinaturasRouter = router({
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
       const { error } = await supabase

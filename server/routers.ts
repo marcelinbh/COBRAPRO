@@ -7,7 +7,7 @@ import { backupRouter } from "./routers/backup";
 import { whatsappEvolutionRouter } from "./routers/whatsappEvolution";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
-import { getDb, getSupabaseClient, resetDb } from "./db";
+import { getDb, getSupabaseClientAsync, resetDb } from "./db";
 import { TRPCError } from "@trpc/server";
 import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
@@ -21,7 +21,7 @@ import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcul
 const dashboardRouter = router({
   kpis: protectedProcedure.query(async () => {
     const db = await getDb();
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     
     if (db) {
       // Use Drizzle ORM if available
@@ -153,7 +153,7 @@ const dashboardRouter = router({
         return rows;
       } catch (err) { console.warn('[dashboard.parcelasHoje] Drizzle failed:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const hoje = new Date().toISOString().split('T')[0];
     const { data } = await supabase.from('parcelas').select('*, clientes(nome)').eq('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']).order('data_vencimento').limit(20);
@@ -176,7 +176,7 @@ const dashboardRouter = router({
         });
       } catch (err) { console.warn('[dashboard.parcelasAtrasadas] Drizzle failed:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data } = await supabase.from('parcelas').select('*, clientes(nome)').eq('status', 'atrasada').order('data_vencimento').limit(20);
     return (data ?? []).map((r: any) => {
@@ -200,7 +200,7 @@ const dashboardRouter = router({
         return dias;
       } catch (err) { console.warn('[dashboard.fluxoMensal] Drizzle failed:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const dias = [];
     for (let i = 6; i >= 0; i--) {
@@ -236,7 +236,7 @@ const clientesRouter = router({
       }
       // Fallback: Supabase REST se Drizzle falhou
       if (rows.length === 0) {
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (supabase) {
           let query = supabase.from('clientes').select('*').order('createdAt', { ascending: false });
           if (input?.ativo !== undefined) query = (query as any).eq('ativo', input.ativo);
@@ -267,7 +267,7 @@ const clientesRouter = router({
       }
     }
     // Fallback: Supabase REST
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
     const { data, error } = await supabase.from('clientes').select('*').eq('id', input.id).single();
     if (error) return null;
@@ -322,7 +322,7 @@ const clientesRouter = router({
         }
       }
       // Fallback: Supabase REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
       const insertData: Record<string, unknown> = { nome: input.nome };
       if (input.cpfCnpj) insertData.cpf_cnpj = input.cpfCnpj;
@@ -406,7 +406,7 @@ const clientesRouter = router({
         }
       }
       // Fallback: Supabase REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const updateData: Record<string, unknown> = {};
       if (data.nome) updateData.nome = data.nome;
@@ -451,7 +451,7 @@ const clientesRouter = router({
       try { return db.select().from(contratos).where(eq(contratos.clienteId, input.clienteId)).orderBy(desc(contratos.createdAt)); }
       catch (err) { console.warn('[clientes.contratosByCliente] Drizzle failed:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data } = await supabase.from('contratos').select('*').eq('cliente_id', input.clienteId).order('createdAt', { ascending: false });
     return data ?? [];
@@ -473,7 +473,7 @@ const clientesRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      const supabaseImport = !db ? getSupabaseClient() : null;
+      const supabaseImport = !db ? await getSupabaseClientAsync() : null;
       if (!db && !supabaseImport) throw new Error('DB unavailable');
       let importados = 0;
       let erros = 0;
@@ -539,7 +539,7 @@ const clientesRouter = router({
       
       // Fallback: Supabase REST
       if (rows.length === 0) {
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (supabase) {
           const { data, error } = await supabase.from('clientes').select('*').eq('ativo', true);
           if (!error && data) rows = data;
@@ -559,7 +559,7 @@ const clientesRouter = router({
         }
         
         if (parcelas_data.length === 0) {
-          const supabase = getSupabaseClient();
+          const supabase = await getSupabaseClientAsync();
           if (supabase) {
             const { data } = await supabase.from('parcelas').select('*').eq('cliente_id', cliente.id);
             if (data) parcelas_data = data;
@@ -666,7 +666,7 @@ const clientesRouter = router({
         }
       }
       // Fallback: Supabase REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data: ctAtivos } = await supabase.from('contratos').select('id').eq('cliente_id', input.id).eq('status', 'ativo');
       if (ctAtivos && ctAtivos.length > 0) {
@@ -687,7 +687,7 @@ const contratosRouter = router({
       busca: z.string().optional(),
     }).optional())
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
 
       // Buscar contratos
@@ -826,7 +826,7 @@ const contratosRouter = router({
   obterDetalhes: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return null;
 
       // Buscar contrato
@@ -955,7 +955,7 @@ const contratosRouter = router({
           // Buscar perfil do cobrador (se for cobrador, filtrar apenas seus contratos)
           let myKoletorId: number | null = null;
           try {
-            const supabaseForPerfil = getSupabaseClient();
+            const supabaseForPerfil = await getSupabaseClientAsync();
             if (supabaseForPerfil) {
               const { data: koletorData } = await supabaseForPerfil.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
               if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
@@ -974,7 +974,7 @@ const contratosRouter = router({
       }
 
       // Fallback: Supabase REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       // Buscar perfil do cobrador
       let myKoletorId: number | null = null;
@@ -1020,7 +1020,7 @@ const contratosRouter = router({
         return rows[0] ?? null;
       } catch (err) { console.warn('[contratos.byId] Drizzle failed:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
     const { data } = await supabase.from('contratos').select('*, clientes(nome, whatsapp, chave_pix)').eq('id', input.id).single();
     if (!data) return null;
@@ -1061,7 +1061,7 @@ const contratosRouter = router({
       // Buscar koletor_id pelo user_id (pode ser null se não encontrado)
       let koletorId: number | null = null;
       try {
-        const supabaseForKoletor = getSupabaseClient();
+        const supabaseForKoletor = await getSupabaseClientAsync();
         if (supabaseForKoletor) {
           const { data: koletorData } = await supabaseForKoletor
             .from('koletores')
@@ -1143,7 +1143,7 @@ const contratosRouter = router({
       }
 
       // ── Fallback: Supabase REST API ──────────────────────────────────────────
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
 
       const totalContratoRest = parseFloat((valorParcela * input.numeroParcelas).toFixed(2));
@@ -1222,7 +1222,7 @@ const contratosRouter = router({
           resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { error } = await supabase.from('contratos').update({ status: input.status }).eq('id', input.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -1235,7 +1235,7 @@ const contratosRouter = router({
       // Buscar dados completos do contrato
       if (!db) {
         // Fallback REST para gerarPDF
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
         const { data: ctData, error: ctErr } = await supabase
           .from('contratos')
@@ -1408,7 +1408,7 @@ const contratosRouter = router({
         }
       }
       // Fallback: Supabase REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data: pNaoPagas } = await supabase.from('parcelas').select('id').eq('contrato_id', input.id).neq('status', 'paga');
       if (pNaoPagas && pNaoPagas.length > 0) {
@@ -1434,7 +1434,7 @@ const contratosRouter = router({
           resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.id);
       await supabase.from('parcelas').update({ status: 'paga', data_pagamento: new Date().toISOString() }).eq('contrato_id', input.id);
@@ -1454,7 +1454,7 @@ const contratosRouter = router({
           resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -1483,7 +1483,7 @@ const contratosRouter = router({
           resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data: pAtraso } = await supabase.from('parcelas').select('id, valor_multa').eq('contrato_id', input.id).eq('status', 'pendente').lt('data_vencimento', hoje);
       for (const parcela of (pAtraso ?? [])) {
@@ -1551,7 +1551,7 @@ const parcelasRouter = router({
           // Buscar perfil do cobrador (se for cobrador, filtrar apenas suas parcelas)
           let myKoletorId: number | null = null;
           try {
-            const supabaseForPerfil = getSupabaseClient();
+            const supabaseForPerfil = await getSupabaseClientAsync();
             if (supabaseForPerfil) {
               const { data: koletorData } = await supabaseForPerfil.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
               if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
@@ -1575,7 +1575,7 @@ const parcelasRouter = router({
       }
 
        // Fallback: Supabase REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       // Buscar perfil do cobrador
       let myKoletorId: number | null = null;
@@ -1652,7 +1652,7 @@ const parcelasRouter = router({
     }))
     .mutation(async ({ input }) => {
       // Usar sempre Supabase REST API (PostgreSQL direto está indisponível neste ambiente)
-      const sb = getSupabaseClient();
+      const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
 
       // Buscar parcela
@@ -1732,7 +1732,7 @@ const parcelasRouter = router({
           const rows = await db.select().from(parcelas).where(eq(parcelas.id, input.parcelaId)).limit(1);
           return rows[0] ?? null;
         }
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (!supabase) return null;
         const { data } = await supabase.from('parcelas').select('*').eq('id', input.parcelaId).single();
         return data ? {
@@ -1752,7 +1752,7 @@ const parcelasRouter = router({
           const rows = await db.select().from(contratos).where(eq(contratos.id, parcela.contratoId)).limit(1);
           return rows[0] ?? null;
         }
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (!supabase) return null;
         const { data } = await supabase.from('contratos').select('*').eq('id', parcela.contratoId).single();
         return data ? {
@@ -1816,7 +1816,7 @@ const parcelasRouter = router({
 
       } else {
         // Fallback REST
-        const supabase = getSupabaseClient();
+        const supabase = await getSupabaseClientAsync();
         if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
         await supabase.from('parcelas').update({
@@ -1886,7 +1886,7 @@ const caixaRouter = router({
       }
     }
     // Fallback REST
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data: contasData } = await supabase.from('contas_caixa').select('*').eq('ativo', true);
     const { data: transData } = await supabase.from('transacoes_caixa').select('conta_caixa_id, tipo, valor');
@@ -1938,7 +1938,7 @@ const caixaRouter = router({
         }
       }
       // Fallback REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       let txQuery = supabase
         .from('transacoes_caixa')
@@ -1992,7 +1992,7 @@ const caixaRouter = router({
         }
       }
       // Fallback REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
       const { data, error } = await supabase.from('contas_caixa').insert({
         nome: input.nome,
@@ -2032,7 +2032,7 @@ const caixaRouter = router({
         }
       }
       // Fallback REST
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
       const { error: txErr } = await supabase.from('transacoes_caixa').insert({
         conta_caixa_id: input.contaCaixaId,
@@ -2077,7 +2077,7 @@ const portalRouter = router({
           resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { error } = await supabase.from('magic_links').insert({
         cliente_id: input.clienteId,
@@ -2112,7 +2112,7 @@ const portalRouter = router({
           resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
       const { data: linkData } = await supabase.from('magic_links').select('*').eq('token', input.token).single();
       if (!linkData) throw new Error('Link inválido');
@@ -2138,7 +2138,7 @@ function aplicarVariaveisTemplate(template: string, vars: Record<string, string>
 
 const whatsappRouter = router({
   templates: protectedProcedure.query(async () => {
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data } = await supabase.from('templates_whatsapp').select('*').eq('ativo', true);
     return (data ?? []).map((r: any) => ({ ...r, ativo: r.ativo }));
@@ -2151,7 +2151,7 @@ const whatsappRouter = router({
       tipo: z.enum(['atraso', 'preventivo', 'vence_hoje']).default('atraso'),
     }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
       const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
       const cfg: Record<string, string> = {};
@@ -2243,7 +2243,7 @@ const whatsappRouter = router({
       parcelaId: z.number(),
     }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
       const { data: templateData } = await supabase.from('templates_whatsapp').select('*').eq('id', input.templateId).single();
       if (!templateData) throw new Error('Template não encontrado');
@@ -2285,7 +2285,7 @@ const whatsappRouter = router({
       tipo: z.enum(['atraso', 'preventivo']).default('atraso'),
     }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
       const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
       const cfg: Record<string, string> = {};
@@ -2324,7 +2324,7 @@ const whatsappRouter = router({
       periodo: z.enum(['hoje', 'semana', 'mes', 'todos']).default('mes'),
     }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return { recebimentos: [], total: 0, totalValor: 0 };
       const hoje = new Date();
       let dataInicio: string | null = null;
@@ -2361,7 +2361,7 @@ const whatsappRouter = router({
   relatorioDiario: protectedProcedure
     .input(z.object({ telefone: z.string().optional() }).optional())
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const hoje = new Date().toISOString().split('T')[0];
       const { data: parcelasHoje } = await supabase
@@ -2432,7 +2432,7 @@ const whatsappRouter = router({
 // ─── RELATÓRIOS ────────────────────────────────────────────────────────────────
 const relatoriosRouter = router({
   resumoGeral: protectedProcedure.query(async () => {
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
 
     const [{ count: totalContratos }, { count: contratosAtivos }, { count: totalClientes }] = await Promise.all([
@@ -2472,7 +2472,7 @@ const configuracoesRouter = router({
       catch (err) { console.warn('[configuracoes.get] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
     }
     if (rows.length === 0) {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (supabase) {
         const { data } = await supabase.from('configuracoes').select('chave, valor');
         if (data) rows = data;
@@ -2523,7 +2523,7 @@ const configuracoesRouter = router({
           return { success: true };
         } catch (err) { console.warn('[configuracoes.save] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       for (const [chave, valor] of entries) {
         await supabase.from('configuracoes').upsert({ chave, valor: String(valor) }, { onConflict: 'chave' });
@@ -2536,7 +2536,7 @@ const configuracoesRouter = router({
       try { return db.select().from(templatesWhatsapp); }
       catch (err) { console.warn('[configuracoes.templates] Drizzle failed:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data } = await supabase.from('templates_whatsapp').select('*');
     return data ?? [];
@@ -2558,7 +2558,7 @@ const configuracoesRouter = router({
           return { success: true };
         } catch (err) { console.warn('[configuracoes.updateTemplate] Drizzle failed:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('templates_whatsapp').update(data).eq('id', id);
       return { success: true };
@@ -2574,14 +2574,14 @@ const cobradoresRouter = router({
       try { return db.select().from(koletores).orderBy(desc(koletores.createdAt)); }
       catch (err) { console.warn('[koletores.list] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data } = await supabase.from('koletores').select('*').order('createdAt', { ascending: false });
     return data ?? [];
   }),
   me: protectedProcedure.query(async ({ ctx }) => {
     if (!ctx.user) return null;
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
     try {
       const { data: koletor } = await supabase.from('koletores').select('*').eq('user_id', ctx.user.id).single();
@@ -2604,7 +2604,7 @@ const cobradoresRouter = router({
           return { id: result[0].id, success: true };
         } catch (err) { console.warn('[koletores.create] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data, error } = await supabase.from('koletores').insert({ nome: input.nome, email: input.email || null, telefone: input.telefone || null, whatsapp: input.whatsapp || null, perfil: input.perfil, limite_emprestimo: input.limiteEmprestimo, comissao_percentual: input.comissaoPercentual, observacoes: input.observacoes || null }).select('id').single();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -2625,7 +2625,7 @@ const cobradoresRouter = router({
           return { success: true };
         } catch (err) { console.warn('[koletores.update] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const updateData: any = { ...rest };
       if (limiteEmprestimo !== undefined) updateData.limite_emprestimo = limiteEmprestimo;
@@ -2642,7 +2642,7 @@ const cobradoresRouter = router({
         try { await db.update(koletores).set({ ativo: false }).where(eq(koletores.id, input.id)); return { success: true }; }
         catch (err) { console.warn('[koletores.delete] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('koletores').update({ ativo: false }).eq('id', input.id);
       return { success: true };
@@ -2651,7 +2651,7 @@ const cobradoresRouter = router({
   performance: protectedProcedure
     .input(z.object({ mes: z.number().optional(), ano: z.number().optional() }))
     .query(async ({ ctx, input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       const ano = input.ano ?? new Date().getFullYear();
       const mes = input.mes ?? new Date().getMonth() + 1;
@@ -2704,7 +2704,7 @@ const reparcelamentoRouter = router({
     }))
     .query(async ({ input }) => {
       // Use Supabase REST to fetch open parcelas
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
 
       const { data: parcelasAbertas, error: parcelasErr } = await supabase
@@ -2760,7 +2760,7 @@ const reparcelamentoRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
       // Buscar contrato original
@@ -2868,7 +2868,7 @@ const contasPagarRouter = router({
           resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       let q = supabase.from('contas_pagar').select('*').order('data_vencimento', { ascending: false });
       if (input?.status && input.status !== 'todos') q = q.eq('status', input.status);
@@ -2902,7 +2902,7 @@ const contasPagarRouter = router({
           return { success: true, id: result[0].id };
         } catch (err) { console.warn('[contasPagar.criar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data, error } = await supabase.from('contas_pagar').insert({
         descricao: input.descricao, categoria: input.categoria, valor: input.valor,
@@ -2937,7 +2937,7 @@ const contasPagarRouter = router({
           console.warn('[contasPagar.pagar] Drizzle failed, trying REST:', err.message); resetDb();
         }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data: contaData } = await supabase.from('contas_pagar').select('valor, descricao').eq('id', input.id).single();
       if (!contaData) throw new Error('Conta não encontrada');
@@ -2956,7 +2956,7 @@ const contasPagarRouter = router({
         try { await db.update(contasPagar).set({ status: 'cancelada' }).where(eq(contasPagar.id, input.id)); return { success: true }; }
         catch (err) { console.warn('[contasPagar.cancelar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('contas_pagar').update({ status: 'cancelada' }).eq('id', input.id);
       return { success: true };
@@ -2970,7 +2970,7 @@ const contasPagarRouter = router({
         try { await db.delete(contasPagar).where(eq(contasPagar.id, input.id)); return { success: true }; }
         catch (err) { console.warn('[contasPagar.excluir] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('contas_pagar').delete().eq('id', input.id);
       return { success: true };
@@ -2979,7 +2979,7 @@ const contasPagarRouter = router({
   resumo: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return { totalPendente: 0, qtdPendente: 0, totalAtrasado: 0, qtdAtrasado: 0, totalPago: 0, qtdPago: 0 };
       const { data: all } = await supabase.from('contas_pagar').select('status, valor');
       const pendentes = (all ?? []).filter((r: any) => r.status === 'pendente');
@@ -3019,7 +3019,7 @@ const vendasRouter = router({
       try { return db.select().from(produtos).where(eq(produtos.ativo, true)).orderBy(desc(produtos.createdAt)); }
       catch (err) { console.warn('[vendas.listarProdutos] Drizzle failed:', (err as Error).message); resetDb(); }
     }
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data } = await supabase.from('produtos').select('*').eq('ativo', true).order('createdAt', { ascending: false });
     return data ?? [];
@@ -3035,7 +3035,7 @@ const vendasRouter = router({
           return { success: true, id: result[0].id };
         } catch (err) { console.warn('[vendas.criarProduto] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data, error } = await supabase.from('produtos').insert({ nome: input.nome, descricao: input.descricao ?? null, preco: input.preco, estoque: input.estoque }).select('id').single();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -3050,7 +3050,7 @@ const vendasRouter = router({
         try { await db.update(produtos).set({ estoque: input.estoque }).where(eq(produtos.id, input.id)); return { success: true }; }
         catch (err) { console.warn('[vendas.atualizarEstoque] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('produtos').update({ estoque: input.estoque }).eq('id', input.id);
       return { success: true };
@@ -3064,7 +3064,7 @@ const vendasRouter = router({
         try { await db.update(produtos).set({ ativo: false }).where(eq(produtos.id, input.id)); return { success: true }; }
         catch (err) { console.warn('[vendas.desativarProduto] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('produtos').update({ ativo: false }).eq('id', input.id);
       return { success: true };
@@ -3098,7 +3098,7 @@ const chequesRouter = router({
           });
         } catch (err) { console.warn('[cheques.listar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       let q = supabase.from('cheques').select('*, clientes(nome)').order('createdAt', { ascending: false });
       if (input?.status && input.status !== 'todos') q = q.eq('status', input.status);
@@ -3164,7 +3164,7 @@ const chequesRouter = router({
           return { success: true, id: result[0].id, valorLiquido, valorDesconto };
         } catch (err) { console.warn('[cheques.criar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data: chqData, error: chqErr } = await supabase.from('cheques').insert({
         cliente_id: input.clienteId, numero_cheque: input.numeroCheque ?? null, banco: input.banco ?? null,
@@ -3195,7 +3195,7 @@ const chequesRouter = router({
           return { success: true };
         } catch (err: any) { if (err.message === 'Cheque não encontrado') throw err; console.warn('[cheques.compensar] Drizzle failed, trying REST:', err.message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data: chqData } = await supabase.from('cheques').select('valor_nominal, emitente, conta_caixa_id').eq('id', input.id).single();
       if (!chqData) throw new Error('Cheque não encontrado');
@@ -3213,7 +3213,7 @@ const chequesRouter = router({
         try { await db.update(cheques).set({ status: 'devolvido', motivoDevolucao: input.motivo }).where(eq(cheques.id, input.id)); return { success: true }; }
         catch (err) { console.warn('[cheques.devolver] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('cheques').update({ status: 'devolvido', motivo_devolucao: input.motivo }).eq('id', input.id);
       return { success: true };
@@ -3227,7 +3227,7 @@ const chequesRouter = router({
         try { await db.update(cheques).set({ status: 'cancelado' }).where(eq(cheques.id, input.id)); return { success: true }; }
         catch (err) { console.warn('[cheques.cancelar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('cheques').update({ status: 'cancelado' }).eq('id', input.id);
       return { success: true };
@@ -3236,7 +3236,7 @@ const chequesRouter = router({
   resumo: protectedProcedure.query(async () => {
     const db = await getDb();
     if (!db) {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return { totalAguardando: 0, qtdAguardando: 0, totalCompensado: 0, qtdCompensado: 0, totalDevolvido: 0, qtdDevolvido: 0 };
       const { data: all } = await supabase.from('cheques').select('status, valor_nominal');
       const ag = (all ?? []).filter((r: any) => r.status === 'aguardando');
@@ -3296,7 +3296,7 @@ const chequesRouter = router({
 // ─── VENDAS DE TELEFONE ─────────────────────────────────────────────────────
 const vendasTelefoneRouter = router({
   listar: protectedProcedure.query(async () => {
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     try {
       const { data, error } = await supabase
@@ -3311,7 +3311,7 @@ const vendasTelefoneRouter = router({
   buscarPorId: protectedProcedure
     .input(z.object({ id: z.number() }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return null;
       try {
         const { data, error } = await supabase
@@ -3327,7 +3327,7 @@ const vendasTelefoneRouter = router({
   parcelas: protectedProcedure
     .input(z.object({ vendaId: z.number() }))
     .query(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       try {
         const { data, error } = await supabase
@@ -3375,7 +3375,7 @@ const vendasTelefoneRouter = router({
       dataPrimeiraParcela: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
       const { data: venda, error } = await supabase
@@ -3472,7 +3472,7 @@ const vendasTelefoneRouter = router({
       valorPago: z.number().positive(),
     }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       // Buscar dados da parcela para obter informações da venda
       const { data: parcela } = await supabase
@@ -3542,7 +3542,7 @@ const vendasTelefoneRouter = router({
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      const supabase = getSupabaseClient();
+      const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
       const { error } = await supabase
@@ -3555,7 +3555,7 @@ const vendasTelefoneRouter = router({
     }),
 
   kpis: protectedProcedure.query(async () => {
-    const supabase = getSupabaseClient();
+    const supabase = await getSupabaseClientAsync();
     if (!supabase) return { totalVendas: 0, capitalInvestido: 0, totalAReceber: 0, lucroBruto: 0, vendasAtivas: 0, vendasQuitadas: 0 };
     const { data } = await supabase.from('vendas_telefone').select('status, custo, total_a_receber, lucro_bruto, entrada_valor');
     const all = data ?? [];
@@ -3573,7 +3573,7 @@ const vendasTelefoneRouter = router({
 // ─── ETIQUETAS ROUTER ───────────────────────────────────────────────────────
 const etiquetasRouter = router({
   listar: protectedProcedure.query(async () => {
-    const sb = getSupabaseClient();
+    const sb = await getSupabaseClientAsync();
     if (!sb) return [];
     const { data } = await sb.from('etiquetas_contratos').select('*').order('nome');
     return (data ?? []) as { id: number; nome: string; cor: string }[];
@@ -3581,7 +3581,7 @@ const etiquetasRouter = router({
   criar: protectedProcedure
     .input(z.object({ nome: z.string().min(1), cor: z.string().default('#6366f1') }))
     .mutation(async ({ input }) => {
-      const sb = getSupabaseClient();
+      const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { data, error } = await sb.from('etiquetas_contratos').insert({ nome: input.nome, cor: input.cor }).select().single();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -3590,7 +3590,7 @@ const etiquetasRouter = router({
   remover: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input }) => {
-      const sb = getSupabaseClient();
+      const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await sb.from('etiquetas_contratos').delete().eq('id', input.id);
       return { success: true };
@@ -3598,7 +3598,7 @@ const etiquetasRouter = router({
   aplicarContrato: protectedProcedure
     .input(z.object({ contratoId: z.number(), etiquetas: z.array(z.string()) }))
     .mutation(async ({ input }) => {
-      const sb = getSupabaseClient();
+      const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const { error } = await sb.from('contratos').update({ etiquetas: JSON.stringify(input.etiquetas) }).eq('id', input.contratoId);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });

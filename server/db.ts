@@ -6,32 +6,98 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
-// Force IPv4 DNS resolution and use public DNS servers to avoid connectivity issues
-// in some hosting environments (e.g., DigitalOcean App Platform ATL1 blocks Supabase DNS)
+// Force IPv4 DNS resolution to avoid IPv6 connectivity issues
 dns.setDefaultResultOrder("ipv4first");
-// Use public DNS servers (Google + Cloudflare) as fallback for better resolution
-try {
-  dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1"]);
-} catch (e) {
-  // Ignore errors - DNS servers may already be set
+
+// ─── Custom fetch using undici with public DNS resolver ───────────────────────
+// Some hosting environments (e.g., DigitalOcean App Platform ATL1) block DNS
+// resolution for *.supabase.co. We use undici with a custom DNS lookup that
+// queries Google/Cloudflare DNS (8.8.8.8, 1.1.1.1) directly.
+let _customFetch: typeof fetch | null = null;
+
+async function getCustomFetch(): Promise<typeof fetch> {
+  if (_customFetch) return _customFetch;
+  
+  try {
+    const { fetch: undiciFetch, Agent } = await import('undici');
+    const dnsResolver = new dns.Resolver();
+    dnsResolver.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1', '1.0.0.1']);
+    
+    // Cache for resolved IPs to avoid repeated DNS lookups
+    const dnsCache = new Map<string, { address: string; expires: number }>();
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agent = new Agent({
+      connect: {
+        lookup: (hostname: string, _options: unknown, callback: (...args: any[]) => void) => {
+          const cached = dnsCache.get(hostname);
+          if (cached && cached.expires > Date.now()) {
+            return callback(null, [{ address: cached.address, family: 4 }]);
+          }
+          dnsResolver.resolve4(hostname, (err, addresses) => {
+            if (err) {
+              // Fallback to system DNS
+              return callback(err);
+            }
+            const address = addresses[0];
+            dnsCache.set(hostname, { address, expires: Date.now() + 60000 }); // Cache for 1 minute
+            callback(null, [{ address, family: 4 }]);
+          });
+        }
+      }
+    });
+    
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    _customFetch = (url: any, init?: any): Promise<Response> => {
+      return undiciFetch(url, { ...init, dispatcher: agent }) as unknown as Promise<Response>;
+    };
+    console.log('[Database] Custom fetch with public DNS resolver initialized');
+  } catch (e) {
+    // Fallback to native fetch if undici is not available
+    console.log('[Database] undici not available, using native fetch');
+    _customFetch = fetch;
+  }
+  
+  return _customFetch!;
 }
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _client: ReturnType<typeof postgres> | null = null;
 let _supabase: SupabaseClient | null = null;
 let _dbInitialized = false;
+let _supabaseInitializing = false;
+let _supabaseInitialized = false;
 
-// Supabase JS client (connects via HTTPS REST - works everywhere, no TCP issues)
-export function getSupabaseClient(): SupabaseClient | null {
+// Supabase JS client (connects via HTTPS REST with custom DNS resolver)
+export async function getSupabaseClientAsync(): Promise<SupabaseClient | null> {
   if (_supabase) return _supabase;
+  if (_supabaseInitialized) return null;
+  if (_supabaseInitializing) {
+    // Wait for initialization
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return _supabase;
+  }
+  
+  _supabaseInitializing = true;
   const url = ENV.supabaseUrl || process.env.SUPABASE_URL;
   const key = ENV.supabaseServiceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
   if (url && key) {
+    const customFetch = await getCustomFetch();
     _supabase = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
+      global: { fetch: customFetch },
     });
-    console.log("[Database] Supabase REST client initialized");
+    console.log("[Database] Supabase REST client initialized with custom DNS fetch");
   }
+  
+  _supabaseInitialized = true;
+  _supabaseInitializing = false;
+  return _supabase;
+}
+
+// Synchronous version for backward compatibility (returns cached client or null)
+export function getSupabaseClient(): SupabaseClient | null {
   return _supabase;
 }
 
@@ -89,113 +155,156 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       const assignNullable = (field: TextField) => {
         const value = user[field];
         if (value === undefined) return;
-        const normalized = value ?? null;
-        values[field] = normalized;
-        updateSet[field] = normalized;
+        values[field] = value;
+        updateSet[field] = value;
       };
       textFields.forEach(assignNullable);
-      if (user.lastSignedIn !== undefined) {
-        values.lastSignedIn = user.lastSignedIn;
-        updateSet.lastSignedIn = user.lastSignedIn;
-      }
       if (user.role !== undefined) {
         values.role = user.role;
         updateSet.role = user.role;
-      } else if (user.openId === ENV.ownerOpenId) {
-        values.role = 'admin';
-        updateSet.role = 'admin';
       }
-      if (!values.lastSignedIn) values.lastSignedIn = new Date();
-      if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
+      updateSet.updatedAt = new Date();
       await db.insert(users).values(values).onConflictDoUpdate({
         target: users.openId,
         set: updateSet,
       });
       return;
-    } catch (error) {
-      console.error("[Database] Drizzle upsert failed, trying REST fallback:", (error as Error).message);
-      resetDb();
+    } catch (err) {
+      console.error('[Database] Drizzle upsertUser failed, trying REST:', (err as Error).message);
     }
   }
 
-  // Fallback: Supabase REST API
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    console.warn("[Database] Cannot upsert user: no database connection available");
-    return;
-  }
-  const updateData: Record<string, unknown> = {
-    openId: user.openId,
-    lastSignedIn: (user.lastSignedIn ?? new Date()).toISOString(),
-  };
-  if (user.name !== undefined) updateData.name = user.name;
-  if (user.email !== undefined) updateData.email = user.email;
-  if (user.loginMethod !== undefined) updateData.loginMethod = user.loginMethod;
-  if (user.role !== undefined) updateData.role = user.role;
-  else if (user.openId === ENV.ownerOpenId) updateData.role = 'admin';
+  // Fallback to Supabase REST
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) throw new Error("No database connection available");
 
-  const { error } = await supabase.from('users').upsert(updateData, { onConflict: 'openId' });
-  if (error) {
-    console.error("[Database] Supabase REST upsert failed:", error);
-    throw new Error(error.message);
-  }
+  const { error } = await supabase.from('users').upsert({
+    openId: user.openId,
+    name: user.name,
+    email: user.email,
+    loginMethod: user.loginMethod,
+    role: user.role,
+    updatedAt: new Date().toISOString(),
+  }, { onConflict: 'openId' });
+
+  if (error) throw new Error(`Supabase upsertUser failed: ${error.message}`);
 }
 
-export async function getUserByOpenId(openId: string) {
+export async function findUserByEmail(email: string) {
+  const db = await getDb();
+
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      return result[0] || null;
+    } catch (err) {
+      console.error('[Auth] Drizzle findUserByEmail failed, trying REST:', (err as Error).message);
+      console.error('[Auth] Full error:', JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    }
+  }
+
+  // Fallback to Supabase REST
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return null;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('email', email)
+    .limit(1);
+
+  console.log(`[Auth] Supabase findUserByEmail - data: ${data ? 'found' : 'null'} error: ${error ? error.message || JSON.stringify(error) : 'none'}`);
+  if (error) return null;
+  return data?.[0] || null;
+}
+
+// Alias for backward compatibility with sdk.ts
+export const getUserByOpenId = findUserByOpenId;
+
+export async function findUserByOpenId(openId: string) {
   const db = await getDb();
 
   if (db) {
     try {
       const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-      return result.length > 0 ? result[0] : undefined;
-    } catch (error) {
-      console.error("[Database] Drizzle select failed, trying REST fallback:", (error as Error).message);
-      resetDb();
+      return result[0] || null;
+    } catch (err) {
+      console.error('[Database] Drizzle findUserByOpenId failed:', (err as Error).message);
     }
   }
 
-  // Fallback: Supabase REST API
-  const supabase = getSupabaseClient();
-  if (!supabase) {
-    console.warn("[Database] Cannot get user: no database connection available");
-    return undefined;
-  }
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return null;
+
   const { data, error } = await supabase
     .from('users')
     .select('*')
     .eq('openId', openId)
-    .limit(1)
-    .maybeSingle();
-  if (error || !data) return undefined;
-  return {
-    id: data.id,
-    openId: data.openId ?? openId,
-    name: data.name ?? null,
-    email: data.email ?? null,
-    passwordHash: data.passwordHash ?? null,
-    loginMethod: data.loginMethod ?? null,
-    role: data.role ?? 'user',
-    lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn) : null,
-    createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-    updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
-  } as typeof users.$inferSelect;
+    .limit(1);
+
+  if (error) return null;
+  return data?.[0] || null;
 }
 
-// TODO: add feature queries here as your schema grows.
+export async function updateUserLastSignedIn(openId: string): Promise<void> {
+  const db = await getDb();
 
-/**
- * Retorna o koletor_id vinculado ao user_id informado.
- * Retorna null se o usuário não tiver um koletor vinculado (admin ou sem vínculo).
- */
-export async function getKoletorIdForUser(userId: number): Promise<number | null> {
-  const supabase = getSupabaseClient();
+  if (db) {
+    try {
+      await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.openId, openId));
+      return;
+    } catch (err) {
+      console.error('[Database] Drizzle updateUserLastSignedIn failed:', (err as Error).message);
+    }
+  }
+
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return;
+
+  await supabase.from('users').update({ lastSignedIn: new Date().toISOString() }).eq('openId', openId);
+}
+
+export async function findUserById(id: number) {
+  const db = await getDb();
+
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      return result[0] || null;
+    } catch (err) {
+      console.error('[Database] Drizzle findUserById failed:', (err as Error).message);
+    }
+  }
+
+  const supabase = await getSupabaseClientAsync();
   if (!supabase) return null;
-  const { data } = await supabase
-    .from('koletores')
-    .select('id')
-    .eq('user_id', userId)
-    .eq('ativo', true)
-    .limit(1)
-    .maybeSingle();
-  return data?.id ?? null;
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', id)
+    .limit(1);
+
+  if (error) return null;
+  return data?.[0] || null;
+}
+
+export async function getUserCount(): Promise<number> {
+  const db = await getDb();
+
+  if (db) {
+    try {
+      const result = await db.select({ count: sql<number>`count(*)` }).from(users);
+      return Number(result[0]?.count || 0);
+    } catch (err) {
+      console.error('[Database] Drizzle getUserCount failed:', (err as Error).message);
+    }
+  }
+
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return 0;
+
+  const { count, error } = await supabase.from('users').select('*', { count: 'exact', head: true });
+  if (error) return 0;
+  return count || 0;
 }
