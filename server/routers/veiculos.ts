@@ -3,7 +3,7 @@ import { z } from "zod";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
 import { veiculos, parcelasVeiculo } from "../../drizzle/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 
 export const veiculosRouter = router({
   criar: protectedProcedure
@@ -18,21 +18,21 @@ export const veiculosRouter = router({
       chassi: z.string().optional(),
       observacoes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
       
-      const result = await db.insert(veiculos).values(input).returning();
+      const result = await db.insert(veiculos).values({ ...input, userId: ctx.user.id }).returning();
       return result[0];
     }),
 
   listar: protectedProcedure
     .input(z.object({ clienteId: z.number().optional() }).optional())
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) return [];
       
-      const allVeiculos = await db.select().from(veiculos).orderBy(desc(veiculos.createdAt));
+      const allVeiculos = await db.select().from(veiculos).where(eq(veiculos.userId, ctx.user.id)).orderBy(desc(veiculos.createdAt));
       
       if (input?.clienteId) {
         return allVeiculos.filter(v => v.clienteId === input.clienteId);
@@ -43,7 +43,7 @@ export const veiculosRouter = router({
 
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
       
@@ -51,7 +51,7 @@ export const veiculosRouter = router({
       await db.delete(parcelasVeiculo).where(eq(parcelasVeiculo.veiculoId, input.id));
       
       // Deletar veículo
-      await db.delete(veiculos).where(eq(veiculos.id, input.id));
+      await db.delete(veiculos).where(and(eq(veiculos.id, input.id), eq(veiculos.userId, ctx.user.id)));
       
       return { success: true };
     }),

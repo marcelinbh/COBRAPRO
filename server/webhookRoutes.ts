@@ -117,7 +117,7 @@ async function processWebhookEvent(payload: Record<string, unknown>) {
         // Salvar estado atual da conexão
         await sb.from("configuracoes").upsert(
           { chave: "evolution_connection_state", valor: state || "unknown" },
-          { onConflict: "chave" }
+          { onConflict: "chave,user_id" }
         ).then(({ error }: { error: unknown }) => {
           if (error) console.warn("[Webhook Evolution] Erro ao salvar estado:", error);
         });

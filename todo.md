@@ -576,3 +576,9 @@
 - [x] Criar página /instalar com abas por dispositivo (iPhone/iPad, Android, Xiaomi/Redmi, Samsung) estilo CobraFácil com layout CobraPro
 - [x] Registrar rota /relatorio-diario no App.tsx e menu lateral do DashboardLayout
 - [x] Reformular página /whatsapp: remover config Evolution API, manter apenas QR Code + templates de mensagens
+
+## Fase 40: Multi-tenant + Login Fix
+- [x] Corrigir senha do usuário contato@vitalfinanceira.com (passwordHash ausente)
+- [x] Melhorar mensagem de erro no login (mostrar mensagem correta em vez de "Erro de conexão")
+- [x] Implementar isolamento multi-tenant: cada usuário tem userId em todas as tabelas e só vê seus próprios dados
+- [x] Garantir que novos usuários registrados chegam com base limpa (sem dados de outros usuários)

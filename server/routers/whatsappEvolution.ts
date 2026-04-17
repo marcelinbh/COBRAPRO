@@ -60,7 +60,7 @@ export const whatsappEvolutionRouter = router({
       apiKey: z.string().min(1),
       instanceName: z.string().min(1),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       
@@ -71,11 +71,11 @@ export const whatsappEvolutionRouter = router({
       ];
       
       for (const cfg of configs) {
-        const { data: existing } = await sb.from('configuracoes').select('id').eq('chave', cfg.chave).single();
+        const { data: existing } = await sb.from('configuracoes').select('id').eq('chave', cfg.chave).eq('user_id', ctx.user.id).single();
         if (existing) {
-          await sb.from('configuracoes').update({ valor: cfg.valor }).eq('chave', cfg.chave);
+          await sb.from('configuracoes').update({ valor: cfg.valor }).eq('chave', cfg.chave).eq('user_id', ctx.user.id);
         } else {
-          await sb.from('configuracoes').insert(cfg);
+          await sb.from('configuracoes').insert({ ...cfg, user_id: ctx.user.id });
         }
       }
       
@@ -83,13 +83,13 @@ export const whatsappEvolutionRouter = router({
     }),
 
   // Obter configurações salvas
-  getConfig: protectedProcedure.query(async () => {
+  getConfig: protectedProcedure.query(async ({ ctx }) => {
     const sb = await getSupabaseClientAsync();
     if (!sb) return null;
     
     const { data } = await sb.from('configuracoes').select('chave, valor').in('chave', [
       'evolution_url', 'evolution_api_key', 'evolution_instance'
-    ]);
+    ]).eq('user_id', ctx.user.id);
     
     if (!data) return null;
     

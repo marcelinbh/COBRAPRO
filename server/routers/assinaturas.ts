@@ -11,14 +11,15 @@ export const assinaturasRouter = router({
       clienteId: z.number().optional(),
       busca: z.string().optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
       let query = supabase
         .from("assinaturas")
         .select("*, clientes!inner(id, nome, whatsapp, telefone)")
-        .order("createdAt", { ascending: false });
+        .order("createdAt", { ascending: false })
+        .eq("user_id", ctx.user.id);
 
       if (input.status !== "todas") {
         query = query.eq("status", input.status);
@@ -42,13 +43,14 @@ export const assinaturasRouter = router({
     }),
 
   // KPIs do módulo de assinaturas
-  kpis: protectedProcedure.query(async () => {
+  kpis: protectedProcedure.query(async ({ ctx }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
     const { data: todas, error } = await supabase
       .from("assinaturas")
-      .select("id, status, valor_mensal");
+      .select("id, status, valor_mensal")
+      .eq("user_id", ctx.user.id);
 
     if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
 
@@ -79,7 +81,7 @@ export const assinaturasRouter = router({
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
 
@@ -95,6 +97,7 @@ export const assinaturasRouter = router({
           data_inicio: input.dataInicio,
           conta_caixa_id: input.contaCaixaId || null,
           observacoes: input.observacoes || null,
+          user_id: ctx.user.id,
         })
         .select()
         .single();

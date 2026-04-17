@@ -13,19 +13,19 @@ export const perfilRouter = router({
     if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
     // Configurações da empresa
-    const { data: cfgRows } = await sb.from("configuracoes").select("chave, valor");
+    const { data: cfgRows } = await sb.from("configuracoes").select("chave, valor").eq("user_id", ctx.user.id);
     const cfg: Record<string, string> = {};
     (cfgRows ?? []).forEach((r: { chave: string; valor: string }) => { cfg[r.chave] = r.valor ?? ""; });
     const get = (camel: string, snake: string, fallback = "") => cfg[camel] ?? cfg[snake] ?? fallback;
 
     // Estatísticas
-    const { data: clientesData } = await sb.from("clientes").select("id", { count: "exact" });
+    const { data: clientesData } = await sb.from("clientes").select("id", { count: "exact" }).eq("user_id", ctx.user.id);
     const totalClientes = clientesData?.length ?? 0;
 
-    const { data: contratosData } = await sb.from("contratos").select("valor_principal");
+    const { data: contratosData } = await sb.from("contratos").select("valor_principal").eq("user_id", ctx.user.id);
     const totalEmprestado = (contratosData ?? []).reduce((sum: number, c: { valor_principal: string }) => sum + parseFloat(c.valor_principal ?? "0"), 0);
 
-    const { data: parcelasData } = await sb.from("parcelas").select("valor_pago").eq("status", "paga");
+    const { data: parcelasData } = await sb.from("parcelas").select("valor_pago").eq("status", "paga").eq("user_id", ctx.user.id);
     const totalRecebido = (parcelasData ?? []).reduce((sum: number, p: { valor_pago: string | null }) => sum + parseFloat(p.valor_pago ?? "0"), 0);
 
     // Assinatura (armazenada nas configurações)
@@ -82,13 +82,13 @@ export const perfilRouter = router({
       nomeCobranca: z.string().optional(),
       linkPagamento: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
       const entries = Object.entries(input).filter(([, v]) => v !== undefined);
       for (const [chave, valor] of entries) {
-        await sb.from("configuracoes").upsert({ chave, valor: String(valor) }, { onConflict: "chave" });
+        await sb.from("configuracoes").upsert({ chave, valor: String(valor), user_id: ctx.user.id }, { onConflict: "chave,user_id" });
       }
       return { success: true };
     }),
@@ -99,12 +99,12 @@ export const perfilRouter = router({
       pixKey: z.string().min(1),
       tipoPix: z.string().default("cpf"),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      await sb.from("configuracoes").upsert({ chave: "pixKey", valor: input.pixKey }, { onConflict: "chave" });
-      await sb.from("configuracoes").upsert({ chave: "tipoPix", valor: input.tipoPix }, { onConflict: "chave" });
+      await sb.from("configuracoes").upsert({ chave: "pixKey", valor: input.pixKey, user_id: ctx.user.id }, { onConflict: "chave,user_id" });
+      await sb.from("configuracoes").upsert({ chave: "tipoPix", valor: input.tipoPix, user_id: ctx.user.id }, { onConflict: "chave,user_id" });
       return { success: true };
     }),
 
@@ -143,15 +143,15 @@ export const perfilRouter = router({
       const url = publicData.publicUrl;
 
       // Salvar URL nas configurações
-      await sb.from("configuracoes").upsert({ chave: "logoUrl", valor: url }, { onConflict: "chave" });
+      await sb.from("configuracoes").upsert({ chave: "logoUrl", valor: url, user_id: ctx.user.id }, { onConflict: "chave,user_id" });
       return { url };
     }),
 
   // Remover logo
-  removerLogo: protectedProcedure.mutation(async () => {
+  removerLogo: protectedProcedure.mutation(async ({ ctx }) => {
     const sb = await getSupabaseClientAsync();
     if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    await sb.from("configuracoes").upsert({ chave: "logoUrl", valor: "" }, { onConflict: "chave" });
+    await sb.from("configuracoes").upsert({ chave: "logoUrl", valor: "", user_id: ctx.user.id }, { onConflict: "chave,user_id" });
     return { success: true };
   }),
 

@@ -84,6 +84,7 @@ export type InsertKoletor = typeof koletores.$inferInsert;
 // ─── CLIENTES ────────────────────────────────────────────────────────────────
 export const clientes = pgTable("clientes", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   nome: varchar("nome", { length: 255 }).notNull(),
   cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
   telefone: varchar("telefone", { length: 20 }),
@@ -131,6 +132,7 @@ export type InsertCliente = typeof clientes.$inferInsert;
 // ─── CONTAS DE CAIXA ─────────────────────────────────────────────────────────
 export const contasCaixa = pgTable("contas_caixa", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   nome: varchar("nome", { length: 100 }).notNull(),
   tipo: tipoCaixaEnum("tipo").default("caixa").notNull(),
   banco: varchar("banco", { length: 100 }),
@@ -148,6 +150,7 @@ export type InsertContaCaixa = typeof contasCaixa.$inferInsert;
 // ─── CONTRATOS ───────────────────────────────────────────────────────────────
 export const contratos = pgTable("contratos", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   clienteId: integer("cliente_id").notNull(),
   koletorId: integer("koletor_id"),
   modalidade: modalidadeEnum("modalidade").notNull(),
@@ -179,6 +182,7 @@ export type InsertContrato = typeof contratos.$inferInsert;
 // ─── PARCELAS ────────────────────────────────────────────────────────────────
 export const parcelas = pgTable("parcelas", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   contratoId: integer("contrato_id").notNull(),
   clienteId: integer("cliente_id").notNull(),
   koletorId: integer("koletor_id"),
@@ -204,6 +208,7 @@ export type InsertParcela = typeof parcelas.$inferInsert;
 // ─── TRANSAÇÕES DE CAIXA ─────────────────────────────────────────────────────
 export const transacoesCaixa = pgTable("transacoes_caixa", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   contaCaixaId: integer("conta_caixa_id").notNull(),
   tipo: tipoTransacaoEnum("tipo").notNull(),
   categoria: categoriaTransacaoEnum("categoria").notNull(),
@@ -236,6 +241,7 @@ export type InsertMagicLink = typeof magicLinks.$inferInsert;
 // ─── TEMPLATES WHATSAPP ───────────────────────────────────────────────────────
 export const templatesWhatsapp = pgTable("templates_whatsapp", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   nome: varchar("nome", { length: 100 }).notNull(),
   tipo: tipoTemplateEnum("tipo").notNull(),
   mensagem: text("mensagem").notNull(),
@@ -251,7 +257,8 @@ export type InsertTemplateWhatsapp = typeof templatesWhatsapp.$inferInsert;
 // ─── CONFIGURAÇÕES ────────────────────────────────────────────────────────────
 export const configuracoes = pgTable("configuracoes", {
   id: serial("id").primaryKey(),
-  chave: varchar("chave", { length: 100 }).notNull().unique(),
+  userId: integer("user_id"),
+  chave: varchar("chave", { length: 100 }).notNull(),
   valor: text("valor"),
   descricao: text("descricao"),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
@@ -263,6 +270,7 @@ export type InsertConfiguracao = typeof configuracoes.$inferInsert;
 // ─── CONTAS A PAGAR ───────────────────────────────────────────────────────────
 export const contasPagar = pgTable("contas_pagar", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   descricao: varchar("descricao", { length: 255 }).notNull(),
   categoria: categoriaContaPagarEnum("categoria").default("outros").notNull(),
   valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
@@ -284,6 +292,7 @@ export type InsertContaPagar = typeof contasPagar.$inferInsert;
 // ─── PRODUTOS ────────────────────────────────────────────────────────────────
 export const produtos = pgTable("produtos", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   nome: varchar("nome", { length: 255 }).notNull(),
   descricao: text("descricao"),
   preco: decimal("preco", { precision: 15, scale: 2 }).notNull(),
@@ -298,6 +307,7 @@ export type InsertProduto = typeof produtos.$inferInsert;
 // ─── CHEQUES ─────────────────────────────────────────────────────────────────
 export const cheques = pgTable("cheques", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   clienteId: integer("cliente_id").notNull(),
   numeroCheque: varchar("numero_cheque", { length: 50 }),
   banco: varchar("banco", { length: 100 }),
@@ -339,6 +349,7 @@ export type InsertPasswordReset = typeof passwordResets.$inferInsert;
 // ─── VEÍCULOS ─────────────────────────────────────────────────────────────────
 export const veiculos = pgTable("veiculos", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   clienteId: integer("cliente_id").notNull(),
   placa: varchar("placa", { length: 10 }).notNull(),
   marca: varchar("marca", { length: 50 }),
@@ -381,6 +392,7 @@ export const statusVendaTelefoneEnum = pgEnum("status_venda_telefone", [
 
 export const vendas_telefone = pgTable("vendas_telefone", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   // Produto
   marca: varchar("marca", { length: 100 }).notNull(),
   modelo: varchar("modelo", { length: 200 }).notNull(),
@@ -439,6 +451,7 @@ export const statusAssinaturaEnum = pgEnum("status_assinatura", [
 
 export const assinaturas = pgTable("assinaturas", {
   id: serial("id").primaryKey(),
+  userId: integer("user_id"),
   clienteId: integer("cliente_id").notNull(),
   servico: varchar("servico", { length: 200 }).notNull(),
   descricao: text("descricao"),
