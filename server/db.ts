@@ -1,9 +1,14 @@
+import dns from "dns";
 import { eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
+
+// Force IPv4 DNS resolution to avoid IPv6 connectivity issues in some hosting environments
+// (e.g., DigitalOcean App Platform ATL1 blocks IPv6 connections to Supabase)
+dns.setDefaultResultOrder("ipv4first");
 
 let _db: ReturnType<typeof drizzle> | null = null;
 let _client: ReturnType<typeof postgres> | null = null;
