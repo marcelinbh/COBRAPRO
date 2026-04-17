@@ -538,13 +538,13 @@
 - [ ] Procedure perfil.assinatura (plano, validade, dias restantes)
 - [ ] Página MeuPerfil.tsx: informações pessoais
 - [ ] Página MeuPerfil.tsx: estatísticas da conta
-- [ ] Página MeuPerfil.tsx: seção assinatura (plano, válido até, dias restantes, renovar)
-- [ ] Página MeuPerfil.tsx: conexão WhatsApp com QR Code (igual imagem)
-- [ ] Página MeuPerfil.tsx: nome da empresa + upload de logo
-- [ ] Página MeuPerfil.tsx: chave PIX
-- [ ] Página MeuPerfil.tsx: alterar senha
-- [ ] Rota /perfil no App.tsx
-- [ ] Item "Meu Perfil" no topo do menu lateral e bottom nav
+- [x] Página MeuPerfil.tsx: seção assinatura (plano, válido até, dias restantes, renovar)
+- [x] Página MeuPerfil.tsx: conexão WhatsApp com QR Code (igual imagem)
+- [x] Página MeuPerfil.tsx: nome da empresa + upload de logo
+- [x] Página MeuPerfil.tsx: chave PIX
+- [x] Página MeuPerfil.tsx: alterar senha
+- [x] Rota /perfil no App.tsx
+- [x] Item "Meu Perfil" no topo do menu lateral e bottom nav
 
 ## Fase 57: WhatsApp Business API Oficial (Meta)
 - [ ] Substituir Evolution API por WhatsApp Cloud API (Meta)
@@ -582,3 +582,21 @@
 - [x] Melhorar mensagem de erro no login (mostrar mensagem correta em vez de "Erro de conexão")
 - [x] Implementar isolamento multi-tenant: cada usuário tem userId em todas as tabelas e só vê seus próprios dados
 - [x] Garantir que novos usuários registrados chegam com base limpa (sem dados de outros usuários)
+
+## Fase 41: Permissões Granulares + Meu Perfil + Nova Conta
+
+- [x] Criar conta wcemprestimorapido@gmail.com com senha 97556511
+- [x] Permissões granulares: koletores só veem empréstimos que eles cadastraram (filtro koletor_id)
+- [x] Permissões granulares: dashboard oculta KPIs financeiros para koletores
+- [x] Módulo Meu Perfil: procedure perfil.get (estatísticas: clientes, emprestado, recebido)
+- [x] Módulo Meu Perfil: procedure perfil.update (nome, empresa, whatsapp, chave_pix, logo_url)
+- [x] Módulo Meu Perfil: procedure perfil.alterarSenha
+- [x] Módulo Meu Perfil: procedure perfil.assinatura (plano, validade, dias restantes)
+- [x] Página MeuPerfil.tsx: informações pessoais + estatísticas
+- [x] Página MeuPerfil.tsx: seção assinatura (plano, válido até, dias restantes, renovar)
+- [x] Página MeuPerfil.tsx: conexão WhatsApp com QR Code
+- [x] Página MeuPerfil.tsx: nome da empresa + upload de logo
+- [x] Página MeuPerfil.tsx: chave PIX
+- [x] Página MeuPerfil.tsx: alterar senha
+- [x] Rota /perfil no App.tsx
+- [x] Item "Meu Perfil" no topo do menu lateral e bottom nav

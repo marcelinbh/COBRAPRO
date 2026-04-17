@@ -695,12 +695,20 @@ const contratosRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
 
+      // Verificar se o usuário logado é um koletor (filtrar apenas seus contratos)
+      let myKoletorIdForList: number | null = null;
+      try {
+        const { data: koletorMe } = await supabase.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).eq('ativo', true).maybeSingle();
+        if (koletorMe?.perfil === 'koletor') myKoletorIdForList = koletorMe.id;
+      } catch (_) { /* não é koletor */ }
+
       // Buscar contratos
       let cQuery = supabase
         .from('contratos')
         .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas, clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
         .order('createdAt', { ascending: false })
         .eq('user_id', ctx.user.id);
+      if (myKoletorIdForList !== null) cQuery = cQuery.eq('koletor_id', myKoletorIdForList);
 
       if (input?.status && input.status !== 'todos') cQuery = cQuery.eq('status', input.status);
       if (input?.modalidade) cQuery = cQuery.eq('modalidade', input.modalidade);
