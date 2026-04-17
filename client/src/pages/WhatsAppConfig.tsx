@@ -1,353 +1,320 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Smartphone, Wifi, WifiOff, RefreshCw, QrCode, Settings, Trash2, LogOut, CheckCircle2, AlertCircle, Info } from "lucide-react";
+import {
+  Smartphone, Wifi, WifiOff, RefreshCw, QrCode, CheckCircle2,
+  MessageSquare, Edit2, Save, X, AlertCircle, Clock, Info,
+} from "lucide-react";
 
-export default function WhatsAppConfig() {
-  const [url, setUrl] = useState("");
-  const [apiKey, setApiKey] = useState("");
-  const [instanceName, setInstanceName] = useState("cobrapro");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [qrRefreshKey, setQrRefreshKey] = useState(0);
+const TEMPLATE_LABELS: Record<string, { label: string; desc: string; emoji: string }> = {
+  cobranca_geral:        { label: "Cobrança Geral",           desc: "Enviada ao cobrar manualmente um cliente",  emoji: "💰" },
+  cobranca_vencida:      { label: "Parcela Vencida",          desc: "Enviada para parcelas em atraso",           emoji: "🚨" },
+  lembrete_vencimento:   { label: "Lembrete de Vencimento",   desc: "Enviada antes do vencimento da parcela",    emoji: "⏰" },
+  confirmacao_pagamento: { label: "Confirmação de Pagamento", desc: "Enviada ao confirmar um pagamento",         emoji: "✅" },
+  boas_vindas:           { label: "Boas-vindas",              desc: "Enviada ao cadastrar um novo cliente",      emoji: "👋" },
+  pix_transferencia:     { label: "PIX / Transferência",      desc: "Enviada com os dados de pagamento PIX",     emoji: "💳" },
+  personalizado:         { label: "Personalizado",            desc: "Template personalizado para uso manual",    emoji: "✏️" },
+};
 
-  const { data: config, refetch: refetchConfig } = trpc.whatsappEvolution.getConfig.useQuery();
-  const { data: status, refetch: refetchStatus } = trpc.whatsappEvolution.getStatus.useQuery(undefined, {
-    refetchInterval: 5000, // Poll every 5 seconds
-  });
-  const { data: qrData, refetch: refetchQR, isLoading: qrLoading } = trpc.whatsappEvolution.getQRCode.useQuery(undefined, {
-    enabled: !!config?.url && !status?.connected,
-    refetchInterval: status?.connected ? false : 8000, // Refresh QR every 8 seconds if not connected
-  });
+const VARIAVEIS = [
+  ["{CLIENTE}", "Nome do cliente"],
+  ["{VALOR}", "Valor da parcela"],
+  ["{DATA}", "Data de vencimento"],
+  ["{PARCELA}", "Número da parcela"],
+  ["{DIAS_ATRASO}", "Dias em atraso"],
+  ["{DIAS_PARA_VENCER}", "Dias para vencer"],
+  ["{PIX}", "Chave PIX"],
+  ["{LINK}", "Link de pagamento"],
+  ["{ASSINATURA}", "Assinatura"],
+  ["{FECHAMENTO}", "Texto de fechamento"],
+  ["{PROGRESSO}", "Progresso das parcelas"],
+  ["{MULTA}", "Valor da multa"],
+  ["{JUROS}", "Valor dos juros"],
+  ["{TOTAL}", "Total com juros e multa"],
+];
 
-  const saveConfig = trpc.whatsappEvolution.saveConfig.useMutation({
-    onSuccess: () => {
-      toast.success("Configurações salvas com sucesso!");
-      refetchConfig();
-      refetchStatus();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const createInstance = trpc.whatsappEvolution.createInstance.useMutation({
-    onSuccess: () => {
-      toast.success("Instância criada! Aguarde o QR Code...");
-      setTimeout(() => { refetchQR(); refetchStatus(); }, 2000);
-    },
-    onError: (e) => toast.error("Erro ao criar instância: " + e.message),
-  });
-
-  const disconnect = trpc.whatsappEvolution.disconnect.useMutation({
-    onSuccess: () => {
-      toast.success("WhatsApp desconectado");
-      refetchStatus();
-      refetchQR();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const deleteInstance = trpc.whatsappEvolution.deleteInstance.useMutation({
-    onSuccess: () => {
-      toast.success("Instância deletada");
-      refetchStatus();
-    },
-    onError: (e) => toast.error(e.message),
-  });
+function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, connected }: {
+  open: boolean; onClose: () => void; qrCode?: string | null;
+  loading: boolean; onRefresh: () => void; onDisconnect: () => void; connected: boolean;
+}) {
+  const [seconds, setSeconds] = useState(90);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (config) {
-      setUrl(config.url || "");
-      setApiKey(config.apiKey || "");
-      setInstanceName(config.instanceName || "cobrapro");
-    }
-  }, [config]);
-
-  const handleSave = () => {
-    if (!url || !apiKey || !instanceName) {
-      toast.error("Preencha todos os campos");
-      return;
-    }
-    saveConfig.mutate({ url, apiKey, instanceName });
-  };
-
-  const handleRefreshQR = () => {
-    setQrRefreshKey(k => k + 1);
-    refetchQR();
-  };
-
-  const isConnected = status?.connected;
-  const isConfigured = status?.configured;
+    if (!open) return;
+    setSeconds(90);
+    timerRef.current = setInterval(() => {
+      setSeconds((s) => { if (s <= 1) { clearInterval(timerRef.current!); return 0; } return s - 1; });
+    }, 1000);
+    return () => clearInterval(timerRef.current!);
+  }, [open, qrCode]);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-green-500/10">
-          <Smartphone className="w-6 h-6 text-green-500" />
-        </div>
-        <div>
-          <h1 className="text-2xl font-bold">WhatsApp</h1>
-          <p className="text-muted-foreground text-sm">Conecte seu WhatsApp para envio automático de cobranças</p>
-        </div>
-        <div className="ml-auto">
-          {isConnected ? (
-            <Badge className="bg-green-500/10 text-green-500 border-green-500/20 gap-1">
-              <CheckCircle2 className="w-3 h-3" /> Conectado
-            </Badge>
-          ) : isConfigured ? (
-            <Badge variant="destructive" className="gap-1">
-              <WifiOff className="w-3 h-3" /> Desconectado
-            </Badge>
+    <Dialog open={open} onOpenChange={onClose}>
+      <DialogContent className="max-w-sm p-0 overflow-hidden">
+        <DialogHeader className="p-4 pb-0">
+          <div className="flex items-center gap-2">
+            <QrCode className="h-5 w-5 text-primary" />
+            <DialogTitle className="text-base">Conectar WhatsApp</DialogTitle>
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">Conecte seu WhatsApp para enviar mensagens aos clientes</p>
+        </DialogHeader>
+        <div className="p-4 space-y-4">
+          {connected ? (
+            <div className="flex flex-col items-center gap-4 py-4">
+              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
+              </div>
+              <div className="text-center">
+                <p className="font-semibold text-green-600 dark:text-green-400">WhatsApp Conectado!</p>
+                <p className="text-xs text-muted-foreground mt-1">As mensagens serão enviadas automaticamente</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={onDisconnect} className="w-full gap-2 text-red-500 border-red-500/30 hover:bg-red-500/10">
+                <WifiOff className="h-4 w-4" /> Desconectar WhatsApp
+              </Button>
+            </div>
           ) : (
-            <Badge variant="secondary" className="gap-1">
-              <AlertCircle className="w-3 h-3" /> Não configurado
-            </Badge>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Configurações */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Settings className="w-4 h-4" />
-              Configurações da Evolution API
-            </CardTitle>
-            <CardDescription>
-              Configure sua instância da Evolution API para envio automático de mensagens
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>URL da Evolution API</Label>
-              <Input
-                placeholder="https://sua-evolution-api.com"
-                value={url}
-                onChange={e => setUrl(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Ex: https://evolution.seudominio.com</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label>API Key</Label>
-              <div className="relative">
-                <Input
-                  type={showApiKey ? "text" : "password"}
-                  placeholder="sua-api-key-aqui"
-                  value={apiKey}
-                  onChange={e => setApiKey(e.target.value)}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {showApiKey ? "Ocultar" : "Mostrar"}
-                </button>
+            <>
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-1.5 text-primary">
+                  <Clock className="h-3.5 w-3.5" /><span>{seconds}s restantes</span>
+                </div>
+                <span className="text-muted-foreground">Escaneie com calma</span>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Nome da Instância</Label>
-              <Input
-                placeholder="cobrapro"
-                value={instanceName}
-                onChange={e => setInstanceName(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Identificador único da sua instância</p>
-            </div>
-
-            <Button
-              onClick={handleSave}
-              disabled={saveConfig.isPending}
-              className="w-full"
-            >
-              {saveConfig.isPending ? "Salvando..." : "Salvar Configurações"}
-            </Button>
-
-            {isConfigured && (
-              <>
-                <Separator />
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => createInstance.mutate()}
-                    disabled={createInstance.isPending}
-                    className="flex-1"
-                  >
-                    <QrCode className="w-4 h-4 mr-1" />
-                    {createInstance.isPending ? "Criando..." : "Criar Instância"}
-                  </Button>
-                  {isConnected && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => disconnect.mutate()}
-                      disabled={disconnect.isPending}
-                      className="flex-1 text-orange-500 border-orange-500/30"
-                    >
-                      <LogOut className="w-4 h-4 mr-1" />
-                      Desconectar
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => deleteInstance.mutate()}
-                    disabled={deleteInstance.isPending}
-                    className="text-red-500 border-red-500/30"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* QR Code / Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <QrCode className="w-4 h-4" />
-              {isConnected ? "Status da Conexão" : "Conectar WhatsApp"}
-            </CardTitle>
-            <CardDescription>
-              {isConnected
-                ? "Seu WhatsApp está conectado e pronto para enviar mensagens"
-                : "Escaneie o QR Code com seu WhatsApp para conectar"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isConnected ? (
-              <div className="flex flex-col items-center gap-4 py-6">
-                <div className="w-20 h-20 rounded-full bg-green-500/10 flex items-center justify-center">
-                  <CheckCircle2 className="w-10 h-10 text-green-500" />
-                </div>
-                <div className="text-center">
-                  <p className="font-semibold text-green-500">WhatsApp Conectado!</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Instância: <span className="font-mono">{status?.instanceName}</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    As cobranças serão enviadas automaticamente via WhatsApp
-                  </p>
-                </div>
-                <div className="flex gap-2 w-full">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => refetchStatus()}
-                    className="flex-1"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-1" />
-                    Verificar Status
-                  </Button>
-                </div>
+              <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 rounded-full transition-all duration-1000" style={{ width: `${(seconds / 90) * 100}%` }} />
               </div>
-            ) : !isConfigured ? (
-              <div className="flex flex-col items-center gap-4 py-6 text-center">
-                <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
-                  <Smartphone className="w-10 h-10 text-muted-foreground" />
-                </div>
-                <p className="text-muted-foreground text-sm">
-                  Configure a Evolution API ao lado para conectar seu WhatsApp
+              <div className="flex justify-center">
+                {loading ? (
+                  <div className="w-48 h-48 bg-muted rounded-xl flex items-center justify-center">
+                    <RefreshCw className="h-8 w-8 text-muted-foreground animate-spin" />
+                  </div>
+                ) : qrCode ? (
+                  <div className="p-3 bg-white rounded-xl shadow-sm">
+                    <img src={qrCode.startsWith("data:") ? qrCode : `data:image/png;base64,${qrCode}`} alt="QR Code" className="w-48 h-48" />
+                  </div>
+                ) : (
+                  <div className="w-48 h-48 bg-muted rounded-xl flex flex-col items-center justify-center gap-2">
+                    <QrCode className="h-10 w-10 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground text-center px-4">Gerando QR Code...</p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <AlertCircle className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  <strong>Importante:</strong> Feche outras sessões do WhatsApp Web antes de escanear.
                 </p>
               </div>
-            ) : qrLoading ? (
-              <div className="flex flex-col items-center gap-4 py-6">
-                <div className="w-48 h-48 bg-muted rounded-lg flex items-center justify-center">
-                  <RefreshCw className="w-8 h-8 text-muted-foreground animate-spin" />
+              {[
+                ["📱", "1. Abra o WhatsApp", "No seu celular"],
+                ["🔗", "2. Aparelhos conectados", "Menu ⋮ → Aparelhos conectados"],
+                ["🔑", "3. Conectar um aparelho", "Toque em \"Conectar um aparelho\""],
+              ].map(([icon, title, desc], i) => (
+                <div key={i} className="flex items-start gap-3 p-2.5 rounded-lg bg-muted/40">
+                  <span className="text-base">{icon}</span>
+                  <div><p className="text-xs font-semibold">{title}</p><p className="text-xs text-muted-foreground">{desc}</p></div>
                 </div>
-                <p className="text-sm text-muted-foreground">Carregando QR Code...</p>
-              </div>
-            ) : qrData?.qrcode ? (
-              <div className="flex flex-col items-center gap-4">
-                <div className="p-2 bg-white rounded-lg">
-                  <img
-                    src={qrData.qrcode.startsWith('data:') ? qrData.qrcode : `data:image/png;base64,${qrData.qrcode}`}
-                    alt="QR Code WhatsApp"
-                    className="w-48 h-48"
-                  />
+              ))}
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Aguardando conexão...
                 </div>
-                <div className="text-center space-y-1">
-                  <p className="text-sm font-medium">Escaneie com seu WhatsApp</p>
-                  <p className="text-xs text-muted-foreground">
-                    Abra o WhatsApp → Dispositivos Conectados → Conectar Dispositivo
-                  </p>
-                </div>
-                <Button variant="outline" size="sm" onClick={handleRefreshQR} className="w-full">
-                  <RefreshCw className="w-4 h-4 mr-1" />
-                  Atualizar QR Code
+                <Button variant="ghost" size="sm" onClick={onRefresh} className="gap-1.5 text-xs h-8">
+                  <RefreshCw className="h-3.5 w-3.5" /> Atualizar QR Code
                 </Button>
               </div>
-            ) : (
-              <div className="flex flex-col items-center gap-4 py-6">
-                <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center">
-                  <WifiOff className="w-10 h-10 text-muted-foreground" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium">Instância desconectada</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Clique em "Criar Instância" para gerar o QR Code
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  onClick={() => createInstance.mutate()}
-                  disabled={createInstance.isPending}
-                  className="w-full"
-                >
-                  <QrCode className="w-4 h-4 mr-1" />
-                  {createInstance.isPending ? "Criando..." : "Gerar QR Code"}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
-      {/* Instruções */}
-      <Card className="border-blue-500/20 bg-blue-500/5">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-base text-blue-400">
-            <Info className="w-4 h-4" />
-            Como configurar a Evolution API
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-3">
-          <p>A <strong className="text-foreground">Evolution API</strong> é uma solução open source gratuita para integração com WhatsApp. Para usar:</p>
-          <ol className="list-decimal list-inside space-y-2 ml-2">
-            <li>Instale a Evolution API em um servidor (VPS, Railway, Render, etc.)</li>
-            <li>Anote a URL e a API Key gerada durante a instalação</li>
-            <li>Preencha as configurações ao lado e clique em <strong className="text-foreground">Salvar</strong></li>
-            <li>Clique em <strong className="text-foreground">Criar Instância</strong> para gerar o QR Code</li>
-            <li>Escaneie o QR Code com seu WhatsApp</li>
-            <li>Pronto! As cobranças serão enviadas automaticamente</li>
-          </ol>
-          <div className="mt-3 p-3 bg-muted rounded-lg">
-            <p className="text-xs font-medium text-foreground mb-1">Links úteis:</p>
-            <div className="flex flex-wrap gap-2">
-              <a href="https://github.com/EvolutionAPI/evolution-api" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">
-                → GitHub Evolution API
-              </a>
-              <a href="https://railway.com/deploy/evolution-api-4" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">
-                → Deploy no Railway (grátis)
-              </a>
-              <a href="https://doc.evolution-api.com" target="_blank" rel="noopener noreferrer" className="text-xs text-blue-400 hover:underline">
-                → Documentação oficial
-              </a>
+function TemplateCard({ template, onSave }: { template: any; onSave: (id: number, mensagem: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [mensagem, setMensagem] = useState(template.mensagem);
+  const info = TEMPLATE_LABELS[template.tipo] ?? { label: template.nome, desc: "", emoji: "💬" };
+  return (
+    <Card className="border-border">
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{info.emoji}</span>
+            <div>
+              <CardTitle className="text-sm font-semibold">{info.label}</CardTitle>
+              <CardDescription className="text-xs mt-0.5">{info.desc}</CardDescription>
             </div>
           </div>
+          {!editing && (
+            <Button size="sm" variant="ghost" onClick={() => setEditing(true)} className="h-8 w-8 p-0 shrink-0">
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0 space-y-3">
+        {editing ? (
+          <>
+            <Textarea value={mensagem} onChange={(e) => setMensagem(e.target.value)} className="min-h-[140px] text-xs font-mono resize-none" />
+            <div className="flex gap-2">
+              <Button size="sm" onClick={() => { onSave(template.id, mensagem); setEditing(false); }} className="gap-1.5 flex-1">
+                <Save className="h-3.5 w-3.5" /> Salvar
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => { setMensagem(template.mensagem); setEditing(false); }} className="gap-1.5">
+                <X className="h-3.5 w-3.5" /> Cancelar
+              </Button>
+            </div>
+          </>
+        ) : (
+          <div className="p-3 rounded-lg bg-muted/40 border border-border">
+            <pre className="text-xs text-muted-foreground whitespace-pre-wrap font-sans leading-relaxed">{template.mensagem}</pre>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+export default function WhatsAppConfig() {
+  const [qrModalOpen, setQrModalOpen] = useState(false);
+  const { data: status, refetch: refetchStatus } = trpc.whatsappEvolution.getStatus.useQuery(undefined, { refetchInterval: 5000 });
+  const { data: qrData, refetch: refetchQR, isLoading: qrLoading } = trpc.whatsappEvolution.getQRCode.useQuery(undefined, {
+    enabled: qrModalOpen && !status?.connected,
+    refetchInterval: qrModalOpen && !status?.connected ? 25000 : false,
+  });
+  const { data: templates, refetch: refetchTemplates } = trpc.configuracoes.templates.useQuery();
+  const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
+    onSuccess: () => { setTimeout(() => { refetchQR(); refetchStatus(); }, 1500); },
+    onError: (e) => toast.error("Erro ao conectar: " + e.message),
+  });
+  const disconnect = trpc.whatsappEvolution.disconnect.useMutation({
+    onSuccess: () => { toast.success("WhatsApp desconectado"); refetchStatus(); setQrModalOpen(false); },
+    onError: (e) => toast.error(e.message),
+  });
+  const updateTemplate = trpc.configuracoes.updateTemplate.useMutation({
+    onSuccess: () => { toast.success("Template salvo!"); refetchTemplates(); },
+    onError: (e) => toast.error("Erro ao salvar: " + e.message),
+  });
+  const connected = status?.connected ?? false;
+  const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) connectWpp.mutate(); };
+  const handleRefreshQR = () => { connectWpp.mutate(); setTimeout(() => refetchQR(), 1500); };
+
+  return (
+    <div className="space-y-6 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-green-500/10 flex items-center justify-center">
+            <Smartphone className="h-5 w-5 text-green-500" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold">WhatsApp</h1>
+            <p className="text-sm text-muted-foreground">Conecte seu WhatsApp para envio automático de cobranças</p>
+          </div>
+        </div>
+        <Badge variant="outline" className={connected ? "border-green-500/40 text-green-600 dark:text-green-400 bg-green-500/10" : "border-muted-foreground/30 text-muted-foreground"}>
+          {connected ? <><Wifi className="h-3 w-3 mr-1" />Conectado</> : <><WifiOff className="h-3 w-3 mr-1" />Não Conectado</>}
+        </Badge>
+      </div>
+
+      <Card className="border-border">
+        <CardContent className="p-6">
+          {connected ? (
+            <div className="flex flex-col items-center gap-4 py-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center">
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-lg text-green-600 dark:text-green-400">WhatsApp Conectado!</p>
+                <p className="text-sm text-muted-foreground mt-1">As cobranças serão enviadas automaticamente via WhatsApp</p>
+              </div>
+              <div className="flex gap-3 w-full max-w-xs">
+                <Button variant="outline" size="sm" onClick={() => refetchStatus()} className="flex-1 gap-2">
+                  <RefreshCw className="h-4 w-4" /> Verificar Status
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => disconnect.mutate()} disabled={disconnect.isPending} className="flex-1 gap-2 text-red-500 border-red-500/30 hover:bg-red-500/10">
+                  <WifiOff className="h-4 w-4" /> Desconectar
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-5 py-4 text-center">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                <QrCode className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="font-semibold text-base">Conecte seu WhatsApp</p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+                  Escaneie um QR Code para conectar seu WhatsApp e enviar mensagens diretamente aos seus clientes.
+                </p>
+              </div>
+              <Button onClick={handleAbrirQRModal} disabled={connectWpp.isPending} className="gap-2 px-8">
+                <QrCode className="h-4 w-4" />
+                {connectWpp.isPending ? "Gerando QR Code..." : "Conectar WhatsApp"}
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Com o WhatsApp conectado, você poderá enviar notificações de cobrança e comprovantes diretamente para os telefones dos seus clientes.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <MessageSquare className="h-5 w-5 text-primary" />
+          <h2 className="text-base font-semibold">Templates de Mensagens</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Personalize as mensagens enviadas automaticamente para seus clientes. Use as variáveis disponíveis para tornar as mensagens dinâmicas.
+        </p>
+        <Card className="border-border mb-4">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">Variáveis disponíveis</span>
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {VARIAVEIS.map(([v, desc]) => (
+                <div key={v} className="flex items-center gap-2 text-xs">
+                  <code className="px-1.5 py-0.5 rounded bg-primary/10 text-primary font-mono text-xs">{v}</code>
+                  <span className="text-muted-foreground">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        {templates && templates.length > 0 ? (
+          <div className="space-y-4">
+            {templates.map((template: any) => (
+              <TemplateCard key={template.id} template={template} onSave={(id, msg) => updateTemplate.mutate({ id, mensagem: msg })} />
+            ))}
+          </div>
+        ) : (
+          <Card className="border-border">
+            <CardContent className="p-8 text-center">
+              <MessageSquare className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground">Nenhum template encontrado. Os templates serão criados automaticamente.</p>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <QRCodeModal
+        open={qrModalOpen}
+        onClose={() => setQrModalOpen(false)}
+        qrCode={qrData?.qrcode}
+        loading={qrLoading || connectWpp.isPending}
+        onRefresh={handleRefreshQR}
+        onDisconnect={() => disconnect.mutate()}
+        connected={connected}
+      />
     </div>
   );
 }

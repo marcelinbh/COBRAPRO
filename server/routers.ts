@@ -6,6 +6,7 @@ import { assinaturasRouter } from "./routers/assinaturas";
 import { backupRouter } from "./routers/backup";
 import { whatsappEvolutionRouter } from "./routers/whatsappEvolution";
 import { perfilRouter } from "./routers/perfil";
+import { relatorioDiarioRouter } from "./routers/relatorioDiario";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
@@ -3653,6 +3654,7 @@ export const appRouter = router({
   backup: backupRouter,
   whatsappEvolution: whatsappEvolutionRouter,
   perfil: perfilRouter,
+  relatorioDiario: relatorioDiarioRouter,
 });
 
 export type AppRouter = typeof appRouter;

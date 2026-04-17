@@ -561,3 +561,18 @@
 - [x] Testar QR Code: instância "cobrapro" gerando QR Code corretamente
 - [x] Filtro de cobrador na página de Empréstimos (Select por cobrador)
 - [x] Testes: 40 testes passando (incluindo novos testes de Evolution API e filtro)
+
+## Fase 38: Webhook Evolution API
+- [ ] Endpoint POST /api/webhook/evolution no servidor CobraPro
+- [ ] Salvar eventos de mensagem no banco (tabela whatsapp_eventos)
+- [ ] Configurar webhook na instância Evolution API via API REST
+- [ ] Testes do endpoint de webhook
+
+## Fase 39: QR Code Modal + Logo Supabase + Relatórios Diários
+
+- [x] Reformular modal de QR Code com timer 90s, instruções passo-a-passo e botão Conectar WhatsApp
+- [x] Corrigir upload de logo usando Supabase Storage (bucket público)
+- [x] Implementar relatórios diários de parcelas a vencer e vencidas via WhatsApp (formato CobraFácil)
+- [x] Criar página /instalar com abas por dispositivo (iPhone/iPad, Android, Xiaomi/Redmi, Samsung) estilo CobraFácil com layout CobraPro
+- [x] Registrar rota /relatorio-diario no App.tsx e menu lateral do DashboardLayout
+- [x] Reformular página /whatsapp: remover config Evolution API, manter apenas QR Code + templates de mensagens

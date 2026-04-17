@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -65,13 +65,46 @@ export default function MeuPerfil() {
   }, [perfil]);
 
   // WhatsApp
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrTimer, setQrTimer] = useState(90);
+  const qrTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const { data: whatsappStatus, refetch: refetchWpp } = trpc.whatsappEvolution.getStatus.useQuery(undefined, {
-    refetchInterval: 5000,
+    refetchInterval: showQRModal ? 3000 : 10000,
   });
   const { data: qrData, refetch: refetchQR, isLoading: qrLoading } = trpc.whatsappEvolution.getQRCode.useQuery(undefined, {
-    enabled: !whatsappStatus?.connected,
-    refetchInterval: whatsappStatus?.connected ? false : 8000,
+    enabled: showQRModal && !whatsappStatus?.connected,
+    refetchInterval: showQRModal && !whatsappStatus?.connected ? 20000 : false,
   });
+
+  // Fechar modal automaticamente ao conectar
+  useEffect(() => {
+    if (whatsappStatus?.connected && showQRModal) {
+      setShowQRModal(false);
+      if (qrTimerRef.current) clearInterval(qrTimerRef.current);
+      toast.success("WhatsApp conectado com sucesso!");
+    }
+  }, [whatsappStatus?.connected, showQRModal]);
+
+  // Timer de 90s para o QR Code
+  useEffect(() => {
+    if (showQRModal) {
+      setQrTimer(90);
+      qrTimerRef.current = setInterval(() => {
+        setQrTimer(prev => {
+          if (prev <= 1) {
+            // Renovar QR Code automaticamente
+            refetchQR();
+            return 90;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      if (qrTimerRef.current) clearInterval(qrTimerRef.current);
+    }
+    return () => { if (qrTimerRef.current) clearInterval(qrTimerRef.current); };
+  }, [showQRModal]);
 
   // Mutations
   const updatePerfil = trpc.perfil.update.useMutation({
@@ -104,9 +137,15 @@ export default function MeuPerfil() {
   });
 
   const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
-    onSuccess: () => { toast.success("Instância criada! Aguarde o QR Code..."); setTimeout(() => { refetchQR(); refetchWpp(); }, 2000); },
+    onSuccess: () => { setTimeout(() => { refetchQR(); refetchWpp(); }, 2000); },
     onError: (e) => toast.error("Erro: " + e.message),
   });
+
+  const handleAbrirQRModal = useCallback(() => {
+    setShowQRModal(true);
+    connectWpp.mutate();
+    setTimeout(() => { refetchQR(); refetchWpp(); }, 2000);
+  }, [connectWpp, refetchQR, refetchWpp]);
 
   const disconnectWpp = trpc.whatsappEvolution.disconnect.useMutation({
     onSuccess: () => { toast.success("WhatsApp desconectado"); refetchWpp(); refetchQR(); },
@@ -575,51 +614,42 @@ export default function MeuPerfil() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* QR Code ou placeholder */}
-              <div className="flex flex-col items-center gap-4 py-4">
-                {qrLoading ? (
-                  <div className="h-48 w-48 flex items-center justify-center bg-muted rounded-lg">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-                  </div>
-                ) : qrData?.qrcode ? (
-                  <div className="p-2 bg-white rounded-lg shadow-md">
-                    <img src={qrData.qrcode} alt="QR Code WhatsApp" className="h-48 w-48 object-contain" />
-                  </div>
-                ) : (
-                  <div className="h-24 w-24 flex items-center justify-center text-muted-foreground/30">
-                    <QrCode className="h-full w-full" />
-                  </div>
-                )}
+              {/* Estado desconectado — ícone + texto + botão */}
+              <div className="flex flex-col items-center gap-4 py-6">
+                <div className="h-16 w-16 flex items-center justify-center text-muted-foreground/30">
+                  <QrCode className="h-full w-full" />
+                </div>
                 <div className="text-center">
                   <p className="font-semibold text-foreground">Conecte seu WhatsApp</p>
                   <p className="text-sm text-muted-foreground max-w-sm">
                     Escaneie um QR Code para conectar seu WhatsApp e enviar mensagens diretamente aos seus clientes.
                   </p>
                 </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row gap-2">
                 <Button
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  onClick={() => connectWpp.mutate()}
+                  className="bg-green-600 hover:bg-green-700 text-white px-8"
+                  onClick={handleAbrirQRModal}
                   disabled={connectWpp.isPending}
                 >
                   <QrCode className="h-4 w-4 mr-2" />
-                  Conectar WhatsApp
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => { refetchQR(); refetchWpp(); }}
-                >
-                  <RefreshCw className="h-4 w-4 mr-2" />
-                  Tentar Reconectar
+                  {connectWpp.isPending ? "Aguardando..." : "Conectar WhatsApp"}
                 </Button>
               </div>
+
+              {/* Aguardando leitura */}
+              {connectWpp.isPending && (
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-blue-400">Aguardando leitura do QR Code...</p>
+                    <p className="text-xs text-muted-foreground">Escaneie o QR Code no WhatsApp do seu celular para conectar.</p>
+                  </div>
+                </div>
+              )}
 
               <Button
                 variant="outline"
                 className="border-orange-500/30 text-orange-500 hover:bg-orange-500/10 w-full sm:w-auto"
-                onClick={() => { refetchQR(); }}
+                onClick={handleAbrirQRModal}
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Reiniciar e Gerar Novo QR
@@ -632,6 +662,107 @@ export default function MeuPerfil() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal QR Code */}
+      <Dialog open={showQRModal} onOpenChange={(open) => { if (!open) setShowQRModal(false); }}>
+        <DialogContent className="max-w-sm bg-[#0d1117] border-[#1e2a1e] text-white p-0 overflow-hidden">
+          <DialogHeader className="px-5 pt-5 pb-3">
+            <div className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5 text-green-400" />
+              <DialogTitle className="text-white text-base">Conectar WhatsApp</DialogTitle>
+            </div>
+            <p className="text-xs text-gray-400 mt-1">Conecte seu WhatsApp para enviar mensagens aos clientes</p>
+          </DialogHeader>
+
+          <div className="px-5 pb-2">
+            {/* Timer */}
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2 text-green-400">
+                <div className="h-3 w-3 rounded-full border-2 border-green-400 border-t-transparent animate-spin" />
+                <span className="text-sm font-medium">{qrTimer}s restantes</span>
+              </div>
+              <span className="text-xs text-gray-400">Escaneie com calma</span>
+            </div>
+            {/* Barra de progresso */}
+            <div className="w-full h-1.5 bg-[#1e2a1e] rounded-full mb-4">
+              <div
+                className="h-full bg-green-500 rounded-full transition-all duration-1000"
+                style={{ width: `${(qrTimer / 90) * 100}%` }}
+              />
+            </div>
+
+            {/* QR Code */}
+            <div className="flex justify-center mb-4">
+              {qrLoading || connectWpp.isPending ? (
+                <div className="h-52 w-52 flex flex-col items-center justify-center bg-white rounded-xl gap-3">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+                  <span className="text-xs text-gray-500">Gerando QR Code...</span>
+                </div>
+              ) : qrData?.qrcode ? (
+                <div className="p-3 bg-white rounded-xl shadow-lg">
+                  <img src={qrData.qrcode} alt="QR Code WhatsApp" className="h-48 w-48 object-contain" />
+                </div>
+              ) : (
+                <div className="h-52 w-52 flex flex-col items-center justify-center bg-white rounded-xl gap-3">
+                  <QrCode className="h-16 w-16 text-gray-300" />
+                  <span className="text-xs text-gray-400">Aguardando QR Code...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Aviso */}
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20 mb-4">
+              <AlertCircle className="h-4 w-4 text-orange-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-orange-300">
+                <strong>Importante:</strong> Se você tiver outras sessões do WhatsApp Web ativas, feche-as primeiro para evitar desconexões.
+              </p>
+            </div>
+
+            {/* Instruções */}
+            <div className="space-y-2 mb-4">
+              {[
+                { icon: Smartphone, step: "1. Abra o WhatsApp", sub: "No seu celular" },
+                { icon: Link, step: "2. Aparelhos conectados", sub: "Menu ⋮ → Aparelhos conectados" },
+                { icon: QrCode, step: "3. Conectar com número de telefone", sub: 'Toque em "Conectar um aparelho" e depois em "Conectar com número de telefone"' },
+              ].map(({ icon: Icon, step, sub }) => (
+                <div key={step} className="flex items-start gap-3 p-2.5 rounded-lg bg-[#1a2420]">
+                  <div className="h-7 w-7 rounded-md bg-green-500/20 flex items-center justify-center shrink-0">
+                    <Icon className="h-3.5 w-3.5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-white">{step}</p>
+                    <p className="text-xs text-gray-400">{sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Botão aguardando / atualizar */}
+            <Button
+              className="w-full bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/30"
+              variant="outline"
+              onClick={() => { refetchQR(); setQrTimer(90); }}
+              disabled={qrLoading}
+            >
+              {qrLoading ? (
+                <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-400 mr-2" /> Aguardando conexão...</>
+              ) : (
+                <><RefreshCw className="h-4 w-4 mr-2" /> Atualizar QR Code</>
+              )}
+            </Button>
+          </div>
+
+          <div className="px-5 pb-5 pt-1">
+            <Button
+              variant="ghost"
+              className="w-full text-gray-500 hover:text-gray-300 text-xs"
+              onClick={() => setShowQRModal(false)}
+            >
+              <X className="h-3 w-3 mr-1" /> Fechar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Alterar Senha */}
       <Card>

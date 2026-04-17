@@ -2,7 +2,6 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
-import { storagePut } from "../storage";
 import bcrypt from "bcryptjs";
 
 // ─── PERFIL ROUTER ────────────────────────────────────────────────────────────
@@ -122,10 +121,26 @@ export const perfilRouter = router({
       // Converter base64 para buffer
       const base64Data = input.base64.replace(/^data:[^;]+;base64,/, "");
       const buffer = Buffer.from(base64Data, "base64");
-      const ext = input.mimeType.split("/")[1] ?? "png";
-      const fileKey = `logos/${ctx.user.id}-logo-${Date.now()}.${ext}`;
+      const ext = input.mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
+      const fileKey = `${ctx.user.id}-logo-${Date.now()}.${ext}`;
 
-      const { url } = await storagePut(fileKey, buffer, input.mimeType);
+      // Upload para Supabase Storage (bucket 'logos' público)
+      const sbAdmin = await getSupabaseClientAsync();
+      if (!sbAdmin) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storage unavailable" });
+
+      const { error: uploadError } = await sbAdmin.storage
+        .from("logos")
+        .upload(fileKey, buffer, {
+          contentType: input.mimeType,
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao fazer upload: ${uploadError.message}` });
+      }
+
+      const { data: publicData } = sbAdmin.storage.from("logos").getPublicUrl(fileKey);
+      const url = publicData.publicUrl;
 
       // Salvar URL nas configurações
       await sb.from("configuracoes").upsert({ chave: "logoUrl", valor: url }, { onConflict: "chave" });
