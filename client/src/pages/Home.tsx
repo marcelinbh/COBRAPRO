@@ -239,7 +239,7 @@ export default function Home() {
               { icon: <TrendingUp className="w-6 h-6" />, title: "Painel de Controle", desc: "Visão completa em tempo real: saldo, capital em circulação, inadimplência e vencimentos do dia.", color: "red" },
               { icon: <Zap className="w-6 h-6" />, title: "Juros Automáticos", desc: "Simples ou composto. Cálculo automático de multas e juros por atraso, sem precisar calcular na mão.", color: "green" },
               { icon: <Users className="w-6 h-6" />, title: "Gestão de Clientes", desc: "Cadastro completo com CPF, PIX, score de crédito interno e histórico unificado de contratos.", color: "red" },
-              { icon: <Shield className="w-6 h-6" />, title: "Múltiplas Modalidades", desc: "Empréstimos padrão, diários, Tabela Price, venda de produtos e desconto de cheques.", color: "green" },
+              { icon: <Shield className="w-6 h-6" />, title: "Múltiplas Modalidades", desc: "Empréstimos padrão, diários, Parcela Fixa, venda de produtos e desconto de cheques.", color: "green" },
               { icon: <Star className="w-6 h-6" />, title: "Cobrança via WhatsApp", desc: "Envie cobranças com templates dinâmicos: nome, valor, data e chave PIX automáticos.", color: "red" },
               { icon: <CheckCircle2 className="w-6 h-6" />, title: "Relatórios Completos", desc: "Fluxo de caixa, inadimplência, performance por cobrador e fechamento diário em PDF.", color: "green" },
             ].map((f) => (

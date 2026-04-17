@@ -48,6 +48,7 @@ import {
   MessageCircle,
   User,
   ClipboardList,
+  Bell,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -81,6 +82,7 @@ const menuItems = [
   { icon: Tv2, label: "Assinaturas", path: "/assinaturas" },
   { icon: MessageCircle, label: "WhatsApp QR", path: "/whatsapp" },
   { icon: ClipboardList, label: "Relatório Diário", path: "/relatorio-diario" },
+  { icon: Bell, label: "Mensagens Auto", path: "/notificacoes-automaticas" },
   { icon: User, label: "Meu Perfil", path: "/perfil" },
   { icon: Smartphone, label: "Instalar App", path: "/install" },
 ];

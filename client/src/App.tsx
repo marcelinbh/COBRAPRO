@@ -40,6 +40,7 @@ import Assinaturas from "./pages/Assinaturas";
 import WhatsAppConfig from "./pages/WhatsAppConfig";
 import MeuPerfil from "./pages/MeuPerfil";
 import RelatorioDiario from "./pages/RelatorioDiario";
+import NotificacoesAutomaticas from "./pages/NotificacoesAutomaticas";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -70,6 +71,7 @@ const AssinaturasPage = () => <DashboardLayout><Assinaturas /></DashboardLayout>
 const WhatsAppConfigPage = () => <DashboardLayout><WhatsAppConfig /></DashboardLayout>;
 const MeuPerfilPage = () => <DashboardLayout><MeuPerfil /></DashboardLayout>;
 const RelatorioDiarioPage = () => <DashboardLayout><RelatorioDiario /></DashboardLayout>;
+const NotificacoesAutomaticasPage = () => <NotificacoesAutomaticas />;
 
 function Router() {
   return (
@@ -113,6 +115,7 @@ function Router() {
       <Route path="/whatsapp" component={WhatsAppConfigPage} />
       <Route path="/perfil" component={MeuPerfilPage} />
       <Route path="/relatorio-diario" component={RelatorioDiarioPage} />
+      <Route path="/notificacoes-automaticas" component={NotificacoesAutomaticasPage} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

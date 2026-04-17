@@ -49,10 +49,10 @@ function KPICard({
 
   return (
     <Card className={`border ${variantStyles[variant]} transition-all hover:border-opacity-60`}>
-      <CardContent className="p-5">
-        <div className="flex items-start justify-between mb-3">
-          <div className={`p-2 rounded-lg ${iconStyles[variant]}`}>
-            <Icon className="h-4 w-4" />
+      <CardContent className="p-3 sm:p-5">
+        <div className="flex items-start justify-between mb-1.5">
+          <div className={`p-1.5 rounded-lg ${iconStyles[variant]}`}>
+            <Icon className="h-3.5 w-3.5" />
           </div>
           {trend && (
             <div className={`flex items-center gap-1 text-xs ${trend.value >= 0 ? 'text-success' : 'text-primary'}`}>
@@ -61,9 +61,9 @@ function KPICard({
             </div>
           )}
         </div>
-        <div className={`font-display text-2xl mb-1 ${valueStyles[variant]}`}>{value}</div>
-        <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{title}</div>
-        {subtitle && <div className="text-xs text-muted-foreground mt-1">{subtitle}</div>}
+        <div className={`font-display text-sm sm:text-2xl mb-0.5 leading-tight ${valueStyles[variant]}`}>{value}</div>
+        <div className="text-[9px] sm:text-xs text-muted-foreground font-medium uppercase tracking-wide leading-tight">{title}</div>
+        {subtitle && <div className="text-[9px] sm:text-xs text-muted-foreground mt-0.5 truncate">{subtitle}</div>}
       </CardContent>
     </Card>
   );
@@ -115,28 +115,34 @@ export default function Dashboard() {
     : '0';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="font-display text-3xl text-foreground tracking-wide">DASHBOARD</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="font-display text-xl sm:text-3xl text-foreground tracking-wide">DASHBOARD</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 hidden sm:block">
             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
+          <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
+            {new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+          </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 shrink-0">
           <Button
             variant="outline"
+            size="sm"
             onClick={() => relatorioDiarioMutation.mutate({})}
             disabled={relatorioDiarioMutation.isPending}
-            className="gap-2 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10"
+            className="gap-1.5 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 text-xs px-2.5"
           >
-            <Send className="h-4 w-4" />
-            {relatorioDiarioMutation.isPending ? 'Gerando...' : 'Relatório Diário'}
+            <Send className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">{relatorioDiarioMutation.isPending ? 'Gerando...' : 'Relatório Diário'}</span>
+            <span className="sm:hidden">{relatorioDiarioMutation.isPending ? '...' : 'Relatório'}</span>
           </Button>
-          <Button onClick={() => setLocation('/contratos/novo')} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Novo Contrato
+          <Button size="sm" onClick={() => setLocation('/contratos/novo')} className="gap-1.5 text-xs px-2.5">
+            <Plus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Novo Contrato</span>
+            <span className="sm:hidden">Novo</span>
           </Button>
         </div>
       </div>
@@ -150,7 +156,7 @@ export default function Dashboard() {
       )}
 
       {/* KPI Cards — ocultos para koletores */}
-      {!isKoletor && <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+      {!isKoletor && <div className="grid grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
         <KPICard
           title="Saldo em Contas"
           value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)}

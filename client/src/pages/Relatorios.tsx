@@ -15,7 +15,7 @@ const CORES = ['#ef4444', '#22c55e', '#f59e0b', '#3b82f6', '#8b5cf6', '#ec4899']
 const MODALIDADE_LABELS: Record<string, string> = {
   'emprestimo_padrao': 'Empréstimo Padrão',
   'emprestimo_diario': 'Empréstimo Diário',
-  'tabela_price': 'Tabela Price',
+  'tabela_price': 'Parcela Fixa',
   'venda_produto': 'Venda de Produto',
   'desconto_cheque': 'Desconto de Cheque',
   'reparcelamento': 'Reparcelamento',

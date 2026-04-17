@@ -600,3 +600,21 @@
 - [x] Página MeuPerfil.tsx: alterar senha
 - [x] Rota /perfil no App.tsx
 - [x] Item "Meu Perfil" no topo do menu lateral e bottom nav
+
+## Fase 42: Notificações Automáticas WhatsApp Configuráveis
+
+- [ ] Criar tabela notificacoes_automaticas no banco (user_id, tipo, ativo, mensagem_template, dias_antes)
+- [ ] Migration SQL: criar tabela notificacoes_automaticas
+- [ ] Procedure notificacoes.listar: listar regras do usuário
+- [ ] Procedure notificacoes.salvar: criar/atualizar regra (mensagem + ativo/inativo)
+- [ ] Procedure notificacoes.toggle: ligar/desligar regra individualmente
+- [ ] Procedure notificacoes.disparar: buscar parcelas do dia e enviar WhatsApp
+- [ ] Job cron diário (08h) que chama notificacoes.disparar para todos os usuários com WhatsApp conectado
+- [ ] Registrar histórico de envios (tabela notificacoes_log)
+- [ ] Variáveis suportadas: {nome}, {valor}, {data_vencimento}, {dias_atraso}, {empresa}
+- [ ] Página NotificacoesAuto.tsx: lista de regras com toggle on/off por regra
+- [ ] Página NotificacoesAuto.tsx: editor de mensagem com preview de variáveis
+- [ ] Página NotificacoesAuto.tsx: botão "Testar Envio" (envia para o próprio WhatsApp)
+- [ ] Página NotificacoesAuto.tsx: histórico de envios recentes
+- [ ] Rota /notificacoes-auto no App.tsx
+- [ ] Item "Notificações Auto" no menu lateral

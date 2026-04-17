@@ -137,7 +137,7 @@ export default function Contratos() {
             <SelectItem value="todas">Todas as modalidades</SelectItem>
             <SelectItem value="emprestimo_padrao">Empréstimo Padrão</SelectItem>
             <SelectItem value="emprestimo_diario">Empréstimo Diário</SelectItem>
-            <SelectItem value="tabela_price">Tabela Price</SelectItem>
+            <SelectItem value="tabela_price">Parcela Fixa</SelectItem>
             <SelectItem value="venda_produto">Venda de Produto</SelectItem>
             <SelectItem value="desconto_cheque">Desconto de Cheque</SelectItem>
           </SelectContent>

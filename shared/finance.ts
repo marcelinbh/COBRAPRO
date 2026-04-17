@@ -107,7 +107,7 @@ export const MODALIDADE_LABELS: Record<string, string> = {
   diario: 'Empréstimo Diário',
   semanal: 'Empréstimo Semanal',
   quinzenal: 'Empréstimo Quinzenal',
-  tabela_price: 'Tabela Price',
+  tabela_price: 'Parcela Fixa',
   venda: 'Venda de Produto',
   cheque: 'Desconto de Cheque',
   reparcelamento: 'Reparcelamento',

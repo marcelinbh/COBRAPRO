@@ -1084,7 +1084,7 @@ export default function Emprestimos() {
         {[
           { id: 'emprestimos', label: 'Empréstimos', count: emprestimos?.length ?? 0 },
           { id: 'diario', label: 'Diário', count: 0 },
-          { id: 'price', label: 'Tabela Price', count: 0 },
+          { id: 'price', label: 'Parcela Fixa', count: 0 },
           { id: 'recebimentos', label: 'Recebimentos', count: recebimentosData?.total ?? 0 },
         ].map(aba => (
           <button
@@ -1378,7 +1378,7 @@ export default function Emprestimos() {
       {/* Abas placeholder */}
       {(abaSelecionada === 'diario' || abaSelecionada === 'price') && (
         <div className="p-8 text-center text-muted-foreground">
-          Em breve: {abaSelecionada === 'diario' ? 'Empréstimos Diários' : 'Tabela Price'}
+          Em breve: {abaSelecionada === 'diario' ? 'Empréstimos Diários' : 'Parcela Fixa'}
         </div>
       )}
 

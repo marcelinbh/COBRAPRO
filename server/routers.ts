@@ -7,6 +7,7 @@ import { backupRouter } from "./routers/backup";
 import { whatsappEvolutionRouter } from "./routers/whatsappEvolution";
 import { perfilRouter } from "./routers/perfil";
 import { relatorioDiarioRouter } from "./routers/relatorioDiario";
+import { notificacoesRouter } from "./routers/notificacoes";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
@@ -1336,7 +1337,7 @@ const contratosRouter = router({
       const modalidadeLabel: Record<string, string> = {
         emprestimo_padrao: 'Empréstimo Padrão',
         emprestimo_diario: 'Empréstimo Diário',
-        tabela_price: 'Tabela Price',
+        tabela_price: 'Parcela Fixa',
         venda_produto: 'Venda de Produto',
         desconto_cheque: 'Desconto de Cheque',
         reparcelamento: 'Reparcelamento',
@@ -3688,6 +3689,7 @@ export const appRouter = router({
   whatsappEvolution: whatsappEvolutionRouter,
   perfil: perfilRouter,
   relatorioDiario: relatorioDiarioRouter,
+  notificacoes: notificacoesRouter,
 });
 
 export type AppRouter = typeof appRouter;

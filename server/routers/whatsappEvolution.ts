@@ -3,14 +3,14 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
 
-// ─── EVOLUTION API HELPER ─────────────────────────────────────────────────────
-async function getEvolutionConfig(): Promise<{ url: string; apiKey: string; instanceName: string } | null> {
+// ─── EVOLUTION API HELPER (com user_id) ──────────────────────────────────────
+async function getEvolutionConfig(userId: number): Promise<{ url: string; apiKey: string; instanceName: string } | null> {
   const sb = await getSupabaseClientAsync();
   if (!sb) return null;
   
-  const { data } = await sb.from('configuracoes').select('chave, valor').in('chave', [
-    'evolution_url', 'evolution_api_key', 'evolution_instance'
-  ]);
+  const { data } = await sb.from('configuracoes').select('chave, valor')
+    .in('chave', ['evolution_url', 'evolution_api_key', 'evolution_instance'])
+    .eq('user_id', userId);
   
   if (!data || data.length < 3) return null;
   
@@ -104,8 +104,8 @@ export const whatsappEvolutionRouter = router({
   }),
 
   // Criar instância na Evolution API
-  createInstance: protectedProcedure.mutation(async () => {
-    const config = await getEvolutionConfig();
+  createInstance: protectedProcedure.mutation(async ({ ctx }) => {
+    const config = await getEvolutionConfig(ctx.user.id);
     if (!config) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Configurações da Evolution API não encontradas' });
     
     const result = await evolutionRequest(config, 'POST', '/instance/create', {
@@ -118,8 +118,8 @@ export const whatsappEvolutionRouter = router({
   }),
 
   // Obter QR Code da instância
-  getQRCode: protectedProcedure.query(async () => {
-    const config = await getEvolutionConfig();
+  getQRCode: protectedProcedure.query(async ({ ctx }) => {
+    const config = await getEvolutionConfig(ctx.user.id);
     if (!config) return { connected: false, qrcode: null, error: 'Configurações não encontradas' };
     
     try {
@@ -145,8 +145,8 @@ export const whatsappEvolutionRouter = router({
   }),
 
   // Verificar status da conexão
-  getStatus: protectedProcedure.query(async () => {
-    const config = await getEvolutionConfig();
+  getStatus: protectedProcedure.query(async ({ ctx }) => {
+    const config = await getEvolutionConfig(ctx.user.id);
     if (!config) return { connected: false, configured: false };
     
     try {
@@ -163,8 +163,8 @@ export const whatsappEvolutionRouter = router({
   }),
 
   // Desconectar instância
-  disconnect: protectedProcedure.mutation(async () => {
-    const config = await getEvolutionConfig();
+  disconnect: protectedProcedure.mutation(async ({ ctx }) => {
+    const config = await getEvolutionConfig(ctx.user.id);
     if (!config) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Configurações não encontradas' });
     
     const result = await evolutionRequest(config, 'DELETE', '/instance/logout/{instance}');
@@ -172,8 +172,8 @@ export const whatsappEvolutionRouter = router({
   }),
 
   // Deletar instância
-  deleteInstance: protectedProcedure.mutation(async () => {
-    const config = await getEvolutionConfig();
+  deleteInstance: protectedProcedure.mutation(async ({ ctx }) => {
+    const config = await getEvolutionConfig(ctx.user.id);
     if (!config) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Configurações não encontradas' });
     
     const result = await evolutionRequest(config, 'DELETE', '/instance/delete/{instance}');
@@ -186,8 +186,8 @@ export const whatsappEvolutionRouter = router({
       phone: z.string(),
       message: z.string(),
     }))
-    .mutation(async ({ input }) => {
-      const config = await getEvolutionConfig();
+    .mutation(async ({ ctx, input }) => {
+      const config = await getEvolutionConfig(ctx.user.id);
       if (!config) throw new TRPCError({ code: 'BAD_REQUEST', message: 'WhatsApp não configurado' });
       
       // Format phone number: remove non-digits, add 55 if needed
@@ -210,8 +210,8 @@ export const whatsappEvolutionRouter = router({
   // Verificar se um número está no WhatsApp
   checkNumber: protectedProcedure
     .input(z.object({ phone: z.string() }))
-    .query(async ({ input }) => {
-      const config = await getEvolutionConfig();
+    .query(async ({ ctx, input }) => {
+      const config = await getEvolutionConfig(ctx.user.id);
       if (!config) return { exists: false };
       
       let phone = input.phone.replace(/\D/g, '');

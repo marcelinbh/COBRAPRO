@@ -34,7 +34,7 @@ interface ResultadoSimulacao {
 const MODALIDADE_LABELS: Record<Modalidade, string> = {
   emprestimo_padrao: "Juros Simples",
   emprestimo_diario: "Diário",
-  tabela_price: "Tabela Price",
+  tabela_price: "Parcela Fixa",
   desconto_cheque: "Desconto de Cheque",
 };
 
@@ -324,7 +324,7 @@ export default function Simulador() {
                   <SelectContent>
                     <SelectItem value="emprestimo_padrao">Empréstimo Padrão (Juros Simples)</SelectItem>
                     <SelectItem value="emprestimo_diario">Empréstimo Diário</SelectItem>
-                    <SelectItem value="tabela_price">Tabela Price (Juros Compostos)</SelectItem>
+                    <SelectItem value="tabela_price">Parcela Fixa / Price</SelectItem>
                     <SelectItem value="desconto_cheque">Desconto de Cheque</SelectItem>
                   </SelectContent>
                 </Select>
@@ -334,7 +334,7 @@ export default function Simulador() {
             {modoComparacao && (
               <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400">
                 <GitCompare className="h-3.5 w-3.5 inline mr-1.5" />
-                Modo comparação ativo — calculará Juros Simples, Tabela Price e Diário simultaneamente.
+                Modo comparação ativo — calculará Juros Simples, Parcela Fixa e Diário simultaneamente.
               </div>
             )}
 
@@ -634,7 +634,7 @@ export default function Simulador() {
               <p className="text-muted-foreground text-xs">Cobrança diária. Taxa aplicada por dia. Ideal para prazos curtos de 15 a 60 dias.</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
-              <Badge variant="outline" className="mb-2 text-xs">Tabela Price</Badge>
+              <Badge variant="outline" className="mb-2 text-xs">Parcela Fixa</Badge>
               <p className="text-muted-foreground text-xs">Juros compostos (SAC). Parcelas iguais com amortização crescente e juros decrescentes.</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
