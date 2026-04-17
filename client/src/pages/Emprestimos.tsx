@@ -1047,25 +1047,33 @@ export default function Emprestimos() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-3xl font-bold">Empréstimos</h1>
-          <p className="text-sm text-muted-foreground">Gerencie seus empréstimos</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">Empréstimos</h1>
+          <p className="text-sm text-muted-foreground hidden sm:block">Gerencie seus empréstimos</p>
         </div>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="gap-1">
+          <Button size="sm" variant="outline" className="gap-1 hidden sm:flex">
             <Eye className="h-4 w-4" />
             Tutorial
           </Button>
-          <Button size="sm" variant="outline" className="gap-1">
+          <Button size="sm" variant="outline" className="gap-1 hidden sm:flex">
             <FileText className="h-4 w-4" />
             Baixar Relatório
+          </Button>
+          <Button
+            size="sm"
+            onClick={() => setLocation('/contratos/novo')}
+            className="gap-1 bg-emerald-600 hover:bg-emerald-700 sm:hidden"
+          >
+            <Plus className="h-4 w-4" />
+            Novo
           </Button>
         </div>
       </div>
 
       {/* Abas */}
-      <div className="flex gap-4 border-b border-border">
+      <div className="flex gap-1 sm:gap-4 border-b border-border overflow-x-auto">
         {[
           { id: 'emprestimos', label: 'Empréstimos', count: emprestimos?.length ?? 0 },
           { id: 'diario', label: 'Diário', count: 0 },

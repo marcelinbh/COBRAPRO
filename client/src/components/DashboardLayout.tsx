@@ -53,6 +53,7 @@ import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { trpc } from "@/lib/trpc";
+import { BottomNav } from "./BottomNav";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -95,6 +96,7 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -113,6 +115,24 @@ export default function DashboardLayout({
     return <DashboardLayoutSkeleton />;
   }
 
+  // Mobile: layout sem sidebar, com bottom nav
+  if (isMobile) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <MobileHeader />
+        <main
+          className="flex-1 overflow-y-auto"
+          style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}
+        >
+          <div className="p-4">
+            {children}
+          </div>
+        </main>
+        <BottomNav />
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider
       style={
@@ -125,6 +145,27 @@ export default function DashboardLayout({
         {children}
       </DashboardLayoutContent>
     </SidebarProvider>
+  );
+}
+
+function MobileHeader() {
+  const [location] = useLocation();
+  const activeItem = menuItems.find(item => item.path === location);
+
+  return (
+    <header
+      className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border flex items-center justify-between px-4 h-14"
+      style={{ paddingTop: "env(safe-area-inset-top)" }}
+    >
+      <img
+        src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
+        alt="CobraPro"
+        className="h-8 w-auto object-contain"
+      />
+      <span className="text-sm font-medium text-muted-foreground">
+        {activeItem?.label ?? "CobraPro"}
+      </span>
+    </header>
   );
 }
 
@@ -153,15 +194,13 @@ function DashboardLayoutContent({
   // Filtrar menu para cobradores
   const filteredMenuItems = menuItems.filter(item => {
     if (myPerfil === 'koletor') {
-      // Cobradores só veem: Dashboard, Clientes, Empréstimos, Parcelas, Calendário, WhatsApp QR, Configurações
       const allowedPaths = ['/dashboard', '/clientes', '/emprestimos', '/parcelas', '/calendario', '/whatsapp', '/configuracoes'];
       return allowedPaths.includes(item.path);
     }
-    return true; // Admins e gerentes veem tudo
+    return true;
   });
   
   const activeMenuItem = filteredMenuItems.find(item => item.path === location);
-  const isMobile = useIsMobile();
 
   useEffect(() => {
     if (isCollapsed) {
@@ -299,19 +338,6 @@ function DashboardLayoutContent({
       </div>
 
       <SidebarInset>
-        {isMobile && (
-          <div className="flex border-b border-border h-14 items-center justify-between bg-background/95 px-3 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
-              <div className="flex items-center gap-2">
-                <SidebarTrigger className="h-9 w-9 rounded-lg" />
-                <img
-                  src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
-                  alt="CobraPro"
-                  className="h-8 w-auto object-contain"
-                />
-              </div>
-            <span className="text-sm text-muted-foreground">{activeMenuItem?.label ?? ""}</span>
-          </div>
-        )}
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </SidebarInset>
     </>
