@@ -186,12 +186,12 @@ export const assinaturasRouter = router({
         const servico = (assinatura as any)?.servico || "Assinatura";
 
         await supabase.from("transacoes_caixa").insert({
-          conta_id: input.contaCaixaId,
+          conta_caixa_id: input.contaCaixaId,
           tipo: "entrada",
           categoria: "outros",
           descricao: `Assinatura ${servico} - ${clienteNome} (${input.mesReferencia})`,
           valor: input.valorPago.toFixed(2),
-          data_transacao: new Date().toISOString(),
+          data_transacao: new Date().toISOString().split("T")[0],
         });
       }
 

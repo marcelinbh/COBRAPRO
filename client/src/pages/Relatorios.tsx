@@ -36,11 +36,17 @@ export default function Relatorios() {
   const { data: contasPagarData } = trpc.contasPagar.listar.useQuery({ status: 'paga' });
 
   // Filtrar parcelas por período e modalidade
+  // Para parcelas pagas: filtrar por data_pagamento (quando foi pago)
+  // Para parcelas pendentes/atrasadas: filtrar por data_vencimento (quando vence)
   const parcelasPeriodo = (parcelas ?? []).filter(p => {
-    const d = new Date(p.dataVencimento).toISOString().split('T')[0];
-    const dentroDoperiodo = d >= dataInicio && d <= dataFim;
     const modalidadeOk = filtroModalidade === 'todas' || p.modalidade === filtroModalidade;
-    return dentroDoperiodo && modalidadeOk;
+    if (!modalidadeOk) return false;
+    if (p.status === 'paga' && p.dataPagamento) {
+      const d = new Date(p.dataPagamento).toISOString().split('T')[0];
+      return d >= dataInicio && d <= dataFim;
+    }
+    const d = new Date(p.dataVencimento).toISOString().split('T')[0];
+    return d >= dataInicio && d <= dataFim;
   });
 
   const totalPeriodo = parcelasPeriodo.reduce((sum, p) => sum + parseFloat(p.valorOriginal), 0);

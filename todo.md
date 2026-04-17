@@ -488,3 +488,16 @@
 - [x] Envio automático via Evolution API nas cobranças (procedure sendMessage disponível)
 - [x] Saídas (Contas a Pagar) no Relatório Operacional — integradas no cálculo de Saídas do período
 - [ ] Melhorias no Comprovante PDF (logo da empresa)
+
+## Fase 54: Correção de Bugs e Testes Práticos (Abril 2026)
+- [x] BUG-04: Relatórios KPIs zerados — filtro de parcelas pagas corrigido para usar data_pagamento
+- [x] BUG-05: Caixa contas duplicadas — contas duplicadas sem transações removidas do banco
+- [x] BUG-06: Parcelas sem nome de cliente — cliente_id preenchido nas parcelas dos contratos 2,3,4,10
+- [x] BUG-07: Configurações em branco — mapeamento camelCase/snake_case corrigido no get
+- [x] BUG-ASS: assinaturas.ts usa conta_id errado — corrigido para conta_caixa_id
+- [x] Tabelas assinaturas e pagamentos_assinatura criadas no Supabase (executado via SQL Editor)
+- [x] Teste prático Clientes: Cliente Teste Automatico criado (id=10)
+- [x] Teste prático Contratos: Contrato teste criado (id=18) com 3 parcelas (83,84,85)
+- [x] Teste prático Cobranças: Pagamento da parcela 83 registrado + transação no caixa (id=11)
+- [x] Teste prático Contas a Pagar: Conta a pagar teste criada (id=2)
+- [x] Teste prático Assinaturas: Assinatura teste criada (id=2) + pagamento registrado (id=2)

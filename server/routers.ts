@@ -1147,6 +1147,17 @@ const contratosRouter = router({
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
 
       const totalContratoRest = parseFloat((valorParcela * input.numeroParcelas).toFixed(2));
+      // Calcular data_vencimento = data da ultima parcela
+      const _primeiraDataRest = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
+      const _ultimaDataRest = new Date(_primeiraDataRest);
+      if (input.numeroParcelas > 1) {
+        const _n = input.numeroParcelas - 1;
+        if (input.tipoTaxa === 'diaria') _ultimaDataRest.setDate(_ultimaDataRest.getDate() + _n);
+        else if (input.tipoTaxa === 'semanal') _ultimaDataRest.setDate(_ultimaDataRest.getDate() + _n * 7);
+        else if (input.tipoTaxa === 'quinzenal') _ultimaDataRest.setDate(_ultimaDataRest.getDate() + _n * 15);
+        else _ultimaDataRest.setMonth(_ultimaDataRest.getMonth() + _n);
+      }
+      const _dataVencFinal = _ultimaDataRest.toISOString().split('T')[0];
       const { data: contratoData, error: contratoErr } = await supabase
         .from('contratos')
         .insert({
@@ -1163,6 +1174,7 @@ const contratosRouter = router({
           juros_mora_diario: parseFloat(input.jurosMoraDiario.toFixed(4)),
           data_inicio: input.dataInicio,
           data_vencimento_primeira: input.dataVencimentoPrimeira,
+          data_vencimento: _dataVencFinal,
           dia_vencimento: input.diaVencimento ?? null,
           descricao: input.descricao ?? null,
           observacoes: input.observacoes ?? null,
@@ -2480,24 +2492,26 @@ const configuracoesRouter = router({
     }
     const map: Record<string, string> = {};
     for (const r of rows) map[r.chave] = r.valor ?? '';
+    // Helper: busca chave camelCase ou snake_case equivalente
+    const get = (camel: string, snake: string, fallback = '') => map[camel] ?? map[snake] ?? fallback;
     return {
-      nomeEmpresa: map['nomeEmpresa'] ?? '',
-      cnpjEmpresa: map['cnpjEmpresa'] ?? '',
-      telefoneEmpresa: map['telefoneEmpresa'] ?? '',
-      enderecoEmpresa: map['enderecoEmpresa'] ?? '',
-      assinaturaWhatsapp: map['assinaturaWhatsapp'] ?? '',
-      fechamentoWhatsapp: map['fechamentoWhatsapp'] ?? '',
-      multaPadrao: parseFloat(map['multaPadrao'] ?? '2'),
-      jurosMoraDiario: parseFloat(map['jurosMoraDiario'] ?? '0.033'),
-      diasLembrete: parseInt(map['diasLembrete'] ?? '3'),
-      multaDiaria: parseFloat(map['multaDiaria'] ?? '100'),
-      pixKey: map['pixKey'] ?? '',
-      nomeCobranca: map['nomeCobranca'] ?? '',
-      linkPagamento: map['linkPagamento'] ?? '',
-      logoUrl: map['logoUrl'] ?? '',
-      templateAtraso: map['templateAtraso'] ?? '',
-      templateVenceHoje: map['templateVenceHoje'] ?? '',
-      templateAntecipada: map['templateAntecipada'] ?? '',
+      nomeEmpresa: get('nomeEmpresa', 'nome_empresa'),
+      cnpjEmpresa: get('cnpjEmpresa', 'cnpj_empresa'),
+      telefoneEmpresa: get('telefoneEmpresa', 'telefone_empresa'),
+      enderecoEmpresa: get('enderecoEmpresa', 'endereco_empresa'),
+      assinaturaWhatsapp: get('assinaturaWhatsapp', 'assinatura_whatsapp'),
+      fechamentoWhatsapp: get('fechamentoWhatsapp', 'fechamento_whatsapp'),
+      multaPadrao: parseFloat(get('multaPadrao', 'multa_padrao', '2')),
+      jurosMoraDiario: parseFloat(get('jurosMoraDiario', 'juros_mora_diario', '0.033')),
+      diasLembrete: parseInt(get('diasLembrete', 'dias_lembrete', '3')),
+      multaDiaria: parseFloat(get('multaDiaria', 'multa_diaria', '100')),
+      pixKey: get('pixKey', 'pix_key'),
+      nomeCobranca: get('nomeCobranca', 'nome_cobranca'),
+      linkPagamento: get('linkPagamento', 'link_pagamento'),
+      logoUrl: get('logoUrl', 'logo_url'),
+      templateAtraso: get('templateAtraso', 'template_atraso'),
+      templateVenceHoje: get('templateVenceHoje', 'template_vence_hoje'),
+      templateAntecipada: get('templateAntecipada', 'template_antecipada'),
     };
   }),
   save: protectedProcedure
