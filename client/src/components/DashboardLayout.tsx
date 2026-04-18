@@ -108,7 +108,7 @@ export default function DashboardLayout({
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
   }, [sidebarWidth]);
 
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
 
   // Redirecionar para a landing page quando não autenticado
   useEffect(() => {
@@ -117,7 +117,18 @@ export default function DashboardLayout({
     }
   }, [loading, user, setLocation]);
 
-  if (loading || !user) {
+  // Check de onboarding para novos usuários
+  const { data: onboardingData, isLoading: onboardingLoading } = trpc.onboarding.check.useQuery(
+    undefined,
+    { enabled: !!user && !loading }
+  );
+  useEffect(() => {
+    if (!onboardingLoading && onboardingData && !onboardingData.completo && location !== '/onboarding') {
+      setLocation('/onboarding');
+    }
+  }, [onboardingLoading, onboardingData, location, setLocation]);
+
+  if (loading || !user || onboardingLoading) {
     return <DashboardLayoutSkeleton />;
   }
 

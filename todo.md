@@ -653,3 +653,10 @@
 
 ## Fase 53: Logout Mobile
 - [x] Adicionar botão de logout no menu "Mais" do mobile (bottom navigation)
+
+## Fase 54: Onboarding para Novos Assinantes
+- [x] Criar campo onboardingCompleto na tabela users
+- [x] Criar procedure onboarding.check e onboarding.complete no servidor
+- [x] Criar página Onboarding.tsx com assistente multi-etapas (nome empresa, conta caixa, templates WhatsApp)
+- [x] Redirecionar novos usuários para /onboarding ao fazer login pela primeira vez
+- [x] Marcar usuários existentes como onboarding completo (contato@vitalfinanceira.com, koletor3@gmail.com, dgfinanceira@gmail.com)

@@ -3680,6 +3680,42 @@ const etiquetasRouter = router({
     }),
 });
 
+// ─── ONBOARDING ROUTER ─────────────────────────────────────────────────────
+const onboardingRouter = router({
+  check: protectedProcedure.query(async ({ ctx }) => {
+    const mysql = await import('mysql2/promise');
+    const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+    const [rows] = await conn.execute('SELECT onboarding_completo, nome_empresa FROM users WHERE id = ?', [ctx.user.id]) as any;
+    await conn.end();
+    if (!rows || rows.length === 0) return { completo: false, nomeEmpresa: null as string | null };
+    return { completo: !!rows[0].onboarding_completo, nomeEmpresa: rows[0].nome_empresa as string | null };
+  }),
+  complete: protectedProcedure
+    .input(z.object({
+      nomeEmpresa: z.string().min(1),
+      nomeConta: z.string().min(1).optional().default('Caixa Principal'),
+      tipoConta: z.enum(['caixa', 'banco', 'digital']).optional().default('caixa'),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const mysql = await import('mysql2/promise');
+      const conn = await mysql.createConnection(process.env.DATABASE_URL!);
+      await conn.execute(
+        'UPDATE users SET onboarding_completo = 1, nome_empresa = ? WHERE id = ?',
+        [input.nomeEmpresa, ctx.user.id]
+      );
+      // Criar conta de caixa inicial se não existir
+      const [contas] = await conn.execute('SELECT COUNT(*) as total FROM contas_caixa WHERE user_id = ?', [ctx.user.id]) as any;
+      if (!contas[0] || contas[0].total === 0) {
+        await conn.execute(
+          'INSERT INTO contas_caixa (user_id, nome, tipo, saldo_inicial, ativa, created_at, updated_at) VALUES (?, ?, ?, 0, 1, NOW(), NOW())',
+          [ctx.user.id, input.nomeConta, input.tipoConta]
+        );
+      }
+      await conn.end();
+      return { success: true };
+    }),
+});
+
 // ─── APP ROUTER ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -3714,6 +3750,7 @@ export const appRouter = router({
   perfil: perfilRouter,
   relatorioDiario: relatorioDiarioRouter,
   notificacoes: notificacoesRouter,
+  onboarding: onboardingRouter,
 });
 
 export type AppRouter = typeof appRouter;
