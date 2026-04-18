@@ -130,7 +130,7 @@ export async function getDb(): Promise<ReturnType<typeof drizzle> | null> {
       });
       if (!canResolve) {
         console.log('[Database] Supabase PostgreSQL hostname not resolvable via public DNS, using REST API');
-        _dbInitialized = false; // Allow retry later
+        _dbInitialized = true; // Mark as initialized to avoid retrying on every request
         return null;
       }
     }
