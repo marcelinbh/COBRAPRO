@@ -12,10 +12,13 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Search, MessageCircle, CheckCircle, Clock, AlertTriangle, Filter
+  Search, MessageCircle, CheckCircle, Clock, AlertTriangle, Filter, Download, FileSpreadsheet, FileText
 } from "lucide-react";
 import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // Templates padrão (mesmos do Cobra Fácil)
 const TEMPLATE_ATRASO = `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━
@@ -350,6 +353,71 @@ export default function Parcelas() {
     paga: parcelas?.filter(p => p.status === 'paga').length ?? 0,
   };
 
+  // Contadores por modalidade (apenas pendentes/atrasadas)
+  const MODALIDADES = [
+    { key: 'diario', label: 'Diário', color: 'border-orange-500/30 bg-orange-500/5', textColor: 'text-orange-400' },
+    { key: 'semanal', label: 'Semanal', color: 'border-blue-500/30 bg-blue-500/5', textColor: 'text-blue-400' },
+    { key: 'quinzenal', label: 'Quinzenal', color: 'border-purple-500/30 bg-purple-500/5', textColor: 'text-purple-400' },
+    { key: 'mensal', label: 'Mensal', color: 'border-teal-500/30 bg-teal-500/5', textColor: 'text-teal-400' },
+  ];
+  const modalidadeCount = MODALIDADES.map(m => ({
+    ...m,
+    qtd: parcelas?.filter(p => p.modalidade === m.key && ['pendente','atrasada','vencendo_hoje','parcial'].includes(p.status)).length ?? 0,
+    valor: parcelas?.filter(p => p.modalidade === m.key && ['pendente','atrasada','vencendo_hoje','parcial'].includes(p.status)).reduce((s, p) => s + parseFloat(p.valorOriginal), 0) ?? 0,
+  }));
+
+  // Funções de exportação
+  const exportarExcel = () => {
+    if (!filtradas || filtradas.length === 0) { toast.error('Nenhuma parcela para exportar'); return; }
+    const dados = filtradas.map(p => ({
+      'Cliente': p.clienteNome,
+      'Parcela': `${p.numeroParcela}/${p.numeroParcelas}`,
+      'Modalidade': p.modalidade ?? '-',
+      'Vencimento': formatarData(p.dataVencimento),
+      'Valor Original': parseFloat(p.valorOriginal),
+      'Valor Pago': parseFloat(p.valorPago ?? '0'),
+      'Status': p.status,
+      'Data Pagamento': p.dataPagamento ? formatarData(p.dataPagamento) : '-',
+    }));
+    const ws = XLSX.utils.json_to_sheet(dados);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Parcelas');
+    XLSX.writeFile(wb, `parcelas_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success('Excel exportado com sucesso!');
+  };
+
+  const exportarPDF = () => {
+    if (!filtradas || filtradas.length === 0) { toast.error('Nenhuma parcela para exportar'); return; }
+    const doc = new jsPDF({ orientation: 'landscape' });
+    doc.setFontSize(16);
+    doc.text('Relatório de Parcelas', 14, 16);
+    doc.setFontSize(10);
+    const filtroInfo = [
+      filtroModalidade !== 'todas' ? `Modalidade: ${filtroModalidade}` : '',
+      filtroStatus !== 'todos' ? `Status: ${filtroStatus}` : '',
+      busca ? `Busca: ${busca}` : '',
+    ].filter(Boolean).join(' | ');
+    if (filtroInfo) doc.text(filtroInfo, 14, 24);
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')} — Total: ${filtradas.length} parcelas`, 14, filtroInfo ? 30 : 24);
+    autoTable(doc, {
+      startY: filtroInfo ? 36 : 30,
+      head: [['Cliente', 'Parcela', 'Modalidade', 'Vencimento', 'Valor', 'Status']],
+      body: filtradas.map(p => [
+        p.clienteNome,
+        `${p.numeroParcela}/${p.numeroParcelas}`,
+        p.modalidade ?? '-',
+        formatarData(p.dataVencimento),
+        formatarMoeda(p.valorOriginal),
+        p.status,
+      ]),
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [30, 30, 30] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+    doc.save(`parcelas_${new Date().toISOString().split('T')[0]}.pdf`);
+    toast.success('PDF exportado com sucesso!');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -357,6 +425,31 @@ export default function Parcelas() {
           <h1 className="font-display text-3xl text-foreground tracking-wide">PARCELAS</h1>
           <p className="text-sm text-muted-foreground mt-1">{filtradas?.length ?? 0} parcelas</p>
         </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={exportarExcel} className="gap-1.5 text-xs">
+            <FileSpreadsheet className="h-3.5 w-3.5 text-green-500" />
+            <span className="hidden sm:inline">Excel</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportarPDF} className="gap-1.5 text-xs">
+            <FileText className="h-3.5 w-3.5 text-red-500" />
+            <span className="hidden sm:inline">PDF</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* Contador por Modalidade */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {modalidadeCount.map(m => (
+          <button
+            key={m.key}
+            className={`p-3 rounded-lg border ${m.color} text-left transition-all hover:opacity-80 ${filtroModalidade === m.key ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setFiltroModalidade(filtroModalidade === m.key ? 'todas' : m.key)}
+          >
+            <div className={`font-display text-2xl ${m.textColor}`}>{m.qtd}</div>
+            <div className="text-xs text-muted-foreground">{m.label}</div>
+            {m.qtd > 0 && <div className={`text-xs font-medium ${m.textColor} mt-0.5`}>{formatarMoeda(m.valor)}</div>}
+          </button>
+        ))}
       </div>
 
       {/* Status Summary */}

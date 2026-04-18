@@ -640,3 +640,7 @@
 ## Fase 50: Limpeza e Filtro de Modalidade
 - [x] Excluir contratos de teste do "Cliente Teste Bateria" e o próprio cliente (banco de produção já estava limpo)
 - [x] Adicionar filtro de modalidade na página de Parcelas (Diário, Semanal, Quinzenal, Mensal)
+
+## Fase 51: Contador por Modalidade e Exportação
+- [x] Adicionar cards de contador por modalidade no topo das Parcelas (Diário, Semanal, Quinzenal, Mensal)
+- [x] Implementar exportação PDF e Excel das parcelas com filtros ativos
