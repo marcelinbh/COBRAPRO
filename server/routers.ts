@@ -1547,6 +1547,7 @@ const parcelasRouter = router({
       contratoId: z.number().optional(),
       dataInicio: z.string().optional(),
       dataFim: z.string().optional(),
+      modalidade: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
       const db = await getDb();
@@ -1611,6 +1612,7 @@ const parcelasRouter = router({
             if (input?.status && r.status !== input.status) return false;
             if (input?.clienteId && r.clienteId !== input.clienteId) return false;
             if (input?.contratoId && r.contratoId !== input.contratoId) return false;
+            if (input?.modalidade && r.modalidade !== input.modalidade) return false;
             return true;
           });
         } catch (err) {
@@ -1648,6 +1650,8 @@ const parcelasRouter = router({
         if (myKoletorId !== null && p.contratos?.koletor_id !== myKoletorId) return false;
         return true;
       });
+      // Filtro de modalidade no REST (aplicado após buscar contratos)
+      // Será aplicado após montar contratosMap abaixo
 
       // Buscar clientes e contratos relacionados
       const clienteIds = Array.from(new Set(parcelasData.map((r: any) => r.cliente_id).filter(Boolean)));
@@ -1665,7 +1669,11 @@ const parcelasRouter = router({
         (ctData || []).forEach((c: any) => { contratosMap[c.id] = c; });
       }
 
-      return parcelasData.map((r: any) => ({
+      const resultData = input?.modalidade
+        ? parcelasData.filter((r: any) => contratosMap[r.contrato_id]?.modalidade === input.modalidade)
+        : parcelasData;
+
+      return resultData.map((r: any) => ({
         id: r.id,
         contratoId: r.contrato_id,
         clienteId: r.cliente_id,

@@ -636,3 +636,7 @@
 - [ ] Adicionar modalidade QUINZENAL (parcelas quinzenais) se não existir
 - [ ] Verificar e garantir MENSAL correto
 - [ ] Testar cálculos no Simulador e NovoContrato
+
+## Fase 50: Limpeza e Filtro de Modalidade
+- [x] Excluir contratos de teste do "Cliente Teste Bateria" e o próprio cliente (banco de produção já estava limpo)
+- [x] Adicionar filtro de modalidade na página de Parcelas (Diário, Semanal, Quinzenal, Mensal)

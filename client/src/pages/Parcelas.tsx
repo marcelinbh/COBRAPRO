@@ -330,9 +330,11 @@ function PagamentoDialog({
 export default function Parcelas() {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroModalidade, setFiltroModalidade] = useState("todas");
 
   const { data: parcelas, isLoading, refetch } = trpc.parcelas.list.useQuery({
     status: filtroStatus !== "todos" ? filtroStatus : undefined,
+    modalidade: filtroModalidade !== "todas" ? filtroModalidade : undefined,
   });
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: configData } = trpc.configuracoes.get.useQuery();
@@ -382,13 +384,26 @@ export default function Parcelas() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Buscar por cliente..." value={busca} onChange={e => setBusca(e.target.value)} />
         </div>
+        <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Modalidade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas as Modalidades</SelectItem>
+            <SelectItem value="diario">Diário</SelectItem>
+            <SelectItem value="semanal">Semanal</SelectItem>
+            <SelectItem value="quinzenal">Quinzenal</SelectItem>
+            <SelectItem value="mensal">Mensal</SelectItem>
+            <SelectItem value="tabela_price">Tabela Price</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
             <SelectValue placeholder="Filtrar status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="todos">Todos os Status</SelectItem>
             <SelectItem value="atrasada">Atrasadas</SelectItem>
             <SelectItem value="vencendo_hoje">Vence Hoje</SelectItem>
             <SelectItem value="pendente">Pendentes</SelectItem>
