@@ -1091,7 +1091,7 @@ const contratosRouter = router({
       } catch (_) { /* koletor_id fica null */ }
 
       const db = await getDb();
-      let contratoId: number;
+      let contratoId: number | undefined;
 
       if (db) {
         try {
@@ -1156,6 +1156,11 @@ const contratosRouter = router({
           }
           return { id: contratoId, valorParcela };
         } catch (err) {
+          // Se o contrato já foi criado pelo Drizzle, não fazer fallback (evita double-submit)
+          if (contratoId) {
+            console.error('[contratos.create] Drizzle parcelas failed after contrato created:', (err as Error).message);
+            return { id: contratoId, valorParcela };
+          }
           console.error('[contratos.create] Drizzle failed, falling back to REST:', (err as Error).message);
           resetDb();
         }
@@ -1680,7 +1685,7 @@ const parcelasRouter = router({
     .input(z.object({
       parcelaId: z.number(),
       valorPago: z.number().positive(),
-      contaCaixaId: z.number(),
+      contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
       desconto: z.number().default(0),
     }))
@@ -1719,23 +1724,25 @@ const parcelasRouter = router({
         valor_desconto: input.desconto.toFixed(2),
         data_pagamento: new Date().toISOString(),
         status: novoStatus,
-        conta_caixa_id: input.contaCaixaId,
+        conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
       }).eq('id', input.parcelaId);
       if (updateErr) console.error('[registrarPagamento] Update parcela error:', updateErr.message);
 
-      // Registrar entrada no caixa
-      const { error: txErr } = await sb.from('transacoes_caixa').insert({
-        conta_caixa_id: input.contaCaixaId,
-        tipo: 'entrada',
-        categoria: 'pagamento_parcela',
-        valor: input.valorPago.toFixed(2),
-        descricao: `Pagamento parcela #${parcela.numeroParcela} - Contrato #${parcela.contratoId}`,
-        parcela_id: input.parcelaId,
-        contrato_id: parcela.contratoId,
-        data_transacao: new Date().toISOString().split('T')[0],
-      });
-      if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
+      // Registrar entrada no caixa (apenas se conta informada)
+      if (input.contaCaixaId) {
+        const { error: txErr } = await sb.from('transacoes_caixa').insert({
+          conta_caixa_id: input.contaCaixaId,
+          tipo: 'entrada',
+          categoria: 'pagamento_parcela',
+          valor: input.valorPago.toFixed(2),
+          descricao: `Pagamento parcela #${parcela.numeroParcela} - Contrato #${parcela.contratoId}`,
+          parcela_id: input.parcelaId,
+          contrato_id: parcela.contratoId,
+          data_transacao: new Date().toISOString().split('T')[0],
+        });
+        if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
+      }
 
       // Verificar se contrato foi quitado
       const { data: pendentes } = await sb.from('parcelas')
@@ -1754,7 +1761,7 @@ const parcelasRouter = router({
     .input(z.object({
       parcelaId: z.number(),
       valorJurosPago: z.number().positive(),
-      contaCaixaId: z.number(),
+      contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
@@ -1816,20 +1823,22 @@ const parcelasRouter = router({
           dataPagamento: hoje,
           status: 'paga' as const,
           observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
-          contaCaixaId: input.contaCaixaId,
+          contaCaixaId: input.contaCaixaId ?? null,
         }).where(eq(parcelas.id, input.parcelaId));
 
-        // Registrar entrada no caixa
-        await db.insert(transacoesCaixa).values({
-          contaCaixaId: input.contaCaixaId,
-          tipo: 'entrada',
-          categoria: 'pagamento_parcela',
-          valor: input.valorJurosPago.toFixed(2),
-          descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
-          parcelaId: input.parcelaId,
-          contratoId: parcela.contratoId as number,
-          clienteId: parcela.clienteId as number,
-        });
+        // Registrar entrada no caixa (apenas se conta informada)
+        if (input.contaCaixaId) {
+          await db.insert(transacoesCaixa).values({
+            contaCaixaId: input.contaCaixaId,
+            tipo: 'entrada',
+            categoria: 'pagamento_parcela',
+            valor: input.valorJurosPago.toFixed(2),
+            descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
+            parcelaId: input.parcelaId,
+            contratoId: parcela.contratoId as number,
+            clienteId: parcela.clienteId as number,
+          });
+        }
 
         // Criar nova parcela com o mesmo valor original e nova data
         await db.insert(parcelas).values({
@@ -1840,7 +1849,7 @@ const parcelasRouter = router({
           valorOriginal: String(parcela.valorOriginal),
           dataVencimento: novaDataVencStr,
           status: 'pendente' as const,
-          contaCaixaId: input.contaCaixaId,
+          contaCaixaId: input.contaCaixaId ?? null,
         });
 
         // Atualizar numeroParcelas do contrato

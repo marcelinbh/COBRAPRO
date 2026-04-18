@@ -155,7 +155,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* KPI Cards — ocultos para koletores */}
+      {/* KPI Cards - ocultos para koletores */}
       {!isKoletor && <div className="grid grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
         <KPICard
           title="Saldo em Contas"
@@ -201,7 +201,7 @@ export default function Dashboard() {
         />
       </div>}
 
-      {/* Barra de saúde financeira — oculta para koletores */}
+      {/* Barra de saúde financeira - oculta para koletores */}
       {!isKoletor && kpis && kpis.capitalCirculacao > 0 && (
         <Card className="border-border">
           <CardContent className="p-4">
@@ -231,7 +231,7 @@ export default function Dashboard() {
         <Card className="xl:col-span-2 border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Fluxo de Recebimentos — Últimos 7 Dias
+              Fluxo de Recebimentos - Últimos 7 Dias
             </CardTitle>
           </CardHeader>
           <CardContent>

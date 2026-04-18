@@ -21,7 +21,7 @@ function formatarMoeda(valor: number) {
 }
 
 function formatarData(data: string | Date | null | undefined) {
-  if (!data) return "—";
+  if (!data) return "-";
   return new Date(data).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
 }
 
@@ -307,7 +307,7 @@ export default function MeuPerfil() {
                 {editando ? (
                   <Input value={whatsappEmpresa} onChange={(e) => setWhatsappEmpresa(e.target.value)} className="h-7 text-sm mt-1" placeholder="(00) 00000-0000" />
                 ) : (
-                  <p className="text-sm font-medium text-foreground">{perfil?.whatsappEmpresa || "—"}</p>
+                  <p className="text-sm font-medium text-foreground">{perfil?.whatsappEmpresa || "-"}</p>
                 )}
               </div>
             </div>
@@ -322,7 +322,7 @@ export default function MeuPerfil() {
                 {editando ? (
                   <Input value={nomeEmpresa} onChange={(e) => setNomeEmpresa(e.target.value)} className="h-7 text-sm mt-1" placeholder="Nome da empresa" />
                 ) : (
-                  <p className="text-sm font-medium text-foreground">{perfil?.nomeEmpresa || "—"}</p>
+                  <p className="text-sm font-medium text-foreground">{perfil?.nomeEmpresa || "-"}</p>
                 )}
               </div>
             </div>
@@ -490,7 +490,7 @@ export default function MeuPerfil() {
             <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
             <div>
               <p className="text-xs text-muted-foreground">Nome Configurado</p>
-              <p className="text-sm font-medium">Usando: {perfil?.nomeCobranca || perfil?.nomeEmpresa || "—"}</p>
+              <p className="text-sm font-medium">Usando: {perfil?.nomeCobranca || perfil?.nomeEmpresa || "-"}</p>
             </div>
           </div>
           {editando && (
@@ -614,7 +614,7 @@ export default function MeuPerfil() {
             </div>
           ) : (
             <div className="space-y-4">
-              {/* Estado desconectado — ícone + texto + botão */}
+              {/* Estado desconectado - ícone + texto + botão */}
               <div className="flex flex-col items-center gap-4 py-6">
                 <div className="h-16 w-16 flex items-center justify-center text-muted-foreground/30">
                   <QrCode className="h-full w-full" />

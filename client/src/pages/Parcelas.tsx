@@ -266,7 +266,7 @@ function PagamentoDialog({
             </div>
 
             <div>
-              <Label>Conta de Caixa *</Label>
+              <Label>Conta de Caixa <span className="text-muted-foreground text-xs">(opcional)</span></Label>
               <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Selecione a conta" />
@@ -285,13 +285,12 @@ function PagamentoDialog({
               <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
               <Button
                 className="flex-1"
-                disabled={!valorPago || !contaCaixaId || pagarMutation.isPending}
+                disabled={!valorPago || pagarMutation.isPending}
                 onClick={() => {
-                  const valorFinal = parseFloat(valorPago) - parseFloat(desconto);
                   pagarMutation.mutate({
                     parcelaId: parcela.id,
                     valorPago: parseFloat(valorPago),
-                    contaCaixaId: parseInt(contaCaixaId),
+                    contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
                     desconto: parseFloat(desconto),
                   });
                   // Gerar comprovante após sucesso (será feito no onSuccess)

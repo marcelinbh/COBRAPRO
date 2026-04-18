@@ -313,7 +313,7 @@ export default function Simulador() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Modalidade — só mostra se não estiver em modo comparação */}
+            {/* Modalidade - só mostra se não estiver em modo comparação */}
             {!modoComparacao && (
               <div className="space-y-1.5">
                 <Label className="text-sm text-muted-foreground">Modalidade</Label>
@@ -334,7 +334,7 @@ export default function Simulador() {
             {modoComparacao && (
               <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400">
                 <GitCompare className="h-3.5 w-3.5 inline mr-1.5" />
-                Modo comparação ativo — calculará Juros Simples, Parcela Fixa e Diário simultaneamente.
+                Modo comparação ativo - calculará Juros Simples, Parcela Fixa e Diário simultaneamente.
               </div>
             )}
 
@@ -415,7 +415,7 @@ export default function Simulador() {
           </CardContent>
         </Card>
 
-        {/* Resultado — Modo Normal */}
+        {/* Resultado - Modo Normal */}
         {!modoComparacao && resultado ? (
           <Card className="bg-card border-border">
             <CardHeader className="pb-4">
@@ -519,7 +519,7 @@ export default function Simulador() {
           </Card>
         ) : null}
 
-        {/* Resultado — Modo Comparação */}
+        {/* Resultado - Modo Comparação */}
         {modoComparacao && comparacoes.length === 0 && (
           <Card className="bg-card border-border flex items-center justify-center min-h-[300px]">
             <div className="text-center space-y-3 p-6">

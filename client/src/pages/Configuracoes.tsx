@@ -11,7 +11,7 @@ import {
   CheckCircle2, Info, Upload, ImageIcon, X, Clock, Send
 } from "lucide-react";
 
-// Variáveis disponíveis — idênticas ao Cobra Fácil
+// Variáveis disponíveis - idênticas ao Cobra Fácil
 const VARIAVEIS = [
   { key: "{CLIENTE}", desc: "Nome do cliente" },
   { key: "{VALOR}", desc: "Valor da parcela" },
@@ -76,7 +76,7 @@ export default function Configuracoes() {
     onError: (e: { message: string }) => toast.error("Erro: " + e.message),
   });
 
-  // Templates de mensagem — carrega do backend se existir, senão usa padrão
+  // Templates de mensagem - carrega do backend se existir, senão usa padrão
   const [templateAtraso, setTemplateAtraso] = useState(() => (config as any)?.templateAtraso || TEMPLATES_PADRAO.atraso);
   const [templateVenceHoje, setTemplateVenceHoje] = useState(() => (config as any)?.templateVenceHoje || TEMPLATES_PADRAO.venceHoje);
   const [templateAntecipada, setTemplateAntecipada] = useState(() => (config as any)?.templateAntecipada || TEMPLATES_PADRAO.antecipada);
@@ -350,12 +350,12 @@ export default function Configuracoes() {
         </CardContent>
       </Card>
 
-      {/* Templates WhatsApp — idêntico ao Cobra Fácil */}
+      {/* Templates WhatsApp - idêntico ao Cobra Fácil */}
       <Card className="border-border">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
             <MessageCircle className="h-4 w-4 text-[#25D366]" />
-            Mensagem de Cobrança — WhatsApp
+            Mensagem de Cobrança - WhatsApp
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -446,7 +446,7 @@ export default function Configuracoes() {
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
             <Bell className="h-4 w-4 text-primary" />
-            BREVO — Email e Magic Links
+            BREVO - Email e Magic Links
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
