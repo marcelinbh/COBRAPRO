@@ -660,3 +660,16 @@
 - [x] Criar página Onboarding.tsx com assistente multi-etapas (nome empresa, conta caixa, templates WhatsApp)
 - [x] Redirecionar novos usuários para /onboarding ao fazer login pela primeira vez
 - [x] Marcar usuários existentes como onboarding completo (contato@vitalfinanceira.com, koletor3@gmail.com, dgfinanceira@gmail.com)
+
+## Fase 55: Correção Crítica - Isolamento por user_id
+- [x] Diagnosticar por que user_id não está filtrando dados em produção
+- [x] Corrigir queries no servidor para filtrar por userId em todas as procedures (11 queries do dashboard)
+- [x] Limpar dados de teste do koletor3 que aparecem para outros usuários
+- [x] Verificar isolamento completo entre contas
+
+## Fase 56: Otimização de Performance
+- [x] Pool de conexões MySQL no servidor (eliminar overhead de 100ms por requisição)
+- [x] Lazy loading de xlsx e jspdf (remover 1.1MB do bundle inicial)
+- [x] Adicionar índices no banco para user_id, status e data_vencimento (11 índices criados)
+- [x] Analytics assíncrono (atributo async+defer no script de analytics)
+- [x] Code splitting por rota no Vite (manualChunks para react, radix, tanstack, icons, charts)

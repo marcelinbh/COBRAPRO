@@ -16,9 +16,7 @@ import {
 } from "lucide-react";
 import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
-import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+// xlsx e jspdf são carregados sob demanda (lazy) para reduzir o bundle inicial em ~1.1MB
 
 // Templates padrão (mesmos do Cobra Fácil)
 const TEMPLATE_ATRASO = `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━
@@ -366,9 +364,10 @@ export default function Parcelas() {
     valor: parcelas?.filter(p => p.modalidade === m.key && ['pendente','atrasada','vencendo_hoje','parcial'].includes(p.status)).reduce((s, p) => s + parseFloat(p.valorOriginal), 0) ?? 0,
   }));
 
-  // Funções de exportação
-  const exportarExcel = () => {
+  // Funções de exportação (lazy loading para reduzir bundle inicial em ~1.1MB)
+  const exportarExcel = async () => {
     if (!filtradas || filtradas.length === 0) { toast.error('Nenhuma parcela para exportar'); return; }
+    const XLSX = await import('xlsx');
     const dados = filtradas.map(p => ({
       'Cliente': p.clienteNome,
       'Parcela': `${p.numeroParcela}/${p.numeroParcelas}`,
@@ -386,8 +385,10 @@ export default function Parcelas() {
     toast.success('Excel exportado com sucesso!');
   };
 
-  const exportarPDF = () => {
+  const exportarPDF = async () => {
     if (!filtradas || filtradas.length === 0) { toast.error('Nenhuma parcela para exportar'); return; }
+    const { default: jsPDF } = await import('jspdf');
+    const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(16);
     doc.text('Relatório de Parcelas', 14, 16);

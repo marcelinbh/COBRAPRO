@@ -167,6 +167,23 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // Separar bibliotecas pesadas em chunks próprios
+          if (id.includes('node_modules/xlsx')) return 'vendor-xlsx';
+          if (id.includes('node_modules/jspdf')) return 'vendor-jspdf';
+          if (id.includes('node_modules/jspdf-autotable')) return 'vendor-jspdf';
+          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'vendor-charts';
+          if (id.includes('node_modules/@radix-ui')) return 'vendor-radix';
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) return 'vendor-react';
+          if (id.includes('node_modules/@tanstack')) return 'vendor-tanstack';
+          if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
+          // Demais node_modules em um chunk genérico
+          if (id.includes('node_modules')) return 'vendor';
+        },
+      },
+    },
   },
   server: {
     host: true,

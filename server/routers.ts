@@ -32,7 +32,7 @@ const dashboardRouter = router({
       hoje.setHours(0, 0, 0, 0);
       const hojeStr = hoje.toISOString().split('T')[0];
 
-      const contas = await db.select().from(contasCaixa).where(eq(contasCaixa.ativa, true));
+      const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativa, true), eq(contasCaixa.userId, ctx.user.id)));
       let saldoTotal = 0;
       for (const conta of contas) {
         const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
@@ -45,26 +45,27 @@ const dashboardRouter = router({
       }
 
       const capitalResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
-        .from(contratos).where(eq(contratos.status, 'ativo'));
+        .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
       const capitalCirculacao = parseFloat(capitalResult[0]?.total ?? '0');
 
       const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)` })
-        .from(parcelas).where(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']));
+        .from(parcelas).where(and(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']), eq(parcelas.userId, ctx.user.id)));
       const totalReceber = parseFloat(receberResult[0]?.total ?? '0');
 
       const inadResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(DISTINCT cliente_id)` })
-        .from(parcelas).where(eq(parcelas.status, 'atrasada'));
+        .from(parcelas).where(and(eq(parcelas.status, 'atrasada'), eq(parcelas.userId, ctx.user.id)));
       const totalInadimplente = parseFloat(inadResult[0]?.total ?? '0');
       const qtdInadimplentes = inadResult[0]?.qtd ?? 0;
 
       const jurosResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_juros), 0)` })
-        .from(parcelas).where(inArray(parcelas.status, ['atrasada', 'parcial']));
+        .from(parcelas).where(and(inArray(parcelas.status, ['atrasada', 'parcial']), eq(parcelas.userId, ctx.user.id)));
       const jurosPendentes = parseFloat(jurosResult[0]?.total ?? '0');
 
       const hojeResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(*)` })
         .from(parcelas).where(and(
           eq(sql`DATE(data_vencimento)`, hojeStr),
-          inArray(parcelas.status, ['pendente', 'vencendo_hoje'])
+          inArray(parcelas.status, ['pendente', 'vencendo_hoje']),
+          eq(parcelas.userId, ctx.user.id)
         ));
       const qtdVenceHoje = hojeResult[0]?.qtd ?? 0;
       const valorVenceHoje = parseFloat(hojeResult[0]?.total ?? '0');
@@ -73,12 +74,13 @@ const dashboardRouter = router({
         .from(transacoesCaixa).where(and(
           eq(transacoesCaixa.tipo, 'entrada'),
           eq(transacoesCaixa.categoria, 'pagamento_parcela'),
-          gte(transacoesCaixa.dataTransacao, hoje)
+          gte(transacoesCaixa.dataTransacao, hoje),
+          eq(transacoesCaixa.userId, ctx.user.id)
         ));
       const recebidoHoje = parseFloat(recebidoResult[0]?.total ?? '0');
 
       const contratosResult = await db.select({ qtd: sql<number>`COUNT(*)` })
-        .from(contratos).where(eq(contratos.status, 'ativo'));
+        .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
       const contratosAtivos = contratosResult[0]?.qtd ?? 0;
 
       return {
@@ -95,12 +97,13 @@ const dashboardRouter = router({
     hoje.setHours(0, 0, 0, 0);
     const hojeStr = hoje.toISOString().split('T')[0];
 
-    // Fetch data via Supabase REST
+    // Fetch data via Supabase REST (filtrado por user_id para isolamento entre contas)
+    const userId = ctx.user.id;
     const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
-      supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true),
-      supabase.from('contratos').select('valor_principal').eq('status', 'ativo'),
-      supabase.from('parcelas').select('valor_original, valor_juros, status, data_vencimento, numero_parcela, cliente_id'),
-      supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao')
+      supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true).eq('user_id', userId),
+      supabase.from('contratos').select('valor_principal').eq('status', 'ativo').eq('user_id', userId),
+      supabase.from('parcelas').select('valor_original, valor_juros, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
+      supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao').eq('user_id', userId)
     ]);
 
     let saldoTotal = 0;
@@ -151,7 +154,7 @@ const dashboardRouter = router({
           dataVencimento: parcelas.dataVencimento, status: parcelas.status,
           totalParcelas: sql<number>`(SELECT COUNT(*) FROM parcelas p2 WHERE p2.contrato_id = ${parcelas.contratoId})`,
         }).from(parcelas).innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
-          .where(and(eq(sql`DATE(${parcelas.dataVencimento})`, hoje), inArray(parcelas.status, ['pendente', 'vencendo_hoje'])))
+          .where(and(eq(sql`DATE(${parcelas.dataVencimento})`, hoje), inArray(parcelas.status, ['pendente', 'vencendo_hoje']), eq(parcelas.userId, ctx.user.id)))
           .orderBy(parcelas.dataVencimento).limit(20);
         return rows;
       } catch (err) { console.warn('[dashboard.parcelasHoje] Drizzle failed:', (err as Error).message); resetDb(); }
@@ -172,7 +175,7 @@ const dashboardRouter = router({
           numeroParcela: parcelas.numeroParcela, valorOriginal: parcelas.valorOriginal,
           dataVencimento: parcelas.dataVencimento, status: parcelas.status,
         }).from(parcelas).innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
-          .where(eq(parcelas.status, 'atrasada')).orderBy(parcelas.dataVencimento).limit(20);
+          .where(and(eq(parcelas.status, 'atrasada'), eq(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
         return rows.map(r => {
           const { total, diasAtraso } = calcularJurosMora(parseFloat(r.valorOriginal), new Date(r.dataVencimento + 'T00:00:00'), new Date());
           return { ...r, valorAtualizado: total, diasAtraso };
