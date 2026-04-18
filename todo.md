@@ -627,3 +627,12 @@
 - [x] Correção: user_id null nos dados de teste — atualizado para 30084 (koletor3) em contratos, clientes e parcelas
 - [x] Bug: Análise de Risco mostrando capitalTotal e totalReceber como R$ 0 — adicionados campos capitalTotal e totalReceber ao retorno da procedure listarComScore
 - [x] Mover "Meu Perfil" para segunda posição no menu lateral (logo abaixo de Dashboard)
+
+## Fase 45: Cálculos de Juros Corretos + Novas Modalidades
+
+- [ ] Auditar cálculos de juros (Price, Simples, Composto, Bullet) para todas as modalidades
+- [ ] Adicionar modalidade DIÁRIA (parcelas diárias) se não existir
+- [ ] Adicionar modalidade SEMANAL (parcelas semanais) se não existir
+- [ ] Adicionar modalidade QUINZENAL (parcelas quinzenais) se não existir
+- [ ] Verificar e garantir MENSAL correto
+- [ ] Testar cálculos no Simulador e NovoContrato

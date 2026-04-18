@@ -68,14 +68,33 @@ export default function NovoContrato() {
     }
   }, [form.valorPrincipal, form.taxaJuros, form.numeroParcelas, form.modalidade]);
 
-  // Auto-preencher data do primeiro vencimento (30 dias após início)
+  // Sincronizar tipoTaxa com modalidade selecionada
+  useEffect(() => {
+    const modalidadeParaTipoTaxa: Record<string, string> = {
+      diario: 'diaria',
+      semanal: 'semanal',
+      quinzenal: 'quinzenal',
+      mensal: 'mensal',
+      tabela_price: 'mensal',
+      reparcelamento: 'mensal',
+      venda: 'mensal',
+      cheque: 'mensal',
+    };
+    const novoTipoTaxa = modalidadeParaTipoTaxa[form.modalidade] || 'mensal';
+    setForm(f => ({ ...f, tipoTaxa: novoTipoTaxa }));
+  }, [form.modalidade]);
+
+  // Auto-preencher data do primeiro vencimento de acordo com a modalidade
   useEffect(() => {
     if (form.dataInicio) {
       const d = new Date(form.dataInicio + 'T00:00:00');
-      d.setDate(d.getDate() + 30);
+      if (form.modalidade === 'diario') d.setDate(d.getDate() + 1);
+      else if (form.modalidade === 'semanal') d.setDate(d.getDate() + 7);
+      else if (form.modalidade === 'quinzenal') d.setDate(d.getDate() + 15);
+      else d.setDate(d.getDate() + 30);
       setForm(f => ({ ...f, dataVencimentoPrimeira: d.toISOString().split('T')[0] }));
     }
-  }, [form.dataInicio]);
+  }, [form.dataInicio, form.modalidade]);
 
   const createMutation = trpc.contratos.create.useMutation({
     onSuccess: (data) => {
