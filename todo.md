@@ -625,3 +625,4 @@
 - [x] Bug: em-dashes (—) em comentários JSX causando erro esbuild — substituídos por hífens em Configuracoes.tsx, Dashboard.tsx, MeuPerfil.tsx, Simulador.tsx
 - [x] Limpeza: contrato duplicado (ID 19) removido do banco — mantido apenas contrato 20 com 12 parcelas
 - [x] Correção: user_id null nos dados de teste — atualizado para 30084 (koletor3) em contratos, clientes e parcelas
+- [x] Bug: Análise de Risco mostrando capitalTotal e totalReceber como R$ 0 — adicionados campos capitalTotal e totalReceber ao retorno da procedure listarComScore

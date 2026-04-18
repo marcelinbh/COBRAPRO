@@ -579,9 +579,14 @@ const clientesRouter = router({
         let parcelasAtrasadas = 0;
         let parcelasQuitadas = 0;
         let pontosRecuperacao = 0;
+        let capitalTotal = 0;
+        let totalReceber = 0;
         const totalParcelas = parcelas_data.length;
         
         for (const parcela of parcelas_data) {
+          const valorOriginalParcela = parseFloat(parcela.valor_original ?? parcela.valorOriginal ?? '0');
+          capitalTotal += valorOriginalParcela;
+          if (parcela.status !== 'paga') totalReceber += valorOriginalParcela;
           if (parcela.status === 'paga') {
             parcelasQuitadas++;
             score += 10; // +10 por parcela paga
@@ -632,6 +637,8 @@ const clientesRouter = router({
           pontosRecuperacao,
           totalParcelas,
           taxaAdimplencia: totalParcelas > 0 ? Math.round(((parcelasQuitadas + parcelasEmDia) / totalParcelas) * 100) : 0,
+          capitalTotal,
+          totalReceber,
         };
       }));
       
