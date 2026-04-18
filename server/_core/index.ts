@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerAuthRoutes } from "../authRoutes";
 import { registerWebhookRoutes } from "../webhookRoutes";
+import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -41,6 +42,8 @@ async function startServer() {
   registerAuthRoutes(app);
   // Webhook da Evolution API (WhatsApp)
   registerWebhookRoutes(app);
+  // Webhook da Kiwify (vendas → criação de usuário + e-mail)
+  registerKiwifyWebhookRoutes(app);
   // Diagnostic endpoint to test Supabase connectivity
   app.get('/api/diag', async (req, res) => {
     const results: Record<string, string> = {};

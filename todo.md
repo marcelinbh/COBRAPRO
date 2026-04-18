@@ -673,3 +673,19 @@
 - [x] Adicionar índices no banco para user_id, status e data_vencimento (11 índices criados)
 - [x] Analytics assíncrono (atributo async+defer no script de analytics)
 - [x] Code splitting por rota no Vite (manualChunks para react, radix, tanstack, icons, charts)
+
+## Fase 57: Integração Kiwify → Criação Automática de Conta
+
+- [x] Endpoint POST /api/webhook/kiwify no servidor Express (fora do tRPC)
+- [x] Validar payload: order_status === 'paid' e customer.email presente
+- [x] Verificar idempotência: se usuário já existe, não duplicar (verificar por email)
+- [x] Gerar senha aleatória segura (10 chars: letras + números, sem caracteres ambíguos)
+- [x] Criar usuário na tabela users (email, nome, senha hash, role: user, loginMethod: kiwify)
+- [x] Registrar log de webhook recebido (tabela kiwify_webhooks: order_id, email, status, payload, created_at)
+- [x] Enviar e-mail de boas-vindas via Brevo com login + senha + link de acesso
+- [x] Template de e-mail HTML profissional com credenciais em destaque e botão CTA
+- [x] Retornar status 200 imediatamente (antes de processar, para evitar timeout da Kiwify)
+- [x] KIWIFY_WEBHOOK_TOKEN configurado como variável de ambiente
+- [x] 5 testes Vitest passando (token inválido, token header, token query, status ignorado, env)
+- [ ] Configurar URL do webhook no painel da Kiwify (Apps > Webhooks) — aguardando usuário
+- [ ] Testar e-mail de boas-vindas chegando corretamente (após configurar na Kiwify)
