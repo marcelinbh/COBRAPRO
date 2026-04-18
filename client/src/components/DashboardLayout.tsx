@@ -60,6 +60,7 @@ import { BottomNav } from "./BottomNav";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: User, label: "Meu Perfil", path: "/perfil" },
   { icon: Users, label: "Clientes", path: "/clientes" },
   { icon: DollarSign, label: "Empréstimos", path: "/emprestimos" },
   { icon: Star, label: "Score de Clientes", path: "/scores" },
@@ -83,7 +84,6 @@ const menuItems = [
   { icon: MessageCircle, label: "WhatsApp QR", path: "/whatsapp" },
   { icon: ClipboardList, label: "Relatório Diário", path: "/relatorio-diario" },
   { icon: Bell, label: "Mensagens Auto", path: "/notificacoes-automaticas" },
-  { icon: User, label: "Meu Perfil", path: "/perfil" },
   { icon: Smartphone, label: "Instalar App", path: "/install" },
 ];
 

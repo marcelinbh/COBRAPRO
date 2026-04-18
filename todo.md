@@ -626,3 +626,4 @@
 - [x] Limpeza: contrato duplicado (ID 19) removido do banco — mantido apenas contrato 20 com 12 parcelas
 - [x] Correção: user_id null nos dados de teste — atualizado para 30084 (koletor3) em contratos, clientes e parcelas
 - [x] Bug: Análise de Risco mostrando capitalTotal e totalReceber como R$ 0 — adicionados campos capitalTotal e totalReceber ao retorno da procedure listarComScore
+- [x] Mover "Meu Perfil" para segunda posição no menu lateral (logo abaixo de Dashboard)
