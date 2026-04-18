@@ -644,3 +644,9 @@
 ## Fase 51: Contador por Modalidade e Exportação
 - [x] Adicionar cards de contador por modalidade no topo das Parcelas (Diário, Semanal, Quinzenal, Mensal)
 - [x] Implementar exportação PDF e Excel das parcelas com filtros ativos
+
+## Fase 52: Limpeza de Produção e Ambiente de Staging
+- [x] Deletar dados de teste do banco de produção (Cliente Teste Bateria + contratos + parcelas)
+- [x] Aplicar migração user_id em todas as tabelas do banco de produção
+- [x] Limpar todos os dados de demonstração do banco (80 parcelas, 5 contratos, 5 clientes, etc.)
+- [x] Criar conta dgfinanceira@gmail.com com base limpa
