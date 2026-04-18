@@ -618,3 +618,10 @@
 - [ ] Página NotificacoesAuto.tsx: histórico de envios recentes
 - [ ] Rota /notificacoes-auto no App.tsx
 - [ ] Item "Notificações Auto" no menu lateral
+
+## Fase 44: Correção de Bugs Críticos (Sessão Atual)
+- [x] Bug: botão "Confirmar Pagamento" desabilitado sem conta de caixa — contaCaixaId tornado opcional no frontend e backend
+- [x] Bug: double-submit no contratos.create — adicionado guard para não fazer fallback REST se contratoId já foi criado pelo Drizzle
+- [x] Bug: em-dashes (—) em comentários JSX causando erro esbuild — substituídos por hífens em Configuracoes.tsx, Dashboard.tsx, MeuPerfil.tsx, Simulador.tsx
+- [x] Limpeza: contrato duplicado (ID 19) removido do banco — mantido apenas contrato 20 com 12 parcelas
+- [x] Correção: user_id null nos dados de teste — atualizado para 30084 (koletor3) em contratos, clientes e parcelas
