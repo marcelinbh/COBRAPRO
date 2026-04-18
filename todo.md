@@ -650,3 +650,6 @@
 - [x] Aplicar migração user_id em todas as tabelas do banco de produção
 - [x] Limpar todos os dados de demonstração do banco (80 parcelas, 5 contratos, 5 clientes, etc.)
 - [x] Criar conta dgfinanceira@gmail.com com base limpa
+
+## Fase 53: Logout Mobile
+- [x] Adicionar botão de logout no menu "Mais" do mobile (bottom navigation)

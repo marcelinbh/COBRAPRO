@@ -150,7 +150,7 @@ export function BottomNav() {
             </div>
           </SheetHeader>
 
-          <div className="overflow-y-auto h-full pb-8">
+          <div className="overflow-y-auto h-full pb-4">
             <div className="grid grid-cols-3 gap-1 p-3">
               {allMenuItems.map((item) => {
                 const isActive = location === item.path;
@@ -174,6 +174,17 @@ export function BottomNav() {
                   </button>
                 );
               })}
+            </div>
+
+            {/* Botão de Logout — visível e acessível */}
+            <div className="px-3 pb-6">
+              <button
+                onClick={() => { logout(); setOpen(false); }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-all touch-manipulation font-medium text-sm"
+              >
+                <LogOut className="h-4 w-4" />
+                Sair da Conta
+              </button>
             </div>
           </div>
         </SheetContent>
