@@ -7,6 +7,8 @@ settings:
 overrides:
   tailwindcss>nanoid: 3.3.7
 
+pnpmfileChecksum: sha256-FegpeSzDb25QvjC+rdfEb/yb9yk+N443siVWcoC2cgg=
+
 patchedDependencies:
   wouter@3.7.1:
     hash: 4e16e6ff3fde7d6c1024d3e0c8605dc9eb6afb690d0d49958c2f449091813072
