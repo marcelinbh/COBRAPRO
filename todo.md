@@ -691,7 +691,7 @@
 - [ ] Testar e-mail de boas-vindas chegando corretamente (após configurar na Kiwify)
 
 ## Fase 58: Correção Tela Preta Mobile
-- [ ] Adicionar splash screen de loading no HTML (antes do React carregar)
-- [ ] Corrigir Home.tsx para renderizar imediatamente sem aguardar auth
-- [ ] Adicionar loading state visível enquanto verifica autenticação
-- [ ] Testar no mobile após deploy
+- [x] Adicionar splash screen de loading no HTML (logo CobraPro + spinner verde)
+- [x] Fade-out suave do splash quando o React monta (main.tsx)
+- [x] Push para GitHub - deploy automático no Digital Ocean
+- [ ] Confirmar que não aparece mais tela preta no iPhone (aguardando deploy)
