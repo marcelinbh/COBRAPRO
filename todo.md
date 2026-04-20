@@ -697,9 +697,9 @@
 - [ ] Confirmar que não aparece mais tela preta no iPhone (aguardando deploy)
 
 ## Fase 59: Otimização de Performance (Site Lento)
-- [ ] Medir tempo de resposta do servidor em produção
-- [ ] Analisar tamanho do bundle JS
-- [ ] Verificar se o servidor está em cold start (Digital Ocean Basic)
-- [ ] Implementar preload de assets críticos
-- [ ] Otimizar bundle com mais code splitting
-- [ ] Verificar se a conexão com Supabase está causando lentidão
+- [x] Medir tempo de resposta: TTFB 500-640ms, bundle 362KB sem cache
+- [x] Cache-Control: max-age=1y + immutable para assets com hash (JS/CSS)
+- [x] Cache-Control: no-cache para index.html
+- [x] Compressão gzip via middleware compression no Express
+- [x] Code splitting melhorado: @trpc+@tanstack, vendor-misc separado
+- [x] Splash screen com logo + spinner verde (elimina tela preta no mobile)
