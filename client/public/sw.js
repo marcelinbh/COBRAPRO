@@ -1,30 +1,17 @@
 // Service Worker para CobraPro PWA
-const CACHE_NAME = 'cobrapro-v1';
-const URLS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon-192x192.png',
-  '/icon-512x512.png',
-];
+// IMPORTANTE: Incrementar CACHE_VERSION a cada deploy para invalidar cache antigo
+const CACHE_VERSION = 'cobrapro-v3';
+const CACHE_NAME = CACHE_VERSION;
 
-// Instalação do Service Worker
+// Instalação: ativar imediatamente sem esperar tabs antigas fecharem
 self.addEventListener('install', (event) => {
-  console.log('[SW] Installing...');
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('[SW] Caching app shell');
-      return cache.addAll(URLS_TO_CACHE).catch((err) => {
-        console.warn('[SW] Cache addAll error:', err);
-      });
-    })
-  );
+  console.log('[SW] Installing version:', CACHE_VERSION);
   self.skipWaiting();
 });
 
-// Ativação do Service Worker
+// Ativação: limpar TODOS os caches antigos
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activating...');
+  console.log('[SW] Activating version:', CACHE_VERSION);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -35,64 +22,44 @@ self.addEventListener('activate', (event) => {
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Estratégia de fetch: Network first, fallback to cache
+// Estratégia de fetch
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
   // Ignorar requisições não-GET
-  if (request.method !== 'GET') {
+  if (request.method !== 'GET') return;
+
+  // Ignorar APIs - sempre ir para rede
+  if (url.pathname.startsWith('/api/')) return;
+
+  // Ignorar outros domínios (fonts, analytics, CDN)
+  if (url.origin !== self.location.origin) return;
+
+  // Assets com hash (/assets/*.js, /assets/*.css): sempre rede
+  // O browser já tem Cache-Control: max-age=1y, immutable - não precisa do SW
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(fetch(request));
     return;
   }
 
-  // Ignorar requisições para APIs (deixar ir para rede)
-  if (url.pathname.startsWith('/api/')) {
+  // Navegação HTML: sempre rede para garantir versão nova
+  if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => {
-        return new Response('Offline', { status: 503 });
-      })
+      fetch(request).catch(() =>
+        caches.match('/index.html') || new Response('Offline', { status: 503 })
+      )
     );
     return;
   }
 
-  // Para recursos estáticos: cache first, fallback to network
-  if (
-    url.pathname.endsWith('.js') ||
-    url.pathname.endsWith('.css') ||
-    url.pathname.endsWith('.png') ||
-    url.pathname.endsWith('.jpg') ||
-    url.pathname.endsWith('.svg') ||
-    url.pathname.endsWith('.woff') ||
-    url.pathname.endsWith('.woff2')
-  ) {
-    event.respondWith(
-      caches.match(request).then((response) => {
-        return response || fetch(request);
-      })
-    );
-    return;
-  }
-
-  // Para HTML: network first, fallback to cache
+  // Outros recursos estáticos: network first
   event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          const cache = caches.open(CACHE_NAME);
-          cache.then((c) => c.put(request, response.clone()));
-        }
-        return response;
-      })
-      .catch(() => {
-        return caches.match(request).then((response) => {
-          return response || new Response('Offline', { status: 503 });
-        });
-      })
+    fetch(request).catch(() => caches.match(request))
   );
 });
 
