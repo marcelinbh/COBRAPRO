@@ -1,0 +1,81 @@
+{
+  "name": "CobraPro - Sistema de Gestão de Cobranças",
+  "short_name": "CobraPro",
+  "description": "Sistema completo de gestão de empréstimos, cobranças e controle financeiro",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#111111",
+  "theme_color": "#22c55e",
+  "lang": "pt-BR",
+  "icons": [
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/icon-192x192_aaed1e1a.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/icon-512x512_9e3b7dff.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/icon-maskable-192x192_e1266f26.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/icon-maskable-512x512_30ae33c7.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Novo Empréstimo",
+      "short_name": "Novo",
+      "description": "Criar um novo empréstimo",
+      "url": "/contratos/novo",
+      "icons": [
+        {
+          "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/icon-96x96_7b3f58e3.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Empréstimos",
+      "short_name": "Empréstimos",
+      "description": "Ver todos os empréstimos",
+      "url": "/emprestimos",
+      "icons": [
+        {
+          "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/icon-96x96_7b3f58e3.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Parcelas",
+      "short_name": "Parcelas",
+      "description": "Ver parcelas pendentes",
+      "url": "/parcelas",
+      "icons": [
+        {
+          "src": "https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/icon-96x96_7b3f58e3.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "categories": ["finance", "business"],
+  "prefer_related_applications": false
+}
