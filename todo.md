@@ -695,3 +695,11 @@
 - [x] Fade-out suave do splash quando o React monta (main.tsx)
 - [x] Push para GitHub - deploy automático no Digital Ocean
 - [ ] Confirmar que não aparece mais tela preta no iPhone (aguardando deploy)
+
+## Fase 59: Otimização de Performance (Site Lento)
+- [ ] Medir tempo de resposta do servidor em produção
+- [ ] Analisar tamanho do bundle JS
+- [ ] Verificar se o servidor está em cold start (Digital Ocean Basic)
+- [ ] Implementar preload de assets críticos
+- [ ] Otimizar bundle com mais code splitting
+- [ ] Verificar se a conexão com Supabase está causando lentidão
