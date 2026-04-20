@@ -174,18 +174,13 @@ export default defineConfig({
           if (id.includes('node_modules/xlsx')) return 'vendor-xlsx';
           if (id.includes('node_modules/jspdf')) return 'vendor-jspdf';
           if (id.includes('node_modules/jspdf-autotable')) return 'vendor-jspdf';
-          // Charts
-          if (id.includes('node_modules/recharts') || id.includes('node_modules/d3-')) return 'vendor-charts';
-          // React core (menor e mais cacheado)
-          if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/')) return 'vendor-react';
-          // Radix UI
-          if (id.includes('node_modules/@radix-ui')) return 'vendor-radix';
           // Tanstack (react-query + trpc)
           if (id.includes('node_modules/@tanstack') || id.includes('node_modules/@trpc')) return 'vendor-tanstack';
           // Icons (lucide é grande)
           if (id.includes('node_modules/lucide-react')) return 'vendor-icons';
-          // Demais node_modules em um chunk genérico
-          if (id.includes('node_modules')) return 'vendor-misc';
+          // Todos os demais node_modules (react, radix, recharts, d3, etc.) no mesmo chunk
+          // para evitar dependências circulares entre chunks
+          if (id.includes('node_modules')) return 'vendor-libs';
         },
       },
     },
