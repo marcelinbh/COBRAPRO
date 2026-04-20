@@ -38,6 +38,41 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
+    <!-- CRÍTICO: Limpar Service Workers antigos ANTES de qualquer coisa -->
+    <!-- Resolve splash infinito causado por SW antigo servindo JS desatualizado -->
+    <script>
+      (function() {
+        var APP_VERSION = '4';
+        var storedVersion = localStorage.getItem('app_version');
+        if (storedVersion !== APP_VERSION) {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(reg) { reg.unregister(); });
+            });
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              keys.forEach(function(key) { caches.delete(key); });
+            });
+          }
+          localStorage.setItem('app_version', APP_VERSION);
+        }
+        // Timeout de segurança: se React não montar em 8s, recarregar
+        setTimeout(function() {
+          var root = document.getElementById('root');
+          if (root && root.innerHTML.trim() === '') {
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(function(regs) {
+                regs.forEach(function(reg) { reg.unregister(); });
+                window.location.reload(true);
+              });
+            } else {
+              window.location.reload(true);
+            }
+          }
+        }, 8000);
+      })();
+    </script>
   </head>
 
   <body>
