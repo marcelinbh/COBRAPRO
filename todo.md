@@ -689,3 +689,9 @@
 - [x] 5 testes Vitest passando (token inválido, token header, token query, status ignorado, env)
 - [ ] Configurar URL do webhook no painel da Kiwify (Apps > Webhooks) — aguardando usuário
 - [ ] Testar e-mail de boas-vindas chegando corretamente (após configurar na Kiwify)
+
+## Fase 58: Correção Tela Preta Mobile
+- [ ] Adicionar splash screen de loading no HTML (antes do React carregar)
+- [ ] Corrigir Home.tsx para renderizar imediatamente sem aguardar auth
+- [ ] Adicionar loading state visível enquanto verifica autenticação
+- [ ] Testar no mobile após deploy

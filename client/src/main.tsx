@@ -52,6 +52,14 @@ const trpcClient = trpc.createClient({
   ],
 });
 
+// Remove splash screen com fade-out suave quando o React montar
+const splash = document.getElementById("splash");
+if (splash) {
+  splash.style.transition = "opacity 0.3s ease";
+  splash.style.opacity = "0";
+  setTimeout(() => splash.remove(), 350);
+}
+
 createRoot(document.getElementById("root")!).render(
   <trpc.Provider client={trpcClient} queryClient={queryClient}>
     <QueryClientProvider client={queryClient}>
