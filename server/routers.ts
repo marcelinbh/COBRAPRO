@@ -764,7 +764,7 @@ const contratosRouter = router({
       // Buscar configuração de multa por dia de atraso
       let multaDiaria = 100; // padrão R$100/dia
       try {
-        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
         if (configRows) {
           const configMap: Record<string, string> = {};
           for (const r of configRows) configMap[r.chave] = r.valor ?? '';
@@ -885,7 +885,7 @@ const contratosRouter = router({
       // Buscar configuração de multa
       let multaDiaria = 100;
       try {
-        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
         if (configRows) {
           const configMap: Record<string, string> = {};
           for (const r of configRows) configMap[r.chave] = r.valor ?? '';
@@ -1278,7 +1278,7 @@ const contratosRouter = router({
     }),
   gerarPDF: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       // Buscar dados completos do contrato
       if (!db) {
@@ -1292,7 +1292,7 @@ const contratosRouter = router({
           .single();
         if (ctErr || !ctData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
         const { data: parcelasData2 } = await supabase.from('parcelas').select('*').eq('contrato_id', input.id).order('numero_parcela');
-        const { data: configRows2 } = await supabase.from('configuracoes').select('chave, valor');
+        const { data: configRows2 } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
         const configMap2: Record<string, string> = {};
         (configRows2 ?? []).forEach((r: any) => { if (r.chave && r.valor) configMap2[r.chave] = r.valor; });
         const c2 = ctData;
@@ -1782,7 +1782,7 @@ const parcelasRouter = router({
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
 
       // Buscar parcela
@@ -2129,7 +2129,7 @@ const caixaRouter = router({
 const portalRouter = router({
   gerarLink: protectedProcedure
     .input(z.object({ clienteId: z.number(), origin: z.string() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       const token = nanoid(48);
       const expiresAt = new Date();
@@ -2216,10 +2216,10 @@ const whatsappRouter = router({
       contratoId: z.number(),
       tipo: z.enum(['atraso', 'preventivo', 'vence_hoje']).default('atraso'),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
-      const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+      const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
       const cfg: Record<string, string> = {};
       for (const r of (configRows ?? [])) cfg[r.chave] = r.valor ?? '';
       const pixEmpresa = cfg['pixKey'] ?? cfg['pix_key'] ?? cfg['chave_pix'] ?? '';
@@ -2350,10 +2350,10 @@ const whatsappRouter = router({
       contratoIds: z.array(z.number()),
       tipo: z.enum(['atraso', 'preventivo']).default('atraso'),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
-      const { data: configRows } = await supabase.from('configuracoes').select('chave, valor');
+      const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
       const cfg: Record<string, string> = {};
       for (const r of (configRows ?? [])) cfg[r.chave] = r.valor ?? '';
       const pixEmpresa = cfg['pixKey'] ?? cfg['pix_key'] ?? '';
@@ -2451,7 +2451,7 @@ const whatsappRouter = router({
       const totalRecebidoHoje = (pagamentosHoje || []).reduce((s: number, p: any) => s + parseFloat(p.valor_pago || 0), 0);
       const totalVencendoHoje = (parcelasHoje || []).filter((p: any) => p.status !== 'paga').length;
       const totalAtrasadas = (atrasadas || []).length;
-      const { data: cfgData } = await supabase.from('configuracoes').select('chave, valor');
+      const { data: cfgData } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
       const cfg: Record<string, string> = {};
       (cfgData || []).forEach((r: any) => { cfg[r.chave] = r.valor; });
       const nomeEmpresa = cfg['nomeEmpresa'] || 'CobraPro';
@@ -2995,7 +2995,7 @@ const contasPagarRouter = router({
       contaCaixaId: z.number().optional(),
       dataPagamento: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       const dataPag = input.dataPagamento ? new Date(input.dataPagamento) : new Date();
       if (db) {
@@ -3025,7 +3025,7 @@ const contasPagarRouter = router({
 
   cancelar: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
         try { await db.update(contasPagar).set({ status: 'cancelada' }).where(eq(contasPagar.id, input.id)); return { success: true }; }
@@ -3039,7 +3039,7 @@ const contasPagarRouter = router({
 
   excluir: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
         try { await db.delete(contasPagar).where(eq(contasPagar.id, input.id)); return { success: true }; }
@@ -3258,7 +3258,7 @@ const chequesRouter = router({
 
   compensar: protectedProcedure
     .input(z.object({ id: z.number(), contaCaixaId: z.number().optional() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
         try {
@@ -3282,7 +3282,7 @@ const chequesRouter = router({
 
   devolver: protectedProcedure
     .input(z.object({ id: z.number(), motivo: z.string().min(1) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
         try { await db.update(cheques).set({ status: 'devolvido', motivoDevolucao: input.motivo }).where(eq(cheques.id, input.id)); return { success: true }; }
@@ -3296,7 +3296,7 @@ const chequesRouter = router({
 
   cancelar: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
         try { await db.update(cheques).set({ status: 'cancelado' }).where(eq(cheques.id, input.id)); return { success: true }; }

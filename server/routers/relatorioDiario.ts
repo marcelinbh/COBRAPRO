@@ -4,12 +4,12 @@ import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
 
 // ─── HELPER: Enviar via Evolution API ─────────────────────────────────────────
-async function getEvolutionConfig() {
+async function getEvolutionConfig(userId: number) {
   const sb = await getSupabaseClientAsync();
   if (!sb) return null;
   const { data } = await sb.from("configuracoes").select("chave, valor").in("chave", [
     "evolution_url", "evolution_api_key", "evolution_instance",
-  ]);
+  ]).eq("user_id", userId);
   if (!data || data.length < 3) return null;
   const cfg: Record<string, string> = {};
   data.forEach((r: { chave: string; valor: string }) => { cfg[r.chave] = r.valor; });
@@ -21,8 +21,8 @@ async function getEvolutionConfig() {
   };
 }
 
-async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean> {
-  const config = await getEvolutionConfig();
+async function sendWhatsAppMessage(phone: string, text: string, userId: number): Promise<boolean> {
+  const config = await getEvolutionConfig(userId);
   if (!config) return false;
   let p = phone.replace(/\D/g, "");
   if (!p.startsWith("55")) p = "55" + p;
@@ -35,14 +35,14 @@ async function sendWhatsAppMessage(phone: string, text: string): Promise<boolean
 }
 
 // ─── HELPER: Gerar mensagem no formato CobraFácil ─────────────────────────────
-async function gerarMensagemRelatorio(): Promise<string> {
+async function gerarMensagemRelatorio(userId: number): Promise<string> {
   const sb = await getSupabaseClientAsync();
   if (!sb) return "";
 
   const hoje = new Date().toISOString().split("T")[0];
 
   // Configurações da empresa
-  const { data: cfgData } = await sb.from("configuracoes").select("chave, valor");
+  const { data: cfgData } = await sb.from("configuracoes").select("chave, valor").eq("user_id", userId);
   const cfg: Record<string, string> = {};
   (cfgData || []).forEach((r: { chave: string; valor: string }) => { cfg[r.chave] = r.valor; });
   const nomeEmpresa = cfg["nomeEmpresa"] || cfg["assinaturaWhatsapp"] || "CobraPro";
@@ -52,6 +52,7 @@ async function gerarMensagemRelatorio(): Promise<string> {
     .from("parcelas")
     .select("id, valor, status, contratos(clientes(nome, telefone))")
     .eq("data_vencimento", hoje)
+    .eq("user_id", userId)
     .neq("status", "paga");
 
   // Parcelas em atraso (status = atrasada)
@@ -59,18 +60,21 @@ async function gerarMensagemRelatorio(): Promise<string> {
     .from("parcelas")
     .select("id, valor, data_vencimento, contratos(clientes(nome, telefone))")
     .eq("status", "atrasada")
+    .eq("user_id", userId)
     .order("data_vencimento", { ascending: true });
 
   // Carteira: clientes ativos, contratos ativos, capital
   const { data: contratosAtivos } = await sb
     .from("contratos")
     .select("id, valor_principal, status")
-    .eq("status", "ativo");
+    .eq("status", "ativo")
+    .eq("user_id", userId);
 
   const { data: clientesAtivos } = await sb
     .from("clientes")
     .select("id")
-    .eq("status", "ativo");
+    .eq("status", "ativo")
+    .eq("user_id", userId);
 
   const capitalNaRua = (contratosAtivos || []).reduce(
     (s: number, c: { valor_principal: string }) => s + parseFloat(c.valor_principal || "0"), 0
@@ -193,7 +197,7 @@ export const relatorioDiarioRouter = router({
       const { data: cfgData } = await sb.from("configuracoes").select("chave, valor").in("chave", [
         "evolution_url", "evolution_api_key", "evolution_instance",
         "relatorio_diario_telefone",
-      ]);
+      ]).eq("user_id", ctx.user.id);
       const cfg: Record<string, string> = {};
       (cfgData || []).forEach((r: { chave: string; valor: string }) => { cfg[r.chave] = r.valor; });
 
@@ -202,10 +206,10 @@ export const relatorioDiarioRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: "Configure o número de telefone para receber o relatório" });
       }
 
-      const mensagem = await gerarMensagemRelatorio();
+      const mensagem = await gerarMensagemRelatorio(ctx.user.id);
       if (!mensagem) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao gerar relatório" });
 
-      const enviado = await sendWhatsAppMessage(telefone, mensagem);
+      const enviado = await sendWhatsAppMessage(telefone, mensagem, ctx.user.id);
       if (!enviado) {
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao enviar mensagem. Verifique se o WhatsApp está conectado." });
       }
@@ -215,7 +219,7 @@ export const relatorioDiarioRouter = router({
 
   // Preview da mensagem (sem enviar)
   preview: protectedProcedure.query(async ({ ctx }) => {
-    const mensagem = await gerarMensagemRelatorio();
+    const mensagem = await gerarMensagemRelatorio(ctx.user.id);
     return { mensagem };
   }),
 });
