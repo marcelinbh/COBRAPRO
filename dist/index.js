@@ -1,10 +1,216 @@
+"use strict";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc3) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc3 = __getOwnPropDesc(from, key)) || desc3.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+
+// vite.config.ts
+var vite_config_exports = {};
+__export(vite_config_exports, {
+  default: () => vite_config_default
+});
+function ensureLogDir() {
+  if (!import_node_fs.default.existsSync(LOG_DIR)) {
+    import_node_fs.default.mkdirSync(LOG_DIR, { recursive: true });
+  }
+}
+function trimLogFile(logPath, maxSize) {
+  try {
+    if (!import_node_fs.default.existsSync(logPath) || import_node_fs.default.statSync(logPath).size <= maxSize) {
+      return;
+    }
+    const lines = import_node_fs.default.readFileSync(logPath, "utf-8").split("\n");
+    const keptLines = [];
+    let keptBytes = 0;
+    const targetSize = TRIM_TARGET_BYTES;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const lineBytes = Buffer.byteLength(`${lines[i]}
+`, "utf-8");
+      if (keptBytes + lineBytes > targetSize) break;
+      keptLines.unshift(lines[i]);
+      keptBytes += lineBytes;
+    }
+    import_node_fs.default.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
+  } catch {
+  }
+}
+function writeToLogFile(source, entries) {
+  if (entries.length === 0) return;
+  ensureLogDir();
+  const logPath = import_node_path.default.join(LOG_DIR, `${source}.log`);
+  const lines = entries.map((entry) => {
+    const ts = (/* @__PURE__ */ new Date()).toISOString();
+    return `[${ts}] ${JSON.stringify(entry)}`;
+  });
+  import_node_fs.default.appendFileSync(logPath, `${lines.join("\n")}
+`, "utf-8");
+  trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
+}
+function vitePluginManusDebugCollector() {
+  return {
+    name: "manus-debug-collector",
+    transformIndexHtml(html) {
+      if (process.env.NODE_ENV === "production") {
+        return html;
+      }
+      return {
+        html,
+        tags: [
+          {
+            tag: "script",
+            attrs: {
+              src: "/__manus__/debug-collector.js",
+              defer: true
+            },
+            injectTo: "head"
+          }
+        ]
+      };
+    },
+    configureServer(server) {
+      server.middlewares.use("/__manus__/logs", (req, res, next) => {
+        if (req.method !== "POST") {
+          return next();
+        }
+        const handlePayload = (payload) => {
+          if (payload.consoleLogs?.length > 0) {
+            writeToLogFile("browserConsole", payload.consoleLogs);
+          }
+          if (payload.networkRequests?.length > 0) {
+            writeToLogFile("networkRequests", payload.networkRequests);
+          }
+          if (payload.sessionEvents?.length > 0) {
+            writeToLogFile("sessionReplay", payload.sessionEvents);
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+        };
+        const reqBody = req.body;
+        if (reqBody && typeof reqBody === "object") {
+          try {
+            handlePayload(reqBody);
+          } catch (e) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: String(e) }));
+          }
+          return;
+        }
+        let body = "";
+        req.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        req.on("end", () => {
+          try {
+            const payload = JSON.parse(body);
+            handlePayload(payload);
+          } catch (e) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: String(e) }));
+          }
+        });
+      });
+    }
+  };
+}
+var import_vite_plugin_jsx_loc, import_vite, import_plugin_react, import_node_fs, import_node_path, import_vite2, import_vite_plugin_manus_runtime, import_meta, PROJECT_ROOT, LOG_DIR, MAX_LOG_SIZE_BYTES, TRIM_TARGET_BYTES, plugins, vite_config_default;
+var init_vite_config = __esm({
+  "vite.config.ts"() {
+    "use strict";
+    import_vite_plugin_jsx_loc = require("../node_modules/@builder.io/vite-plugin-jsx-loc/dist/index.js");
+    import_vite = __toESM(require("../node_modules/@tailwindcss/vite/dist/index.mjs"), 1);
+    import_plugin_react = __toESM(require("../node_modules/@vitejs/plugin-react/dist/index.js"), 1);
+    import_node_fs = __toESM(require("node:fs"), 1);
+    import_node_path = __toESM(require("node:path"), 1);
+    import_vite2 = require("../node_modules/vite/dist/node/index.js");
+    import_vite_plugin_manus_runtime = require("../node_modules/vite-plugin-manus-runtime/dist/index.js");
+    import_meta = {};
+    PROJECT_ROOT = import_meta.dirname;
+    LOG_DIR = import_node_path.default.join(PROJECT_ROOT, ".manus-logs");
+    MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024;
+    TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6);
+    plugins = [(0, import_plugin_react.default)(), (0, import_vite.default)(), (0, import_vite_plugin_jsx_loc.jsxLocPlugin)(), (0, import_vite_plugin_manus_runtime.vitePluginManusRuntime)(), vitePluginManusDebugCollector()];
+    vite_config_default = (0, import_vite2.defineConfig)({
+      plugins,
+      resolve: {
+        alias: {
+          "@": import_node_path.default.resolve(import_meta.dirname, "client", "src"),
+          "@shared": import_node_path.default.resolve(import_meta.dirname, "shared"),
+          "@assets": import_node_path.default.resolve(import_meta.dirname, "attached_assets")
+        }
+      },
+      envDir: import_node_path.default.resolve(import_meta.dirname),
+      root: import_node_path.default.resolve(import_meta.dirname, "client"),
+      publicDir: import_node_path.default.resolve(import_meta.dirname, "client", "public"),
+      build: {
+        outDir: import_node_path.default.resolve(import_meta.dirname, "dist/public"),
+        emptyOutDir: true,
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (id.includes("node_modules/xlsx")) return "vendor-xlsx";
+              if (id.includes("node_modules/jspdf")) return "vendor-jspdf";
+              if (id.includes("node_modules/jspdf-autotable")) return "vendor-jspdf";
+              if (id.includes("node_modules/@tanstack") || id.includes("node_modules/@trpc")) return "vendor-tanstack";
+              if (id.includes("node_modules/lucide-react")) return "vendor-icons";
+              if (id.includes("node_modules")) return "vendor-libs";
+            }
+          }
+        },
+        // Aumentar o limite de aviso de chunk (chunks grandes são esperados com lazy loading)
+        chunkSizeWarningLimit: 600
+      },
+      server: {
+        host: true,
+        allowedHosts: [
+          ".manuspre.computer",
+          ".manus.computer",
+          ".manus-asia.computer",
+          ".manuscomputer.ai",
+          ".manusvm.computer",
+          "localhost",
+          "127.0.0.1"
+        ],
+        fs: {
+          strict: true,
+          deny: ["**/.*"]
+        }
+      }
+    });
+  }
+});
+
 // server/_core/index.ts
-import "dotenv/config";
-import compression from "compression";
-import express2 from "express";
-import { createServer } from "http";
-import net from "net";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
+var import_config = require("../node_modules/dotenv/config.js");
+var import_compression = __toESM(require("../node_modules/compression/index.js"), 1);
+var import_express2 = __toESM(require("../node_modules/express/index.js"), 1);
+var import_http = require("http");
+var import_net = __toESM(require("net"), 1);
+var import_express3 = require("../node_modules/@trpc/server/dist/adapters/express.mjs");
 
 // shared/const.ts
 var COOKIE_NAME = "app_session_id";
@@ -14,32 +220,21 @@ var UNAUTHED_ERR_MSG = "Please login (10001)";
 var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
 
 // server/db.ts
-import dns from "dns";
-import { eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { createClient } from "@supabase/supabase-js";
+var import_dns = __toESM(require("dns"), 1);
+var import_drizzle_orm = require("../node_modules/drizzle-orm/index.js");
+var import_postgres_js = require("../node_modules/drizzle-orm/postgres-js/index.js");
+var import_postgres = __toESM(require("../node_modules/postgres/src/index.js"), 1);
+var import_supabase_js = require("../node_modules/@supabase/supabase-js/dist/index.mjs");
 
 // drizzle/schema.ts
-import {
-  pgTable,
-  serial,
-  text,
-  varchar,
-  boolean,
-  integer,
-  decimal,
-  date,
-  timestamp,
-  pgEnum
-} from "drizzle-orm/pg-core";
-var roleEnum = pgEnum("role", ["user", "admin"]);
-var perfilEnum = pgEnum("perfil", ["admin", "gerente", "koletor"]);
-var categoriaClienteEnum = pgEnum("categoria_cliente", ["bronze", "prata", "ouro", "prefeitura", "padrao"]);
-var qualificacaoEnum = pgEnum("qualificacao", ["bom", "medio", "ruim"]);
-var tipoChavePixEnum = pgEnum("tipo_chave_pix", ["cpf", "cnpj", "email", "telefone", "aleatoria"]);
-var tipoCaixaEnum = pgEnum("tipo_caixa", ["caixa", "banco", "digital"]);
-var modalidadeEnum = pgEnum("modalidade", [
+var import_pg_core = require("../node_modules/drizzle-orm/pg-core/index.js");
+var roleEnum = (0, import_pg_core.pgEnum)("role", ["user", "admin"]);
+var perfilEnum = (0, import_pg_core.pgEnum)("perfil", ["admin", "gerente", "koletor"]);
+var categoriaClienteEnum = (0, import_pg_core.pgEnum)("categoria_cliente", ["bronze", "prata", "ouro", "prefeitura", "padrao"]);
+var qualificacaoEnum = (0, import_pg_core.pgEnum)("qualificacao", ["bom", "medio", "ruim"]);
+var tipoChavePixEnum = (0, import_pg_core.pgEnum)("tipo_chave_pix", ["cpf", "cnpj", "email", "telefone", "aleatoria"]);
+var tipoCaixaEnum = (0, import_pg_core.pgEnum)("tipo_caixa", ["caixa", "banco", "digital"]);
+var modalidadeEnum = (0, import_pg_core.pgEnum)("modalidade", [
   "emprestimo_padrao",
   "emprestimo_diario",
   "tabela_price",
@@ -47,11 +242,11 @@ var modalidadeEnum = pgEnum("modalidade", [
   "desconto_cheque",
   "reparcelamento"
 ]);
-var statusContratoEnum = pgEnum("status_contrato", ["ativo", "quitado", "inadimplente", "cancelado"]);
-var tipoTaxaEnum = pgEnum("tipo_taxa", ["diaria", "semanal", "quinzenal", "mensal", "anual"]);
-var statusParcelaEnum = pgEnum("status_parcela", ["pendente", "paga", "atrasada", "vencendo_hoje", "parcial"]);
-var tipoTransacaoEnum = pgEnum("tipo_transacao", ["entrada", "saida", "transferencia"]);
-var categoriaTransacaoEnum = pgEnum("categoria_transacao", [
+var statusContratoEnum = (0, import_pg_core.pgEnum)("status_contrato", ["ativo", "quitado", "inadimplente", "cancelado"]);
+var tipoTaxaEnum = (0, import_pg_core.pgEnum)("tipo_taxa", ["diaria", "semanal", "quinzenal", "mensal", "anual"]);
+var statusParcelaEnum = (0, import_pg_core.pgEnum)("status_parcela", ["pendente", "paga", "atrasada", "vencendo_hoje", "parcial"]);
+var tipoTransacaoEnum = (0, import_pg_core.pgEnum)("tipo_transacao", ["entrada", "saida", "transferencia"]);
+var categoriaTransacaoEnum = (0, import_pg_core.pgEnum)("categoria_transacao", [
   "pagamento_parcela",
   "emprestimo_liberado",
   "despesa_operacional",
@@ -59,7 +254,7 @@ var categoriaTransacaoEnum = pgEnum("categoria_transacao", [
   "ajuste_manual",
   "outros"
 ]);
-var tipoTemplateEnum = pgEnum("tipo_template", [
+var tipoTemplateEnum = (0, import_pg_core.pgEnum)("tipo_template", [
   "cobranca_geral",
   "cobranca_vencida",
   "lembrete_vencimento",
@@ -68,7 +263,7 @@ var tipoTemplateEnum = pgEnum("tipo_template", [
   "pix_transferencia",
   "personalizado"
 ]);
-var categoriaContaPagarEnum = pgEnum("categoria_conta_pagar", [
+var categoriaContaPagarEnum = (0, import_pg_core.pgEnum)("categoria_conta_pagar", [
   "aluguel",
   "salario",
   "servicos",
@@ -78,363 +273,365 @@ var categoriaContaPagarEnum = pgEnum("categoria_conta_pagar", [
   "tecnologia",
   "outros"
 ]);
-var statusContaPagarEnum = pgEnum("status_conta_pagar", ["pendente", "paga", "atrasada", "cancelada"]);
-var periodicidadeEnum = pgEnum("periodicidade", ["mensal", "semanal", "anual", "unica"]);
-var tipoTaxaChequeEnum = pgEnum("tipo_taxa_cheque", ["mensal", "diaria", "anual"]);
-var statusChequeEnum = pgEnum("status_cheque", ["aguardando", "compensado", "devolvido", "cancelado"]);
-var sexoEnum = pgEnum("sexo", ["masculino", "feminino", "outro"]);
-var estadoCivilEnum = pgEnum("estado_civil", ["solteiro", "casado", "divorciado", "viuvo", "outro"]);
-var users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  passwordHash: varchar("passwordHash", { length: 255 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
+var statusContaPagarEnum = (0, import_pg_core.pgEnum)("status_conta_pagar", ["pendente", "paga", "atrasada", "cancelada"]);
+var periodicidadeEnum = (0, import_pg_core.pgEnum)("periodicidade", ["mensal", "semanal", "anual", "unica"]);
+var tipoTaxaChequeEnum = (0, import_pg_core.pgEnum)("tipo_taxa_cheque", ["mensal", "diaria", "anual"]);
+var statusChequeEnum = (0, import_pg_core.pgEnum)("status_cheque", ["aguardando", "compensado", "devolvido", "cancelado"]);
+var sexoEnum = (0, import_pg_core.pgEnum)("sexo", ["masculino", "feminino", "outro"]);
+var estadoCivilEnum = (0, import_pg_core.pgEnum)("estado_civil", ["solteiro", "casado", "divorciado", "viuvo", "outro"]);
+var users = (0, import_pg_core.pgTable)("users", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  openId: (0, import_pg_core.varchar)("openId", { length: 64 }).notNull().unique(),
+  name: (0, import_pg_core.text)("name"),
+  email: (0, import_pg_core.varchar)("email", { length: 320 }),
+  passwordHash: (0, import_pg_core.varchar)("passwordHash", { length: 255 }),
+  loginMethod: (0, import_pg_core.varchar)("loginMethod", { length: 64 }),
   role: roleEnum("role").default("user").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull()
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+  lastSignedIn: (0, import_pg_core.timestamp)("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
+  onboardingCompleto: (0, import_pg_core.boolean)("onboarding_completo").default(false).notNull(),
+  nomeEmpresa: (0, import_pg_core.varchar)("nome_empresa", { length: 255 })
 });
-var koletores = pgTable("koletores", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 255 }).notNull(),
-  email: varchar("email", { length: 320 }),
-  telefone: varchar("telefone", { length: 20 }),
-  whatsapp: varchar("whatsapp", { length: 20 }),
+var koletores = (0, import_pg_core.pgTable)("koletores", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  nome: (0, import_pg_core.varchar)("nome", { length: 255 }).notNull(),
+  email: (0, import_pg_core.varchar)("email", { length: 320 }),
+  telefone: (0, import_pg_core.varchar)("telefone", { length: 20 }),
+  whatsapp: (0, import_pg_core.varchar)("whatsapp", { length: 20 }),
   perfil: perfilEnum("perfil").default("koletor").notNull(),
-  limiteEmprestimo: decimal("limite_emprestimo", { precision: 15, scale: 2 }).default("0.00"),
-  comissaoPercentual: decimal("comissao_percentual", { precision: 8, scale: 4 }).default("0.00"),
-  ativo: boolean("ativo").default(true).notNull(),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  limiteEmprestimo: (0, import_pg_core.decimal)("limite_emprestimo", { precision: 15, scale: 2 }).default("0.00"),
+  comissaoPercentual: (0, import_pg_core.decimal)("comissao_percentual", { precision: 8, scale: 4 }).default("0.00"),
+  ativo: (0, import_pg_core.boolean)("ativo").default(true).notNull(),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var clientes = pgTable("clientes", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 255 }).notNull(),
-  cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
-  telefone: varchar("telefone", { length: 20 }),
-  whatsapp: varchar("whatsapp", { length: 20 }),
-  email: varchar("email", { length: 320 }),
-  chavePix: varchar("chave_pix", { length: 255 }),
+var clientes = (0, import_pg_core.pgTable)("clientes", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  nome: (0, import_pg_core.varchar)("nome", { length: 255 }).notNull(),
+  cpfCnpj: (0, import_pg_core.varchar)("cpf_cnpj", { length: 20 }),
+  telefone: (0, import_pg_core.varchar)("telefone", { length: 20 }),
+  whatsapp: (0, import_pg_core.varchar)("whatsapp", { length: 20 }),
+  email: (0, import_pg_core.varchar)("email", { length: 320 }),
+  chavePix: (0, import_pg_core.varchar)("chave_pix", { length: 255 }),
   tipoChavePix: tipoChavePixEnum("tipo_chave_pix"),
-  endereco: text("endereco"),
-  numero: varchar("numero", { length: 20 }),
-  complemento: varchar("complemento", { length: 100 }),
-  bairro: varchar("bairro", { length: 100 }),
-  cidade: varchar("cidade", { length: 100 }),
-  estado: varchar("estado", { length: 2 }),
-  cep: varchar("cep", { length: 9 }),
-  observacoes: text("observacoes"),
-  score: integer("score").default(100),
-  fotoUrl: varchar("foto_url", { length: 500 }),
+  endereco: (0, import_pg_core.text)("endereco"),
+  numero: (0, import_pg_core.varchar)("numero", { length: 20 }),
+  complemento: (0, import_pg_core.varchar)("complemento", { length: 100 }),
+  bairro: (0, import_pg_core.varchar)("bairro", { length: 100 }),
+  cidade: (0, import_pg_core.varchar)("cidade", { length: 100 }),
+  estado: (0, import_pg_core.varchar)("estado", { length: 2 }),
+  cep: (0, import_pg_core.varchar)("cep", { length: 9 }),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  score: (0, import_pg_core.integer)("score").default(100),
+  fotoUrl: (0, import_pg_core.varchar)("foto_url", { length: 500 }),
   categoria: categoriaClienteEnum("categoria").default("padrao"),
   qualificacao: qualificacaoEnum("qualificacao").default("bom"),
-  limiteCredito: decimal("limite_credito", { precision: 15, scale: 2 }).default("0.00"),
-  limiteDisponivel: decimal("limite_disponivel", { precision: 15, scale: 2 }).default("0.00"),
-  koletorId: integer("koletor_id"),
-  banco: varchar("banco", { length: 100 }),
-  agencia: varchar("agencia", { length: 20 }),
-  numeroConta: varchar("numero_conta", { length: 30 }),
-  ativo: boolean("ativo").default(true).notNull(),
-  rg: varchar("rg", { length: 20 }),
-  cnpj: varchar("cnpj", { length: 20 }),
-  instagram: varchar("instagram", { length: 100 }),
-  facebook: varchar("facebook", { length: 255 }),
-  profissao: varchar("profissao", { length: 100 }),
-  dataNascimento: date("data_nascimento"),
+  limiteCredito: (0, import_pg_core.decimal)("limite_credito", { precision: 15, scale: 2 }).default("0.00"),
+  limiteDisponivel: (0, import_pg_core.decimal)("limite_disponivel", { precision: 15, scale: 2 }).default("0.00"),
+  koletorId: (0, import_pg_core.integer)("koletor_id"),
+  banco: (0, import_pg_core.varchar)("banco", { length: 100 }),
+  agencia: (0, import_pg_core.varchar)("agencia", { length: 20 }),
+  numeroConta: (0, import_pg_core.varchar)("numero_conta", { length: 30 }),
+  ativo: (0, import_pg_core.boolean)("ativo").default(true).notNull(),
+  rg: (0, import_pg_core.varchar)("rg", { length: 20 }),
+  cnpj: (0, import_pg_core.varchar)("cnpj", { length: 20 }),
+  instagram: (0, import_pg_core.varchar)("instagram", { length: 100 }),
+  facebook: (0, import_pg_core.varchar)("facebook", { length: 255 }),
+  profissao: (0, import_pg_core.varchar)("profissao", { length: 100 }),
+  dataNascimento: (0, import_pg_core.date)("data_nascimento"),
   sexo: sexoEnum("sexo"),
   estadoCivil: estadoCivilEnum("estado_civil"),
-  nomeMae: varchar("nome_mae", { length: 255 }),
-  nomePai: varchar("nome_pai", { length: 255 }),
-  documentosUrls: text("documentos_urls"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  nomeMae: (0, import_pg_core.varchar)("nome_mae", { length: 255 }),
+  nomePai: (0, import_pg_core.varchar)("nome_pai", { length: 255 }),
+  documentosUrls: (0, import_pg_core.text)("documentos_urls"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var contasCaixa = pgTable("contas_caixa", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 100 }).notNull(),
+var contasCaixa = (0, import_pg_core.pgTable)("contas_caixa", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  nome: (0, import_pg_core.varchar)("nome", { length: 100 }).notNull(),
   tipo: tipoCaixaEnum("tipo").default("caixa").notNull(),
-  banco: varchar("banco", { length: 100 }),
-  agencia: varchar("agencia", { length: 20 }),
-  numeroConta: varchar("numero_conta", { length: 30 }),
-  saldoInicial: decimal("saldo_inicial", { precision: 15, scale: 2 }).default("0.00").notNull(),
-  ativa: boolean("ativa").default(true).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  banco: (0, import_pg_core.varchar)("banco", { length: 100 }),
+  agencia: (0, import_pg_core.varchar)("agencia", { length: 20 }),
+  numeroConta: (0, import_pg_core.varchar)("numero_conta", { length: 30 }),
+  saldoInicial: (0, import_pg_core.decimal)("saldo_inicial", { precision: 15, scale: 2 }).default("0.00").notNull(),
+  ativa: (0, import_pg_core.boolean)("ativa").default(true).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var contratos = pgTable("contratos", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  koletorId: integer("koletor_id"),
+var contratos = (0, import_pg_core.pgTable)("contratos", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  clienteId: (0, import_pg_core.integer)("cliente_id").notNull(),
+  koletorId: (0, import_pg_core.integer)("koletor_id"),
   modalidade: modalidadeEnum("modalidade").notNull(),
   status: statusContratoEnum("status").default("ativo").notNull(),
-  valorPrincipal: decimal("valor_principal", { precision: 15, scale: 2 }).notNull(),
-  taxaJuros: decimal("taxa_juros", { precision: 8, scale: 4 }).notNull(),
+  valorPrincipal: (0, import_pg_core.decimal)("valor_principal", { precision: 15, scale: 2 }).notNull(),
+  taxaJuros: (0, import_pg_core.decimal)("taxa_juros", { precision: 8, scale: 4 }).notNull(),
   tipoTaxa: tipoTaxaEnum("tipo_taxa").default("mensal").notNull(),
-  numeroParcelas: integer("numero_parcelas").notNull(),
-  valorParcela: decimal("valor_parcela", { precision: 15, scale: 2 }).notNull(),
-  totalContrato: decimal("total_contrato", { precision: 15, scale: 2 }).notNull(),
-  multaAtraso: decimal("multa_atraso", { precision: 8, scale: 4 }).default("2.00"),
-  jurosMoraDiario: decimal("juros_mora_diario", { precision: 8, scale: 4 }).default("0.033"),
-  dataInicio: date("data_inicio").notNull(),
-  dataVencimentoPrimeira: date("data_vencimento_primeira").notNull(),
-  diaVencimento: integer("dia_vencimento"),
-  descricao: text("descricao"),
-  observacoes: text("observacoes"),
-  contaCaixaId: integer("conta_caixa_id"),
-  contratoOrigemId: integer("contrato_origem_id"),
-  contratoAssinado: boolean("contrato_assinado").default(false),
-  contratoUrl: varchar("contrato_url", { length: 500 }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  numeroParcelas: (0, import_pg_core.integer)("numero_parcelas").notNull(),
+  valorParcela: (0, import_pg_core.decimal)("valor_parcela", { precision: 15, scale: 2 }).notNull(),
+  totalContrato: (0, import_pg_core.decimal)("total_contrato", { precision: 15, scale: 2 }).notNull(),
+  multaAtraso: (0, import_pg_core.decimal)("multa_atraso", { precision: 8, scale: 4 }).default("2.00"),
+  jurosMoraDiario: (0, import_pg_core.decimal)("juros_mora_diario", { precision: 8, scale: 4 }).default("0.033"),
+  dataInicio: (0, import_pg_core.date)("data_inicio").notNull(),
+  dataVencimentoPrimeira: (0, import_pg_core.date)("data_vencimento_primeira").notNull(),
+  diaVencimento: (0, import_pg_core.integer)("dia_vencimento"),
+  descricao: (0, import_pg_core.text)("descricao"),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  contaCaixaId: (0, import_pg_core.integer)("conta_caixa_id"),
+  contratoOrigemId: (0, import_pg_core.integer)("contrato_origem_id"),
+  contratoAssinado: (0, import_pg_core.boolean)("contrato_assinado").default(false),
+  contratoUrl: (0, import_pg_core.varchar)("contrato_url", { length: 500 }),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var parcelas = pgTable("parcelas", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  contratoId: integer("contrato_id").notNull(),
-  clienteId: integer("cliente_id").notNull(),
-  koletorId: integer("koletor_id"),
-  numeroParcela: integer("numero_parcela").notNull(),
-  valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
-  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
-  valorJuros: decimal("valor_juros", { precision: 15, scale: 2 }).default("0.00"),
-  valorMulta: decimal("valor_multa", { precision: 15, scale: 2 }).default("0.00"),
-  valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).default("0.00"),
-  multaManual: decimal("multa_manual", { precision: 15, scale: 2 }).default("0.00"),
-  dataVencimento: date("data_vencimento").notNull(),
-  dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
+var parcelas = (0, import_pg_core.pgTable)("parcelas", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  contratoId: (0, import_pg_core.integer)("contrato_id").notNull(),
+  clienteId: (0, import_pg_core.integer)("cliente_id").notNull(),
+  koletorId: (0, import_pg_core.integer)("koletor_id"),
+  numeroParcela: (0, import_pg_core.integer)("numero_parcela").notNull(),
+  valorOriginal: (0, import_pg_core.decimal)("valor_original", { precision: 15, scale: 2 }).notNull(),
+  valorPago: (0, import_pg_core.decimal)("valor_pago", { precision: 15, scale: 2 }),
+  valorJuros: (0, import_pg_core.decimal)("valor_juros", { precision: 15, scale: 2 }).default("0.00"),
+  valorMulta: (0, import_pg_core.decimal)("valor_multa", { precision: 15, scale: 2 }).default("0.00"),
+  valorDesconto: (0, import_pg_core.decimal)("valor_desconto", { precision: 15, scale: 2 }).default("0.00"),
+  multaManual: (0, import_pg_core.decimal)("multa_manual", { precision: 15, scale: 2 }).default("0.00"),
+  dataVencimento: (0, import_pg_core.date)("data_vencimento").notNull(),
+  dataPagamento: (0, import_pg_core.timestamp)("data_pagamento", { withTimezone: true }),
   status: statusParcelaEnum("status").default("pendente").notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  contaCaixaId: (0, import_pg_core.integer)("conta_caixa_id"),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var transacoesCaixa = pgTable("transacoes_caixa", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  contaCaixaId: integer("conta_caixa_id").notNull(),
+var transacoesCaixa = (0, import_pg_core.pgTable)("transacoes_caixa", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  contaCaixaId: (0, import_pg_core.integer)("conta_caixa_id").notNull(),
   tipo: tipoTransacaoEnum("tipo").notNull(),
   categoria: categoriaTransacaoEnum("categoria").notNull(),
-  valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
-  descricao: text("descricao"),
-  parcelaId: integer("parcela_id"),
-  contratoId: integer("contrato_id"),
-  clienteId: integer("cliente_id"),
-  contaDestinoId: integer("conta_destino_id"),
-  dataTransacao: timestamp("data_transacao", { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+  valor: (0, import_pg_core.decimal)("valor", { precision: 15, scale: 2 }).notNull(),
+  descricao: (0, import_pg_core.text)("descricao"),
+  parcelaId: (0, import_pg_core.integer)("parcela_id"),
+  contratoId: (0, import_pg_core.integer)("contrato_id"),
+  clienteId: (0, import_pg_core.integer)("cliente_id"),
+  contaDestinoId: (0, import_pg_core.integer)("conta_destino_id"),
+  dataTransacao: (0, import_pg_core.timestamp)("data_transacao", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var magicLinks = pgTable("magic_links", {
-  id: serial("id").primaryKey(),
-  clienteId: integer("cliente_id").notNull(),
-  token: varchar("token", { length: 128 }).notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  usado: boolean("usado").default(false).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+var magicLinks = (0, import_pg_core.pgTable)("magic_links", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  clienteId: (0, import_pg_core.integer)("cliente_id").notNull(),
+  token: (0, import_pg_core.varchar)("token", { length: 128 }).notNull().unique(),
+  expiresAt: (0, import_pg_core.timestamp)("expires_at", { withTimezone: true }).notNull(),
+  usado: (0, import_pg_core.boolean)("usado").default(false).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var templatesWhatsapp = pgTable("templates_whatsapp", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 100 }).notNull(),
+var templatesWhatsapp = (0, import_pg_core.pgTable)("templates_whatsapp", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  nome: (0, import_pg_core.varchar)("nome", { length: 100 }).notNull(),
   tipo: tipoTemplateEnum("tipo").notNull(),
-  mensagem: text("mensagem").notNull(),
-  ativo: boolean("ativo").default(true).notNull(),
-  padrao: boolean("padrao").default(false).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  mensagem: (0, import_pg_core.text)("mensagem").notNull(),
+  ativo: (0, import_pg_core.boolean)("ativo").default(true).notNull(),
+  padrao: (0, import_pg_core.boolean)("padrao").default(false).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var configuracoes = pgTable("configuracoes", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  chave: varchar("chave", { length: 100 }).notNull(),
-  valor: text("valor"),
-  descricao: text("descricao"),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+var configuracoes = (0, import_pg_core.pgTable)("configuracoes", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  chave: (0, import_pg_core.varchar)("chave", { length: 100 }).notNull(),
+  valor: (0, import_pg_core.text)("valor"),
+  descricao: (0, import_pg_core.text)("descricao"),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var contasPagar = pgTable("contas_pagar", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  descricao: varchar("descricao", { length: 255 }).notNull(),
+var contasPagar = (0, import_pg_core.pgTable)("contas_pagar", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  descricao: (0, import_pg_core.varchar)("descricao", { length: 255 }).notNull(),
   categoria: categoriaContaPagarEnum("categoria").default("outros").notNull(),
-  valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
-  dataVencimento: date("data_vencimento").notNull(),
-  dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
+  valor: (0, import_pg_core.decimal)("valor", { precision: 15, scale: 2 }).notNull(),
+  dataVencimento: (0, import_pg_core.date)("data_vencimento").notNull(),
+  dataPagamento: (0, import_pg_core.timestamp)("data_pagamento", { withTimezone: true }),
   status: statusContaPagarEnum("status").default("pendente").notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  recorrente: boolean("recorrente").default(false).notNull(),
+  contaCaixaId: (0, import_pg_core.integer)("conta_caixa_id"),
+  recorrente: (0, import_pg_core.boolean)("recorrente").default(false).notNull(),
   periodicidade: periodicidadeEnum("periodicidade").default("unica"),
-  observacoes: text("observacoes"),
-  comprovante: varchar("comprovante", { length: 500 }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  comprovante: (0, import_pg_core.varchar)("comprovante", { length: 500 }),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var produtos = pgTable("produtos", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 255 }).notNull(),
-  descricao: text("descricao"),
-  preco: decimal("preco", { precision: 15, scale: 2 }).notNull(),
-  estoque: integer("estoque").default(0).notNull(),
-  ativo: boolean("ativo").default(true).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+var produtos = (0, import_pg_core.pgTable)("produtos", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  nome: (0, import_pg_core.varchar)("nome", { length: 255 }).notNull(),
+  descricao: (0, import_pg_core.text)("descricao"),
+  preco: (0, import_pg_core.decimal)("preco", { precision: 15, scale: 2 }).notNull(),
+  estoque: (0, import_pg_core.integer)("estoque").default(0).notNull(),
+  ativo: (0, import_pg_core.boolean)("ativo").default(true).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var cheques = pgTable("cheques", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  numeroCheque: varchar("numero_cheque", { length: 50 }),
-  banco: varchar("banco", { length: 100 }),
-  agencia: varchar("agencia", { length: 20 }),
-  conta: varchar("conta", { length: 30 }),
-  emitente: varchar("emitente", { length: 255 }).notNull(),
-  cpfCnpjEmitente: varchar("cpf_cnpj_emitente", { length: 20 }),
-  valorNominal: decimal("valor_nominal", { precision: 15, scale: 2 }).notNull(),
-  dataVencimento: date("data_vencimento").notNull(),
-  taxaDesconto: decimal("taxa_desconto", { precision: 8, scale: 4 }).notNull(),
+var cheques = (0, import_pg_core.pgTable)("cheques", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  clienteId: (0, import_pg_core.integer)("cliente_id").notNull(),
+  numeroCheque: (0, import_pg_core.varchar)("numero_cheque", { length: 50 }),
+  banco: (0, import_pg_core.varchar)("banco", { length: 100 }),
+  agencia: (0, import_pg_core.varchar)("agencia", { length: 20 }),
+  conta: (0, import_pg_core.varchar)("conta", { length: 30 }),
+  emitente: (0, import_pg_core.varchar)("emitente", { length: 255 }).notNull(),
+  cpfCnpjEmitente: (0, import_pg_core.varchar)("cpf_cnpj_emitente", { length: 20 }),
+  valorNominal: (0, import_pg_core.decimal)("valor_nominal", { precision: 15, scale: 2 }).notNull(),
+  dataVencimento: (0, import_pg_core.date)("data_vencimento").notNull(),
+  taxaDesconto: (0, import_pg_core.decimal)("taxa_desconto", { precision: 8, scale: 4 }).notNull(),
   tipoTaxa: tipoTaxaChequeEnum("tipo_taxa_cheque").default("mensal").notNull(),
-  valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).notNull(),
-  valorLiquido: decimal("valor_liquido", { precision: 15, scale: 2 }).notNull(),
+  valorDesconto: (0, import_pg_core.decimal)("valor_desconto", { precision: 15, scale: 2 }).notNull(),
+  valorLiquido: (0, import_pg_core.decimal)("valor_liquido", { precision: 15, scale: 2 }).notNull(),
   status: statusChequeEnum("status_cheque").default("aguardando").notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  dataCompensacao: timestamp("data_compensacao", { withTimezone: true }),
-  motivoDevolucao: varchar("motivo_devolucao", { length: 255 }),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  contaCaixaId: (0, import_pg_core.integer)("conta_caixa_id"),
+  dataCompensacao: (0, import_pg_core.timestamp)("data_compensacao", { withTimezone: true }),
+  motivoDevolucao: (0, import_pg_core.varchar)("motivo_devolucao", { length: 255 }),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var passwordResets = pgTable("password_resets", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  token: varchar("token", { length: 128 }).notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  usado: boolean("usado").default(false).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+var passwordResets = (0, import_pg_core.pgTable)("password_resets", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id").notNull(),
+  token: (0, import_pg_core.varchar)("token", { length: 128 }).notNull().unique(),
+  expiresAt: (0, import_pg_core.timestamp)("expires_at", { withTimezone: true }).notNull(),
+  usado: (0, import_pg_core.boolean)("usado").default(false).notNull(),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var veiculos = pgTable("veiculos", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  placa: varchar("placa", { length: 10 }).notNull(),
-  marca: varchar("marca", { length: 50 }),
-  modelo: varchar("modelo", { length: 100 }),
-  ano: integer("ano"),
-  cor: varchar("cor", { length: 50 }),
-  renavam: varchar("renavam", { length: 20 }),
-  chassi: varchar("chassi", { length: 50 }),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+var veiculos = (0, import_pg_core.pgTable)("veiculos", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  clienteId: (0, import_pg_core.integer)("cliente_id").notNull(),
+  placa: (0, import_pg_core.varchar)("placa", { length: 10 }).notNull(),
+  marca: (0, import_pg_core.varchar)("marca", { length: 50 }),
+  modelo: (0, import_pg_core.varchar)("modelo", { length: 100 }),
+  ano: (0, import_pg_core.integer)("ano"),
+  cor: (0, import_pg_core.varchar)("cor", { length: 50 }),
+  renavam: (0, import_pg_core.varchar)("renavam", { length: 20 }),
+  chassi: (0, import_pg_core.varchar)("chassi", { length: 50 }),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var parcelasVeiculo = pgTable("parcelas_veiculo", {
-  id: serial("id").primaryKey(),
-  veiculoId: integer("veiculo_id").notNull(),
-  numero: integer("numero").notNull(),
-  valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
-  juros: decimal("juros", { precision: 15, scale: 2 }).default("0.00"),
-  vencimento: date("vencimento").notNull(),
+var parcelasVeiculo = (0, import_pg_core.pgTable)("parcelas_veiculo", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  veiculoId: (0, import_pg_core.integer)("veiculo_id").notNull(),
+  numero: (0, import_pg_core.integer)("numero").notNull(),
+  valorOriginal: (0, import_pg_core.decimal)("valor_original", { precision: 15, scale: 2 }).notNull(),
+  juros: (0, import_pg_core.decimal)("juros", { precision: 15, scale: 2 }).default("0.00"),
+  vencimento: (0, import_pg_core.date)("vencimento").notNull(),
   status: statusParcelaEnum("status").default("pendente").notNull(),
-  pagamentoData: date("pagamento_data"),
-  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  pagamentoData: (0, import_pg_core.date)("pagamento_data"),
+  valorPago: (0, import_pg_core.decimal)("valor_pago", { precision: 15, scale: 2 }),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var statusVendaTelefoneEnum = pgEnum("status_venda_telefone", [
+var statusVendaTelefoneEnum = (0, import_pg_core.pgEnum)("status_venda_telefone", [
   "ativo",
   "quitado",
   "inadimplente",
   "cancelado"
 ]);
-var vendas_telefone = pgTable("vendas_telefone", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
+var vendas_telefone = (0, import_pg_core.pgTable)("vendas_telefone", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
   // Produto
-  marca: varchar("marca", { length: 100 }).notNull(),
-  modelo: varchar("modelo", { length: 200 }).notNull(),
-  imei: varchar("imei", { length: 20 }),
-  cor: varchar("cor", { length: 50 }),
-  armazenamento: varchar("armazenamento", { length: 20 }),
-  custo: decimal("custo", { precision: 12, scale: 2 }).notNull(),
-  preco_venda: decimal("preco_venda", { precision: 12, scale: 2 }).notNull(),
+  marca: (0, import_pg_core.varchar)("marca", { length: 100 }).notNull(),
+  modelo: (0, import_pg_core.varchar)("modelo", { length: 200 }).notNull(),
+  imei: (0, import_pg_core.varchar)("imei", { length: 20 }),
+  cor: (0, import_pg_core.varchar)("cor", { length: 50 }),
+  armazenamento: (0, import_pg_core.varchar)("armazenamento", { length: 20 }),
+  custo: (0, import_pg_core.decimal)("custo", { precision: 12, scale: 2 }).notNull(),
+  preco_venda: (0, import_pg_core.decimal)("preco_venda", { precision: 12, scale: 2 }).notNull(),
   // Financiamento
-  entrada_percentual: decimal("entrada_percentual", { precision: 5, scale: 2 }).notNull(),
-  entrada_valor: decimal("entrada_valor", { precision: 12, scale: 2 }).notNull(),
-  num_parcelas: integer("num_parcelas").notNull(),
-  juros_mensal: decimal("juros_mensal", { precision: 5, scale: 2 }).notNull(),
-  valor_parcela: decimal("valor_parcela", { precision: 12, scale: 2 }).notNull(),
-  total_juros: decimal("total_juros", { precision: 12, scale: 2 }).notNull(),
-  total_a_receber: decimal("total_a_receber", { precision: 12, scale: 2 }).notNull(),
-  lucro_bruto: decimal("lucro_bruto", { precision: 12, scale: 2 }).notNull(),
-  roi: decimal("roi", { precision: 8, scale: 2 }),
-  payback_meses: decimal("payback_meses", { precision: 5, scale: 2 }),
+  entrada_percentual: (0, import_pg_core.decimal)("entrada_percentual", { precision: 5, scale: 2 }).notNull(),
+  entrada_valor: (0, import_pg_core.decimal)("entrada_valor", { precision: 12, scale: 2 }).notNull(),
+  num_parcelas: (0, import_pg_core.integer)("num_parcelas").notNull(),
+  juros_mensal: (0, import_pg_core.decimal)("juros_mensal", { precision: 5, scale: 2 }).notNull(),
+  valor_parcela: (0, import_pg_core.decimal)("valor_parcela", { precision: 12, scale: 2 }).notNull(),
+  total_juros: (0, import_pg_core.decimal)("total_juros", { precision: 12, scale: 2 }).notNull(),
+  total_a_receber: (0, import_pg_core.decimal)("total_a_receber", { precision: 12, scale: 2 }).notNull(),
+  lucro_bruto: (0, import_pg_core.decimal)("lucro_bruto", { precision: 12, scale: 2 }).notNull(),
+  roi: (0, import_pg_core.decimal)("roi", { precision: 8, scale: 2 }),
+  payback_meses: (0, import_pg_core.decimal)("payback_meses", { precision: 5, scale: 2 }),
   // Comprador
-  comprador_nome: varchar("comprador_nome", { length: 200 }).notNull(),
-  comprador_cpf: varchar("comprador_cpf", { length: 14 }),
-  comprador_rg: varchar("comprador_rg", { length: 20 }),
-  comprador_telefone: varchar("comprador_telefone", { length: 20 }),
-  comprador_email: varchar("comprador_email", { length: 320 }),
-  comprador_estado_civil: varchar("comprador_estado_civil", { length: 30 }),
-  comprador_profissao: varchar("comprador_profissao", { length: 100 }),
-  comprador_instagram: varchar("comprador_instagram", { length: 100 }),
-  comprador_cep: varchar("comprador_cep", { length: 9 }),
-  comprador_cidade: varchar("comprador_cidade", { length: 100 }),
-  comprador_estado: varchar("comprador_estado", { length: 2 }),
-  comprador_endereco: varchar("comprador_endereco", { length: 300 }),
-  comprador_local_trabalho: varchar("comprador_local_trabalho", { length: 200 }),
+  comprador_nome: (0, import_pg_core.varchar)("comprador_nome", { length: 200 }).notNull(),
+  comprador_cpf: (0, import_pg_core.varchar)("comprador_cpf", { length: 14 }),
+  comprador_rg: (0, import_pg_core.varchar)("comprador_rg", { length: 20 }),
+  comprador_telefone: (0, import_pg_core.varchar)("comprador_telefone", { length: 20 }),
+  comprador_email: (0, import_pg_core.varchar)("comprador_email", { length: 320 }),
+  comprador_estado_civil: (0, import_pg_core.varchar)("comprador_estado_civil", { length: 30 }),
+  comprador_profissao: (0, import_pg_core.varchar)("comprador_profissao", { length: 100 }),
+  comprador_instagram: (0, import_pg_core.varchar)("comprador_instagram", { length: 100 }),
+  comprador_cep: (0, import_pg_core.varchar)("comprador_cep", { length: 9 }),
+  comprador_cidade: (0, import_pg_core.varchar)("comprador_cidade", { length: 100 }),
+  comprador_estado: (0, import_pg_core.varchar)("comprador_estado", { length: 2 }),
+  comprador_endereco: (0, import_pg_core.varchar)("comprador_endereco", { length: 300 }),
+  comprador_local_trabalho: (0, import_pg_core.varchar)("comprador_local_trabalho", { length: 200 }),
   // Status
   status: statusVendaTelefoneEnum("status").default("ativo").notNull(),
-  data_venda: timestamp("data_venda", { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+  data_venda: (0, import_pg_core.timestamp)("data_venda", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var parcelas_venda_telefone = pgTable("parcelas_venda_telefone", {
-  id: serial("id").primaryKey(),
-  venda_id: integer("venda_id").notNull(),
-  numero: integer("numero").notNull(),
-  valor: decimal("valor", { precision: 12, scale: 2 }).notNull(),
-  vencimento: timestamp("vencimento", { withTimezone: true }).notNull(),
+var parcelas_venda_telefone = (0, import_pg_core.pgTable)("parcelas_venda_telefone", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  venda_id: (0, import_pg_core.integer)("venda_id").notNull(),
+  numero: (0, import_pg_core.integer)("numero").notNull(),
+  valor: (0, import_pg_core.decimal)("valor", { precision: 12, scale: 2 }).notNull(),
+  vencimento: (0, import_pg_core.timestamp)("vencimento", { withTimezone: true }).notNull(),
   status: statusParcelaEnum("status").default("pendente").notNull(),
-  pago_em: timestamp("pago_em", { withTimezone: true }),
-  valor_pago: decimal("valor_pago", { precision: 12, scale: 2 }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+  pago_em: (0, import_pg_core.timestamp)("pago_em", { withTimezone: true }),
+  valor_pago: (0, import_pg_core.decimal)("valor_pago", { precision: 12, scale: 2 }),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
-var statusAssinaturaEnum = pgEnum("status_assinatura", [
+var statusAssinaturaEnum = (0, import_pg_core.pgEnum)("status_assinatura", [
   "ativa",
   "cancelada",
   "suspensa",
   "inadimplente"
 ]);
-var assinaturas = pgTable("assinaturas", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  servico: varchar("servico", { length: 200 }).notNull(),
-  descricao: text("descricao"),
-  valorMensal: decimal("valor_mensal", { precision: 15, scale: 2 }).notNull(),
-  diaVencimento: integer("dia_vencimento").notNull().default(10),
+var assinaturas = (0, import_pg_core.pgTable)("assinaturas", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  userId: (0, import_pg_core.integer)("user_id"),
+  clienteId: (0, import_pg_core.integer)("cliente_id").notNull(),
+  servico: (0, import_pg_core.varchar)("servico", { length: 200 }).notNull(),
+  descricao: (0, import_pg_core.text)("descricao"),
+  valorMensal: (0, import_pg_core.decimal)("valor_mensal", { precision: 15, scale: 2 }).notNull(),
+  diaVencimento: (0, import_pg_core.integer)("dia_vencimento").notNull().default(10),
   status: statusAssinaturaEnum("status").default("ativa").notNull(),
-  dataInicio: date("data_inicio").notNull(),
-  dataCancelamento: date("data_cancelamento"),
-  contaCaixaId: integer("conta_caixa_id"),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+  dataInicio: (0, import_pg_core.date)("data_inicio").notNull(),
+  dataCancelamento: (0, import_pg_core.date)("data_cancelamento"),
+  contaCaixaId: (0, import_pg_core.integer)("conta_caixa_id"),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: (0, import_pg_core.timestamp)("updatedAt", { withTimezone: true }).defaultNow().notNull()
 });
-var pagamentosAssinatura = pgTable("pagamentos_assinatura", {
-  id: serial("id").primaryKey(),
-  assinaturaId: integer("assinatura_id").notNull(),
-  clienteId: integer("cliente_id").notNull(),
-  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }).notNull(),
-  dataPagamento: timestamp("data_pagamento", { withTimezone: true }).defaultNow().notNull(),
-  mesReferencia: varchar("mes_referencia", { length: 7 }).notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+var pagamentosAssinatura = (0, import_pg_core.pgTable)("pagamentos_assinatura", {
+  id: (0, import_pg_core.serial)("id").primaryKey(),
+  assinaturaId: (0, import_pg_core.integer)("assinatura_id").notNull(),
+  clienteId: (0, import_pg_core.integer)("cliente_id").notNull(),
+  valorPago: (0, import_pg_core.decimal)("valor_pago", { precision: 15, scale: 2 }).notNull(),
+  dataPagamento: (0, import_pg_core.timestamp)("data_pagamento", { withTimezone: true }).defaultNow().notNull(),
+  mesReferencia: (0, import_pg_core.varchar)("mes_referencia", { length: 7 }).notNull(),
+  contaCaixaId: (0, import_pg_core.integer)("conta_caixa_id"),
+  observacoes: (0, import_pg_core.text)("observacoes"),
+  createdAt: (0, import_pg_core.timestamp)("createdAt", { withTimezone: true }).defaultNow().notNull()
 });
 
 // server/_core/env.ts
@@ -452,13 +649,13 @@ var ENV = {
 };
 
 // server/db.ts
-dns.setDefaultResultOrder("ipv4first");
+import_dns.default.setDefaultResultOrder("ipv4first");
 var _customFetch = null;
 async function getCustomFetch() {
   if (_customFetch) return _customFetch;
   try {
-    const { fetch: undiciFetch, Agent } = await import("undici");
-    const dnsResolver = new dns.Resolver();
+    const { fetch: undiciFetch, Agent } = await import("../node_modules/undici/index.js");
+    const dnsResolver = new import_dns.default.Resolver();
     dnsResolver.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1", "1.0.0.1"]);
     const dnsCache = /* @__PURE__ */ new Map();
     const agent = new Agent({
@@ -507,7 +704,7 @@ async function getSupabaseClientAsync() {
   const key = ENV.supabaseServiceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (url && key) {
     const customFetch = await getCustomFetch();
-    _supabase = createClient(url, key, {
+    _supabase = (0, import_supabase_js.createClient)(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
       global: { fetch: customFetch }
     });
@@ -531,7 +728,7 @@ async function getDb() {
     const hostname = urlObj.hostname;
     if (hostname.includes("supabase.co") || hostname.includes("supabase.com")) {
       const canResolve = await new Promise((resolve) => {
-        const testResolver = new dns.Resolver();
+        const testResolver = new import_dns.default.Resolver();
         testResolver.setServers(["8.8.8.8", "1.1.1.1"]);
         testResolver.resolve4(hostname, (err) => resolve(!err));
       });
@@ -544,13 +741,13 @@ async function getDb() {
   } catch (_) {
   }
   try {
-    _client = postgres(dbUrl, {
+    _client = (0, import_postgres.default)(dbUrl, {
       ssl: dbUrl.includes("sslmode=require") ? { rejectUnauthorized: false } : false,
       max: 5,
       idle_timeout: 20,
       connect_timeout: 10
     });
-    _db = drizzle(_client);
+    _db = (0, import_postgres_js.drizzle)(_client);
     console.log("[Database] PostgreSQL direct connection initialized");
     return _db;
   } catch (err) {
@@ -616,7 +813,7 @@ async function findUserByOpenId(openId) {
   const db = await getDb();
   if (db) {
     try {
-      const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+      const result = await db.select().from(users).where((0, import_drizzle_orm.eq)(users.openId, openId)).limit(1);
       return result[0] || null;
     } catch (err) {
       console.error("[Database] Drizzle findUserByOpenId failed:", err.message);
@@ -657,9 +854,9 @@ var HttpError = class extends Error {
 var ForbiddenError = (msg) => new HttpError(403, msg);
 
 // server/_core/sdk.ts
-import axios from "axios";
-import { parse as parseCookieHeader } from "cookie";
-import { SignJWT, jwtVerify } from "jose";
+var import_axios = __toESM(require("../node_modules/axios/index.js"), 1);
+var import_cookie = require("../node_modules/cookie/dist/index.js");
+var import_jose = require("../node_modules/jose/dist/webapi/index.js");
 var isNonEmptyString = (value) => typeof value === "string" && value.length > 0;
 var EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 var GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
@@ -701,7 +898,7 @@ var OAuthService = class {
     return data;
   }
 };
-var createOAuthHttpClient = () => axios.create({
+var createOAuthHttpClient = () => import_axios.default.create({
   baseURL: ENV.oAuthServerUrl,
   timeout: AXIOS_TIMEOUT_MS
 });
@@ -758,7 +955,7 @@ var SDKServer = class {
     if (!cookieHeader) {
       return /* @__PURE__ */ new Map();
     }
-    const parsed = parseCookieHeader(cookieHeader);
+    const parsed = (0, import_cookie.parse)(cookieHeader);
     return new Map(Object.entries(parsed));
   }
   getSessionSecret() {
@@ -785,7 +982,7 @@ var SDKServer = class {
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1e3);
     const secretKey = this.getSessionSecret();
-    return new SignJWT({
+    return new import_jose.SignJWT({
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name
@@ -798,7 +995,7 @@ var SDKServer = class {
     }
     try {
       const secretKey = this.getSessionSecret();
-      const { payload } = await jwtVerify(cookieValue, secretKey, {
+      const { payload } = await (0, import_jose.jwtVerify)(cookieValue, secretKey, {
         algorithms: ["HS256"]
       });
       const { openId, appId, name } = payload;
@@ -915,9 +1112,9 @@ function registerOAuthRoutes(app) {
 }
 
 // server/authRoutes.ts
-import bcrypt from "bcryptjs";
-import crypto from "crypto";
-import { and, eq as eq2, gt, sql as sql2 } from "drizzle-orm";
+var import_bcryptjs = __toESM(require("../node_modules/bcryptjs/index.js"), 1);
+var import_crypto = __toESM(require("crypto"), 1);
+var import_drizzle_orm2 = require("../node_modules/drizzle-orm/index.js");
 
 // server/storage.ts
 function getStorageConfig() {
@@ -975,7 +1172,7 @@ async function findUserByEmail(email) {
   const db = await getDb();
   if (db) {
     try {
-      const result = await db.select().from(users).where(eq2(users.email, email)).limit(1);
+      const result = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.email, email)).limit(1);
       return result[0] ?? null;
     } catch (err) {
       console.warn("[Auth] Drizzle findUserByEmail failed, trying REST:", err.message);
@@ -1003,7 +1200,9 @@ function mapSupabaseUser(data) {
     role: data.role ?? "user",
     lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn) : /* @__PURE__ */ new Date(),
     createdAt: data.createdAt ? new Date(data.createdAt) : /* @__PURE__ */ new Date(),
-    updatedAt: data.updatedAt ? new Date(data.updatedAt) : /* @__PURE__ */ new Date()
+    updatedAt: data.updatedAt ? new Date(data.updatedAt) : /* @__PURE__ */ new Date(),
+    onboardingCompleto: data.onboarding_completo ?? false,
+    nomeEmpresa: data.nome_empresa ?? null
   };
 }
 async function createSessionForUser(user, req, res) {
@@ -1036,7 +1235,7 @@ function registerAuthRoutes(app) {
         res.status(401).json({ error: "Email ou senha incorretos" });
         return;
       }
-      const valid = await bcrypt.compare(password, user.passwordHash);
+      const valid = await import_bcryptjs.default.compare(password, user.passwordHash);
       if (!valid) {
         res.status(401).json({ error: "Email ou senha incorretos" });
         return;
@@ -1044,7 +1243,7 @@ function registerAuthRoutes(app) {
       try {
         const db = await getDb();
         if (db) {
-          await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq2(users.id, user.id));
+          await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.eq)(users.id, user.id));
         } else {
           const supabase = await getSupabaseClientAsync();
           if (supabase) {
@@ -1079,12 +1278,12 @@ function registerAuthRoutes(app) {
         res.status(409).json({ error: "Este email j\xE1 est\xE1 cadastrado" });
         return;
       }
-      const passwordHash = await bcrypt.hash(password, 12);
+      const passwordHash = await import_bcryptjs.default.hash(password, 12);
       const openId = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       const db = await getDb();
       let newUser = null;
       if (db) {
-        const countResult = await db.select({ count: sql2`count(*)` }).from(users);
+        const countResult = await db.select({ count: import_drizzle_orm2.sql`count(*)` }).from(users);
         const isFirstUser = (countResult[0]?.count ?? 0) === 0;
         await db.insert(users).values({
           openId,
@@ -1095,7 +1294,7 @@ function registerAuthRoutes(app) {
           role: isFirstUser ? "admin" : "user",
           lastSignedIn: /* @__PURE__ */ new Date()
         });
-        newUser = (await db.select().from(users).where(eq2(users.email, email)).limit(1))[0] ?? null;
+        newUser = (await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.email, email)).limit(1))[0] ?? null;
       } else {
         const supabase = await getSupabaseClientAsync();
         if (!supabase) {
@@ -1145,11 +1344,11 @@ function registerAuthRoutes(app) {
         res.json({ success: true, message: "Se o email existir, voc\xEA receber\xE1 as instru\xE7\xF5es." });
         return;
       }
-      const token = crypto.randomBytes(32).toString("hex");
+      const token = import_crypto.default.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
       const db = await getDb();
       if (db) {
-        await db.update(passwordResets).set({ usado: true }).where(eq2(passwordResets.userId, user.id));
+        await db.update(passwordResets).set({ usado: true }).where((0, import_drizzle_orm2.eq)(passwordResets.userId, user.id));
         await db.insert(passwordResets).values({ userId: user.id, token, expiresAt });
       } else {
         const supabase = await getSupabaseClientAsync();
@@ -1221,15 +1420,15 @@ function registerAuthRoutes(app) {
         res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
         return;
       }
-      const passwordHash = await bcrypt.hash(password, 12);
+      const passwordHash = await import_bcryptjs.default.hash(password, 12);
       const now = /* @__PURE__ */ new Date();
       const db = await getDb();
       if (db) {
         const resetResult = await db.select().from(passwordResets).where(
-          and(
-            eq2(passwordResets.token, token),
-            eq2(passwordResets.usado, false),
-            gt(passwordResets.expiresAt, now)
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.eq)(passwordResets.token, token),
+            (0, import_drizzle_orm2.eq)(passwordResets.usado, false),
+            (0, import_drizzle_orm2.gt)(passwordResets.expiresAt, now)
           )
         ).limit(1);
         const reset = resetResult[0];
@@ -1237,8 +1436,8 @@ function registerAuthRoutes(app) {
           res.status(400).json({ error: "Token inv\xE1lido ou expirado" });
           return;
         }
-        await db.update(users).set({ passwordHash }).where(eq2(users.id, reset.userId));
-        await db.update(passwordResets).set({ usado: true }).where(eq2(passwordResets.id, reset.id));
+        await db.update(users).set({ passwordHash }).where((0, import_drizzle_orm2.eq)(users.id, reset.userId));
+        await db.update(passwordResets).set({ usado: true }).where((0, import_drizzle_orm2.eq)(passwordResets.id, reset.id));
       } else {
         const supabase = await getSupabaseClientAsync();
         if (!supabase) {
@@ -1267,12 +1466,12 @@ function registerAuthRoutes(app) {
         return;
       }
       const adminEmail = "koletor3@gmail.com";
-      const passwordHash = await bcrypt.hash("97556511", 12);
+      const passwordHash = await import_bcryptjs.default.hash("97556511", 12);
       const db = await getDb();
       if (db) {
-        const existing2 = await db.select().from(users).where(eq2(users.email, adminEmail)).limit(1);
+        const existing2 = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.email, adminEmail)).limit(1);
         if (existing2.length > 0) {
-          await db.update(users).set({ passwordHash, role: "admin", loginMethod: "email" }).where(eq2(users.email, adminEmail));
+          await db.update(users).set({ passwordHash, role: "admin", loginMethod: "email" }).where((0, import_drizzle_orm2.eq)(users.email, adminEmail));
           res.json({ success: true, message: "Admin atualizado com sucesso (Drizzle)" });
           return;
         }
@@ -1436,8 +1635,8 @@ async function processWebhookEvent(payload) {
 }
 
 // server/kiwifyWebhook.ts
-import bcrypt2 from "bcryptjs";
-import { eq as eq3 } from "drizzle-orm";
+var import_bcryptjs2 = __toESM(require("../node_modules/bcryptjs/index.js"), 1);
+var import_drizzle_orm3 = require("../node_modules/drizzle-orm/index.js");
 
 // server/_core/email.ts
 async function enviarEmail(params) {
@@ -1600,7 +1799,7 @@ async function processarCompraAprovada(payload) {
   try {
     let usuarioExistente = null;
     if (db) {
-      const result = await db.select().from(users).where(eq3(users.email, email)).limit(1);
+      const result = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.email, email)).limit(1);
       usuarioExistente = result[0] ?? null;
     } else {
       const supabase = await getSupabaseClientAsync();
@@ -1617,7 +1816,9 @@ async function processarCompraAprovada(payload) {
             role: data.role ?? "user",
             lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn) : /* @__PURE__ */ new Date(),
             createdAt: data.createdAt ? new Date(data.createdAt) : /* @__PURE__ */ new Date(),
-            updatedAt: data.updatedAt ? new Date(data.updatedAt) : /* @__PURE__ */ new Date()
+            updatedAt: data.updatedAt ? new Date(data.updatedAt) : /* @__PURE__ */ new Date(),
+            onboardingCompleto: data.onboarding_completo ?? false,
+            nomeEmpresa: data.nome_empresa ?? null
           };
         }
       }
@@ -1626,9 +1827,9 @@ async function processarCompraAprovada(payload) {
       console.log(`[Kiwify] Usu\xE1rio ${email} j\xE1 existe (id: ${usuarioExistente.id}) \u2014 reenviando acesso`);
       userId = usuarioExistente.id;
       senhaGerada = gerarSenhaTemporaria();
-      const novoHash = await bcrypt2.hash(senhaGerada, 12);
+      const novoHash = await import_bcryptjs2.default.hash(senhaGerada, 12);
       if (db) {
-        await db.update(users).set({ passwordHash: novoHash, updatedAt: /* @__PURE__ */ new Date() }).where(eq3(users.id, usuarioExistente.id));
+        await db.update(users).set({ passwordHash: novoHash, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm3.eq)(users.id, usuarioExistente.id));
       } else {
         const supabase = await getSupabaseClientAsync();
         if (supabase) {
@@ -1637,7 +1838,7 @@ async function processarCompraAprovada(payload) {
       }
     } else {
       senhaGerada = gerarSenhaTemporaria();
-      const passwordHash = await bcrypt2.hash(senhaGerada, 12);
+      const passwordHash = await import_bcryptjs2.default.hash(senhaGerada, 12);
       const openId = `kiwify_${Date.now()}_${Math.random().toString(36).slice(2)}`;
       if (db) {
         await db.insert(users).values({
@@ -1649,7 +1850,7 @@ async function processarCompraAprovada(payload) {
           role: "user",
           lastSignedIn: /* @__PURE__ */ new Date()
         });
-        const created = await db.select().from(users).where(eq3(users.email, email)).limit(1);
+        const created = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.email, email)).limit(1);
         userId = created[0]?.id;
       } else {
         const supabase = await getSupabaseClientAsync();
@@ -1730,10 +1931,10 @@ function registerKiwifyWebhookRoutes(app) {
 }
 
 // server/_core/systemRouter.ts
-import { z } from "zod";
+var import_zod = require("../node_modules/zod/index.js");
 
 // server/_core/notification.ts
-import { TRPCError } from "@trpc/server";
+var import_server = require("../node_modules/@trpc/server/dist/index.mjs");
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
 var trimValue = (value) => value.trim();
@@ -1747,13 +1948,13 @@ var buildEndpointUrl = (baseUrl) => {
 };
 var validatePayload = (input) => {
   if (!isNonEmptyString2(input.title)) {
-    throw new TRPCError({
+    throw new import_server.TRPCError({
       code: "BAD_REQUEST",
       message: "Notification title is required."
     });
   }
   if (!isNonEmptyString2(input.content)) {
-    throw new TRPCError({
+    throw new import_server.TRPCError({
       code: "BAD_REQUEST",
       message: "Notification content is required."
     });
@@ -1761,13 +1962,13 @@ var validatePayload = (input) => {
   const title = trimValue(input.title);
   const content = trimValue(input.content);
   if (title.length > TITLE_MAX_LENGTH) {
-    throw new TRPCError({
+    throw new import_server.TRPCError({
       code: "BAD_REQUEST",
       message: `Notification title must be at most ${TITLE_MAX_LENGTH} characters.`
     });
   }
   if (content.length > CONTENT_MAX_LENGTH) {
-    throw new TRPCError({
+    throw new import_server.TRPCError({
       code: "BAD_REQUEST",
       message: `Notification content must be at most ${CONTENT_MAX_LENGTH} characters.`
     });
@@ -1777,13 +1978,13 @@ var validatePayload = (input) => {
 async function notifyOwner(payload) {
   const { title, content } = validatePayload(payload);
   if (!ENV.forgeApiUrl) {
-    throw new TRPCError({
+    throw new import_server.TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service URL is not configured."
     });
   }
   if (!ENV.forgeApiKey) {
-    throw new TRPCError({
+    throw new import_server.TRPCError({
       code: "INTERNAL_SERVER_ERROR",
       message: "Notification service API key is not configured."
     });
@@ -1815,17 +2016,17 @@ async function notifyOwner(payload) {
 }
 
 // server/_core/trpc.ts
-import { initTRPC, TRPCError as TRPCError2 } from "@trpc/server";
-import superjson from "superjson";
-var t = initTRPC.context().create({
-  transformer: superjson
+var import_server2 = require("../node_modules/@trpc/server/dist/index.mjs");
+var import_superjson = __toESM(require("../node_modules/superjson/dist/index.js"), 1);
+var t = import_server2.initTRPC.context().create({
+  transformer: import_superjson.default
 });
 var router = t.router;
 var publicProcedure = t.procedure;
 var requireUser = t.middleware(async (opts) => {
   const { ctx, next } = opts;
   if (!ctx.user) {
-    throw new TRPCError2({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    throw new import_server2.TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
   }
   return next({
     ctx: {
@@ -1839,7 +2040,7 @@ var adminProcedure = t.procedure.use(
   t.middleware(async (opts) => {
     const { ctx, next } = opts;
     if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+      throw new import_server2.TRPCError({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
     }
     return next({
       ctx: {
@@ -1853,16 +2054,16 @@ var adminProcedure = t.procedure.use(
 // server/_core/systemRouter.ts
 var systemRouter = router({
   health: publicProcedure.input(
-    z.object({
-      timestamp: z.number().min(0, "timestamp cannot be negative")
+    import_zod.z.object({
+      timestamp: import_zod.z.number().min(0, "timestamp cannot be negative")
     })
   ).query(() => ({
     ok: true
   })),
   notifyOwner: adminProcedure.input(
-    z.object({
-      title: z.string().min(1, "title is required"),
-      content: z.string().min(1, "content is required")
+    import_zod.z.object({
+      title: import_zod.z.string().min(1, "title is required"),
+      content: import_zod.z.string().min(1, "content is required")
     })
   ).mutation(async ({ input }) => {
     const delivered = await notifyOwner(input);
@@ -1873,49 +2074,49 @@ var systemRouter = router({
 });
 
 // server/routers/veiculos.ts
-import { z as z2 } from "zod";
-import { TRPCError as TRPCError3 } from "@trpc/server";
-import { eq as eq4, desc, and as and2 } from "drizzle-orm";
+var import_zod2 = require("../node_modules/zod/index.js");
+var import_server3 = require("../node_modules/@trpc/server/dist/index.mjs");
+var import_drizzle_orm4 = require("../node_modules/drizzle-orm/index.js");
 var veiculosRouter = router({
-  criar: protectedProcedure.input(z2.object({
-    clienteId: z2.number(),
-    placa: z2.string().min(1),
-    marca: z2.string().optional(),
-    modelo: z2.string().optional(),
-    ano: z2.number().optional(),
-    cor: z2.string().optional(),
-    renavam: z2.string().optional(),
-    chassi: z2.string().optional(),
-    observacoes: z2.string().optional()
+  criar: protectedProcedure.input(import_zod2.z.object({
+    clienteId: import_zod2.z.number(),
+    placa: import_zod2.z.string().min(1),
+    marca: import_zod2.z.string().optional(),
+    modelo: import_zod2.z.string().optional(),
+    ano: import_zod2.z.number().optional(),
+    cor: import_zod2.z.string().optional(),
+    renavam: import_zod2.z.string().optional(),
+    chassi: import_zod2.z.string().optional(),
+    observacoes: import_zod2.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    if (!db) throw new import_server3.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const result = await db.insert(veiculos).values({ ...input, userId: ctx.user.id }).returning();
     return result[0];
   }),
-  listar: protectedProcedure.input(z2.object({ clienteId: z2.number().optional() }).optional()).query(async ({ ctx, input }) => {
+  listar: protectedProcedure.input(import_zod2.z.object({ clienteId: import_zod2.z.number().optional() }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (!db) return [];
-    const allVeiculos = await db.select().from(veiculos).where(eq4(veiculos.userId, ctx.user.id)).orderBy(desc(veiculos.createdAt));
+    const allVeiculos = await db.select().from(veiculos).where((0, import_drizzle_orm4.eq)(veiculos.userId, ctx.user.id)).orderBy((0, import_drizzle_orm4.desc)(veiculos.createdAt));
     if (input?.clienteId) {
       return allVeiculos.filter((v) => v.clienteId === input.clienteId);
     }
     return allVeiculos;
   }),
-  deletar: protectedProcedure.input(z2.object({ id: z2.number() })).mutation(async ({ ctx, input }) => {
+  deletar: protectedProcedure.input(import_zod2.z.object({ id: import_zod2.z.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
-    await db.delete(parcelasVeiculo).where(eq4(parcelasVeiculo.veiculoId, input.id));
-    await db.delete(veiculos).where(and2(eq4(veiculos.id, input.id), eq4(veiculos.userId, ctx.user.id)));
+    if (!db) throw new import_server3.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    await db.delete(parcelasVeiculo).where((0, import_drizzle_orm4.eq)(parcelasVeiculo.veiculoId, input.id));
+    await db.delete(veiculos).where((0, import_drizzle_orm4.and)((0, import_drizzle_orm4.eq)(veiculos.id, input.id), (0, import_drizzle_orm4.eq)(veiculos.userId, ctx.user.id)));
     return { success: true };
   }),
-  pagarParcela: protectedProcedure.input(z2.object({
-    parcelaId: z2.number(),
-    valorPago: z2.number(),
-    observacoes: z2.string().optional()
+  pagarParcela: protectedProcedure.input(import_zod2.z.object({
+    parcelaId: import_zod2.z.number(),
+    valorPago: import_zod2.z.number(),
+    observacoes: import_zod2.z.string().optional()
   })).mutation(async ({ input }) => {
     const db = await getDb();
-    if (!db) throw new TRPCError3({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    if (!db) throw new import_server3.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const hoje = /* @__PURE__ */ new Date();
     const result = await db.update(parcelasVeiculo).set({
       status: "paga",
@@ -1923,23 +2124,23 @@ var veiculosRouter = router({
       pagamentoData: hoje.toISOString().split("T")[0],
       observacoes: input.observacoes,
       updatedAt: /* @__PURE__ */ new Date()
-    }).where(eq4(parcelasVeiculo.id, input.parcelaId)).returning();
+    }).where((0, import_drizzle_orm4.eq)(parcelasVeiculo.id, input.parcelaId)).returning();
     return result[0];
   })
 });
 
 // server/routers/assinaturas.ts
-import { z as z3 } from "zod";
-import { TRPCError as TRPCError4 } from "@trpc/server";
+var import_zod3 = require("../node_modules/zod/index.js");
+var import_server4 = require("../node_modules/@trpc/server/dist/index.mjs");
 var assinaturasRouter = router({
   // Listar assinaturas com dados do cliente
-  list: protectedProcedure.input(z3.object({
-    status: z3.enum(["ativa", "cancelada", "suspensa", "inadimplente", "todas"]).optional().default("todas"),
-    clienteId: z3.number().optional(),
-    busca: z3.string().optional()
+  list: protectedProcedure.input(import_zod3.z.object({
+    status: import_zod3.z.enum(["ativa", "cancelada", "suspensa", "inadimplente", "todas"]).optional().default("todas"),
+    clienteId: import_zod3.z.number().optional(),
+    busca: import_zod3.z.string().optional()
   })).query(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
+    if (!supabase) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
     let query = supabase.from("assinaturas").select("*, clientes!inner(id, nome, whatsapp, telefone)").order("createdAt", { ascending: false }).eq("user_id", ctx.user.id);
     if (input.status !== "todas") {
       query = query.eq("status", input.status);
@@ -1948,7 +2149,7 @@ var assinaturasRouter = router({
       query = query.eq("cliente_id", input.clienteId);
     }
     const { data, error } = await query;
-    if (error) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     let result = data || [];
     if (input.busca) {
       const busca = input.busca.toLowerCase();
@@ -1961,9 +2162,9 @@ var assinaturasRouter = router({
   // KPIs do módulo de assinaturas
   kpis: protectedProcedure.query(async ({ ctx }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
+    if (!supabase) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
     const { data: todas, error } = await supabase.from("assinaturas").select("id, status, valor_mensal").eq("user_id", ctx.user.id);
-    if (error) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     const ativas = (todas || []).filter((a) => a.status === "ativa");
     const inadimplentes = (todas || []).filter((a) => a.status === "inadimplente");
     const canceladas = (todas || []).filter((a) => a.status === "cancelada");
@@ -1977,18 +2178,18 @@ var assinaturasRouter = router({
     };
   }),
   // Criar nova assinatura
-  criar: protectedProcedure.input(z3.object({
-    clienteId: z3.number(),
-    servico: z3.string().min(1),
-    descricao: z3.string().optional(),
-    valorMensal: z3.number().positive(),
-    diaVencimento: z3.number().min(1).max(31).default(10),
-    dataInicio: z3.string(),
-    contaCaixaId: z3.number().optional(),
-    observacoes: z3.string().optional()
+  criar: protectedProcedure.input(import_zod3.z.object({
+    clienteId: import_zod3.z.number(),
+    servico: import_zod3.z.string().min(1),
+    descricao: import_zod3.z.string().optional(),
+    valorMensal: import_zod3.z.number().positive(),
+    diaVencimento: import_zod3.z.number().min(1).max(31).default(10),
+    dataInicio: import_zod3.z.string(),
+    contaCaixaId: import_zod3.z.number().optional(),
+    observacoes: import_zod3.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
+    if (!supabase) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
     const { data, error } = await supabase.from("assinaturas").insert({
       cliente_id: input.clienteId,
       servico: input.servico,
@@ -2001,22 +2202,22 @@ var assinaturasRouter = router({
       observacoes: input.observacoes || null,
       user_id: ctx.user.id
     }).select().single();
-    if (error) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return data;
   }),
   // Atualizar assinatura
-  atualizar: protectedProcedure.input(z3.object({
-    id: z3.number(),
-    servico: z3.string().min(1).optional(),
-    descricao: z3.string().optional(),
-    valorMensal: z3.number().positive().optional(),
-    diaVencimento: z3.number().min(1).max(31).optional(),
-    status: z3.enum(["ativa", "cancelada", "suspensa", "inadimplente"]).optional(),
-    contaCaixaId: z3.number().optional(),
-    observacoes: z3.string().optional()
+  atualizar: protectedProcedure.input(import_zod3.z.object({
+    id: import_zod3.z.number(),
+    servico: import_zod3.z.string().min(1).optional(),
+    descricao: import_zod3.z.string().optional(),
+    valorMensal: import_zod3.z.number().positive().optional(),
+    diaVencimento: import_zod3.z.number().min(1).max(31).optional(),
+    status: import_zod3.z.enum(["ativa", "cancelada", "suspensa", "inadimplente"]).optional(),
+    contaCaixaId: import_zod3.z.number().optional(),
+    observacoes: import_zod3.z.string().optional()
   })).mutation(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
+    if (!supabase) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
     const updates = { updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
     if (input.servico !== void 0) updates.servico = input.servico;
     if (input.descricao !== void 0) updates.descricao = input.descricao;
@@ -2031,20 +2232,20 @@ var assinaturasRouter = router({
     if (input.contaCaixaId !== void 0) updates.conta_caixa_id = input.contaCaixaId;
     if (input.observacoes !== void 0) updates.observacoes = input.observacoes;
     const { data, error } = await supabase.from("assinaturas").update(updates).eq("id", input.id).select().single();
-    if (error) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return data;
   }),
   // Registrar pagamento de assinatura
-  registrarPagamento: protectedProcedure.input(z3.object({
-    assinaturaId: z3.number(),
-    clienteId: z3.number(),
-    valorPago: z3.number().positive(),
-    mesReferencia: z3.string().regex(/^\d{4}-\d{2}$/),
-    contaCaixaId: z3.number().optional(),
-    observacoes: z3.string().optional()
+  registrarPagamento: protectedProcedure.input(import_zod3.z.object({
+    assinaturaId: import_zod3.z.number(),
+    clienteId: import_zod3.z.number(),
+    valorPago: import_zod3.z.number().positive(),
+    mesReferencia: import_zod3.z.string().regex(/^\d{4}-\d{2}$/),
+    contaCaixaId: import_zod3.z.number().optional(),
+    observacoes: import_zod3.z.string().optional()
   })).mutation(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
+    if (!supabase) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
     const { data: pagamento, error: pagErr } = await supabase.from("pagamentos_assinatura").insert({
       assinatura_id: input.assinaturaId,
       cliente_id: input.clienteId,
@@ -2053,7 +2254,7 @@ var assinaturasRouter = router({
       conta_caixa_id: input.contaCaixaId || null,
       observacoes: input.observacoes || null
     }).select().single();
-    if (pagErr) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: pagErr.message });
+    if (pagErr) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: pagErr.message });
     if (input.contaCaixaId) {
       const { data: assinatura } = await supabase.from("assinaturas").select("servico, clientes!inner(nome)").eq("id", input.assinaturaId).single();
       const clienteNome = assinatura?.clientes?.nome || "Cliente";
@@ -2071,25 +2272,25 @@ var assinaturasRouter = router({
     return pagamento;
   }),
   // Listar pagamentos de uma assinatura
-  pagamentos: protectedProcedure.input(z3.object({ assinaturaId: z3.number() })).query(async ({ input }) => {
+  pagamentos: protectedProcedure.input(import_zod3.z.object({ assinaturaId: import_zod3.z.number() })).query(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
+    if (!supabase) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
     const { data, error } = await supabase.from("pagamentos_assinatura").select("*").eq("assinatura_id", input.assinaturaId).order("data_pagamento", { ascending: false });
-    if (error) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return data || [];
   }),
   // Deletar assinatura
-  deletar: protectedProcedure.input(z3.object({ id: z3.number() })).mutation(async ({ input }) => {
+  deletar: protectedProcedure.input(import_zod3.z.object({ id: import_zod3.z.number() })).mutation(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
+    if (!supabase) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indispon\xEDvel" });
     const { error } = await supabase.from("assinaturas").delete().eq("id", input.id);
-    if (error) throw new TRPCError4({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server4.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   })
 });
 
 // server/routers/backup.ts
-import { z as z4 } from "zod";
+var import_zod4 = require("../node_modules/zod/index.js");
 async function sb() {
   const client = await getSupabaseClientAsync();
   if (!client) throw new Error("Supabase client not available");
@@ -2101,7 +2302,7 @@ var backupRouter = router({
     if (error) throw error;
     return { dados: data || [], total: (data || []).length };
   }),
-  exportarContratos: protectedProcedure.input(z4.object({ modalidade: z4.string().optional() }).optional()).query(async ({ ctx, input }) => {
+  exportarContratos: protectedProcedure.input(import_zod4.z.object({ modalidade: import_zod4.z.string().optional() }).optional()).query(async ({ ctx, input }) => {
     let query = (await sb()).from("contratos").select("id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, dia_vencimento, multa_atraso, juros_mora_diario, etiquetas, created_at, clientes(nome, cpf_cnpj, telefone, whatsapp)").order("created_at", { ascending: false }).eq("user_id", ctx.user.id);
     if (input?.modalidade && input.modalidade !== "todos") {
       query = query.eq("modalidade", input.modalidade);
@@ -2110,7 +2311,7 @@ var backupRouter = router({
     if (error) throw error;
     return { dados: data || [], total: (data || []).length };
   }),
-  exportarParcelas: protectedProcedure.input(z4.object({ status: z4.string().optional(), dataInicio: z4.string().optional(), dataFim: z4.string().optional() }).optional()).query(async ({ ctx, input }) => {
+  exportarParcelas: protectedProcedure.input(import_zod4.z.object({ status: import_zod4.z.string().optional(), dataInicio: import_zod4.z.string().optional(), dataFim: import_zod4.z.string().optional() }).optional()).query(async ({ ctx, input }) => {
     let query = (await sb()).from("parcelas").select("id, contrato_id, numero_parcela, valor, valor_juros, data_vencimento, data_pagamento, status, valor_pago, forma_pagamento, observacoes, created_at, contratos(modalidade, valor_principal, clientes(nome, cpf_cnpj, telefone))").order("data_vencimento", { ascending: false }).eq("user_id", ctx.user.id);
     if (input?.status && input.status !== "todos") {
       query = query.eq("status", input.status);
@@ -2138,7 +2339,7 @@ var backupRouter = router({
       totalVeiculos: (veiculos2 || []).length
     };
   }),
-  exportarTransacoes: protectedProcedure.input(z4.object({ dataInicio: z4.string().optional(), dataFim: z4.string().optional() }).optional()).query(async ({ ctx, input }) => {
+  exportarTransacoes: protectedProcedure.input(import_zod4.z.object({ dataInicio: import_zod4.z.string().optional(), dataFim: import_zod4.z.string().optional() }).optional()).query(async ({ ctx, input }) => {
     let query = (await sb()).from("transacoes_caixa").select("id, conta_caixa_id, tipo, categoria, descricao, valor, data_transacao, created_at, contas_caixa(nome)").order("data_transacao", { ascending: false }).eq("user_id", ctx.user.id);
     if (input?.dataInicio) {
       query = query.gte("data_transacao", input.dataInicio);
@@ -2153,8 +2354,8 @@ var backupRouter = router({
 });
 
 // server/routers/whatsappEvolution.ts
-import { z as z5 } from "zod";
-import { TRPCError as TRPCError5 } from "@trpc/server";
+var import_zod5 = require("../node_modules/zod/index.js");
+var import_server5 = require("../node_modules/@trpc/server/dist/index.mjs");
 async function getEvolutionConfig(userId) {
   const sb2 = await getSupabaseClientAsync();
   if (!sb2) return null;
@@ -2171,8 +2372,8 @@ async function getEvolutionConfig(userId) {
     instanceName: config.evolution_instance
   };
 }
-async function evolutionRequest(config, method, path2, body) {
-  const fullPath = path2.replace("{instance}", config.instanceName);
+async function evolutionRequest(config, method, path3, body) {
+  const fullPath = path3.replace("{instance}", config.instanceName);
   const res = await fetch(`${config.url}${fullPath}`, {
     method,
     headers: {
@@ -2190,13 +2391,13 @@ async function evolutionRequest(config, method, path2, body) {
 }
 var whatsappEvolutionRouter = router({
   // Salvar configurações da Evolution API
-  saveConfig: protectedProcedure.input(z5.object({
-    url: z5.string().url(),
-    apiKey: z5.string().min(1),
-    instanceName: z5.string().min(1)
+  saveConfig: protectedProcedure.input(import_zod5.z.object({
+    url: import_zod5.z.string().url(),
+    apiKey: import_zod5.z.string().min(1),
+    instanceName: import_zod5.z.string().min(1)
   })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server5.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const configs = [
       { chave: "evolution_url", valor: input.url },
       { chave: "evolution_api_key", valor: input.apiKey },
@@ -2235,7 +2436,7 @@ var whatsappEvolutionRouter = router({
   // Criar instância na Evolution API
   createInstance: protectedProcedure.mutation(async ({ ctx }) => {
     const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es da Evolution API n\xE3o encontradas" });
+    if (!config) throw new import_server5.TRPCError({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es da Evolution API n\xE3o encontradas" });
     const result = await evolutionRequest(config, "POST", "/instance/create", {
       instanceName: config.instanceName,
       qrcode: true,
@@ -2282,24 +2483,24 @@ var whatsappEvolutionRouter = router({
   // Desconectar instância
   disconnect: protectedProcedure.mutation(async ({ ctx }) => {
     const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es n\xE3o encontradas" });
+    if (!config) throw new import_server5.TRPCError({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es n\xE3o encontradas" });
     const result = await evolutionRequest(config, "DELETE", "/instance/logout/{instance}");
     return result;
   }),
   // Deletar instância
   deleteInstance: protectedProcedure.mutation(async ({ ctx }) => {
     const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es n\xE3o encontradas" });
+    if (!config) throw new import_server5.TRPCError({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es n\xE3o encontradas" });
     const result = await evolutionRequest(config, "DELETE", "/instance/delete/{instance}");
     return result;
   }),
   // Enviar mensagem de texto via Evolution API
-  sendMessage: protectedProcedure.input(z5.object({
-    phone: z5.string(),
-    message: z5.string()
+  sendMessage: protectedProcedure.input(import_zod5.z.object({
+    phone: import_zod5.z.string(),
+    message: import_zod5.z.string()
   })).mutation(async ({ ctx, input }) => {
     const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "WhatsApp n\xE3o configurado" });
+    if (!config) throw new import_server5.TRPCError({ code: "BAD_REQUEST", message: "WhatsApp n\xE3o configurado" });
     let phone = input.phone.replace(/\D/g, "");
     if (!phone.startsWith("55")) phone = "55" + phone;
     if (!phone.endsWith("@s.whatsapp.net")) phone = phone + "@s.whatsapp.net";
@@ -2308,12 +2509,12 @@ var whatsappEvolutionRouter = router({
       text: input.message
     });
     if (result?.error || result?.status === 400) {
-      throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: result?.message || "Erro ao enviar mensagem" });
+      throw new import_server5.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: result?.message || "Erro ao enviar mensagem" });
     }
     return { success: true, result };
   }),
   // Verificar se um número está no WhatsApp
-  checkNumber: protectedProcedure.input(z5.object({ phone: z5.string() })).query(async ({ ctx, input }) => {
+  checkNumber: protectedProcedure.input(import_zod5.z.object({ phone: import_zod5.z.string() })).query(async ({ ctx, input }) => {
     const config = await getEvolutionConfig(ctx.user.id);
     if (!config) return { exists: false };
     let phone = input.phone.replace(/\D/g, "");
@@ -2331,14 +2532,14 @@ var whatsappEvolutionRouter = router({
 });
 
 // server/routers/perfil.ts
-import { z as z6 } from "zod";
-import { TRPCError as TRPCError6 } from "@trpc/server";
-import bcrypt3 from "bcryptjs";
+var import_zod6 = require("../node_modules/zod/index.js");
+var import_server6 = require("../node_modules/@trpc/server/dist/index.mjs");
+var import_bcryptjs3 = __toESM(require("../node_modules/bcryptjs/index.js"), 1);
 var perfilRouter = router({
   // Dados completos do perfil: user + configurações + estatísticas
   get: protectedProcedure.query(async ({ ctx }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: cfgRows } = await sb2.from("configuracoes").select("chave, valor").eq("user_id", ctx.user.id);
     const cfg = {};
     (cfgRows ?? []).forEach((r) => {
@@ -2389,16 +2590,16 @@ var perfilRouter = router({
     };
   }),
   // Atualizar dados da empresa no perfil
-  update: protectedProcedure.input(z6.object({
-    nomeEmpresa: z6.string().optional(),
-    whatsappEmpresa: z6.string().optional(),
-    cnpjEmpresa: z6.string().optional(),
-    enderecoEmpresa: z6.string().optional(),
-    nomeCobranca: z6.string().optional(),
-    linkPagamento: z6.string().optional()
+  update: protectedProcedure.input(import_zod6.z.object({
+    nomeEmpresa: import_zod6.z.string().optional(),
+    whatsappEmpresa: import_zod6.z.string().optional(),
+    cnpjEmpresa: import_zod6.z.string().optional(),
+    enderecoEmpresa: import_zod6.z.string().optional(),
+    nomeCobranca: import_zod6.z.string().optional(),
+    linkPagamento: import_zod6.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const entries = Object.entries(input).filter(([, v]) => v !== void 0);
     for (const [chave, valor] of entries) {
       await sb2.from("configuracoes").upsert({ chave, valor: String(valor), user_id: ctx.user.id }, { onConflict: "chave,user_id" });
@@ -2406,35 +2607,35 @@ var perfilRouter = router({
     return { success: true };
   }),
   // Salvar chave PIX
-  salvarPix: protectedProcedure.input(z6.object({
-    pixKey: z6.string().min(1),
-    tipoPix: z6.string().default("cpf")
+  salvarPix: protectedProcedure.input(import_zod6.z.object({
+    pixKey: import_zod6.z.string().min(1),
+    tipoPix: import_zod6.z.string().default("cpf")
   })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await sb2.from("configuracoes").upsert({ chave: "pixKey", valor: input.pixKey, user_id: ctx.user.id }, { onConflict: "chave,user_id" });
     await sb2.from("configuracoes").upsert({ chave: "tipoPix", valor: input.tipoPix, user_id: ctx.user.id }, { onConflict: "chave,user_id" });
     return { success: true };
   }),
   // Upload de logo da empresa
-  uploadLogo: protectedProcedure.input(z6.object({
-    base64: z6.string(),
-    mimeType: z6.string().default("image/png")
+  uploadLogo: protectedProcedure.input(import_zod6.z.object({
+    base64: import_zod6.z.string(),
+    mimeType: import_zod6.z.string().default("image/png")
   })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const base64Data = input.base64.replace(/^data:[^;]+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
     const ext = input.mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
     const fileKey = `${ctx.user.id}-logo-${Date.now()}.${ext}`;
     const sbAdmin = await getSupabaseClientAsync();
-    if (!sbAdmin) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Storage unavailable" });
+    if (!sbAdmin) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Storage unavailable" });
     const { error: uploadError } = await sbAdmin.storage.from("logos").upload(fileKey, buffer, {
       contentType: input.mimeType,
       upsert: true
     });
     if (uploadError) {
-      throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao fazer upload: ${uploadError.message}` });
+      throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Erro ao fazer upload: ${uploadError.message}` });
     }
     const { data: publicData } = sbAdmin.storage.from("logos").getPublicUrl(fileKey);
     const url = publicData.publicUrl;
@@ -2444,30 +2645,30 @@ var perfilRouter = router({
   // Remover logo
   removerLogo: protectedProcedure.mutation(async ({ ctx }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await sb2.from("configuracoes").upsert({ chave: "logoUrl", valor: "", user_id: ctx.user.id }, { onConflict: "chave,user_id" });
     return { success: true };
   }),
   // Alterar senha
-  alterarSenha: protectedProcedure.input(z6.object({
-    novaSenha: z6.string().min(6, "A senha deve ter pelo menos 6 caracteres"),
-    confirmarSenha: z6.string().min(6)
+  alterarSenha: protectedProcedure.input(import_zod6.z.object({
+    novaSenha: import_zod6.z.string().min(6, "A senha deve ter pelo menos 6 caracteres"),
+    confirmarSenha: import_zod6.z.string().min(6)
   })).mutation(async ({ ctx, input }) => {
     if (input.novaSenha !== input.confirmarSenha) {
-      throw new TRPCError6({ code: "BAD_REQUEST", message: "As senhas n\xE3o coincidem" });
+      throw new import_server6.TRPCError({ code: "BAD_REQUEST", message: "As senhas n\xE3o coincidem" });
     }
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const hash = await bcrypt3.hash(input.novaSenha, 12);
+    if (!sb2) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const hash = await import_bcryptjs3.default.hash(input.novaSenha, 12);
     const { error } = await sb2.from("users").update({ passwordHash: hash }).eq("id", ctx.user.id);
-    if (error) throw new TRPCError6({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao alterar senha" });
+    if (error) throw new import_server6.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao alterar senha" });
     return { success: true };
   })
 });
 
 // server/routers/relatorioDiario.ts
-import { z as z7 } from "zod";
-import { TRPCError as TRPCError7 } from "@trpc/server";
+var import_zod7 = require("../node_modules/zod/index.js");
+var import_server7 = require("../node_modules/@trpc/server/dist/index.mjs");
 async function getEvolutionConfig2() {
   const sb2 = await getSupabaseClientAsync();
   if (!sb2) return null;
@@ -2621,13 +2822,13 @@ var relatorioDiarioRouter = router({
     };
   }),
   // Salvar configurações do relatório diário
-  saveConfig: protectedProcedure.input(z7.object({
-    ativo: z7.boolean(),
-    horario: z7.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM"),
-    telefone: z7.string()
+  saveConfig: protectedProcedure.input(import_zod7.z.object({
+    ativo: import_zod7.z.boolean(),
+    horario: import_zod7.z.string().regex(/^\d{2}:\d{2}$/, "Formato HH:MM"),
+    telefone: import_zod7.z.string()
   })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server7.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await sb2.from("configuracoes").upsert([
       { chave: "relatorio_diario_ativo", valor: String(input.ativo), user_id: ctx.user.id },
       { chave: "relatorio_diario_horario", valor: input.horario, user_id: ctx.user.id },
@@ -2636,9 +2837,9 @@ var relatorioDiarioRouter = router({
     return { success: true };
   }),
   // Enviar relatório agora (manual)
-  enviarAgora: protectedProcedure.input(z7.object({ telefone: z7.string().optional() }).optional()).mutation(async ({ ctx, input }) => {
+  enviarAgora: protectedProcedure.input(import_zod7.z.object({ telefone: import_zod7.z.string().optional() }).optional()).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server7.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: cfgData } = await sb2.from("configuracoes").select("chave, valor").in("chave", [
       "evolution_url",
       "evolution_api_key",
@@ -2651,13 +2852,13 @@ var relatorioDiarioRouter = router({
     });
     const telefone = input?.telefone || cfg["relatorio_diario_telefone"] || "";
     if (!telefone) {
-      throw new TRPCError7({ code: "BAD_REQUEST", message: "Configure o n\xFAmero de telefone para receber o relat\xF3rio" });
+      throw new import_server7.TRPCError({ code: "BAD_REQUEST", message: "Configure o n\xFAmero de telefone para receber o relat\xF3rio" });
     }
     const mensagem = await gerarMensagemRelatorio();
-    if (!mensagem) throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao gerar relat\xF3rio" });
+    if (!mensagem) throw new import_server7.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao gerar relat\xF3rio" });
     const enviado = await sendWhatsAppMessage(telefone, mensagem);
     if (!enviado) {
-      throw new TRPCError7({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao enviar mensagem. Verifique se o WhatsApp est\xE1 conectado." });
+      throw new import_server7.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao enviar mensagem. Verifique se o WhatsApp est\xE1 conectado." });
     }
     return { success: true, mensagem };
   }),
@@ -2669,8 +2870,8 @@ var relatorioDiarioRouter = router({
 });
 
 // server/routers/notificacoes.ts
-import { z as z8 } from "zod";
-import { TRPCError as TRPCError8 } from "@trpc/server";
+var import_zod8 = require("../node_modules/zod/index.js");
+var import_server8 = require("../node_modules/@trpc/server/dist/index.mjs");
 var TIPOS_NOTIFICACAO = [
   { tipo: "antes_vencimento_3", label: "3 dias antes", descricao: "Lembrete 3 dias antes do vencimento", diasAntes: 3 },
   { tipo: "antes_vencimento_2", label: "2 dias antes", descricao: "Lembrete 2 dias antes do vencimento", diasAntes: 2 },
@@ -2769,9 +2970,9 @@ var notificacoesRouter = router({
     return data?.valor === "true";
   }),
   // Ligar/desligar o sistema globalmente
-  setGlobalAtivo: protectedProcedure.input(z8.object({ ativo: z8.boolean() })).mutation(async ({ ctx, input }) => {
+  setGlobalAtivo: protectedProcedure.input(import_zod8.z.object({ ativo: import_zod8.z.boolean() })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server8.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await sb2.from("configuracoes").upsert(
       { chave: "notificacoes_auto_ativo", valor: String(input.ativo), user_id: ctx.user.id },
       { onConflict: "chave,user_id" }
@@ -2779,15 +2980,15 @@ var notificacoesRouter = router({
     return { success: true };
   }),
   // Salvar/atualizar uma regra (mensagem + ativo)
-  salvar: protectedProcedure.input(z8.object({
-    tipo: z8.string(),
-    ativo: z8.boolean(),
-    mensagem_template: z8.string().min(1)
+  salvar: protectedProcedure.input(import_zod8.z.object({
+    tipo: import_zod8.z.string(),
+    ativo: import_zod8.z.boolean(),
+    mensagem_template: import_zod8.z.string().min(1)
   })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server8.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const tipoInfo = TIPOS_NOTIFICACAO.find((t2) => t2.tipo === input.tipo);
-    if (!tipoInfo) throw new TRPCError8({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
+    if (!tipoInfo) throw new import_server8.TRPCError({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
     await sb2.from("notificacoes_automaticas").upsert(
       {
         user_id: ctx.user.id,
@@ -2802,11 +3003,11 @@ var notificacoesRouter = router({
     return { success: true };
   }),
   // Toggle rápido de ativo/inativo para uma regra
-  toggle: protectedProcedure.input(z8.object({ tipo: z8.string(), ativo: z8.boolean() })).mutation(async ({ ctx, input }) => {
+  toggle: protectedProcedure.input(import_zod8.z.object({ tipo: import_zod8.z.string(), ativo: import_zod8.z.boolean() })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server8.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const tipoInfo = TIPOS_NOTIFICACAO.find((t2) => t2.tipo === input.tipo);
-    if (!tipoInfo) throw new TRPCError8({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
+    if (!tipoInfo) throw new import_server8.TRPCError({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
     const { data: existing } = await sb2.from("notificacoes_automaticas").select("id, mensagem_template").eq("user_id", ctx.user.id).eq("tipo", input.tipo).maybeSingle();
     if (existing) {
       await sb2.from("notificacoes_automaticas").update({ ativo: input.ativo, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }).eq("user_id", ctx.user.id).eq("tipo", input.tipo);
@@ -2822,23 +3023,23 @@ var notificacoesRouter = router({
     return { success: true };
   }),
   // Histórico de envios recentes
-  historico: protectedProcedure.input(z8.object({ limit: z8.number().default(50) }).optional()).query(async ({ ctx, input }) => {
+  historico: protectedProcedure.input(import_zod8.z.object({ limit: import_zod8.z.number().default(50) }).optional()).query(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
     if (!sb2) return [];
     const { data } = await sb2.from("notificacoes_log").select("*, clientes(nome)").eq("user_id", ctx.user.id).order("createdAt", { ascending: false }).limit(input?.limit ?? 50);
     return data ?? [];
   }),
   // Testar envio (envia para o WhatsApp do próprio usuário)
-  testar: protectedProcedure.input(z8.object({
-    tipo: z8.string(),
-    mensagem_template: z8.string()
+  testar: protectedProcedure.input(import_zod8.z.object({
+    tipo: import_zod8.z.string(),
+    mensagem_template: import_zod8.z.string()
   })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server8.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: wppConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "whatsappEmpresa").eq("user_id", ctx.user.id).maybeSingle();
     const { data: empresaConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "nomeEmpresa").eq("user_id", ctx.user.id).maybeSingle();
     const telefone = wppConfig?.valor;
-    if (!telefone) throw new TRPCError8({ code: "BAD_REQUEST", message: "Configure o WhatsApp da empresa no Meu Perfil primeiro" });
+    if (!telefone) throw new import_server8.TRPCError({ code: "BAD_REQUEST", message: "Configure o WhatsApp da empresa no Meu Perfil primeiro" });
     const mensagem = substituirVariaveis(input.mensagem_template, {
       nome: "Jo\xE3o Silva (teste)",
       valor: 250,
@@ -2849,13 +3050,13 @@ var notificacoesRouter = router({
       total_parcelas: 12
     });
     const resultado = await enviarWhatsApp(ctx.user.id, telefone, mensagem);
-    if (!resultado.ok) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: resultado.erro || "Erro ao enviar" });
+    if (!resultado.ok) throw new import_server8.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: resultado.erro || "Erro ao enviar" });
     return { success: true, mensagem };
   }),
   // Job: disparar notificações do dia para um usuário específico (chamado pelo cron)
   dispararDoDia: protectedProcedure.mutation(async ({ ctx }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server8.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: globalConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "notificacoes_auto_ativo").eq("user_id", ctx.user.id).maybeSingle();
     if (globalConfig?.valor !== "true") return { enviados: 0, mensagem: "Notifica\xE7\xF5es autom\xE1ticas desativadas" };
     const { data: regras } = await sb2.from("notificacoes_automaticas").select("*").eq("user_id", ctx.user.id).eq("ativo", true);
@@ -2906,10 +3107,10 @@ var notificacoesRouter = router({
 });
 
 // server/routers.ts
-import { z as z9 } from "zod";
-import { TRPCError as TRPCError9 } from "@trpc/server";
-import { eq as eq5, and as and3, sql as sql3, desc as desc2, gte, lt, inArray, ne } from "drizzle-orm";
-import { nanoid } from "nanoid";
+var import_zod9 = require("../node_modules/zod/index.js");
+var import_server9 = require("../node_modules/@trpc/server/dist/index.mjs");
+var import_drizzle_orm5 = require("../node_modules/drizzle-orm/index.js");
+var import_nanoid = require("../node_modules/nanoid/index.js");
 
 // shared/finance.ts
 function calcularJurosMora(valorOriginal, dataVencimento, dataPagamento, jurosMoraDiario = 0.033, multaAtraso = 2) {
@@ -2965,37 +3166,37 @@ var dashboardRouter = router({
       const hoje2 = /* @__PURE__ */ new Date();
       hoje2.setHours(0, 0, 0, 0);
       const hojeStr2 = hoje2.toISOString().split("T")[0];
-      const contas = await db.select().from(contasCaixa).where(and3(eq5(contasCaixa.ativa, true), eq5(contasCaixa.userId, ctx.user.id)));
+      const contas = await db.select().from(contasCaixa).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contasCaixa.ativa, true), (0, import_drizzle_orm5.eq)(contasCaixa.userId, ctx.user.id)));
       let saldoTotal2 = 0;
       for (const conta of contas) {
-        const entradas = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(eq5(transacoesCaixa.contaCaixaId, conta.id), eq5(transacoesCaixa.tipo, "entrada")));
-        const saidas = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(eq5(transacoesCaixa.contaCaixaId, conta.id), eq5(transacoesCaixa.tipo, "saida")));
+        const entradas = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(transacoesCaixa.contaCaixaId, conta.id), (0, import_drizzle_orm5.eq)(transacoesCaixa.tipo, "entrada")));
+        const saidas = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(transacoesCaixa.contaCaixaId, conta.id), (0, import_drizzle_orm5.eq)(transacoesCaixa.tipo, "saida")));
         saldoTotal2 += parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? "0") - parseFloat(saidas[0]?.total ?? "0");
       }
-      const capitalResult = await db.select({ total: sql3`COALESCE(SUM(valor_principal), 0)` }).from(contratos).where(and3(eq5(contratos.status, "ativo"), eq5(contratos.userId, ctx.user.id)));
+      const capitalResult = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_principal), 0)` }).from(contratos).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contratos.status, "ativo"), (0, import_drizzle_orm5.eq)(contratos.userId, ctx.user.id)));
       const capitalCirculacao2 = parseFloat(capitalResult[0]?.total ?? "0");
-      const receberResult = await db.select({ total: sql3`COALESCE(SUM(valor_original), 0)` }).from(parcelas).where(and3(inArray(parcelas.status, ["pendente", "atrasada", "vencendo_hoje", "parcial"]), eq5(parcelas.userId, ctx.user.id)));
+      const receberResult = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_original), 0)` }).from(parcelas).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.inArray)(parcelas.status, ["pendente", "atrasada", "vencendo_hoje", "parcial"]), (0, import_drizzle_orm5.eq)(parcelas.userId, ctx.user.id)));
       const totalReceber2 = parseFloat(receberResult[0]?.total ?? "0");
-      const inadResult = await db.select({ total: sql3`COALESCE(SUM(valor_original), 0)`, qtd: sql3`COUNT(DISTINCT cliente_id)` }).from(parcelas).where(and3(eq5(parcelas.status, "atrasada"), eq5(parcelas.userId, ctx.user.id)));
+      const inadResult = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_original), 0)`, qtd: import_drizzle_orm5.sql`COUNT(DISTINCT cliente_id)` }).from(parcelas).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(parcelas.status, "atrasada"), (0, import_drizzle_orm5.eq)(parcelas.userId, ctx.user.id)));
       const totalInadimplente2 = parseFloat(inadResult[0]?.total ?? "0");
       const qtdInadimplentes2 = inadResult[0]?.qtd ?? 0;
-      const jurosResult = await db.select({ total: sql3`COALESCE(SUM(valor_juros), 0)` }).from(parcelas).where(and3(inArray(parcelas.status, ["atrasada", "parcial"]), eq5(parcelas.userId, ctx.user.id)));
+      const jurosResult = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_juros), 0)` }).from(parcelas).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.inArray)(parcelas.status, ["atrasada", "parcial"]), (0, import_drizzle_orm5.eq)(parcelas.userId, ctx.user.id)));
       const jurosPendentes2 = parseFloat(jurosResult[0]?.total ?? "0");
-      const hojeResult = await db.select({ total: sql3`COALESCE(SUM(valor_original), 0)`, qtd: sql3`COUNT(*)` }).from(parcelas).where(and3(
-        eq5(sql3`DATE(data_vencimento)`, hojeStr2),
-        inArray(parcelas.status, ["pendente", "vencendo_hoje"]),
-        eq5(parcelas.userId, ctx.user.id)
+      const hojeResult = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_original), 0)`, qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(parcelas).where((0, import_drizzle_orm5.and)(
+        (0, import_drizzle_orm5.eq)(import_drizzle_orm5.sql`DATE(data_vencimento)`, hojeStr2),
+        (0, import_drizzle_orm5.inArray)(parcelas.status, ["pendente", "vencendo_hoje"]),
+        (0, import_drizzle_orm5.eq)(parcelas.userId, ctx.user.id)
       ));
       const qtdVenceHoje2 = hojeResult[0]?.qtd ?? 0;
       const valorVenceHoje2 = parseFloat(hojeResult[0]?.total ?? "0");
-      const recebidoResult = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(
-        eq5(transacoesCaixa.tipo, "entrada"),
-        eq5(transacoesCaixa.categoria, "pagamento_parcela"),
-        gte(transacoesCaixa.dataTransacao, hoje2),
-        eq5(transacoesCaixa.userId, ctx.user.id)
+      const recebidoResult = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where((0, import_drizzle_orm5.and)(
+        (0, import_drizzle_orm5.eq)(transacoesCaixa.tipo, "entrada"),
+        (0, import_drizzle_orm5.eq)(transacoesCaixa.categoria, "pagamento_parcela"),
+        (0, import_drizzle_orm5.gte)(transacoesCaixa.dataTransacao, hoje2),
+        (0, import_drizzle_orm5.eq)(transacoesCaixa.userId, ctx.user.id)
       ));
       const recebidoHoje2 = parseFloat(recebidoResult[0]?.total ?? "0");
-      const contratosResult = await db.select({ qtd: sql3`COUNT(*)` }).from(contratos).where(and3(eq5(contratos.status, "ativo"), eq5(contratos.userId, ctx.user.id)));
+      const contratosResult = await db.select({ qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(contratos).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contratos.status, "ativo"), (0, import_drizzle_orm5.eq)(contratos.userId, ctx.user.id)));
       const contratosAtivos2 = contratosResult[0]?.qtd ?? 0;
       return {
         saldoTotal: saldoTotal2,
@@ -3069,8 +3270,8 @@ var dashboardRouter = router({
           valorOriginal: parcelas.valorOriginal,
           dataVencimento: parcelas.dataVencimento,
           status: parcelas.status,
-          totalParcelas: sql3`(SELECT COUNT(*) FROM parcelas p2 WHERE p2.contrato_id = ${parcelas.contratoId})`
-        }).from(parcelas).innerJoin(clientes, eq5(parcelas.clienteId, clientes.id)).where(and3(eq5(sql3`DATE(${parcelas.dataVencimento})`, hoje2), inArray(parcelas.status, ["pendente", "vencendo_hoje"]), eq5(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
+          totalParcelas: import_drizzle_orm5.sql`(SELECT COUNT(*) FROM parcelas p2 WHERE p2.contrato_id = ${parcelas.contratoId})`
+        }).from(parcelas).innerJoin(clientes, (0, import_drizzle_orm5.eq)(parcelas.clienteId, clientes.id)).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(import_drizzle_orm5.sql`DATE(${parcelas.dataVencimento})`, hoje2), (0, import_drizzle_orm5.inArray)(parcelas.status, ["pendente", "vencendo_hoje"]), (0, import_drizzle_orm5.eq)(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
         return rows;
       } catch (err) {
         console.warn("[dashboard.parcelasHoje] Drizzle failed:", err.message);
@@ -3095,7 +3296,7 @@ var dashboardRouter = router({
           valorOriginal: parcelas.valorOriginal,
           dataVencimento: parcelas.dataVencimento,
           status: parcelas.status
-        }).from(parcelas).innerJoin(clientes, eq5(parcelas.clienteId, clientes.id)).where(and3(eq5(parcelas.status, "atrasada"), eq5(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
+        }).from(parcelas).innerJoin(clientes, (0, import_drizzle_orm5.eq)(parcelas.clienteId, clientes.id)).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(parcelas.status, "atrasada"), (0, import_drizzle_orm5.eq)(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
         return rows.map((r) => {
           const { total, diasAtraso } = calcularJurosMora(parseFloat(r.valorOriginal), /* @__PURE__ */ new Date(r.dataVencimento + "T00:00:00"), /* @__PURE__ */ new Date());
           return { ...r, valorAtualizado: total, diasAtraso };
@@ -3122,7 +3323,7 @@ var dashboardRouter = router({
           const d = /* @__PURE__ */ new Date();
           d.setDate(d.getDate() - i);
           const dStr = d.toISOString().split("T")[0];
-          const result = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(eq5(transacoesCaixa.tipo, "entrada"), eq5(sql3`DATE(data_transacao)`, dStr)));
+          const result = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(transacoesCaixa.tipo, "entrada"), (0, import_drizzle_orm5.eq)(import_drizzle_orm5.sql`DATE(data_transacao)`, dStr)));
           dias2.push({ dia: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), valor: parseFloat(result[0]?.total ?? "0") });
         }
         return dias2;
@@ -3146,12 +3347,12 @@ var dashboardRouter = router({
   })
 });
 var clientesRouter = router({
-  list: protectedProcedure.input(z9.object({ busca: z9.string().optional(), ativo: z9.boolean().optional() }).optional()).query(async ({ ctx, input }) => {
+  list: protectedProcedure.input(import_zod9.z.object({ busca: import_zod9.z.string().optional(), ativo: import_zod9.z.boolean().optional() }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     let rows;
     if (db) {
       try {
-        rows = await db.select().from(clientes).where(and3(eq5(clientes.userId, ctx.user.id), input?.ativo !== void 0 ? eq5(clientes.ativo, input.ativo) : void 0)).orderBy(desc2(clientes.createdAt));
+        rows = await db.select().from(clientes).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(clientes.userId, ctx.user.id), input?.ativo !== void 0 ? (0, import_drizzle_orm5.eq)(clientes.ativo, input.ativo) : void 0)).orderBy((0, import_drizzle_orm5.desc)(clientes.createdAt));
       } catch (err) {
         console.warn("[clientes.list] Drizzle failed, trying REST:", err.message);
         resetDb();
@@ -3177,11 +3378,11 @@ var clientesRouter = router({
     }
     return { clientes: rows, total: rows.length };
   }),
-  byId: protectedProcedure.input(z9.object({ id: z9.number() })).query(async ({ ctx, input }) => {
+  byId: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        const rows = await db.select().from(clientes).where(eq5(clientes.id, input.id)).limit(1);
+        const rows = await db.select().from(clientes).where((0, import_drizzle_orm5.eq)(clientes.id, input.id)).limit(1);
         if (rows.length > 0) return rows[0];
       } catch (err) {
         console.warn("[clientes.byId] Drizzle failed, trying REST:", err.message);
@@ -3194,37 +3395,37 @@ var clientesRouter = router({
     if (error) return null;
     return data;
   }),
-  create: protectedProcedure.input(z9.object({
-    nome: z9.string().min(2),
-    cpfCnpj: z9.string().optional(),
-    cnpj: z9.string().optional(),
-    rg: z9.string().optional(),
-    telefone: z9.string().optional(),
-    whatsapp: z9.string().optional(),
-    email: z9.string().email().optional().or(z9.literal("")),
-    chavePix: z9.string().optional(),
-    tipoChavePix: z9.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional(),
-    endereco: z9.string().optional(),
-    numero: z9.string().optional(),
-    complemento: z9.string().optional(),
-    bairro: z9.string().optional(),
-    cidade: z9.string().optional(),
-    estado: z9.string().optional(),
-    cep: z9.string().optional(),
-    observacoes: z9.string().optional(),
-    instagram: z9.string().optional(),
-    facebook: z9.string().optional(),
-    profissao: z9.string().optional(),
-    dataNascimento: z9.string().optional(),
-    sexo: z9.enum(["masculino", "feminino", "outro"]).optional(),
-    estadoCivil: z9.enum(["solteiro", "casado", "divorciado", "viuvo", "outro"]).optional(),
-    nomeMae: z9.string().optional(),
-    nomePai: z9.string().optional(),
-    fotoUrl: z9.string().optional(),
-    documentosUrls: z9.string().optional(),
-    banco: z9.string().optional(),
-    agencia: z9.string().optional(),
-    numeroConta: z9.string().optional()
+  create: protectedProcedure.input(import_zod9.z.object({
+    nome: import_zod9.z.string().min(2),
+    cpfCnpj: import_zod9.z.string().optional(),
+    cnpj: import_zod9.z.string().optional(),
+    rg: import_zod9.z.string().optional(),
+    telefone: import_zod9.z.string().optional(),
+    whatsapp: import_zod9.z.string().optional(),
+    email: import_zod9.z.string().email().optional().or(import_zod9.z.literal("")),
+    chavePix: import_zod9.z.string().optional(),
+    tipoChavePix: import_zod9.z.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional(),
+    endereco: import_zod9.z.string().optional(),
+    numero: import_zod9.z.string().optional(),
+    complemento: import_zod9.z.string().optional(),
+    bairro: import_zod9.z.string().optional(),
+    cidade: import_zod9.z.string().optional(),
+    estado: import_zod9.z.string().optional(),
+    cep: import_zod9.z.string().optional(),
+    observacoes: import_zod9.z.string().optional(),
+    instagram: import_zod9.z.string().optional(),
+    facebook: import_zod9.z.string().optional(),
+    profissao: import_zod9.z.string().optional(),
+    dataNascimento: import_zod9.z.string().optional(),
+    sexo: import_zod9.z.enum(["masculino", "feminino", "outro"]).optional(),
+    estadoCivil: import_zod9.z.enum(["solteiro", "casado", "divorciado", "viuvo", "outro"]).optional(),
+    nomeMae: import_zod9.z.string().optional(),
+    nomePai: import_zod9.z.string().optional(),
+    fotoUrl: import_zod9.z.string().optional(),
+    documentosUrls: import_zod9.z.string().optional(),
+    banco: import_zod9.z.string().optional(),
+    agencia: import_zod9.z.string().optional(),
+    numeroConta: import_zod9.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -3241,7 +3442,7 @@ var clientesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel" });
     const insertData = { nome: input.nome };
     if (input.cpfCnpj) insertData.cpf_cnpj = input.cpfCnpj;
     if (input.cnpj) insertData.cnpj = input.cnpj;
@@ -3274,48 +3475,48 @@ var clientesRouter = router({
     if (input.numeroConta) insertData.numero_conta = input.numeroConta;
     insertData.user_id = ctx.user.id;
     const { data, error } = await supabase.from("clientes").insert(insertData).select("id").single();
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { id: data.id };
   }),
-  update: protectedProcedure.input(z9.object({
-    id: z9.number(),
-    nome: z9.string().min(2).optional(),
-    cpfCnpj: z9.string().optional(),
-    cnpj: z9.string().optional(),
-    rg: z9.string().optional(),
-    telefone: z9.string().optional(),
-    whatsapp: z9.string().optional(),
-    email: z9.string().optional(),
-    chavePix: z9.string().optional(),
-    tipoChavePix: z9.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional(),
-    endereco: z9.string().optional(),
-    numero: z9.string().optional(),
-    complemento: z9.string().optional(),
-    bairro: z9.string().optional(),
-    cidade: z9.string().optional(),
-    estado: z9.string().optional(),
-    cep: z9.string().optional(),
-    observacoes: z9.string().optional(),
-    score: z9.number().min(0).max(1e3).optional(),
-    instagram: z9.string().optional(),
-    facebook: z9.string().optional(),
-    profissao: z9.string().optional(),
-    dataNascimento: z9.string().optional(),
-    sexo: z9.enum(["masculino", "feminino", "outro"]).optional(),
-    estadoCivil: z9.enum(["solteiro", "casado", "divorciado", "viuvo", "outro"]).optional(),
-    nomeMae: z9.string().optional(),
-    nomePai: z9.string().optional(),
-    fotoUrl: z9.string().optional(),
-    documentosUrls: z9.string().optional(),
-    banco: z9.string().optional(),
-    agencia: z9.string().optional(),
-    numeroConta: z9.string().optional()
+  update: protectedProcedure.input(import_zod9.z.object({
+    id: import_zod9.z.number(),
+    nome: import_zod9.z.string().min(2).optional(),
+    cpfCnpj: import_zod9.z.string().optional(),
+    cnpj: import_zod9.z.string().optional(),
+    rg: import_zod9.z.string().optional(),
+    telefone: import_zod9.z.string().optional(),
+    whatsapp: import_zod9.z.string().optional(),
+    email: import_zod9.z.string().optional(),
+    chavePix: import_zod9.z.string().optional(),
+    tipoChavePix: import_zod9.z.enum(["cpf", "cnpj", "email", "telefone", "aleatoria"]).optional(),
+    endereco: import_zod9.z.string().optional(),
+    numero: import_zod9.z.string().optional(),
+    complemento: import_zod9.z.string().optional(),
+    bairro: import_zod9.z.string().optional(),
+    cidade: import_zod9.z.string().optional(),
+    estado: import_zod9.z.string().optional(),
+    cep: import_zod9.z.string().optional(),
+    observacoes: import_zod9.z.string().optional(),
+    score: import_zod9.z.number().min(0).max(1e3).optional(),
+    instagram: import_zod9.z.string().optional(),
+    facebook: import_zod9.z.string().optional(),
+    profissao: import_zod9.z.string().optional(),
+    dataNascimento: import_zod9.z.string().optional(),
+    sexo: import_zod9.z.enum(["masculino", "feminino", "outro"]).optional(),
+    estadoCivil: import_zod9.z.enum(["solteiro", "casado", "divorciado", "viuvo", "outro"]).optional(),
+    nomeMae: import_zod9.z.string().optional(),
+    nomePai: import_zod9.z.string().optional(),
+    fotoUrl: import_zod9.z.string().optional(),
+    documentosUrls: import_zod9.z.string().optional(),
+    banco: import_zod9.z.string().optional(),
+    agencia: import_zod9.z.string().optional(),
+    numeroConta: import_zod9.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     const { id, ...data } = input;
     if (db) {
       try {
-        await db.update(clientes).set(data).where(eq5(clientes.id, id));
+        await db.update(clientes).set(data).where((0, import_drizzle_orm5.eq)(clientes.id, id));
         return { success: true };
       } catch (err) {
         console.warn("[clientes.update] Drizzle failed, trying REST:", err.message);
@@ -3323,7 +3524,7 @@ var clientesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const updateData = {};
     if (data.nome) updateData.nome = data.nome;
     if (data.cpfCnpj !== void 0) updateData.cpf_cnpj = data.cpfCnpj;
@@ -3357,14 +3558,14 @@ var clientesRouter = router({
     if (data.agencia !== void 0) updateData.agencia = data.agencia;
     if (data.numeroConta !== void 0) updateData.numero_conta = data.numeroConta;
     const { error } = await supabase.from("clientes").update(updateData).eq("id", id);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
-  contratosByCliente: protectedProcedure.input(z9.object({ clienteId: z9.number() })).query(async ({ input }) => {
+  contratosByCliente: protectedProcedure.input(import_zod9.z.object({ clienteId: import_zod9.z.number() })).query(async ({ input }) => {
     const db = await getDb();
     if (db) {
       try {
-        return db.select().from(contratos).where(eq5(contratos.clienteId, input.clienteId)).orderBy(desc2(contratos.createdAt));
+        return db.select().from(contratos).where((0, import_drizzle_orm5.eq)(contratos.clienteId, input.clienteId)).orderBy((0, import_drizzle_orm5.desc)(contratos.createdAt));
       } catch (err) {
         console.warn("[clientes.contratosByCliente] Drizzle failed:", err.message);
         resetDb();
@@ -3375,18 +3576,18 @@ var clientesRouter = router({
     const { data } = await supabase.from("contratos").select("*").eq("cliente_id", input.clienteId).order("createdAt", { ascending: false });
     return data ?? [];
   }),
-  importarCSV: protectedProcedure.input(z9.object({
-    registros: z9.array(z9.object({
-      nome: z9.string().min(1),
-      cpfCnpj: z9.string().optional(),
-      telefone: z9.string().optional(),
-      whatsapp: z9.string().optional(),
-      email: z9.string().optional(),
-      chavePix: z9.string().optional(),
-      endereco: z9.string().optional(),
-      cidade: z9.string().optional(),
-      estado: z9.string().optional(),
-      observacoes: z9.string().optional()
+  importarCSV: protectedProcedure.input(import_zod9.z.object({
+    registros: import_zod9.z.array(import_zod9.z.object({
+      nome: import_zod9.z.string().min(1),
+      cpfCnpj: import_zod9.z.string().optional(),
+      telefone: import_zod9.z.string().optional(),
+      whatsapp: import_zod9.z.string().optional(),
+      email: import_zod9.z.string().optional(),
+      chavePix: import_zod9.z.string().optional(),
+      endereco: import_zod9.z.string().optional(),
+      cidade: import_zod9.z.string().optional(),
+      estado: import_zod9.z.string().optional(),
+      observacoes: import_zod9.z.string().optional()
     }))
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
@@ -3439,12 +3640,12 @@ var clientesRouter = router({
     }
     return { importados, erros, detalhesErros };
   }),
-  listarComScore: protectedProcedure.input(z9.object({ ordenarPor: z9.enum(["score", "lucro", "nome"]).optional() }).optional()).query(async ({ ctx, input }) => {
+  listarComScore: protectedProcedure.input(import_zod9.z.object({ ordenarPor: import_zod9.z.enum(["score", "lucro", "nome"]).optional() }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     let rows = [];
     if (db) {
       try {
-        rows = await db.select().from(clientes).where(and3(eq5(clientes.ativo, true), eq5(clientes.userId, ctx.user.id)));
+        rows = await db.select().from(clientes).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(clientes.ativo, true), (0, import_drizzle_orm5.eq)(clientes.userId, ctx.user.id)));
       } catch (err) {
         console.warn("[clientes.listarComScore] Drizzle failed, trying REST:", err.message);
         resetDb();
@@ -3461,7 +3662,7 @@ var clientesRouter = router({
       let parcelas_data = [];
       if (db) {
         try {
-          parcelas_data = await db.select().from(parcelas).where(eq5(parcelas.clienteId, cliente.id));
+          parcelas_data = await db.select().from(parcelas).where((0, import_drizzle_orm5.eq)(parcelas.clienteId, cliente.id));
         } catch (err) {
           resetDb();
         }
@@ -3540,20 +3741,20 @@ var clientesRouter = router({
     }
     return { clientes: clientesComScore, total: clientesComScore.length };
   }),
-  deletar: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ ctx, input }) => {
+  deletar: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
         const contratosAtivos = await db.select().from(contratos).where(
-          and3(eq5(contratos.clienteId, input.id), eq5(contratos.status, "ativo"))
+          (0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contratos.clienteId, input.id), (0, import_drizzle_orm5.eq)(contratos.status, "ativo"))
         );
         if (contratosAtivos.length > 0) {
-          throw new TRPCError9({
+          throw new import_server9.TRPCError({
             code: "CONFLICT",
             message: `Nao eh possivel deletar cliente com ${contratosAtivos.length} contrato(s) ativo(s).`
           });
         }
-        await db.delete(clientes).where(eq5(clientes.id, input.id));
+        await db.delete(clientes).where((0, import_drizzle_orm5.eq)(clientes.id, input.id));
         return { success: true };
       } catch (err) {
         if (err?.code === "CONFLICT") throw err;
@@ -3562,22 +3763,22 @@ var clientesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: ctAtivos } = await supabase.from("contratos").select("id").eq("cliente_id", input.id).eq("status", "ativo").eq("user_id", ctx.user.id);
     if (ctAtivos && ctAtivos.length > 0) {
-      throw new TRPCError9({ code: "CONFLICT", message: `Nao eh possivel deletar cliente com ${ctAtivos.length} contrato(s) ativo(s).` });
+      throw new import_server9.TRPCError({ code: "CONFLICT", message: `Nao eh possivel deletar cliente com ${ctAtivos.length} contrato(s) ativo(s).` });
     }
     const { error } = await supabase.from("clientes").delete().eq("id", input.id).eq("user_id", ctx.user.id);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   })
 });
 var contratosRouter = router({
   // Lista contratos com dados agregados das parcelas para os cards de Empréstimos
-  listComParcelas: protectedProcedure.input(z9.object({
-    status: z9.string().optional(),
-    modalidade: z9.string().optional(),
-    busca: z9.string().optional()
+  listComParcelas: protectedProcedure.input(import_zod9.z.object({
+    status: import_zod9.z.string().optional(),
+    modalidade: import_zod9.z.string().optional(),
+    busca: import_zod9.z.string().optional()
   }).optional()).query(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
@@ -3693,7 +3894,7 @@ var contratosRouter = router({
       };
     });
   }),
-  obterDetalhes: protectedProcedure.input(z9.object({ id: z9.number() })).query(async ({ ctx, input }) => {
+  obterDetalhes: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).query(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
     const { data: contratoData, error: contratoErr } = await supabase.from("contratos").select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas, clientes!inner(id, nome, whatsapp, chave_pix, telefone)').eq("id", input.id).eq("user_id", ctx.user.id).single();
@@ -3771,10 +3972,10 @@ var contratosRouter = router({
       todasParcelas: parcelas2
     };
   }),
-  list: protectedProcedure.input(z9.object({
-    status: z9.string().optional(),
-    modalidade: z9.string().optional(),
-    clienteId: z9.number().optional()
+  list: protectedProcedure.input(import_zod9.z.object({
+    status: import_zod9.z.string().optional(),
+    modalidade: import_zod9.z.string().optional(),
+    clienteId: import_zod9.z.number().optional()
   }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -3793,7 +3994,7 @@ var contratosRouter = router({
           dataInicio: contratos.dataInicio,
           createdAt: contratos.createdAt,
           koletorId: contratos.koletorId
-        }).from(contratos).innerJoin(clientes, eq5(contratos.clienteId, clientes.id)).where(eq5(contratos.userId, ctx.user.id)).orderBy(desc2(contratos.createdAt));
+        }).from(contratos).innerJoin(clientes, (0, import_drizzle_orm5.eq)(contratos.clienteId, clientes.id)).where((0, import_drizzle_orm5.eq)(contratos.userId, ctx.user.id)).orderBy((0, import_drizzle_orm5.desc)(contratos.createdAt));
         let myKoletorId2 = null;
         try {
           const supabaseForPerfil = await getSupabaseClientAsync();
@@ -3847,7 +4048,7 @@ var contratosRouter = router({
       createdAt: r.createdAt
     }));
   }),
-  byId: protectedProcedure.input(z9.object({ id: z9.number() })).query(async ({ ctx, input }) => {
+  byId: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
@@ -3856,7 +4057,7 @@ var contratosRouter = router({
           clienteNome: clientes.nome,
           clienteWhatsapp: clientes.whatsapp,
           clienteChavePix: clientes.chavePix
-        }).from(contratos).innerJoin(clientes, eq5(contratos.clienteId, clientes.id)).where(eq5(contratos.id, input.id)).limit(1);
+        }).from(contratos).innerJoin(clientes, (0, import_drizzle_orm5.eq)(contratos.clienteId, clientes.id)).where((0, import_drizzle_orm5.eq)(contratos.id, input.id)).limit(1);
         return rows[0] ?? null;
       } catch (err) {
         console.warn("[contratos.byId] Drizzle failed:", err.message);
@@ -3874,21 +4075,21 @@ var contratosRouter = router({
       clienteChavePix: data.clientes?.chave_pix ?? null
     };
   }),
-  create: protectedProcedure.input(z9.object({
-    clienteId: z9.number(),
-    modalidade: z9.enum(["mensal", "diario", "semanal", "quinzenal", "tabela_price", "reparcelamento", "venda", "cheque"]),
-    valorPrincipal: z9.number().positive(),
-    taxaJuros: z9.number().min(0),
-    tipoTaxa: z9.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
-    numeroParcelas: z9.number().int().positive(),
-    dataInicio: z9.string(),
-    dataVencimentoPrimeira: z9.string(),
-    diaVencimento: z9.number().int().min(1).max(31).optional(),
-    descricao: z9.string().optional(),
-    observacoes: z9.string().optional(),
-    contaCaixaId: z9.number().optional(),
-    multaAtraso: z9.number().default(2),
-    jurosMoraDiario: z9.number().default(0.033)
+  create: protectedProcedure.input(import_zod9.z.object({
+    clienteId: import_zod9.z.number(),
+    modalidade: import_zod9.z.enum(["mensal", "diario", "semanal", "quinzenal", "tabela_price", "reparcelamento", "venda", "cheque"]),
+    valorPrincipal: import_zod9.z.number().positive(),
+    taxaJuros: import_zod9.z.number().min(0),
+    tipoTaxa: import_zod9.z.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
+    numeroParcelas: import_zod9.z.number().int().positive(),
+    dataInicio: import_zod9.z.string(),
+    dataVencimentoPrimeira: import_zod9.z.string(),
+    diaVencimento: import_zod9.z.number().int().min(1).max(31).optional(),
+    descricao: import_zod9.z.string().optional(),
+    observacoes: import_zod9.z.string().optional(),
+    contaCaixaId: import_zod9.z.number().optional(),
+    multaAtraso: import_zod9.z.number().default(2),
+    jurosMoraDiario: import_zod9.z.number().default(0.033)
   })).mutation(async ({ ctx, input }) => {
     let valorParcela;
     if (input.modalidade === "tabela_price") {
@@ -3978,7 +4179,7 @@ var contratosRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
     const totalContratoRest = parseFloat((valorParcela * input.numeroParcelas).toFixed(2));
     const _primeiraDataRest = /* @__PURE__ */ new Date(input.dataVencimentoPrimeira + "T00:00:00");
     const _ultimaDataRest = new Date(_primeiraDataRest);
@@ -4012,7 +4213,7 @@ var contratosRouter = router({
       status: "ativo",
       user_id: ctx.user.id
     }).select("id").single();
-    if (contratoErr || !contratoData) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: contratoErr?.message ?? "Erro ao criar contrato" });
+    if (contratoErr || !contratoData) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: contratoErr?.message ?? "Erro ao criar contrato" });
     contratoId = contratoData.id;
     const primeiraData = /* @__PURE__ */ new Date(input.dataVencimentoPrimeira + "T00:00:00");
     const hoje2 = /* @__PURE__ */ new Date();
@@ -4048,11 +4249,11 @@ var contratosRouter = router({
     if (parcelasErr) console.error("[contratos.create] Erro ao criar parcelas via REST:", parcelasErr.message);
     return { id: contratoId, valorParcela };
   }),
-  updateStatus: protectedProcedure.input(z9.object({ id: z9.number(), status: z9.enum(["ativo", "quitado", "inadimplente", "cancelado"]) })).mutation(async ({ ctx, input }) => {
+  updateStatus: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), status: import_zod9.z.enum(["ativo", "quitado", "inadimplente", "cancelado"]) })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(contratos).set({ status: input.status }).where(eq5(contratos.id, input.id));
+        await db.update(contratos).set({ status: input.status }).where((0, import_drizzle_orm5.eq)(contratos.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[contratos.updateStatus] Drizzle failed, trying REST:", err.message);
@@ -4060,18 +4261,18 @@ var contratosRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { error } = await supabase.from("contratos").update({ status: input.status }).eq("id", input.id);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
-  gerarPDF: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
+  gerarPDF: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (!db) {
       const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       const { data: ctData, error: ctErr } = await supabase.from("contratos").select("*, clientes!inner(nome, cpf_cnpj, telefone, whatsapp, chave_pix, endereco, cidade, estado)").eq("id", input.id).single();
-      if (ctErr || !ctData) throw new TRPCError9({ code: "NOT_FOUND", message: "Contrato n\xE3o encontrado" });
+      if (ctErr || !ctData) throw new import_server9.TRPCError({ code: "NOT_FOUND", message: "Contrato n\xE3o encontrado" });
       const { data: parcelasData2 } = await supabase.from("parcelas").select("*").eq("contrato_id", input.id).order("numero_parcela");
       const { data: configRows2 } = await supabase.from("configuracoes").select("chave, valor");
       const configMap2 = {};
@@ -4105,10 +4306,10 @@ var contratosRouter = router({
       clienteEndereco: clientes.endereco,
       clienteCidade: clientes.cidade,
       clienteEstado: clientes.estado
-    }).from(contratos).innerJoin(clientes, eq5(contratos.clienteId, clientes.id)).where(eq5(contratos.id, input.id)).limit(1);
+    }).from(contratos).innerJoin(clientes, (0, import_drizzle_orm5.eq)(contratos.clienteId, clientes.id)).where((0, import_drizzle_orm5.eq)(contratos.id, input.id)).limit(1);
     const row = rows[0];
     if (!row) throw new Error("Contrato n\xE3o encontrado");
-    const parcelasData = await db.select().from(parcelas).where(eq5(parcelas.contratoId, input.id)).orderBy(parcelas.numeroParcela);
+    const parcelasData = await db.select().from(parcelas).where((0, import_drizzle_orm5.eq)(parcelas.contratoId, input.id)).orderBy(parcelas.numeroParcela);
     const configRows = await db.select().from(configuracoes);
     const configMap = {};
     configRows.forEach((r) => {
@@ -4207,18 +4408,18 @@ var contratosRouter = router({
         </body></html>`;
     return { html, contratoId: c.id, clienteNome: row.clienteNome };
   }),
-  deletar: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ ctx, input }) => {
+  deletar: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
         const parcelasNaoPagas = await db.select().from(parcelas).where(
-          and3(eq5(parcelas.contratoId, input.id), ne(parcelas.status, "paga"))
+          (0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(parcelas.contratoId, input.id), (0, import_drizzle_orm5.ne)(parcelas.status, "paga"))
         );
         if (parcelasNaoPagas.length > 0) {
-          throw new TRPCError9({ code: "CONFLICT", message: `Nao eh possivel deletar contrato com ${parcelasNaoPagas.length} parcela(s) nao paga(s).` });
+          throw new import_server9.TRPCError({ code: "CONFLICT", message: `Nao eh possivel deletar contrato com ${parcelasNaoPagas.length} parcela(s) nao paga(s).` });
         }
-        await db.delete(contratos).where(eq5(contratos.id, input.id));
-        await db.delete(parcelas).where(eq5(parcelas.contratoId, input.id));
+        await db.delete(contratos).where((0, import_drizzle_orm5.eq)(contratos.id, input.id));
+        await db.delete(parcelas).where((0, import_drizzle_orm5.eq)(parcelas.contratoId, input.id));
         return { success: true };
       } catch (err) {
         if (err?.code === "CONFLICT") throw err;
@@ -4227,22 +4428,22 @@ var contratosRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: pNaoPagas } = await supabase.from("parcelas").select("id").eq("contrato_id", input.id).neq("status", "paga");
     if (pNaoPagas && pNaoPagas.length > 0) {
-      throw new TRPCError9({ code: "CONFLICT", message: `Nao eh possivel deletar contrato com ${pNaoPagas.length} parcela(s) nao paga(s).` });
+      throw new import_server9.TRPCError({ code: "CONFLICT", message: `Nao eh possivel deletar contrato com ${pNaoPagas.length} parcela(s) nao paga(s).` });
     }
     await supabase.from("parcelas").delete().eq("contrato_id", input.id);
     const { error } = await supabase.from("contratos").delete().eq("id", input.id);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
-  pagarTotal: protectedProcedure.input(z9.object({ id: z9.number(), valor: z9.number() })).mutation(async ({ ctx, input }) => {
+  pagarTotal: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), valor: import_zod9.z.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(contratos).set({ status: "quitado" }).where(eq5(contratos.id, input.id));
-        await db.update(parcelas).set({ status: "paga", dataPagamento: /* @__PURE__ */ new Date() }).where(eq5(parcelas.contratoId, input.id));
+        await db.update(contratos).set({ status: "quitado" }).where((0, import_drizzle_orm5.eq)(contratos.id, input.id));
+        await db.update(parcelas).set({ status: "paga", dataPagamento: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm5.eq)(parcelas.contratoId, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[contratos.pagarTotal] Drizzle failed, trying REST:", err.message);
@@ -4250,16 +4451,16 @@ var contratosRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("contratos").update({ status: "quitado" }).eq("id", input.id);
     await supabase.from("parcelas").update({ status: "paga", data_pagamento: (/* @__PURE__ */ new Date()).toISOString() }).eq("contrato_id", input.id);
     return { success: true };
   }),
-  editarJuros: protectedProcedure.input(z9.object({ id: z9.number(), novaTaxa: z9.string() })).mutation(async ({ ctx, input }) => {
+  editarJuros: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), novaTaxa: import_zod9.z.string() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(contratos).set({ taxaJuros: input.novaTaxa }).where(eq5(contratos.id, input.id));
+        await db.update(contratos).set({ taxaJuros: input.novaTaxa }).where((0, import_drizzle_orm5.eq)(contratos.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[contratos.editarJuros] Drizzle failed, trying REST:", err.message);
@@ -4267,24 +4468,24 @@ var contratosRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { error } = await supabase.from("contratos").update({ taxa_juros: input.novaTaxa }).eq("id", input.id);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
-  aplicarMulta: protectedProcedure.input(z9.object({ id: z9.number(), multa: z9.string() })).mutation(async ({ ctx, input }) => {
+  aplicarMulta: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), multa: import_zod9.z.string() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     const hoje = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     if (db) {
       try {
-        const parcelasAtraso = await db.select().from(parcelas).where(and3(
-          eq5(parcelas.contratoId, input.id),
-          eq5(parcelas.status, "pendente"),
-          lt(sql3`DATE(${parcelas.dataVencimento})`, hoje)
+        const parcelasAtraso = await db.select().from(parcelas).where((0, import_drizzle_orm5.and)(
+          (0, import_drizzle_orm5.eq)(parcelas.contratoId, input.id),
+          (0, import_drizzle_orm5.eq)(parcelas.status, "pendente"),
+          (0, import_drizzle_orm5.lt)(import_drizzle_orm5.sql`DATE(${parcelas.dataVencimento})`, hoje)
         ));
         for (const parcela of parcelasAtraso) {
           const multaAtual = parcela.valorMulta ? parseFloat(parcela.valorMulta) : 0;
-          await db.update(parcelas).set({ valorMulta: (multaAtual + parseFloat(input.multa)).toString() }).where(eq5(parcelas.id, parcela.id));
+          await db.update(parcelas).set({ valorMulta: (multaAtual + parseFloat(input.multa)).toString() }).where((0, import_drizzle_orm5.eq)(parcelas.id, parcela.id));
         }
         return { success: true };
       } catch (err) {
@@ -4293,7 +4494,7 @@ var contratosRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: pAtraso } = await supabase.from("parcelas").select("id, valor_multa").eq("contrato_id", input.id).eq("status", "pendente").lt("data_vencimento", hoje);
     for (const parcela of pAtraso ?? []) {
       const multaAtual = parcela.valor_multa ? parseFloat(parcela.valor_multa) : 0;
@@ -4303,25 +4504,25 @@ var contratosRouter = router({
   })
 });
 var parcelasRouter = router({
-  list: protectedProcedure.input(z9.object({
-    status: z9.string().optional(),
-    clienteId: z9.number().optional(),
-    contratoId: z9.number().optional(),
-    dataInicio: z9.string().optional(),
-    dataFim: z9.string().optional(),
-    modalidade: z9.string().optional()
+  list: protectedProcedure.input(import_zod9.z.object({
+    status: import_zod9.z.string().optional(),
+    clienteId: import_zod9.z.number().optional(),
+    contratoId: import_zod9.z.number().optional(),
+    dataInicio: import_zod9.z.string().optional(),
+    dataFim: import_zod9.z.string().optional(),
+    modalidade: import_zod9.z.string().optional()
   }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     const hoje = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     if (db) {
       try {
-        await db.update(parcelas).set({ status: "atrasada" }).where(and3(
-          lt(sql3`DATE(data_vencimento)`, hoje),
-          inArray(parcelas.status, ["pendente", "vencendo_hoje"])
+        await db.update(parcelas).set({ status: "atrasada" }).where((0, import_drizzle_orm5.and)(
+          (0, import_drizzle_orm5.lt)(import_drizzle_orm5.sql`DATE(data_vencimento)`, hoje),
+          (0, import_drizzle_orm5.inArray)(parcelas.status, ["pendente", "vencendo_hoje"])
         ));
-        await db.update(parcelas).set({ status: "vencendo_hoje" }).where(and3(
-          eq5(sql3`DATE(data_vencimento)`, hoje),
-          eq5(parcelas.status, "pendente")
+        await db.update(parcelas).set({ status: "vencendo_hoje" }).where((0, import_drizzle_orm5.and)(
+          (0, import_drizzle_orm5.eq)(import_drizzle_orm5.sql`DATE(data_vencimento)`, hoje),
+          (0, import_drizzle_orm5.eq)(parcelas.status, "pendente")
         ));
         const rows = await db.select({
           id: parcelas.id,
@@ -4344,7 +4545,7 @@ var parcelasRouter = router({
           tipoTaxa: contratos.tipoTaxa,
           valorPrincipal: contratos.valorPrincipal,
           koletorId: contratos.koletorId
-        }).from(parcelas).innerJoin(clientes, eq5(parcelas.clienteId, clientes.id)).innerJoin(contratos, eq5(parcelas.contratoId, contratos.id)).orderBy(parcelas.dataVencimento);
+        }).from(parcelas).innerJoin(clientes, (0, import_drizzle_orm5.eq)(parcelas.clienteId, clientes.id)).innerJoin(contratos, (0, import_drizzle_orm5.eq)(parcelas.contratoId, contratos.id)).orderBy(parcelas.dataVencimento);
         let myKoletorId2 = null;
         try {
           const supabaseForPerfil = await getSupabaseClientAsync();
@@ -4433,17 +4634,17 @@ var parcelasRouter = router({
       valorPrincipal: contratosMap[r.contrato_id]?.valor_principal ?? null
     }));
   }),
-  registrarPagamento: protectedProcedure.input(z9.object({
-    parcelaId: z9.number(),
-    valorPago: z9.number().positive(),
-    contaCaixaId: z9.number().optional(),
-    observacoes: z9.string().optional(),
-    desconto: z9.number().default(0)
+  registrarPagamento: protectedProcedure.input(import_zod9.z.object({
+    parcelaId: import_zod9.z.number(),
+    valorPago: import_zod9.z.number().positive(),
+    contaCaixaId: import_zod9.z.number().optional(),
+    observacoes: import_zod9.z.string().optional(),
+    desconto: import_zod9.z.number().default(0)
   })).mutation(async ({ input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel" });
+    if (!sb2) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel" });
     const { data: parcelaData, error: parcelaErr } = await sb2.from("parcelas").select("*").eq("id", input.parcelaId).single();
-    if (parcelaErr || !parcelaData) throw new TRPCError9({ code: "NOT_FOUND", message: "Parcela n\xE3o encontrada" });
+    if (parcelaErr || !parcelaData) throw new import_server9.TRPCError({ code: "NOT_FOUND", message: "Parcela n\xE3o encontrada" });
     const parcela = {
       id: parcelaData.id,
       contratoId: parcelaData.contrato_id,
@@ -4490,16 +4691,16 @@ var parcelasRouter = router({
     return { success: true, status: novoStatus };
   }),
   // Pagar apenas os juros do período e renovar a parcela por mais um período
-  pagarJuros: protectedProcedure.input(z9.object({
-    parcelaId: z9.number(),
-    valorJurosPago: z9.number().positive(),
-    contaCaixaId: z9.number().optional(),
-    observacoes: z9.string().optional()
+  pagarJuros: protectedProcedure.input(import_zod9.z.object({
+    parcelaId: import_zod9.z.number(),
+    valorJurosPago: import_zod9.z.number().positive(),
+    contaCaixaId: import_zod9.z.number().optional(),
+    observacoes: import_zod9.z.string().optional()
   })).mutation(async ({ input }) => {
     const db = await getDb();
     const fetchParcela = async () => {
       if (db) {
-        const rows = await db.select().from(parcelas).where(eq5(parcelas.id, input.parcelaId)).limit(1);
+        const rows = await db.select().from(parcelas).where((0, import_drizzle_orm5.eq)(parcelas.id, input.parcelaId)).limit(1);
         return rows[0] ?? null;
       }
       const supabase = await getSupabaseClientAsync();
@@ -4518,10 +4719,10 @@ var parcelasRouter = router({
       } : null;
     };
     const parcela = await fetchParcela();
-    if (!parcela) throw new TRPCError9({ code: "NOT_FOUND", message: "Parcela n\xE3o encontrada" });
+    if (!parcela) throw new import_server9.TRPCError({ code: "NOT_FOUND", message: "Parcela n\xE3o encontrada" });
     const fetchContrato = async () => {
       if (db) {
-        const rows = await db.select().from(contratos).where(eq5(contratos.id, parcela.contratoId)).limit(1);
+        const rows = await db.select().from(contratos).where((0, import_drizzle_orm5.eq)(contratos.id, parcela.contratoId)).limit(1);
         return rows[0] ?? null;
       }
       const supabase = await getSupabaseClientAsync();
@@ -4542,7 +4743,7 @@ var parcelasRouter = router({
       } : null;
     };
     const contrato = await fetchContrato();
-    if (!contrato) throw new TRPCError9({ code: "NOT_FOUND", message: "Contrato n\xE3o encontrado" });
+    if (!contrato) throw new import_server9.TRPCError({ code: "NOT_FOUND", message: "Contrato n\xE3o encontrado" });
     const diasIntervalo = getDiasModalidade(contrato.tipoTaxa ?? contrato.modalidade);
     const dataVencAtual = /* @__PURE__ */ new Date(String(parcela.dataVencimento) + "T00:00:00");
     const novaDataVenc = new Date(dataVencAtual);
@@ -4556,7 +4757,7 @@ var parcelasRouter = router({
         status: "paga",
         observacoes: input.observacoes ?? "Pagamento de juros - renovado",
         contaCaixaId: input.contaCaixaId ?? null
-      }).where(eq5(parcelas.id, input.parcelaId));
+      }).where((0, import_drizzle_orm5.eq)(parcelas.id, input.parcelaId));
       if (input.contaCaixaId) {
         await db.insert(transacoesCaixa).values({
           contaCaixaId: input.contaCaixaId,
@@ -4579,10 +4780,10 @@ var parcelasRouter = router({
         status: "pendente",
         contaCaixaId: input.contaCaixaId ?? null
       });
-      await db.update(contratos).set({ numeroParcelas: sql3`numero_parcelas + 1` }).where(eq5(contratos.id, parcela.contratoId));
+      await db.update(contratos).set({ numeroParcelas: import_drizzle_orm5.sql`numero_parcelas + 1` }).where((0, import_drizzle_orm5.eq)(contratos.id, parcela.contratoId));
     } else {
       const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
       await supabase.from("parcelas").update({
         valor_pago: parseFloat(input.valorJurosPago.toFixed(2)),
         data_pagamento: hoje.toISOString(),
@@ -4623,11 +4824,11 @@ var caixaRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        const contas = await db.select().from(contasCaixa).where(and3(eq5(contasCaixa.ativa, true), eq5(contasCaixa.userId, ctx.user.id)));
+        const contas = await db.select().from(contasCaixa).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contasCaixa.ativa, true), (0, import_drizzle_orm5.eq)(contasCaixa.userId, ctx.user.id)));
         const result = [];
         for (const conta of contas) {
-          const entradas = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(eq5(transacoesCaixa.contaCaixaId, conta.id), eq5(transacoesCaixa.tipo, "entrada")));
-          const saidas = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(eq5(transacoesCaixa.contaCaixaId, conta.id), eq5(transacoesCaixa.tipo, "saida")));
+          const entradas = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(transacoesCaixa.contaCaixaId, conta.id), (0, import_drizzle_orm5.eq)(transacoesCaixa.tipo, "entrada")));
+          const saidas = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(transacoesCaixa.contaCaixaId, conta.id), (0, import_drizzle_orm5.eq)(transacoesCaixa.tipo, "saida")));
           const saldo = parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? "0") - parseFloat(saidas[0]?.total ?? "0");
           result.push({ ...conta, saldoAtual: saldo });
         }
@@ -4659,7 +4860,7 @@ var caixaRouter = router({
     }
     return result2;
   }),
-  transacoes: protectedProcedure.input(z9.object({ contaCaixaId: z9.number().optional(), limit: z9.number().default(50) }).optional()).query(async ({ ctx, input }) => {
+  transacoes: protectedProcedure.input(import_zod9.z.object({ contaCaixaId: import_zod9.z.number().optional(), limit: import_zod9.z.number().default(50) }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
@@ -4673,7 +4874,7 @@ var caixaRouter = router({
           descricao: transacoesCaixa.descricao,
           clienteNome: clientes.nome,
           dataTransacao: transacoesCaixa.dataTransacao
-        }).from(transacoesCaixa).innerJoin(contasCaixa, eq5(transacoesCaixa.contaCaixaId, contasCaixa.id)).leftJoin(clientes, eq5(transacoesCaixa.clienteId, clientes.id)).where(and3(eq5(transacoesCaixa.userId, ctx.user.id), input?.contaCaixaId ? eq5(transacoesCaixa.contaCaixaId, input.contaCaixaId) : void 0)).orderBy(desc2(transacoesCaixa.dataTransacao)).limit(input?.limit ?? 50);
+        }).from(transacoesCaixa).innerJoin(contasCaixa, (0, import_drizzle_orm5.eq)(transacoesCaixa.contaCaixaId, contasCaixa.id)).leftJoin(clientes, (0, import_drizzle_orm5.eq)(transacoesCaixa.clienteId, clientes.id)).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(transacoesCaixa.userId, ctx.user.id), input?.contaCaixaId ? (0, import_drizzle_orm5.eq)(transacoesCaixa.contaCaixaId, input.contaCaixaId) : void 0)).orderBy((0, import_drizzle_orm5.desc)(transacoesCaixa.dataTransacao)).limit(input?.limit ?? 50);
         return rows;
       } catch (err) {
         console.warn("[caixa.transacoes] Drizzle failed:", err.message);
@@ -4705,11 +4906,11 @@ var caixaRouter = router({
       dataTransacao: t2.data_transacao
     }));
   }),
-  criarConta: protectedProcedure.input(z9.object({
-    nome: z9.string().min(2),
-    tipo: z9.enum(["caixa", "banco", "digital"]),
-    banco: z9.string().optional(),
-    saldoInicial: z9.number().default(0)
+  criarConta: protectedProcedure.input(import_zod9.z.object({
+    nome: import_zod9.z.string().min(2),
+    tipo: import_zod9.z.enum(["caixa", "banco", "digital"]),
+    banco: import_zod9.z.string().optional(),
+    saldoInicial: import_zod9.z.number().default(0)
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -4738,12 +4939,12 @@ var caixaRouter = router({
     if (error) throw new Error(error.message);
     return { id: data.id };
   }),
-  registrarTransacao: protectedProcedure.input(z9.object({
-    contaCaixaId: z9.number(),
-    tipo: z9.enum(["entrada", "saida"]),
-    categoria: z9.enum(["pagamento_parcela", "emprestimo_liberado", "despesa_operacional", "transferencia_conta", "ajuste_manual", "outros"]),
-    valor: z9.number().positive(),
-    descricao: z9.string().optional()
+  registrarTransacao: protectedProcedure.input(import_zod9.z.object({
+    contaCaixaId: import_zod9.z.number(),
+    tipo: import_zod9.z.enum(["entrada", "saida"]),
+    categoria: import_zod9.z.enum(["pagamento_parcela", "emprestimo_liberado", "despesa_operacional", "transferencia_conta", "ajuste_manual", "outros"]),
+    valor: import_zod9.z.number().positive(),
+    descricao: import_zod9.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -4757,7 +4958,7 @@ var caixaRouter = router({
           userId: ctx.user.id
         });
         const delta2 = input.tipo === "entrada" ? input.valor : -input.valor;
-        await db.execute(sql3`UPDATE contas_caixa SET saldo_inicial = COALESCE(saldo_inicial::numeric, 0) + ${delta2} WHERE id = ${input.contaCaixaId}`);
+        await db.execute(import_drizzle_orm5.sql`UPDATE contas_caixa SET saldo_inicial = COALESCE(saldo_inicial::numeric, 0) + ${delta2} WHERE id = ${input.contaCaixaId}`);
         return { success: true };
       } catch (err) {
         console.warn("[caixa.registrarTransacao] Drizzle failed:", err.message);
@@ -4786,9 +4987,9 @@ var caixaRouter = router({
   })
 });
 var portalRouter = router({
-  gerarLink: protectedProcedure.input(z9.object({ clienteId: z9.number(), origin: z9.string() })).mutation(async ({ input }) => {
+  gerarLink: protectedProcedure.input(import_zod9.z.object({ clienteId: import_zod9.z.number(), origin: import_zod9.z.string() })).mutation(async ({ input }) => {
     const db = await getDb();
-    const token = nanoid(48);
+    const token = (0, import_nanoid.nanoid)(48);
     const expiresAt = /* @__PURE__ */ new Date();
     expiresAt.setDate(expiresAt.getDate() + 7);
     if (db) {
@@ -4801,28 +5002,28 @@ var portalRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { error } = await supabase.from("magic_links").insert({
       cliente_id: input.clienteId,
       token,
       expires_at: expiresAt.toISOString()
     });
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { url: `${input.origin}/portal/${token}`, token };
   }),
-  acessar: publicProcedure.input(z9.object({ token: z9.string() })).query(async ({ input }) => {
+  acessar: publicProcedure.input(import_zod9.z.object({ token: import_zod9.z.string() })).query(async ({ input }) => {
     const db = await getDb();
     if (db) {
       try {
-        const links = await db.select().from(magicLinks).where(eq5(magicLinks.token, input.token)).limit(1);
+        const links = await db.select().from(magicLinks).where((0, import_drizzle_orm5.eq)(magicLinks.token, input.token)).limit(1);
         const link = links[0];
         if (!link) throw new Error("Link inv\xE1lido");
         if (link.usado) throw new Error("Link j\xE1 utilizado");
         if (/* @__PURE__ */ new Date() > link.expiresAt) throw new Error("Link expirado");
-        const clienteRows = await db.select().from(clientes).where(eq5(clientes.id, link.clienteId)).limit(1);
+        const clienteRows = await db.select().from(clientes).where((0, import_drizzle_orm5.eq)(clientes.id, link.clienteId)).limit(1);
         const cliente = clienteRows[0];
         if (!cliente) throw new Error("Cliente n\xE3o encontrado");
-        const parcelasCliente = await db.select().from(parcelas).where(and3(eq5(parcelas.clienteId, link.clienteId), inArray(parcelas.status, ["pendente", "atrasada", "vencendo_hoje", "parcial"]))).orderBy(parcelas.dataVencimento).limit(10);
+        const parcelasCliente = await db.select().from(parcelas).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(parcelas.clienteId, link.clienteId), (0, import_drizzle_orm5.inArray)(parcelas.status, ["pendente", "atrasada", "vencendo_hoje", "parcial"]))).orderBy(parcelas.dataVencimento).limit(10);
         return { cliente: { nome: cliente.nome, chavePix: cliente.chavePix, tipoChavePix: cliente.tipoChavePix }, parcelas: parcelasCliente };
       } catch (err) {
         if (["Link inv\xE1lido", "Link j\xE1 utilizado", "Link expirado", "Cliente n\xE3o encontrado"].includes(err.message)) throw err;
@@ -4858,9 +5059,9 @@ var whatsappRouter = router({
     return (data ?? []).map((r) => ({ ...r, ativo: r.ativo }));
   }),
   // Gerar mensagem a partir de contrato (para botão Cobrar no card de empréstimo)
-  gerarMensagemContrato: protectedProcedure.input(z9.object({
-    contratoId: z9.number(),
-    tipo: z9.enum(["atraso", "preventivo", "vence_hoje"]).default("atraso")
+  gerarMensagemContrato: protectedProcedure.input(import_zod9.z.object({
+    contratoId: import_zod9.z.number(),
+    tipo: import_zod9.z.enum(["atraso", "preventivo", "vence_hoje"]).default("atraso")
   })).query(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new Error("DB unavailable");
@@ -4961,9 +5162,9 @@ ${assinatura}` : "",
     return { mensagem, whatsappUrl, whatsapp: clienteWhatsapp, clienteNome };
   }),
   // Gerar mensagem por parcela (legado)
-  gerarMensagem: protectedProcedure.input(z9.object({
-    templateId: z9.number(),
-    parcelaId: z9.number()
+  gerarMensagem: protectedProcedure.input(import_zod9.z.object({
+    templateId: import_zod9.z.number(),
+    parcelaId: import_zod9.z.number()
   })).query(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new Error("DB unavailable");
@@ -5006,9 +5207,9 @@ ${assinatura}` : "",
     return { mensagem, whatsappUrl, whatsapp: clienteWhatsapp };
   }),
   // Cobrança em lote
-  cobrarLote: protectedProcedure.input(z9.object({
-    contratoIds: z9.array(z9.number()),
-    tipo: z9.enum(["atraso", "preventivo"]).default("atraso")
+  cobrarLote: protectedProcedure.input(import_zod9.z.object({
+    contratoIds: import_zod9.z.array(import_zod9.z.number()),
+    tipo: import_zod9.z.enum(["atraso", "preventivo"]).default("atraso")
   })).mutation(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new Error("DB unavailable");
@@ -5052,8 +5253,8 @@ ${assinatura}` : ""}`;
     return { resultados, total: resultados.length, sucesso: resultados.filter((r) => r.sucesso).length };
   }),
   // Recebimentos (histórico de pagamentos)
-  recebimentos: protectedProcedure.input(z9.object({
-    periodo: z9.enum(["hoje", "semana", "mes", "todos"]).default("mes")
+  recebimentos: protectedProcedure.input(import_zod9.z.object({
+    periodo: import_zod9.z.enum(["hoje", "semana", "mes", "todos"]).default("mes")
   })).query(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return { recebimentos: [], total: 0, totalValor: 0 };
@@ -5084,9 +5285,9 @@ ${assinatura}` : ""}`;
     const totalValor = recebimentos.reduce((s, r) => s + r.valor, 0);
     return { recebimentos, total: recebimentos.length, totalValor };
   }),
-  relatorioDiario: protectedProcedure.input(z9.object({ telefone: z9.string().optional() }).optional()).mutation(async ({ ctx, input }) => {
+  relatorioDiario: protectedProcedure.input(import_zod9.z.object({ telefone: import_zod9.z.string().optional() }).optional()).mutation(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const hoje = (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
     const { data: parcelasHoje } = await supabase.from("parcelas").select("id, valor, valor_pago, status, data_vencimento, contratos(clientes(nome))").eq("data_vencimento", hoje).eq("user_id", ctx.user.id);
     const { data: pagamentosHoje } = await supabase.from("parcelas").select("id, valor_pago, data_pagamento, contratos(clientes(nome))").eq("data_pagamento", hoje).eq("status", "paga").eq("user_id", ctx.user.id);
@@ -5191,7 +5392,7 @@ var configuracoesRouter = router({
     let rows = [];
     if (db) {
       try {
-        rows = await db.select().from(configuracoes).where(eq5(configuracoes.userId, ctx.user.id));
+        rows = await db.select().from(configuracoes).where((0, import_drizzle_orm5.eq)(configuracoes.userId, ctx.user.id));
       } catch (err) {
         console.warn("[configuracoes.get] Drizzle failed, trying REST:", err.message);
         resetDb();
@@ -5227,24 +5428,24 @@ var configuracoesRouter = router({
       templateAntecipada: get("templateAntecipada", "template_antecipada")
     };
   }),
-  save: protectedProcedure.input(z9.object({
-    nomeEmpresa: z9.string().optional(),
-    cnpjEmpresa: z9.string().optional(),
-    telefoneEmpresa: z9.string().optional(),
-    enderecoEmpresa: z9.string().optional(),
-    assinaturaWhatsapp: z9.string().optional(),
-    fechamentoWhatsapp: z9.string().optional(),
-    multaPadrao: z9.number().optional(),
-    jurosMoraDiario: z9.number().optional(),
-    diasLembrete: z9.number().optional(),
-    multaDiaria: z9.number().optional(),
-    pixKey: z9.string().optional(),
-    nomeCobranca: z9.string().optional(),
-    linkPagamento: z9.string().optional(),
-    logoUrl: z9.string().optional(),
-    templateAtraso: z9.string().optional(),
-    templateVenceHoje: z9.string().optional(),
-    templateAntecipada: z9.string().optional()
+  save: protectedProcedure.input(import_zod9.z.object({
+    nomeEmpresa: import_zod9.z.string().optional(),
+    cnpjEmpresa: import_zod9.z.string().optional(),
+    telefoneEmpresa: import_zod9.z.string().optional(),
+    enderecoEmpresa: import_zod9.z.string().optional(),
+    assinaturaWhatsapp: import_zod9.z.string().optional(),
+    fechamentoWhatsapp: import_zod9.z.string().optional(),
+    multaPadrao: import_zod9.z.number().optional(),
+    jurosMoraDiario: import_zod9.z.number().optional(),
+    diasLembrete: import_zod9.z.number().optional(),
+    multaDiaria: import_zod9.z.number().optional(),
+    pixKey: import_zod9.z.string().optional(),
+    nomeCobranca: import_zod9.z.string().optional(),
+    linkPagamento: import_zod9.z.string().optional(),
+    logoUrl: import_zod9.z.string().optional(),
+    templateAtraso: import_zod9.z.string().optional(),
+    templateVenceHoje: import_zod9.z.string().optional(),
+    templateAntecipada: import_zod9.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     const entries = Object.entries(input).filter(([, v]) => v !== void 0);
@@ -5260,7 +5461,7 @@ var configuracoesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     for (const [chave, valor] of entries) {
       await supabase.from("configuracoes").upsert({ chave, valor: String(valor), user_id: ctx.user.id }, { onConflict: "chave,user_id" });
     }
@@ -5270,7 +5471,7 @@ var configuracoesRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        return db.select().from(templatesWhatsapp).where(eq5(templatesWhatsapp.userId, ctx.user.id));
+        return db.select().from(templatesWhatsapp).where((0, import_drizzle_orm5.eq)(templatesWhatsapp.userId, ctx.user.id));
       } catch (err) {
         console.warn("[configuracoes.templates] Drizzle failed:", err.message);
         resetDb();
@@ -5281,17 +5482,17 @@ var configuracoesRouter = router({
     const { data } = await supabase.from("templates_whatsapp").select("*");
     return data ?? [];
   }),
-  updateTemplate: protectedProcedure.input(z9.object({
-    id: z9.number(),
-    nome: z9.string().optional(),
-    mensagem: z9.string().optional(),
-    ativo: z9.boolean().optional()
+  updateTemplate: protectedProcedure.input(import_zod9.z.object({
+    id: import_zod9.z.number(),
+    nome: import_zod9.z.string().optional(),
+    mensagem: import_zod9.z.string().optional(),
+    ativo: import_zod9.z.boolean().optional()
   })).mutation(async ({ ctx, input }) => {
     const { id, ...data } = input;
     const db = await getDb();
     if (db) {
       try {
-        await db.update(templatesWhatsapp).set(data).where(eq5(templatesWhatsapp.id, id));
+        await db.update(templatesWhatsapp).set(data).where((0, import_drizzle_orm5.eq)(templatesWhatsapp.id, id));
         return { success: true };
       } catch (err) {
         console.warn("[configuracoes.updateTemplate] Drizzle failed:", err.message);
@@ -5299,7 +5500,7 @@ var configuracoesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("templates_whatsapp").update(data).eq("id", id);
     return { success: true };
   })
@@ -5309,7 +5510,7 @@ var cobradoresRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        return db.select().from(koletores).where(eq5(koletores.userId, ctx.user.id)).orderBy(desc2(koletores.createdAt));
+        return db.select().from(koletores).where((0, import_drizzle_orm5.eq)(koletores.userId, ctx.user.id)).orderBy((0, import_drizzle_orm5.desc)(koletores.createdAt));
       } catch (err) {
         console.warn("[koletores.list] Drizzle failed, trying REST:", err.message);
         resetDb();
@@ -5331,15 +5532,15 @@ var cobradoresRouter = router({
       return null;
     }
   }),
-  create: protectedProcedure.input(z9.object({
-    nome: z9.string().min(2),
-    email: z9.string().email().optional().or(z9.literal("")),
-    telefone: z9.string().optional(),
-    whatsapp: z9.string().optional(),
-    perfil: z9.enum(["admin", "gerente", "koletor"]).default("koletor"),
-    limiteEmprestimo: z9.number().default(0),
-    comissaoPercentual: z9.number().default(0),
-    observacoes: z9.string().optional()
+  create: protectedProcedure.input(import_zod9.z.object({
+    nome: import_zod9.z.string().min(2),
+    email: import_zod9.z.string().email().optional().or(import_zod9.z.literal("")),
+    telefone: import_zod9.z.string().optional(),
+    whatsapp: import_zod9.z.string().optional(),
+    perfil: import_zod9.z.enum(["admin", "gerente", "koletor"]).default("koletor"),
+    limiteEmprestimo: import_zod9.z.number().default(0),
+    comissaoPercentual: import_zod9.z.number().default(0),
+    observacoes: import_zod9.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -5352,12 +5553,12 @@ var cobradoresRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data, error } = await supabase.from("koletores").insert({ nome: input.nome, email: input.email || null, telefone: input.telefone || null, whatsapp: input.whatsapp || null, perfil: input.perfil, limite_emprestimo: input.limiteEmprestimo, comissao_percentual: input.comissaoPercentual, observacoes: input.observacoes || null }).select("id").single();
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { id: data.id, success: true };
   }),
-  update: protectedProcedure.input(z9.object({ id: z9.number(), nome: z9.string().optional(), email: z9.string().optional(), telefone: z9.string().optional(), whatsapp: z9.string().optional(), perfil: z9.enum(["admin", "gerente", "koletor"]).optional(), limiteEmprestimo: z9.number().optional(), comissaoPercentual: z9.number().optional(), ativo: z9.boolean().optional(), observacoes: z9.string().optional() })).mutation(async ({ ctx, input }) => {
+  update: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), nome: import_zod9.z.string().optional(), email: import_zod9.z.string().optional(), telefone: import_zod9.z.string().optional(), whatsapp: import_zod9.z.string().optional(), perfil: import_zod9.z.enum(["admin", "gerente", "koletor"]).optional(), limiteEmprestimo: import_zod9.z.number().optional(), comissaoPercentual: import_zod9.z.number().optional(), ativo: import_zod9.z.boolean().optional(), observacoes: import_zod9.z.string().optional() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     const { id, limiteEmprestimo, comissaoPercentual, ...rest } = input;
     if (db) {
@@ -5365,7 +5566,7 @@ var cobradoresRouter = router({
         const updateData2 = { ...rest };
         if (limiteEmprestimo !== void 0) updateData2.limiteEmprestimo = limiteEmprestimo.toString();
         if (comissaoPercentual !== void 0) updateData2.comissaoPercentual = comissaoPercentual.toString();
-        await db.update(koletores).set(updateData2).where(eq5(koletores.id, id));
+        await db.update(koletores).set(updateData2).where((0, import_drizzle_orm5.eq)(koletores.id, id));
         return { success: true };
       } catch (err) {
         console.warn("[koletores.update] Drizzle failed, trying REST:", err.message);
@@ -5373,18 +5574,18 @@ var cobradoresRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const updateData = { ...rest };
     if (limiteEmprestimo !== void 0) updateData.limite_emprestimo = limiteEmprestimo;
     if (comissaoPercentual !== void 0) updateData.comissao_percentual = comissaoPercentual;
     await supabase.from("koletores").update(updateData).eq("id", id);
     return { success: true };
   }),
-  delete: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ ctx, input }) => {
+  delete: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(koletores).set({ ativo: false }).where(eq5(koletores.id, input.id));
+        await db.update(koletores).set({ ativo: false }).where((0, import_drizzle_orm5.eq)(koletores.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[koletores.delete] Drizzle failed, trying REST:", err.message);
@@ -5392,11 +5593,11 @@ var cobradoresRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("koletores").update({ ativo: false }).eq("id", input.id);
     return { success: true };
   }),
-  performance: protectedProcedure.input(z9.object({ mes: z9.number().optional(), ano: z9.number().optional() })).query(async ({ ctx, input }) => {
+  performance: protectedProcedure.input(import_zod9.z.object({ mes: import_zod9.z.number().optional(), ano: import_zod9.z.number().optional() })).query(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const ano = input.ano ?? (/* @__PURE__ */ new Date()).getFullYear();
@@ -5427,13 +5628,13 @@ var cobradoresRouter = router({
   })
 });
 var reparcelamentoRouter = router({
-  preview: protectedProcedure.input(z9.object({
-    contratoId: z9.number(),
-    numeroParcelas: z9.number().min(1),
-    taxaJuros: z9.number().min(0),
-    tipoTaxa: z9.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
-    dataInicio: z9.string(),
-    incluirMultas: z9.boolean().default(true)
+  preview: protectedProcedure.input(import_zod9.z.object({
+    contratoId: import_zod9.z.number(),
+    numeroParcelas: import_zod9.z.number().min(1),
+    taxaJuros: import_zod9.z.number().min(0),
+    tipoTaxa: import_zod9.z.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
+    dataInicio: import_zod9.z.string(),
+    incluirMultas: import_zod9.z.boolean().default(true)
   })).query(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new Error("DB unavailable");
@@ -5471,17 +5672,17 @@ var reparcelamentoRouter = router({
       })
     };
   }),
-  executar: protectedProcedure.input(z9.object({
-    contratoId: z9.number(),
-    numeroParcelas: z9.number().min(1),
-    taxaJuros: z9.number().min(0),
-    tipoTaxa: z9.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
-    dataInicio: z9.string(),
-    incluirMultas: z9.boolean().default(true),
-    observacoes: z9.string().optional()
+  executar: protectedProcedure.input(import_zod9.z.object({
+    contratoId: import_zod9.z.number(),
+    numeroParcelas: import_zod9.z.number().min(1),
+    taxaJuros: import_zod9.z.number().min(0),
+    tipoTaxa: import_zod9.z.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
+    dataInicio: import_zod9.z.string(),
+    incluirMultas: import_zod9.z.boolean().default(true),
+    observacoes: import_zod9.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: contratoOriginalArr, error: contratoErr } = await supabase.from("contratos").select("*").eq("id", input.contratoId).eq("user_id", ctx.user.id).single();
     if (contratoErr || !contratoOriginalArr) throw new Error("Contrato n\xE3o encontrado");
     const contratoOriginal = contratoOriginalArr;
@@ -5525,7 +5726,7 @@ var reparcelamentoRouter = router({
       observacoes: input.observacoes || `Reparcelamento do contrato #${input.contratoId}`,
       user_id: ctx.user.id
     }).select("id").single();
-    if (novoContratoErr || !novoContrato) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: novoContratoErr?.message ?? "Failed to create reparcelamento" });
+    if (novoContratoErr || !novoContrato) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: novoContratoErr?.message ?? "Failed to create reparcelamento" });
     const novoContratoId = novoContrato.id;
     for (let i = 0; i < input.numeroParcelas; i++) {
       const venc = new Date(dataInicioDate);
@@ -5546,19 +5747,19 @@ var reparcelamentoRouter = router({
   })
 });
 var contasPagarRouter = router({
-  listar: protectedProcedure.input(z9.object({
-    status: z9.enum(["pendente", "paga", "atrasada", "cancelada", "todos"]).optional(),
-    categoria: z9.string().optional()
+  listar: protectedProcedure.input(import_zod9.z.object({
+    status: import_zod9.z.enum(["pendente", "paga", "atrasada", "cancelada", "todos"]).optional(),
+    categoria: import_zod9.z.string().optional()
   }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
         let query = db.select().from(contasPagar).$dynamic();
-        const conditions = [eq5(contasPagar.userId, ctx.user.id)];
-        if (input?.status && input.status !== "todos") conditions.push(eq5(contasPagar.status, input.status));
-        if (input?.categoria) conditions.push(eq5(contasPagar.categoria, input.categoria));
-        query = query.where(and3(...conditions));
-        return query.orderBy(desc2(contasPagar.dataVencimento));
+        const conditions = [(0, import_drizzle_orm5.eq)(contasPagar.userId, ctx.user.id)];
+        if (input?.status && input.status !== "todos") conditions.push((0, import_drizzle_orm5.eq)(contasPagar.status, input.status));
+        if (input?.categoria) conditions.push((0, import_drizzle_orm5.eq)(contasPagar.categoria, input.categoria));
+        query = query.where((0, import_drizzle_orm5.and)(...conditions));
+        return query.orderBy((0, import_drizzle_orm5.desc)(contasPagar.dataVencimento));
       } catch (err) {
         console.warn("[contasPagar.listar] Drizzle failed, trying REST:", err.message);
         resetDb();
@@ -5576,15 +5777,15 @@ var contasPagarRouter = router({
     }
     return (data ?? []).map((r) => ({ ...r, dataVencimento: r.data_vencimento, dataPagamento: r.data_pagamento, contaCaixaId: r.conta_caixa_id }));
   }),
-  criar: protectedProcedure.input(z9.object({
-    descricao: z9.string().min(1),
-    categoria: z9.enum(["aluguel", "salario", "servicos", "impostos", "fornecedores", "marketing", "tecnologia", "outros"]),
-    valor: z9.number().positive(),
-    dataVencimento: z9.string(),
-    recorrente: z9.boolean().optional().default(false),
-    periodicidade: z9.enum(["mensal", "semanal", "anual", "unica"]).optional().default("unica"),
-    observacoes: z9.string().optional(),
-    contaCaixaId: z9.number().optional()
+  criar: protectedProcedure.input(import_zod9.z.object({
+    descricao: import_zod9.z.string().min(1),
+    categoria: import_zod9.z.enum(["aluguel", "salario", "servicos", "impostos", "fornecedores", "marketing", "tecnologia", "outros"]),
+    valor: import_zod9.z.number().positive(),
+    dataVencimento: import_zod9.z.string(),
+    recorrente: import_zod9.z.boolean().optional().default(false),
+    periodicidade: import_zod9.z.enum(["mensal", "semanal", "anual", "unica"]).optional().default("unica"),
+    observacoes: import_zod9.z.string().optional(),
+    contaCaixaId: import_zod9.z.number().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -5608,7 +5809,7 @@ var contasPagarRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data, error } = await supabase.from("contas_pagar").insert({
       descricao: input.descricao,
       categoria: input.categoria,
@@ -5621,21 +5822,21 @@ var contasPagarRouter = router({
       status: "pendente",
       user_id: ctx.user.id
     }).select("id").single();
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true, id: data.id };
   }),
-  pagar: protectedProcedure.input(z9.object({
-    id: z9.number(),
-    contaCaixaId: z9.number().optional(),
-    dataPagamento: z9.string().optional()
+  pagar: protectedProcedure.input(import_zod9.z.object({
+    id: import_zod9.z.number(),
+    contaCaixaId: import_zod9.z.number().optional(),
+    dataPagamento: import_zod9.z.string().optional()
   })).mutation(async ({ input }) => {
     const db = await getDb();
     const dataPag = input.dataPagamento ? new Date(input.dataPagamento) : /* @__PURE__ */ new Date();
     if (db) {
       try {
-        const conta = await db.select().from(contasPagar).where(eq5(contasPagar.id, input.id)).limit(1);
+        const conta = await db.select().from(contasPagar).where((0, import_drizzle_orm5.eq)(contasPagar.id, input.id)).limit(1);
         if (!conta[0]) throw new Error("Conta n\xE3o encontrada");
-        await db.update(contasPagar).set({ status: "paga", dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where(eq5(contasPagar.id, input.id));
+        await db.update(contasPagar).set({ status: "paga", dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where((0, import_drizzle_orm5.eq)(contasPagar.id, input.id));
         if (input.contaCaixaId) {
           await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: "saida", categoria: "despesa_operacional", valor: conta[0].valor, descricao: `Pagamento: ${conta[0].descricao}`, dataTransacao: dataPag });
         }
@@ -5647,7 +5848,7 @@ var contasPagarRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: contaData } = await supabase.from("contas_pagar").select("valor, descricao").eq("id", input.id).single();
     if (!contaData) throw new Error("Conta n\xE3o encontrada");
     await supabase.from("contas_pagar").update({ status: "paga", data_pagamento: dataPag.toISOString(), conta_caixa_id: input.contaCaixaId ?? null }).eq("id", input.id);
@@ -5656,11 +5857,11 @@ var contasPagarRouter = router({
     }
     return { success: true };
   }),
-  cancelar: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
+  cancelar: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(contasPagar).set({ status: "cancelada" }).where(eq5(contasPagar.id, input.id));
+        await db.update(contasPagar).set({ status: "cancelada" }).where((0, import_drizzle_orm5.eq)(contasPagar.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[contasPagar.cancelar] Drizzle failed, trying REST:", err.message);
@@ -5668,15 +5869,15 @@ var contasPagarRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("contas_pagar").update({ status: "cancelada" }).eq("id", input.id);
     return { success: true };
   }),
-  excluir: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
+  excluir: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.delete(contasPagar).where(eq5(contasPagar.id, input.id));
+        await db.delete(contasPagar).where((0, import_drizzle_orm5.eq)(contasPagar.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[contasPagar.excluir] Drizzle failed, trying REST:", err.message);
@@ -5684,7 +5885,7 @@ var contasPagarRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("contas_pagar").delete().eq("id", input.id);
     return { success: true };
   }),
@@ -5709,9 +5910,9 @@ var contasPagarRouter = router({
     if (false) throw new Error();
     const hoje = /* @__PURE__ */ new Date();
     const hojeStr = hoje.toISOString().split("T")[0];
-    const pendentes = await db.select({ total: sql3`COALESCE(SUM(valor), 0)`, qtd: sql3`COUNT(*)` }).from(contasPagar).where(and3(eq5(contasPagar.status, "pendente"), eq5(contasPagar.userId, ctx.user.id)));
-    const atrasadas = await db.select({ total: sql3`COALESCE(SUM(valor), 0)`, qtd: sql3`COUNT(*)` }).from(contasPagar).where(and3(eq5(contasPagar.status, "atrasada"), eq5(contasPagar.userId, ctx.user.id)));
-    const pagas = await db.select({ total: sql3`COALESCE(SUM(valor), 0)`, qtd: sql3`COUNT(*)` }).from(contasPagar).where(and3(eq5(contasPagar.status, "paga"), eq5(contasPagar.userId, ctx.user.id)));
+    const pendentes = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)`, qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(contasPagar).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contasPagar.status, "pendente"), (0, import_drizzle_orm5.eq)(contasPagar.userId, ctx.user.id)));
+    const atrasadas = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)`, qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(contasPagar).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contasPagar.status, "atrasada"), (0, import_drizzle_orm5.eq)(contasPagar.userId, ctx.user.id)));
+    const pagas = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor), 0)`, qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(contasPagar).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(contasPagar.status, "paga"), (0, import_drizzle_orm5.eq)(contasPagar.userId, ctx.user.id)));
     return {
       totalPendente: parseFloat(pendentes[0]?.total ?? "0"),
       qtdPendente: pendentes[0]?.qtd ?? 0,
@@ -5727,7 +5928,7 @@ var vendasRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        return db.select().from(produtos).where(and3(eq5(produtos.ativo, true), eq5(produtos.userId, ctx.user.id))).orderBy(desc2(produtos.createdAt));
+        return db.select().from(produtos).where((0, import_drizzle_orm5.and)((0, import_drizzle_orm5.eq)(produtos.ativo, true), (0, import_drizzle_orm5.eq)(produtos.userId, ctx.user.id))).orderBy((0, import_drizzle_orm5.desc)(produtos.createdAt));
       } catch (err) {
         console.warn("[vendas.listarProdutos] Drizzle failed:", err.message);
         resetDb();
@@ -5738,7 +5939,7 @@ var vendasRouter = router({
     const { data } = await supabase.from("produtos").select("*").eq("ativo", true).order("createdAt", { ascending: false });
     return data ?? [];
   }),
-  criarProduto: protectedProcedure.input(z9.object({ nome: z9.string().min(1), descricao: z9.string().optional(), preco: z9.number().positive(), estoque: z9.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {
+  criarProduto: protectedProcedure.input(import_zod9.z.object({ nome: import_zod9.z.string().min(1), descricao: import_zod9.z.string().optional(), preco: import_zod9.z.number().positive(), estoque: import_zod9.z.number().int().min(0).default(0) })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
@@ -5750,16 +5951,16 @@ var vendasRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data, error } = await supabase.from("produtos").insert({ nome: input.nome, descricao: input.descricao ?? null, preco: input.preco, estoque: input.estoque, user_id: ctx.user.id }).select("id").single();
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true, id: data.id };
   }),
-  atualizarEstoque: protectedProcedure.input(z9.object({ id: z9.number(), estoque: z9.number().int().min(0) })).mutation(async ({ ctx, input }) => {
+  atualizarEstoque: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), estoque: import_zod9.z.number().int().min(0) })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(produtos).set({ estoque: input.estoque }).where(eq5(produtos.id, input.id));
+        await db.update(produtos).set({ estoque: input.estoque }).where((0, import_drizzle_orm5.eq)(produtos.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[vendas.atualizarEstoque] Drizzle failed, trying REST:", err.message);
@@ -5767,15 +5968,15 @@ var vendasRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("produtos").update({ estoque: input.estoque }).eq("id", input.id);
     return { success: true };
   }),
-  desativarProduto: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ ctx, input }) => {
+  desativarProduto: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(produtos).set({ ativo: false }).where(eq5(produtos.id, input.id));
+        await db.update(produtos).set({ ativo: false }).where((0, import_drizzle_orm5.eq)(produtos.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[vendas.desativarProduto] Drizzle failed, trying REST:", err.message);
@@ -5783,15 +5984,15 @@ var vendasRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("produtos").update({ ativo: false }).eq("id", input.id);
     return { success: true };
   })
 });
 var chequesRouter = router({
-  listar: protectedProcedure.input(z9.object({
-    status: z9.enum(["aguardando", "compensado", "devolvido", "cancelado", "todos"]).optional(),
-    clienteId: z9.number().optional()
+  listar: protectedProcedure.input(import_zod9.z.object({
+    status: import_zod9.z.enum(["aguardando", "compensado", "devolvido", "cancelado", "todos"]).optional(),
+    clienteId: import_zod9.z.number().optional()
   }).optional()).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -5816,7 +6017,7 @@ var chequesRouter = router({
           motivoDevolucao: cheques.motivoDevolucao,
           observacoes: cheques.observacoes,
           createdAt: cheques.createdAt
-        }).from(cheques).leftJoin(clientes, eq5(cheques.clienteId, clientes.id)).where(eq5(cheques.userId, ctx.user.id)).orderBy(desc2(cheques.createdAt));
+        }).from(cheques).leftJoin(clientes, (0, import_drizzle_orm5.eq)(cheques.clienteId, clientes.id)).where((0, import_drizzle_orm5.eq)(cheques.userId, ctx.user.id)).orderBy((0, import_drizzle_orm5.desc)(cheques.createdAt));
         return rows.filter((r) => {
           if (input?.status && input.status !== "todos" && r.status !== input.status) return false;
           if (input?.clienteId && r.clienteId !== input.clienteId) return false;
@@ -5849,20 +6050,20 @@ var chequesRouter = router({
       motivoDevolucao: r.motivo_devolucao
     }));
   }),
-  criar: protectedProcedure.input(z9.object({
-    clienteId: z9.number(),
-    numeroCheque: z9.string().optional(),
-    banco: z9.string().optional(),
-    agencia: z9.string().optional(),
-    conta: z9.string().optional(),
-    emitente: z9.string().min(1),
-    cpfCnpjEmitente: z9.string().optional(),
-    valorNominal: z9.number().positive(),
-    dataVencimento: z9.string(),
-    taxaDesconto: z9.number().positive(),
-    tipoTaxa: z9.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
-    contaCaixaId: z9.number().optional(),
-    observacoes: z9.string().optional()
+  criar: protectedProcedure.input(import_zod9.z.object({
+    clienteId: import_zod9.z.number(),
+    numeroCheque: import_zod9.z.string().optional(),
+    banco: import_zod9.z.string().optional(),
+    agencia: import_zod9.z.string().optional(),
+    conta: import_zod9.z.string().optional(),
+    emitente: import_zod9.z.string().min(1),
+    cpfCnpjEmitente: import_zod9.z.string().optional(),
+    valorNominal: import_zod9.z.number().positive(),
+    dataVencimento: import_zod9.z.string(),
+    taxaDesconto: import_zod9.z.number().positive(),
+    tipoTaxa: import_zod9.z.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal"),
+    contaCaixaId: import_zod9.z.number().optional(),
+    observacoes: import_zod9.z.string().optional()
   })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     const dbAvailable = !!db;
@@ -5910,7 +6111,7 @@ var chequesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: chqData, error: chqErr } = await supabase.from("cheques").insert({
       user_id: ctx.user.id,
       cliente_id: input.clienteId,
@@ -5930,20 +6131,20 @@ var chequesRouter = router({
       observacoes: input.observacoes ?? null,
       status: "aguardando"
     }).select("id").single();
-    if (chqErr) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: chqErr.message });
+    if (chqErr) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: chqErr.message });
     if (input.contaCaixaId) {
       await supabase.from("transacoes_caixa").insert({ conta_caixa_id: input.contaCaixaId, tipo: "saida", categoria: "outros", valor: valorLiquido, descricao: `Desconto de cheque - ${input.emitente}`, data_transacao: (/* @__PURE__ */ new Date()).toISOString() });
     }
     return { success: true, id: chqData.id, valorLiquido, valorDesconto };
   }),
-  compensar: protectedProcedure.input(z9.object({ id: z9.number(), contaCaixaId: z9.number().optional() })).mutation(async ({ input }) => {
+  compensar: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), contaCaixaId: import_zod9.z.number().optional() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (db) {
       try {
-        const cheque = await db.select().from(cheques).where(eq5(cheques.id, input.id)).limit(1);
+        const cheque = await db.select().from(cheques).where((0, import_drizzle_orm5.eq)(cheques.id, input.id)).limit(1);
         if (!cheque[0]) throw new Error("Cheque n\xE3o encontrado");
         const contaId2 = input.contaCaixaId ?? cheque[0].contaCaixaId;
-        await db.update(cheques).set({ status: "compensado", dataCompensacao: /* @__PURE__ */ new Date(), contaCaixaId: contaId2 }).where(eq5(cheques.id, input.id));
+        await db.update(cheques).set({ status: "compensado", dataCompensacao: /* @__PURE__ */ new Date(), contaCaixaId: contaId2 }).where((0, import_drizzle_orm5.eq)(cheques.id, input.id));
         if (contaId2) await db.insert(transacoesCaixa).values({ contaCaixaId: contaId2, tipo: "entrada", categoria: "outros", valor: cheque[0].valorNominal, descricao: `Cheque compensado - ${cheque[0].emitente}`, dataTransacao: /* @__PURE__ */ new Date() });
         return { success: true };
       } catch (err) {
@@ -5953,7 +6154,7 @@ var chequesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: chqData } = await supabase.from("cheques").select("valor_nominal, emitente, conta_caixa_id").eq("id", input.id).single();
     if (!chqData) throw new Error("Cheque n\xE3o encontrado");
     const contaId = input.contaCaixaId ?? chqData.conta_caixa_id;
@@ -5961,11 +6162,11 @@ var chequesRouter = router({
     if (contaId) await supabase.from("transacoes_caixa").insert({ conta_caixa_id: contaId, tipo: "entrada", categoria: "outros", valor: chqData.valor_nominal, descricao: `Cheque compensado - ${chqData.emitente}`, data_transacao: (/* @__PURE__ */ new Date()).toISOString() });
     return { success: true };
   }),
-  devolver: protectedProcedure.input(z9.object({ id: z9.number(), motivo: z9.string().min(1) })).mutation(async ({ input }) => {
+  devolver: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number(), motivo: import_zod9.z.string().min(1) })).mutation(async ({ input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(cheques).set({ status: "devolvido", motivoDevolucao: input.motivo }).where(eq5(cheques.id, input.id));
+        await db.update(cheques).set({ status: "devolvido", motivoDevolucao: input.motivo }).where((0, import_drizzle_orm5.eq)(cheques.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[cheques.devolver] Drizzle failed, trying REST:", err.message);
@@ -5973,15 +6174,15 @@ var chequesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("cheques").update({ status: "devolvido", motivo_devolucao: input.motivo }).eq("id", input.id);
     return { success: true };
   }),
-  cancelar: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
+  cancelar: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ input }) => {
     const db = await getDb();
     if (db) {
       try {
-        await db.update(cheques).set({ status: "cancelado" }).where(eq5(cheques.id, input.id));
+        await db.update(cheques).set({ status: "cancelado" }).where((0, import_drizzle_orm5.eq)(cheques.id, input.id));
         return { success: true };
       } catch (err) {
         console.warn("[cheques.cancelar] Drizzle failed, trying REST:", err.message);
@@ -5989,7 +6190,7 @@ var chequesRouter = router({
       }
     }
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await supabase.from("cheques").update({ status: "cancelado" }).eq("id", input.id);
     return { success: true };
   }),
@@ -6011,9 +6212,9 @@ var chequesRouter = router({
         qtdDevolvido: de.length
       };
     }
-    const aguardando = await db.select({ total: sql3`COALESCE(SUM(valor_nominal), 0)`, qtd: sql3`COUNT(*)` }).from(cheques).where(eq5(cheques.status, "aguardando"));
-    const compensados = await db.select({ total: sql3`COALESCE(SUM(valor_nominal), 0)`, qtd: sql3`COUNT(*)` }).from(cheques).where(eq5(cheques.status, "compensado"));
-    const devolvidos = await db.select({ total: sql3`COALESCE(SUM(valor_nominal), 0)`, qtd: sql3`COUNT(*)` }).from(cheques).where(eq5(cheques.status, "devolvido"));
+    const aguardando = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_nominal), 0)`, qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(cheques).where((0, import_drizzle_orm5.eq)(cheques.status, "aguardando"));
+    const compensados = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_nominal), 0)`, qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(cheques).where((0, import_drizzle_orm5.eq)(cheques.status, "compensado"));
+    const devolvidos = await db.select({ total: import_drizzle_orm5.sql`COALESCE(SUM(valor_nominal), 0)`, qtd: import_drizzle_orm5.sql`COUNT(*)` }).from(cheques).where((0, import_drizzle_orm5.eq)(cheques.status, "devolvido"));
     return {
       totalAguardando: parseFloat(aguardando[0]?.total ?? "0"),
       qtdAguardando: aguardando[0]?.qtd ?? 0,
@@ -6023,11 +6224,11 @@ var chequesRouter = router({
       qtdDevolvido: devolvidos[0]?.qtd ?? 0
     };
   }),
-  simular: publicProcedure.input(z9.object({
-    valorNominal: z9.number().positive(),
-    dataVencimento: z9.string(),
-    taxaDesconto: z9.number().positive(),
-    tipoTaxa: z9.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal")
+  simular: publicProcedure.input(import_zod9.z.object({
+    valorNominal: import_zod9.z.number().positive(),
+    dataVencimento: import_zod9.z.string(),
+    taxaDesconto: import_zod9.z.number().positive(),
+    tipoTaxa: import_zod9.z.enum(["diaria", "semanal", "quinzenal", "mensal", "anual"]).default("mensal")
   })).query(({ input }) => {
     const dataVenc = /* @__PURE__ */ new Date(input.dataVencimento + "T00:00:00");
     const hoje = /* @__PURE__ */ new Date();
@@ -6068,7 +6269,7 @@ var vendasTelefoneRouter = router({
       return [];
     }
   }),
-  buscarPorId: protectedProcedure.input(z9.object({ id: z9.number() })).query(async ({ ctx, input }) => {
+  buscarPorId: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).query(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
     try {
@@ -6079,7 +6280,7 @@ var vendasTelefoneRouter = router({
       return null;
     }
   }),
-  parcelas: protectedProcedure.input(z9.object({ vendaId: z9.number() })).query(async ({ input }) => {
+  parcelas: protectedProcedure.input(import_zod9.z.object({ vendaId: import_zod9.z.number() })).query(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     try {
@@ -6090,41 +6291,41 @@ var vendasTelefoneRouter = router({
       return [];
     }
   }),
-  criar: protectedProcedure.input(z9.object({
-    marca: z9.string().min(1),
-    modelo: z9.string().min(1),
-    imei: z9.string().optional(),
-    cor: z9.string().optional(),
-    armazenamento: z9.string().optional(),
-    custo: z9.number().positive(),
-    precoVenda: z9.number().positive(),
-    entradaPercentual: z9.number().min(0).max(100),
-    entradaValor: z9.number().min(0),
-    numParcelas: z9.number().int().min(1).max(60),
-    jurosMensal: z9.number().min(0),
-    valorParcela: z9.number().min(0),
-    totalJuros: z9.number().min(0),
-    totalAReceber: z9.number().min(0),
-    lucroBruto: z9.number(),
-    roi: z9.number().optional(),
-    paybackMeses: z9.number().optional(),
-    compradorNome: z9.string().min(1),
-    compradorCpf: z9.string().optional(),
-    compradorRg: z9.string().optional(),
-    compradorTelefone: z9.string().optional(),
-    compradorEmail: z9.string().optional(),
-    compradorEstadoCivil: z9.string().optional(),
-    compradorProfissao: z9.string().optional(),
-    compradorInstagram: z9.string().optional(),
-    compradorCep: z9.string().optional(),
-    compradorCidade: z9.string().optional(),
-    compradorEstado: z9.string().optional(),
-    compradorEndereco: z9.string().optional(),
-    compradorLocalTrabalho: z9.string().optional(),
-    dataPrimeiraParcela: z9.string().optional()
+  criar: protectedProcedure.input(import_zod9.z.object({
+    marca: import_zod9.z.string().min(1),
+    modelo: import_zod9.z.string().min(1),
+    imei: import_zod9.z.string().optional(),
+    cor: import_zod9.z.string().optional(),
+    armazenamento: import_zod9.z.string().optional(),
+    custo: import_zod9.z.number().positive(),
+    precoVenda: import_zod9.z.number().positive(),
+    entradaPercentual: import_zod9.z.number().min(0).max(100),
+    entradaValor: import_zod9.z.number().min(0),
+    numParcelas: import_zod9.z.number().int().min(1).max(60),
+    jurosMensal: import_zod9.z.number().min(0),
+    valorParcela: import_zod9.z.number().min(0),
+    totalJuros: import_zod9.z.number().min(0),
+    totalAReceber: import_zod9.z.number().min(0),
+    lucroBruto: import_zod9.z.number(),
+    roi: import_zod9.z.number().optional(),
+    paybackMeses: import_zod9.z.number().optional(),
+    compradorNome: import_zod9.z.string().min(1),
+    compradorCpf: import_zod9.z.string().optional(),
+    compradorRg: import_zod9.z.string().optional(),
+    compradorTelefone: import_zod9.z.string().optional(),
+    compradorEmail: import_zod9.z.string().optional(),
+    compradorEstadoCivil: import_zod9.z.string().optional(),
+    compradorProfissao: import_zod9.z.string().optional(),
+    compradorInstagram: import_zod9.z.string().optional(),
+    compradorCep: import_zod9.z.string().optional(),
+    compradorCidade: import_zod9.z.string().optional(),
+    compradorEstado: import_zod9.z.string().optional(),
+    compradorEndereco: import_zod9.z.string().optional(),
+    compradorLocalTrabalho: import_zod9.z.string().optional(),
+    dataPrimeiraParcela: import_zod9.z.string().optional()
   })).mutation(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: venda, error } = await supabase.from("vendas_telefone").insert({
       marca: input.marca,
       modelo: input.modelo,
@@ -6158,7 +6359,7 @@ var vendasTelefoneRouter = router({
       comprador_local_trabalho: input.compradorLocalTrabalho ?? null,
       status: "ativo"
     }).select().single();
-    if (error || !venda) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error?.message ?? "Erro ao criar venda" });
+    if (error || !venda) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error?.message ?? "Erro ao criar venda" });
     const primeiraParcela = input.dataPrimeiraParcela ? /* @__PURE__ */ new Date(input.dataPrimeiraParcela + "T00:00:00") : (() => {
       const d = /* @__PURE__ */ new Date();
       d.setMonth(d.getMonth() + 1);
@@ -6198,15 +6399,15 @@ var vendasTelefoneRouter = router({
     }
     return venda;
   }),
-  pagarParcela: protectedProcedure.input(z9.object({
-    parcelaId: z9.number(),
-    valorPago: z9.number().positive()
+  pagarParcela: protectedProcedure.input(import_zod9.z.object({
+    parcelaId: import_zod9.z.number(),
+    valorPago: import_zod9.z.number().positive()
   })).mutation(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data: parcela } = await supabase.from("parcelas_venda_telefone").select("*, vendas_telefone(marca, modelo, comprador_nome)").eq("id", input.parcelaId).maybeSingle();
     const { error } = await supabase.from("parcelas_venda_telefone").update({ status: "paga", pago_em: (/* @__PURE__ */ new Date()).toISOString(), valor_pago: input.valorPago }).eq("id", input.parcelaId);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     try {
       const { data: contas } = await supabase.from("contas_caixa").select("id, saldo").order("id", { ascending: true }).limit(1);
       if (contas && contas.length > 0) {
@@ -6246,11 +6447,11 @@ var vendasTelefoneRouter = router({
     }
     return { success: true };
   }),
-  deletar: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ input }) => {
+  deletar: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { error } = await supabase.from("vendas_telefone").delete().eq("id", input.id);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
   kpis: protectedProcedure.query(async ({ ctx }) => {
@@ -6275,24 +6476,24 @@ var etiquetasRouter = router({
     const { data } = await sb2.from("etiquetas_contratos").select("*").order("nome").eq("user_id", ctx.user.id);
     return data ?? [];
   }),
-  criar: protectedProcedure.input(z9.object({ nome: z9.string().min(1), cor: z9.string().default("#6366f1") })).mutation(async ({ ctx, input }) => {
+  criar: protectedProcedure.input(import_zod9.z.object({ nome: import_zod9.z.string().min(1), cor: import_zod9.z.string().default("#6366f1") })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { data, error } = await sb2.from("etiquetas_contratos").insert({ nome: input.nome, cor: input.cor, user_id: ctx.user.id }).select().single();
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return data;
   }),
-  remover: protectedProcedure.input(z9.object({ id: z9.number() })).mutation(async ({ ctx, input }) => {
+  remover: protectedProcedure.input(import_zod9.z.object({ id: import_zod9.z.number() })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     await sb2.from("etiquetas_contratos").delete().eq("id", input.id).eq("user_id", ctx.user.id);
     return { success: true };
   }),
-  aplicarContrato: protectedProcedure.input(z9.object({ contratoId: z9.number(), etiquetas: z9.array(z9.string()) })).mutation(async ({ ctx, input }) => {
+  aplicarContrato: protectedProcedure.input(import_zod9.z.object({ contratoId: import_zod9.z.number(), etiquetas: import_zod9.z.array(import_zod9.z.string()) })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    if (!sb2) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
     const { error } = await sb2.from("contratos").update({ etiquetas: JSON.stringify(input.etiquetas) }).eq("id", input.contratoId);
-    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (error) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   })
 });
@@ -6304,13 +6505,13 @@ var onboardingRouter = router({
     if (error || !row) return { completo: false, nomeEmpresa: null };
     return { completo: !!row.onboarding_completo, nomeEmpresa: row.nome_empresa };
   }),
-  complete: protectedProcedure.input(z9.object({
-    nomeEmpresa: z9.string().min(1),
-    nomeConta: z9.string().min(1).optional().default("Caixa Principal"),
-    tipoConta: z9.enum(["caixa", "banco", "digital"]).optional().default("caixa")
+  complete: protectedProcedure.input(import_zod9.z.object({
+    nomeEmpresa: import_zod9.z.string().min(1),
+    nomeConta: import_zod9.z.string().min(1).optional().default("Caixa Principal"),
+    tipoConta: import_zod9.z.enum(["caixa", "banco", "digital"]).optional().default("caixa")
   })).mutation(async ({ ctx, input }) => {
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB indispon\xEDvel" });
+    if (!supabase) throw new import_server9.TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB indispon\xEDvel" });
     await supabase.from("users").update({ onboarding_completo: true, nome_empresa: input.nomeEmpresa }).eq("id", ctx.user.id);
     const { data: contas } = await supabase.from("contas_caixa").select("id").eq("user_id", ctx.user.id).limit(1);
     if (!contas || contas.length === 0) {
@@ -6377,13 +6578,14 @@ async function createContext(opts) {
 }
 
 // server/_core/vite.ts
-import express from "express";
-import fs from "fs";
-import path from "path";
+var import_express = __toESM(require("../node_modules/express/index.js"), 1);
+var import_fs = __toESM(require("fs"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_meta2 = {};
 async function setupVite(app, server) {
-  const { createServer: createViteServer } = await import("vite");
-  const { nanoid: nanoid2 } = await import("nanoid");
-  const { default: viteConfig } = await import("../../vite.config");
+  const { createServer: createViteServer } = await import("../node_modules/vite/dist/node/index.js");
+  const { nanoid: nanoid2 } = await import("../node_modules/nanoid/index.js");
+  const { default: viteConfig } = await Promise.resolve().then(() => (init_vite_config(), vite_config_exports));
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -6399,13 +6601,13 @@ async function setupVite(app, server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
+      const clientTemplate = import_path.default.resolve(
+        import_meta2.dirname,
         "../..",
         "client",
         "index.html"
       );
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
+      let template = await import_fs.default.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid2()}"`
@@ -6419,19 +6621,19 @@ async function setupVite(app, server) {
   });
 }
 function serveStatic(app) {
-  const distPath = process.env.NODE_ENV === "development" ? path.resolve(import.meta.dirname, "../..", "dist", "public") : path.resolve(import.meta.dirname, "public");
-  if (!fs.existsSync(distPath)) {
+  const distPath = process.env.NODE_ENV === "development" ? import_path.default.resolve(import_meta2.dirname, "../..", "dist", "public") : import_path.default.resolve(import_meta2.dirname, "public");
+  if (!import_fs.default.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
-  app.use("/assets", express.static(path.join(distPath, "assets"), {
+  app.use("/assets", import_express.default.static(import_path.default.join(distPath, "assets"), {
     maxAge: "1y",
     immutable: true,
     etag: false,
     lastModified: false
   }));
-  app.use(express.static(distPath, {
+  app.use(import_express.default.static(distPath, {
     maxAge: "1h",
     etag: true,
     lastModified: true,
@@ -6440,14 +6642,14 @@ function serveStatic(app) {
   }));
   app.use("*", (_req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile(import_path.default.resolve(distPath, "index.html"));
   });
 }
 
 // server/_core/index.ts
 function isPortAvailable(port) {
   return new Promise((resolve) => {
-    const server = net.createServer();
+    const server = import_net.default.createServer();
     server.listen(port, () => {
       server.close(() => resolve(true));
     });
@@ -6463,11 +6665,11 @@ async function findAvailablePort(startPort = 3e3) {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 async function startServer() {
-  const app = express2();
-  const server = createServer(app);
-  app.use(compression());
-  app.use(express2.json({ limit: "50mb" }));
-  app.use(express2.urlencoded({ limit: "50mb", extended: true }));
+  const app = (0, import_express2.default)();
+  const server = (0, import_http.createServer)(app);
+  app.use((0, import_compression.default)());
+  app.use(import_express2.default.json({ limit: "50mb" }));
+  app.use(import_express2.default.urlencoded({ limit: "50mb", extended: true }));
   registerOAuthRoutes(app);
   registerAuthRoutes(app);
   registerWebhookRoutes(app);
@@ -6499,7 +6701,7 @@ async function startServer() {
   });
   app.use(
     "/api/trpc",
-    createExpressMiddleware({
+    (0, import_express3.createExpressMiddleware)({
       router: appRouter,
       createContext
     })

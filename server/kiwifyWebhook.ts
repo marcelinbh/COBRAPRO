@@ -217,6 +217,8 @@ async function processarCompraAprovada(payload: KiwifyPayload) {
             lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn) : new Date(),
             createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
             updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
+            onboardingCompleto: (data.onboarding_completo ?? false) as boolean,
+            nomeEmpresa: (data.nome_empresa ?? null) as string | null,
           };
         }
       }
