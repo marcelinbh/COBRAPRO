@@ -42,12 +42,12 @@ function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, 
   open: boolean; onClose: () => void; qrCode?: string | null;
   loading: boolean; onRefresh: () => void; onDisconnect: () => void; connected: boolean;
 }) {
-  const [seconds, setSeconds] = useState(90);
+  const [seconds, setSeconds] = useState(15);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setSeconds(90);
+    setSeconds(15);
     timerRef.current = setInterval(() => {
       setSeconds((s) => { if (s <= 1) { clearInterval(timerRef.current!); return 0; } return s - 1; });
     }, 1000);
@@ -82,12 +82,12 @@ function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, 
             <>
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 text-primary">
-                  <Clock className="h-3.5 w-3.5" /><span>{seconds}s restantes</span>
+                  <Clock className="h-3.5 w-3.5" /><span>{seconds > 0 ? `${seconds}s restantes` : 'Atualizando QR...'}</span>
                 </div>
                 <span className="text-muted-foreground">Escaneie com calma</span>
               </div>
               <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full transition-all duration-1000" style={{ width: `${(seconds / 90) * 100}%` }} />
+                <div className="h-full bg-green-500 rounded-full transition-all duration-1000" style={{ width: `${(seconds / 15) * 100}%` }} />
               </div>
               <div className="flex justify-center">
                 {loading ? (
@@ -187,7 +187,9 @@ export default function WhatsAppConfig() {
   const { data: status, refetch: refetchStatus } = trpc.whatsappEvolution.getStatus.useQuery(undefined, { refetchInterval: 5000 });
   const { data: qrData, refetch: refetchQR, isLoading: qrLoading } = trpc.whatsappEvolution.getQRCode.useQuery(undefined, {
     enabled: qrModalOpen && !status?.connected,
-    refetchInterval: qrModalOpen && !status?.connected ? 25000 : false,
+    refetchInterval: qrModalOpen && !status?.connected ? 15000 : false,
+    staleTime: 0,
+    gcTime: 0,
   });
   const { data: templates, refetch: refetchTemplates } = trpc.configuracoes.templates.useQuery();
   const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
@@ -203,7 +205,7 @@ export default function WhatsAppConfig() {
     onError: (e) => toast.error("Erro ao salvar: " + e.message),
   });
   const connected = status?.connected ?? false;
-  const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) connectWpp.mutate(); };
+  const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) { connectWpp.mutate(); setTimeout(() => refetchQR(), 2000); } };
   const handleRefreshQR = () => { connectWpp.mutate(); setTimeout(() => refetchQR(), 1500); };
 
   return (
