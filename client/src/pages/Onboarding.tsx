@@ -139,7 +139,7 @@ export default function Onboarding() {
                 <Label htmlFor="nomeEmpresa">Nome da empresa ou seu nome</Label>
                 <Input
                   id="nomeEmpresa"
-                  placeholder="Ex: João Empréstimos, DG Financeira..."
+                  placeholder="Ex: ABC Empréstimos, XYZ Empréstimos..."
                   value={nomeEmpresa}
                   onChange={(e) => setNomeEmpresa(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleProximo()}

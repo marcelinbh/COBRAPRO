@@ -56,6 +56,8 @@ export const users = pgTable("users", {
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
+  onboardingCompleto: boolean("onboarding_completo").default(false).notNull(),
+  nomeEmpresa: varchar("nome_empresa", { length: 255 }),
 });
 
 export type User = typeof users.$inferSelect;
