@@ -162,9 +162,10 @@ export const whatsappEvolutionRouter = router({
       if (!phone.startsWith('55')) phone = '55' + phone;
       if (!phone.endsWith('@s.whatsapp.net')) phone = phone + '@s.whatsapp.net';
 
+      // v1.8.x format: textMessage wrapper
       const result = await evolutionRequest(config, 'POST', '/message/sendText/{instance}', {
         number: phone,
-        text: input.message,
+        textMessage: { text: input.message },
       });
 
       if (result?.error || result?.status === 400) {
