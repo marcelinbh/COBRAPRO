@@ -2,28 +2,19 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
+import { ENV } from "../_core/env";
 
-// ─── HELPER: Enviar via Evolution API ─────────────────────────────────────────
-async function getEvolutionConfig(userId: number) {
-  const sb = await getSupabaseClientAsync();
-  if (!sb) return null;
-  const { data } = await sb.from("configuracoes").select("chave, valor").in("chave", [
-    "evolution_url", "evolution_api_key", "evolution_instance",
-  ]).eq("user_id", userId);
-  if (!data || data.length < 3) return null;
-  const cfg: Record<string, string> = {};
-  data.forEach((r: { chave: string; valor: string }) => { cfg[r.chave] = r.valor; });
-  if (!cfg.evolution_url || !cfg.evolution_api_key || !cfg.evolution_instance) return null;
+// ─── HELPER: Enviar via Evolution API (config global) ─────────────────────────
+function getEvolutionConfig(userId: number) {
   return {
-    url: cfg.evolution_url.replace(/\/$/, ""),
-    apiKey: cfg.evolution_api_key,
-    instanceName: cfg.evolution_instance,
+    url: ENV.evolutionApiUrl.replace(/\/$/, ""),
+    apiKey: ENV.evolutionApiKey,
+    instanceName: `user-${userId}`,
   };
 }
 
 async function sendWhatsAppMessage(phone: string, text: string, userId: number): Promise<boolean> {
-  const config = await getEvolutionConfig(userId);
-  if (!config) return false;
+  const config = getEvolutionConfig(userId);
   let p = phone.replace(/\D/g, "");
   if (!p.startsWith("55")) p = "55" + p;
   const res = await fetch(`${config.url}/message/sendText/${config.instanceName}`, {

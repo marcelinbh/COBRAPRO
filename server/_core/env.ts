@@ -9,4 +9,6 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  evolutionApiUrl: process.env.EVOLUTION_API_URL ?? "http://147.182.191.118:8080",
+  evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "cobrapro_evo_key_2024",
 };

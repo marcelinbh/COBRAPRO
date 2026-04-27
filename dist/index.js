@@ -1,3 +1,187 @@
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+
+// vite.config.ts
+var vite_config_exports = {};
+__export(vite_config_exports, {
+  default: () => vite_config_default
+});
+import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import fs from "node:fs";
+import path from "node:path";
+import { defineConfig } from "vite";
+import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
+function ensureLogDir() {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+}
+function trimLogFile(logPath, maxSize) {
+  try {
+    if (!fs.existsSync(logPath) || fs.statSync(logPath).size <= maxSize) {
+      return;
+    }
+    const lines = fs.readFileSync(logPath, "utf-8").split("\n");
+    const keptLines = [];
+    let keptBytes = 0;
+    const targetSize = TRIM_TARGET_BYTES;
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const lineBytes = Buffer.byteLength(`${lines[i]}
+`, "utf-8");
+      if (keptBytes + lineBytes > targetSize) break;
+      keptLines.unshift(lines[i]);
+      keptBytes += lineBytes;
+    }
+    fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
+  } catch {
+  }
+}
+function writeToLogFile(source, entries) {
+  if (entries.length === 0) return;
+  ensureLogDir();
+  const logPath = path.join(LOG_DIR, `${source}.log`);
+  const lines = entries.map((entry) => {
+    const ts = (/* @__PURE__ */ new Date()).toISOString();
+    return `[${ts}] ${JSON.stringify(entry)}`;
+  });
+  fs.appendFileSync(logPath, `${lines.join("\n")}
+`, "utf-8");
+  trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
+}
+function vitePluginManusDebugCollector() {
+  return {
+    name: "manus-debug-collector",
+    transformIndexHtml(html) {
+      if (process.env.NODE_ENV === "production") {
+        return html;
+      }
+      return {
+        html,
+        tags: [
+          {
+            tag: "script",
+            attrs: {
+              src: "/__manus__/debug-collector.js",
+              defer: true
+            },
+            injectTo: "head"
+          }
+        ]
+      };
+    },
+    configureServer(server) {
+      server.middlewares.use("/__manus__/logs", (req, res, next) => {
+        if (req.method !== "POST") {
+          return next();
+        }
+        const handlePayload = (payload) => {
+          if (payload.consoleLogs?.length > 0) {
+            writeToLogFile("browserConsole", payload.consoleLogs);
+          }
+          if (payload.networkRequests?.length > 0) {
+            writeToLogFile("networkRequests", payload.networkRequests);
+          }
+          if (payload.sessionEvents?.length > 0) {
+            writeToLogFile("sessionReplay", payload.sessionEvents);
+          }
+          res.writeHead(200, { "Content-Type": "application/json" });
+          res.end(JSON.stringify({ success: true }));
+        };
+        const reqBody = req.body;
+        if (reqBody && typeof reqBody === "object") {
+          try {
+            handlePayload(reqBody);
+          } catch (e) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: String(e) }));
+          }
+          return;
+        }
+        let body = "";
+        req.on("data", (chunk) => {
+          body += chunk.toString();
+        });
+        req.on("end", () => {
+          try {
+            const payload = JSON.parse(body);
+            handlePayload(payload);
+          } catch (e) {
+            res.writeHead(400, { "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: false, error: String(e) }));
+          }
+        });
+      });
+    }
+  };
+}
+var PROJECT_ROOT, LOG_DIR, MAX_LOG_SIZE_BYTES, TRIM_TARGET_BYTES, plugins, vite_config_default;
+var init_vite_config = __esm({
+  "vite.config.ts"() {
+    "use strict";
+    PROJECT_ROOT = import.meta.dirname;
+    LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
+    MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024;
+    TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6);
+    plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
+    vite_config_default = defineConfig({
+      plugins,
+      resolve: {
+        alias: {
+          "@": path.resolve(import.meta.dirname, "client", "src"),
+          "@shared": path.resolve(import.meta.dirname, "shared"),
+          "@assets": path.resolve(import.meta.dirname, "attached_assets")
+        }
+      },
+      envDir: path.resolve(import.meta.dirname),
+      root: path.resolve(import.meta.dirname, "client"),
+      publicDir: path.resolve(import.meta.dirname, "client", "public"),
+      build: {
+        outDir: path.resolve(import.meta.dirname, "dist/public"),
+        emptyOutDir: true,
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (id.includes("node_modules/xlsx")) return "vendor-xlsx";
+              if (id.includes("node_modules/jspdf")) return "vendor-jspdf";
+              if (id.includes("node_modules/jspdf-autotable")) return "vendor-jspdf";
+              if (id.includes("node_modules/@tanstack") || id.includes("node_modules/@trpc")) return "vendor-tanstack";
+              if (id.includes("node_modules/lucide-react")) return "vendor-icons";
+              if (id.includes("node_modules")) return "vendor-libs";
+            }
+          }
+        },
+        // Aumentar o limite de aviso de chunk (chunks grandes são esperados com lazy loading)
+        chunkSizeWarningLimit: 600
+      },
+      server: {
+        host: true,
+        allowedHosts: [
+          ".manuspre.computer",
+          ".manus.computer",
+          ".manus-asia.computer",
+          ".manuscomputer.ai",
+          ".manusvm.computer",
+          "localhost",
+          "127.0.0.1"
+        ],
+        fs: {
+          strict: true,
+          deny: ["**/.*"]
+        }
+      }
+    });
+  }
+});
+
 // server/_core/index.ts
 import "dotenv/config";
 import compression from "compression";
@@ -450,7 +634,9 @@ var ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   supabaseUrl: process.env.SUPABASE_URL ?? "",
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? ""
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  evolutionApiUrl: process.env.EVOLUTION_API_URL ?? "http://147.182.191.118:8080",
+  evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "cobrapro_evo_key_2024"
 };
 
 // server/db.ts
@@ -2161,24 +2347,15 @@ var backupRouter = router({
 // server/routers/whatsappEvolution.ts
 import { z as z5 } from "zod";
 import { TRPCError as TRPCError5 } from "@trpc/server";
-async function getEvolutionConfig(userId) {
-  const sb2 = await getSupabaseClientAsync();
-  if (!sb2) return null;
-  const { data } = await sb2.from("configuracoes").select("chave, valor").in("chave", ["evolution_url", "evolution_api_key", "evolution_instance"]).eq("user_id", userId);
-  if (!data || data.length < 3) return null;
-  const config = {};
-  data.forEach((row) => {
-    config[row.chave] = row.valor;
-  });
-  if (!config.evolution_url || !config.evolution_api_key || !config.evolution_instance) return null;
+function getGlobalConfig(userId) {
   return {
-    url: config.evolution_url.replace(/\/$/, ""),
-    apiKey: config.evolution_api_key,
-    instanceName: config.evolution_instance
+    url: ENV.evolutionApiUrl.replace(/\/$/, ""),
+    apiKey: ENV.evolutionApiKey,
+    instanceName: `user-${userId}`
   };
 }
-async function evolutionRequest(config, method, path2, body) {
-  const fullPath = path2.replace("{instance}", config.instanceName);
+async function evolutionRequest(config, method, path3, body) {
+  const fullPath = path3.replace("{instance}", config.instanceName);
   const res = await fetch(`${config.url}${fullPath}`, {
     method,
     headers: {
@@ -2195,53 +2372,22 @@ async function evolutionRequest(config, method, path2, body) {
   }
 }
 var whatsappEvolutionRouter = router({
-  // Salvar configurações da Evolution API
-  saveConfig: protectedProcedure.input(z5.object({
-    url: z5.string().url(),
-    apiKey: z5.string().min(1),
-    instanceName: z5.string().min(1)
-  })).mutation(async ({ ctx, input }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const configs = [
-      { chave: "evolution_url", valor: input.url },
-      { chave: "evolution_api_key", valor: input.apiKey },
-      { chave: "evolution_instance", valor: input.instanceName }
-    ];
-    for (const cfg of configs) {
-      const { data: existing } = await sb2.from("configuracoes").select("id").eq("chave", cfg.chave).eq("user_id", ctx.user.id).single();
-      if (existing) {
-        await sb2.from("configuracoes").update({ valor: cfg.valor }).eq("chave", cfg.chave).eq("user_id", ctx.user.id);
-      } else {
-        await sb2.from("configuracoes").insert({ ...cfg, user_id: ctx.user.id });
-      }
-    }
-    return { success: true };
-  }),
-  // Obter configurações salvas
+  // Obter configurações (apenas retorna instanceName para o frontend)
   getConfig: protectedProcedure.query(async ({ ctx }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) return null;
-    const { data } = await sb2.from("configuracoes").select("chave, valor").in("chave", [
-      "evolution_url",
-      "evolution_api_key",
-      "evolution_instance"
-    ]).eq("user_id", ctx.user.id);
-    if (!data) return null;
-    const config = {};
-    data.forEach((row) => {
-      config[row.chave] = row.valor;
-    });
+    const config = getGlobalConfig(ctx.user.id);
     return {
-      url: config.evolution_url || "",
-      apiKey: config.evolution_api_key || "",
-      instanceName: config.evolution_instance || "cobrapro"
+      url: config.url,
+      instanceName: config.instanceName,
+      configured: true
     };
   }),
-  // Criar instância na Evolution API
+  // Criar instância na Evolution API (ou retornar existente)
   createInstance: protectedProcedure.mutation(async ({ ctx }) => {
-    const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es da Evolution API n\xE3o encontradas" });
+    const config = getGlobalConfig(ctx.user.id);
+    const existing = await evolutionRequest(config, "GET", "/instance/connectionState/{instance}");
+    if (existing?.instance?.state) {
+      return { success: true, alreadyExists: true, state: existing.instance.state };
+    }
     const result = await evolutionRequest(config, "POST", "/instance/create", {
       instanceName: config.instanceName,
       qrcode: true,
@@ -2249,14 +2395,21 @@ var whatsappEvolutionRouter = router({
     });
     return result;
   }),
-  // Obter QR Code da instância
+  // Obter QR Code da instância (cria automaticamente se não existir)
   getQRCode: protectedProcedure.query(async ({ ctx }) => {
-    const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) return { connected: false, qrcode: null, error: "Configura\xE7\xF5es n\xE3o encontradas" };
+    const config = getGlobalConfig(ctx.user.id);
     try {
       const status = await evolutionRequest(config, "GET", "/instance/connectionState/{instance}");
       if (status?.instance?.state === "open") {
         return { connected: true, qrcode: null, state: "open", instanceName: config.instanceName };
+      }
+      if (!status?.instance?.state || status?.status === 404 || status?.error) {
+        await evolutionRequest(config, "POST", "/instance/create", {
+          instanceName: config.instanceName,
+          qrcode: true,
+          integration: "WHATSAPP-BAILEYS"
+        });
+        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
       const qrResult = await evolutionRequest(config, "GET", "/instance/connect/{instance}");
       return {
@@ -2271,8 +2424,7 @@ var whatsappEvolutionRouter = router({
   }),
   // Verificar status da conexão
   getStatus: protectedProcedure.query(async ({ ctx }) => {
-    const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) return { connected: false, configured: false };
+    const config = getGlobalConfig(ctx.user.id);
     try {
       const status = await evolutionRequest(config, "GET", "/instance/connectionState/{instance}");
       return {
@@ -2287,15 +2439,13 @@ var whatsappEvolutionRouter = router({
   }),
   // Desconectar instância
   disconnect: protectedProcedure.mutation(async ({ ctx }) => {
-    const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es n\xE3o encontradas" });
+    const config = getGlobalConfig(ctx.user.id);
     const result = await evolutionRequest(config, "DELETE", "/instance/logout/{instance}");
     return result;
   }),
   // Deletar instância
   deleteInstance: protectedProcedure.mutation(async ({ ctx }) => {
-    const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "Configura\xE7\xF5es n\xE3o encontradas" });
+    const config = getGlobalConfig(ctx.user.id);
     const result = await evolutionRequest(config, "DELETE", "/instance/delete/{instance}");
     return result;
   }),
@@ -2304,8 +2454,7 @@ var whatsappEvolutionRouter = router({
     phone: z5.string(),
     message: z5.string()
   })).mutation(async ({ ctx, input }) => {
-    const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) throw new TRPCError5({ code: "BAD_REQUEST", message: "WhatsApp n\xE3o configurado" });
+    const config = getGlobalConfig(ctx.user.id);
     let phone = input.phone.replace(/\D/g, "");
     if (!phone.startsWith("55")) phone = "55" + phone;
     if (!phone.endsWith("@s.whatsapp.net")) phone = phone + "@s.whatsapp.net";
@@ -2320,8 +2469,7 @@ var whatsappEvolutionRouter = router({
   }),
   // Verificar se um número está no WhatsApp
   checkNumber: protectedProcedure.input(z5.object({ phone: z5.string() })).query(async ({ ctx, input }) => {
-    const config = await getEvolutionConfig(ctx.user.id);
-    if (!config) return { exists: false };
+    const config = getGlobalConfig(ctx.user.id);
     let phone = input.phone.replace(/\D/g, "");
     if (!phone.startsWith("55")) phone = "55" + phone;
     try {
@@ -2474,29 +2622,15 @@ var perfilRouter = router({
 // server/routers/relatorioDiario.ts
 import { z as z7 } from "zod";
 import { TRPCError as TRPCError7 } from "@trpc/server";
-async function getEvolutionConfig2(userId) {
-  const sb2 = await getSupabaseClientAsync();
-  if (!sb2) return null;
-  const { data } = await sb2.from("configuracoes").select("chave, valor").in("chave", [
-    "evolution_url",
-    "evolution_api_key",
-    "evolution_instance"
-  ]).eq("user_id", userId);
-  if (!data || data.length < 3) return null;
-  const cfg = {};
-  data.forEach((r) => {
-    cfg[r.chave] = r.valor;
-  });
-  if (!cfg.evolution_url || !cfg.evolution_api_key || !cfg.evolution_instance) return null;
+function getEvolutionConfig(userId) {
   return {
-    url: cfg.evolution_url.replace(/\/$/, ""),
-    apiKey: cfg.evolution_api_key,
-    instanceName: cfg.evolution_instance
+    url: ENV.evolutionApiUrl.replace(/\/$/, ""),
+    apiKey: ENV.evolutionApiKey,
+    instanceName: `user-${userId}`
   };
 }
 async function sendWhatsAppMessage(phone, text2, userId) {
-  const config = await getEvolutionConfig2(userId);
-  if (!config) return false;
+  const config = getEvolutionConfig(userId);
   let p = phone.replace(/\D/g, "");
   if (!p.startsWith("55")) p = "55" + p;
   const res = await fetch(`${config.url}/message/sendText/${config.instanceName}`, {
@@ -2709,21 +2843,13 @@ function substituirVariaveis(template, vars) {
   return msg;
 }
 async function enviarWhatsApp(userId, telefone, mensagem) {
-  const sb2 = await getSupabaseClientAsync();
-  if (!sb2) return { ok: false, erro: "DB unavailable" };
-  const { data: configs } = await sb2.from("configuracoes").select("chave, valor").in("chave", ["evolution_url", "evolution_api_key", "evolution_instance"]).eq("user_id", userId);
-  if (!configs || configs.length < 3) return { ok: false, erro: "WhatsApp n\xE3o configurado" };
-  const cfg = {};
-  configs.forEach((c) => {
-    cfg[c.chave] = c.valor;
-  });
-  if (!cfg.evolution_url || !cfg.evolution_api_key || !cfg.evolution_instance) {
-    return { ok: false, erro: "Configura\xE7\xE3o incompleta" };
-  }
+  const evolutionUrl = ENV.evolutionApiUrl.replace(/\/$/, "");
+  const evolutionApiKey = ENV.evolutionApiKey;
+  const instanceName = `user-${userId}`;
   try {
     const statusRes = await fetch(
-      `${cfg.evolution_url.replace(/\/$/, "")}/instance/connectionState/${cfg.evolution_instance}`,
-      { headers: { apikey: cfg.evolution_api_key } }
+      `${evolutionUrl}/instance/connectionState/${instanceName}`,
+      { headers: { apikey: evolutionApiKey } }
     );
     const statusData = await statusRes.json();
     if (statusData?.instance?.state !== "open") {
@@ -2736,10 +2862,10 @@ async function enviarWhatsApp(userId, telefone, mensagem) {
   if (!phone.startsWith("55")) phone = "55" + phone;
   try {
     const res = await fetch(
-      `${cfg.evolution_url.replace(/\/$/, "")}/message/sendText/${cfg.evolution_instance}`,
+      `${evolutionUrl}/message/sendText/${instanceName}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: cfg.evolution_api_key },
+        headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
         body: JSON.stringify({ number: phone + "@s.whatsapp.net", text: mensagem })
       }
     );
@@ -6384,12 +6510,12 @@ async function createContext(opts) {
 
 // server/_core/vite.ts
 import express from "express";
-import fs from "fs";
-import path from "path";
+import fs2 from "fs";
+import path2 from "path";
 async function setupVite(app, server) {
   const { createServer: createViteServer } = await import("vite");
   const { nanoid: nanoid2 } = await import("nanoid");
-  const { default: viteConfig } = await import("../../vite.config");
+  const { default: viteConfig } = await Promise.resolve().then(() => (init_vite_config(), vite_config_exports));
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -6405,13 +6531,13 @@ async function setupVite(app, server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     try {
-      const clientTemplate = path.resolve(
+      const clientTemplate = path2.resolve(
         import.meta.dirname,
         "../..",
         "client",
         "index.html"
       );
-      let template = await fs.promises.readFile(clientTemplate, "utf-8");
+      let template = await fs2.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid2()}"`
@@ -6425,13 +6551,13 @@ async function setupVite(app, server) {
   });
 }
 function serveStatic(app) {
-  const distPath = process.env.NODE_ENV === "development" ? path.resolve(import.meta.dirname, "../..", "dist", "public") : path.resolve(import.meta.dirname, "public");
-  if (!fs.existsSync(distPath)) {
+  const distPath = process.env.NODE_ENV === "development" ? path2.resolve(import.meta.dirname, "../..", "dist", "public") : path2.resolve(import.meta.dirname, "public");
+  if (!fs2.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
-  app.use("/assets", express.static(path.join(distPath, "assets"), {
+  app.use("/assets", express.static(path2.join(distPath, "assets"), {
     maxAge: "1y",
     immutable: true,
     etag: false,
@@ -6446,7 +6572,7 @@ function serveStatic(app) {
   }));
   app.use("*", (_req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.sendFile(path.resolve(distPath, "index.html"));
+    res.sendFile(path2.resolve(distPath, "index.html"));
   });
 }
 

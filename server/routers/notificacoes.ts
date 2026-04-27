@@ -2,6 +2,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
+import { ENV } from "../_core/env";
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export type TipoNotificacao =
@@ -58,29 +59,17 @@ export function substituirVariaveis(template: string, vars: {
   return msg;
 }
 
-// ─── HELPER: enviar mensagem via Evolution API ────────────────────────────────
+// ─── HELPER: enviar mensagem via Evolution API (config global) ───────────────
 async function enviarWhatsApp(userId: number, telefone: string, mensagem: string): Promise<{ ok: boolean; erro?: string }> {
-  const sb = await getSupabaseClientAsync();
-  if (!sb) return { ok: false, erro: "DB unavailable" };
-
-  const { data: configs } = await sb.from("configuracoes").select("chave, valor")
-    .in("chave", ["evolution_url", "evolution_api_key", "evolution_instance"])
-    .eq("user_id", userId);
-
-  if (!configs || configs.length < 3) return { ok: false, erro: "WhatsApp não configurado" };
-
-  const cfg: Record<string, string> = {};
-  configs.forEach((c: { chave: string; valor: string }) => { cfg[c.chave] = c.valor; });
-
-  if (!cfg.evolution_url || !cfg.evolution_api_key || !cfg.evolution_instance) {
-    return { ok: false, erro: "Configuração incompleta" };
-  }
+  const evolutionUrl = ENV.evolutionApiUrl.replace(/\/$/, "");
+  const evolutionApiKey = ENV.evolutionApiKey;
+  const instanceName = `user-${userId}`;
 
   // Verificar se WhatsApp está conectado
   try {
     const statusRes = await fetch(
-      `${cfg.evolution_url.replace(/\/$/, "")}/instance/connectionState/${cfg.evolution_instance}`,
-      { headers: { apikey: cfg.evolution_api_key } }
+      `${evolutionUrl}/instance/connectionState/${instanceName}`,
+      { headers: { apikey: evolutionApiKey } }
     );
     const statusData = await statusRes.json() as { instance?: { state?: string } };
     if (statusData?.instance?.state !== "open") {
@@ -96,10 +85,10 @@ async function enviarWhatsApp(userId: number, telefone: string, mensagem: string
 
   try {
     const res = await fetch(
-      `${cfg.evolution_url.replace(/\/$/, "")}/message/sendText/${cfg.evolution_instance}`,
+      `${evolutionUrl}/message/sendText/${instanceName}`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json", apikey: cfg.evolution_api_key },
+        headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
         body: JSON.stringify({ number: phone + "@s.whatsapp.net", text: mensagem }),
       }
     );
