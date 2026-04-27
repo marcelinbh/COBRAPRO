@@ -3686,12 +3686,15 @@ const etiquetasRouter = router({
 // ─── ONBOARDING ROUTER ─────────────────────────────────────────────────────
 const onboardingRouter = router({
   check: protectedProcedure.query(async ({ ctx }) => {
-    const mysql = await import('mysql2/promise');
-    const conn = await mysql.createConnection(process.env.DATABASE_URL!);
-    const [rows] = await conn.execute('SELECT onboarding_completo, nome_empresa FROM users WHERE id = ?', [ctx.user.id]) as any;
-    await conn.end();
-    if (!rows || rows.length === 0) return { completo: false, nomeEmpresa: null as string | null };
-    return { completo: !!rows[0].onboarding_completo, nomeEmpresa: rows[0].nome_empresa as string | null };
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) return { completo: false, nomeEmpresa: null as string | null };
+    const { data: row, error } = await supabase
+      .from('users')
+      .select('onboarding_completo, nome_empresa')
+      .eq('id', ctx.user.id)
+      .single();
+    if (error || !row) return { completo: false, nomeEmpresa: null as string | null };
+    return { completo: !!row.onboarding_completo, nomeEmpresa: row.nome_empresa as string | null };
   }),
   complete: protectedProcedure
     .input(z.object({
@@ -3700,21 +3703,28 @@ const onboardingRouter = router({
       tipoConta: z.enum(['caixa', 'banco', 'digital']).optional().default('caixa'),
     }))
     .mutation(async ({ ctx, input }) => {
-      const mysql = await import('mysql2/promise');
-      const conn = await mysql.createConnection(process.env.DATABASE_URL!);
-      await conn.execute(
-        'UPDATE users SET onboarding_completo = 1, nome_empresa = ? WHERE id = ?',
-        [input.nomeEmpresa, ctx.user.id]
-      );
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB indisponível' });
+      // Atualizar onboarding do usuário
+      await supabase
+        .from('users')
+        .update({ onboarding_completo: true, nome_empresa: input.nomeEmpresa })
+        .eq('id', ctx.user.id);
       // Criar conta de caixa inicial se não existir
-      const [contas] = await conn.execute('SELECT COUNT(*) as total FROM contas_caixa WHERE user_id = ?', [ctx.user.id]) as any;
-      if (!contas[0] || contas[0].total === 0) {
-        await conn.execute(
-          'INSERT INTO contas_caixa (user_id, nome, tipo, saldo_inicial, ativa, created_at, updated_at) VALUES (?, ?, ?, 0, 1, NOW(), NOW())',
-          [ctx.user.id, input.nomeConta, input.tipoConta]
-        );
+      const { data: contas } = await supabase
+        .from('contas_caixa')
+        .select('id')
+        .eq('user_id', ctx.user.id)
+        .limit(1);
+      if (!contas || contas.length === 0) {
+        await supabase.from('contas_caixa').insert({
+          user_id: ctx.user.id,
+          nome: input.nomeConta,
+          tipo: input.tipoConta,
+          saldo_inicial: 0,
+          ativa: true,
+        });
       }
-      await conn.end();
       return { success: true };
     }),
 });

@@ -6298,32 +6298,30 @@ var etiquetasRouter = router({
 });
 var onboardingRouter = router({
   check: protectedProcedure.query(async ({ ctx }) => {
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.createConnection(process.env.DATABASE_URL);
-    const [rows] = await conn.execute("SELECT onboarding_completo, nome_empresa FROM users WHERE id = ?", [ctx.user.id]);
-    await conn.end();
-    if (!rows || rows.length === 0) return { completo: false, nomeEmpresa: null };
-    return { completo: !!rows[0].onboarding_completo, nomeEmpresa: rows[0].nome_empresa };
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) return { completo: false, nomeEmpresa: null };
+    const { data: row, error } = await supabase.from("users").select("onboarding_completo, nome_empresa").eq("id", ctx.user.id).single();
+    if (error || !row) return { completo: false, nomeEmpresa: null };
+    return { completo: !!row.onboarding_completo, nomeEmpresa: row.nome_empresa };
   }),
   complete: protectedProcedure.input(z9.object({
     nomeEmpresa: z9.string().min(1),
     nomeConta: z9.string().min(1).optional().default("Caixa Principal"),
     tipoConta: z9.enum(["caixa", "banco", "digital"]).optional().default("caixa")
   })).mutation(async ({ ctx, input }) => {
-    const mysql = await import("mysql2/promise");
-    const conn = await mysql.createConnection(process.env.DATABASE_URL);
-    await conn.execute(
-      "UPDATE users SET onboarding_completo = 1, nome_empresa = ? WHERE id = ?",
-      [input.nomeEmpresa, ctx.user.id]
-    );
-    const [contas] = await conn.execute("SELECT COUNT(*) as total FROM contas_caixa WHERE user_id = ?", [ctx.user.id]);
-    if (!contas[0] || contas[0].total === 0) {
-      await conn.execute(
-        "INSERT INTO contas_caixa (user_id, nome, tipo, saldo_inicial, ativa, created_at, updated_at) VALUES (?, ?, ?, 0, 1, NOW(), NOW())",
-        [ctx.user.id, input.nomeConta, input.tipoConta]
-      );
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB indispon\xEDvel" });
+    await supabase.from("users").update({ onboarding_completo: true, nome_empresa: input.nomeEmpresa }).eq("id", ctx.user.id);
+    const { data: contas } = await supabase.from("contas_caixa").select("id").eq("user_id", ctx.user.id).limit(1);
+    if (!contas || contas.length === 0) {
+      await supabase.from("contas_caixa").insert({
+        user_id: ctx.user.id,
+        nome: input.nomeConta,
+        tipo: input.tipoConta,
+        saldo_inicial: 0,
+        ativa: true
+      });
     }
-    await conn.end();
     return { success: true };
   })
 });
