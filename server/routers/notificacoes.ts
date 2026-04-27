@@ -89,7 +89,7 @@ async function enviarWhatsApp(userId: number, telefone: string, mensagem: string
       {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
-        body: JSON.stringify({ number: phone + "@s.whatsapp.net", text: mensagem }),
+        body: JSON.stringify({ number: phone + "@s.whatsapp.net", textMessage: { text: mensagem } }),
       }
     );
     const data = await res.json() as { error?: string; message?: string };

@@ -703,3 +703,6 @@
 - [x] Compressão gzip via middleware compression no Express
 - [x] Code splitting melhorado: @trpc+@tanstack, vendor-misc separado
 - [x] Splash screen com logo + spinner verde (elimina tela preta no mobile)
+
+## Fase 62: Persistência da Versão WA Web (Evolution API)
+- [ ] Criar Dockerfile customizado para Evolution API com baileys-version.json [2,3000,1035194821] para persistir a versão WA Web correta mesmo se o container for recriado no Droplet

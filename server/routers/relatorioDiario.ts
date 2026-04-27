@@ -20,7 +20,7 @@ async function sendWhatsAppMessage(phone: string, text: string, userId: number):
   const res = await fetch(`${config.url}/message/sendText/${config.instanceName}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: config.apiKey },
-    body: JSON.stringify({ number: p + "@s.whatsapp.net", text }),
+    body: JSON.stringify({ number: p + "@s.whatsapp.net", textMessage: { text } }),
   });
   return res.ok;
 }
