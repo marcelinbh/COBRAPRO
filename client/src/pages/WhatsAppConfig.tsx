@@ -42,12 +42,12 @@ function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, 
   open: boolean; onClose: () => void; qrCode?: string | null;
   loading: boolean; onRefresh: () => void; onDisconnect: () => void; connected: boolean;
 }) {
-  const [seconds, setSeconds] = useState(15);
+  const [seconds, setSeconds] = useState(40);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!open) return;
-    setSeconds(15);
+    setSeconds(40);
     timerRef.current = setInterval(() => {
       setSeconds((s) => { if (s <= 1) { clearInterval(timerRef.current!); return 0; } return s - 1; });
     }, 1000);
@@ -87,7 +87,7 @@ function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, 
                 <span className="text-muted-foreground">Escaneie com calma</span>
               </div>
               <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full transition-all duration-1000" style={{ width: `${(seconds / 15) * 100}%` }} />
+                <div className="h-full bg-green-500 rounded-full transition-all duration-1000" style={{ width: `${(seconds / 40) * 100}%` }} />
               </div>
               <div className="flex justify-center">
                 {loading ? (
@@ -187,7 +187,7 @@ export default function WhatsAppConfig() {
   const { data: status, refetch: refetchStatus } = trpc.whatsappEvolution.getStatus.useQuery(undefined, { refetchInterval: 5000 });
   const { data: qrData, refetch: refetchQR, isLoading: qrLoading } = trpc.whatsappEvolution.getQRCode.useQuery(undefined, {
     enabled: qrModalOpen && !status?.connected,
-    refetchInterval: qrModalOpen && !status?.connected ? 15000 : false,
+    refetchInterval: qrModalOpen && !status?.connected ? 35000 : false,
     staleTime: 0,
     gcTime: 0,
   });
