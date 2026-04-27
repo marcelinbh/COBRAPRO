@@ -2381,12 +2381,18 @@ var whatsappEvolutionRouter = router({
       configured: true
     };
   }),
-  // Criar instância na Evolution API (ou retornar existente)
+  // Criar instância na Evolution API
+  // Se já está conectado (open), retorna sem recriar.
+  // Se está em estado inválido (close/connecting), deleta e recria para garantir QR fresco.
   createInstance: protectedProcedure.mutation(async ({ ctx }) => {
     const config = getGlobalConfig(ctx.user.id);
     const existing = await evolutionRequest(config, "GET", "/instance/connectionState/{instance}");
+    if (existing?.instance?.state === "open") {
+      return { success: true, alreadyExists: true, state: "open" };
+    }
     if (existing?.instance?.state) {
-      return { success: true, alreadyExists: true, state: existing.instance.state };
+      await evolutionRequest(config, "DELETE", "/instance/delete/{instance}");
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
     const result = await evolutionRequest(config, "POST", "/instance/create", {
       instanceName: config.instanceName,
@@ -2409,7 +2415,7 @@ var whatsappEvolutionRouter = router({
           qrcode: true,
           integration: "WHATSAPP-BAILEYS"
         });
-        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await new Promise((resolve) => setTimeout(resolve, 2e3));
       }
       const qrResult = await evolutionRequest(config, "GET", "/instance/connect/{instance}");
       return {

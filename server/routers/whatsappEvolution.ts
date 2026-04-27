@@ -52,14 +52,22 @@ export const whatsappEvolutionRouter = router({
     };
   }),
 
-  // Criar instância na Evolution API (ou retornar existente)
+  // Criar instância na Evolution API
+  // Se já está conectado (open), retorna sem recriar.
+  // Se está em estado inválido (close/connecting), deleta e recria para garantir QR fresco.
   createInstance: protectedProcedure.mutation(async ({ ctx }) => {
     const config = getGlobalConfig(ctx.user.id);
 
-    // Verificar se a instância já existe
+    // Verificar se já está conectado — não recriar
     const existing = await evolutionRequest(config, 'GET', '/instance/connectionState/{instance}');
+    if (existing?.instance?.state === 'open') {
+      return { success: true, alreadyExists: true, state: 'open' };
+    }
+
+    // Se existe mas não está conectado, deletar para garantir QR fresco
     if (existing?.instance?.state) {
-      return { success: true, alreadyExists: true, state: existing.instance.state };
+      await evolutionRequest(config, 'DELETE', '/instance/delete/{instance}');
+      await new Promise(resolve => setTimeout(resolve, 1500));
     }
 
     // Criar nova instância
@@ -91,8 +99,8 @@ export const whatsappEvolutionRouter = router({
           qrcode: true,
           integration: 'WHATSAPP-BAILEYS',
         });
-        // Aguardar um momento para a instância ser criada
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        // Aguardar a instância ser criada
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
       // Obter QR Code
