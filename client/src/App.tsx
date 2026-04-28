@@ -106,6 +106,7 @@ function Router() {
       <Route path="/vendas" component={VendasPage} />
       <Route path="/cheques" component={ChequesPage} />
       <Route path="/emprestimos" component={EmprestimosPage} />
+      <Route path="/emprestimos/novo" component={NovoContratoPage} />
       <Route path="/emprestimos/:id" component={EmprestimoDetalhesPage} />
       <Route path="/scores" component={ScoresPage} />
       <Route path="/veiculos" component={VeiculosPage} />
