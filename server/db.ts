@@ -103,54 +103,14 @@ export function getSupabaseClient(): SupabaseClient | null {
 
 // Use PostgreSQL direct connection (DATABASE_URL) as primary database.
 // Falls back to Supabase REST API if DATABASE_URL is not available or unreachable.
+// NOTE: Direct PostgreSQL connection is disabled because Drizzle schema uses camelCase
+// column names (e.g., openId) but Supabase PostgreSQL uses snake_case (e.g., open_id).
+// All queries use the Supabase REST API via getSupabaseClientAsync() instead.
 export async function getDb(): Promise<ReturnType<typeof drizzle> | null> {
-  if (_db) return _db;
-  if (_dbInitialized) return null;
-  _dbInitialized = true;
-
-  const dbUrl = ENV.databaseUrl || process.env.DATABASE_URL;
-  if (!dbUrl || (!dbUrl.startsWith('postgresql://') && !dbUrl.startsWith('postgres://'))) {
-    console.log('[Database] No PostgreSQL DATABASE_URL found, using Supabase REST API');
-    return null;
-  }
-
-  // Check if this is a Supabase-hosted PostgreSQL URL (*.supabase.co)
-  // On some hosting environments (e.g., DigitalOcean ATL1), the Supabase PostgreSQL
-  // hostname does not resolve via system DNS. In that case, skip direct connection
-  // and use the Supabase REST API (which works via undici with public DNS).
-  try {
-    const urlObj = new URL(dbUrl);
-    const hostname = urlObj.hostname;
-    if (hostname.includes('supabase.co') || hostname.includes('supabase.com')) {
-      // Test DNS resolution via public DNS resolver
-      const canResolve = await new Promise<boolean>((resolve) => {
-        const testResolver = new dns.Resolver();
-        testResolver.setServers(['8.8.8.8', '1.1.1.1']);
-        testResolver.resolve4(hostname, (err) => resolve(!err));
-      });
-      if (!canResolve) {
-        console.log('[Database] Supabase PostgreSQL hostname not resolvable via public DNS, using REST API');
-        _dbInitialized = true; // Mark as initialized to avoid retrying on every request
-        return null;
-      }
-    }
-  } catch (_) { /* ignore URL parse errors */ }
-
-  try {
-    _client = postgres(dbUrl, {
-      ssl: dbUrl.includes('sslmode=require') ? { rejectUnauthorized: false } : false,
-      max: 5,
-      idle_timeout: 20,
-      connect_timeout: 10,
-    });
-    _db = drizzle(_client);
-    console.log('[Database] PostgreSQL direct connection initialized');
-    return _db;
-  } catch (err) {
-    console.error('[Database] PostgreSQL connection failed:', (err as Error).message);
-    _dbInitialized = false;
-    return null;
-  }
+  // Direct PostgreSQL connection disabled: Drizzle schema uses camelCase column names
+  // (e.g., openId, contaCaixaId) but Supabase PostgreSQL uses snake_case (open_id, conta_caixa_id).
+  // All queries use the Supabase REST API via getSupabaseClientAsync() instead.
+  return null;
 }
 
 // Reset connection state (useful for reconnect after errors)
