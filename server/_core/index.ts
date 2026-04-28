@@ -73,6 +73,7 @@ async function startServer() {
     results.nodeVersion = process.version;
     results.nodeOptions = process.env.NODE_OPTIONS || 'not set';
     results.platform = process.platform;
+    results.version = 'cbe4ac65-diag-v2';
     
     // Test 4: Evolution API connectivity
     try {
