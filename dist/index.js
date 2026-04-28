@@ -1956,11 +1956,12 @@ async function logWebhook(dados) {
   }
 }
 async function processarCompraAprovada(payload) {
-  const orderId = payload.order_id ?? "";
-  const customer = payload.customer ?? {};
+  const order = payload.order;
+  const orderId = (order?.order_id ?? payload.order_id ?? "").trim();
+  const customer = order?.Customer ?? payload.Customer ?? payload.customer ?? {};
   const email = (customer.email ?? "").trim().toLowerCase();
   const nome = (customer.full_name ?? customer.name ?? "Cliente").trim();
-  const produto = (payload.product_title ?? "CobraPro").trim();
+  const produto = (order?.Product?.product_name ?? payload.product_title ?? "CobraPro").trim();
   if (!email) {
     console.error("[Kiwify] Compra sem e-mail do cliente:", orderId);
     return;
@@ -2087,21 +2088,19 @@ function registerKiwifyWebhookRoutes(app) {
   const KIWIFY_TOKEN = process.env.KIWIFY_WEBHOOK_TOKEN ?? "";
   app.post("/api/webhook/kiwify", async (req, res) => {
     try {
-      const tokenHeader = req.headers["x-kiwify-token"] ?? "";
-      const tokenQuery = req.query.token ?? "";
-      const tokenRecebido = tokenHeader || tokenQuery;
-      if (KIWIFY_TOKEN && tokenRecebido !== KIWIFY_TOKEN) {
-        console.warn("[Kiwify] Token inv\xE1lido recebido:", tokenRecebido);
-        res.status(401).json({ error: "Token inv\xE1lido" });
-        return;
-      }
+      const bodySignature = req.body?.signature ?? "";
+      console.log("[Kiwify] Webhook recebido | signature:", bodySignature ? "presente" : "ausente");
       const payload = req.body;
-      const status = payload.order_status ?? "";
+      const orderData = payload.order;
+      const status = (orderData?.order_status ?? payload.order_status ?? "").toLowerCase();
+      const eventType = (orderData?.webhook_event_type ?? "").toLowerCase();
+      const orderId = orderData?.order_id ?? payload.order_id ?? "";
       res.status(200).json({ received: true });
-      if (status === "paid" || status === "approved" || status === "complete") {
+      const isApproved = status === "paid" || status === "approved" || status === "complete" || eventType === "order_approved";
+      if (isApproved) {
         await processarCompraAprovada(payload);
       } else {
-        console.log(`[Kiwify] Evento ignorado (status: ${status}) | order: ${payload.order_id}`);
+        console.log(`[Kiwify] Evento ignorado (status: ${status}, event: ${eventType}) | order: ${orderId}`);
       }
     } catch (err) {
       console.error("[Kiwify] Erro no endpoint:", err);
