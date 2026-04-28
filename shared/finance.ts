@@ -79,7 +79,7 @@ export function formatarMoeda(valor: number | string | null | undefined): string
 
 export function formatarData(data: Date | string | null | undefined): string {
   if (!data) return '-';
-  const d = typeof data === 'string' ? new Date(data + 'T00:00:00') : data;
+  const d = typeof data === 'string' ? (data.includes('T') || data.includes('Z') ? new Date(data) : new Date(data + 'T00:00:00')) : data;
   return d.toLocaleDateString('pt-BR');
 }
 
