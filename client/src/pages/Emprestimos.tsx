@@ -84,6 +84,10 @@ function EditarEmprestimoModal({
   const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(
     emprestimo.proximaParcela ? formatarData(emprestimo.proximaParcela.data_vencimento) : ""
   );
+  // Estado para criar nova parcela
+  const [novaParcelaData, setNovaParcelaData] = useState("");
+  const [novaParcelaValor, setNovaParcelaValor] = useState("");
+  const [showNovaParcela, setShowNovaParcela] = useState(false);
 
   const jurosTotal = valor * (juros / 100);
   const valorParcela = (valor + jurosTotal) / parcelas;
@@ -94,6 +98,8 @@ function EditarEmprestimoModal({
     onSuccess: () => {
       toast.success('Empréstimo atualizado com sucesso!');
       utils.contratos.list.invalidate();
+      utils.contratos.listComParcelas.invalidate();
+      utils.dashboard.kpis.invalidate();
       onSuccess();
       onClose();
     },
@@ -101,6 +107,31 @@ function EditarEmprestimoModal({
       toast.error('Erro ao atualizar: ' + err.message);
     },
   });
+
+  const criarParcelaMutation = trpc.parcelas.criarParcela.useMutation({
+    onSuccess: (data) => {
+      toast.success(`Parcela #${data.numeroParcela} criada com sucesso!`);
+      setNovaParcelaData("");
+      setNovaParcelaValor("");
+      setShowNovaParcela(false);
+      utils.contratos.listComParcelas.invalidate();
+      utils.dashboard.kpis.invalidate();
+      onSuccess();
+    },
+    onError: (err) => {
+      toast.error('Erro ao criar parcela: ' + err.message);
+    },
+  });
+
+  const handleCriarParcela = () => {
+    if (!novaParcelaData) { toast.error('Informe a data de vencimento'); return; }
+    if (!novaParcelaValor || parseFloat(novaParcelaValor) <= 0) { toast.error('Informe o valor da parcela'); return; }
+    criarParcelaMutation.mutate({
+      contratoId: emprestimo.id,
+      dataVencimento: novaParcelaData,
+      valorOriginal: parseFloat(novaParcelaValor),
+    });
+  };
 
   const handleSalvar = () => {
     editarMutation.mutate({
@@ -262,6 +293,109 @@ function EditarEmprestimoModal({
             </div>
           </div>
 
+          {/* Parcelas existentes + Criar nova parcela */}
+          <div className="border border-border rounded-lg overflow-hidden">
+            <div className="px-4 py-3 bg-muted/30 border-b border-border flex items-center justify-between">
+              <Label className="text-sm font-semibold">Parcelas do Contrato</Label>
+              <button
+                type="button"
+                className="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1 font-medium"
+                onClick={() => setShowNovaParcela(!showNovaParcela)}
+              >
+                <span className="text-base leading-none">+</span> Criar Parcela
+              </button>
+            </div>
+
+            {/* Tabela de parcelas existentes */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border bg-muted/20">
+                    <th className="text-left px-3 py-2 text-muted-foreground">#</th>
+                    <th className="text-left px-3 py-2 text-muted-foreground">Vencimento</th>
+                    <th className="text-right px-3 py-2 text-muted-foreground">Valor</th>
+                    <th className="text-right px-3 py-2 text-muted-foreground">Multa</th>
+                    <th className="text-center px-3 py-2 text-muted-foreground">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(emprestimo.todasParcelas ?? []).length === 0 ? (
+                    <tr><td colSpan={5} className="text-center py-4 text-muted-foreground">Nenhuma parcela</td></tr>
+                  ) : (
+                    (emprestimo.todasParcelas ?? []).map((p: any) => (
+                      <tr key={p.id} className="border-b border-border/50 hover:bg-muted/10">
+                        <td className="px-3 py-2 font-medium">{p.numero_parcela}</td>
+                        <td className="px-3 py-2">{formatarData(p.data_vencimento)}</td>
+                        <td className="px-3 py-2 text-right">{formatarMoeda(parseFloat(p.valor_original ?? '0'))}</td>
+                        <td className="px-3 py-2 text-right text-amber-400">
+                          {parseFloat(p.valor_multa ?? '0') > 0 ? formatarMoeda(parseFloat(p.valor_multa)) : '-'}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                            p.status === 'paga' ? 'bg-emerald-500/20 text-emerald-400' :
+                            p.status === 'atrasada' ? 'bg-red-500/20 text-red-400' :
+                            p.status === 'vencendo_hoje' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-muted text-muted-foreground'
+                          }`}>
+                            {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : p.status === 'vencendo_hoje' ? 'Hoje' : 'Pendente'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Formulário para criar nova parcela */}
+            {showNovaParcela && (
+              <div className="px-4 py-3 border-t border-border bg-emerald-500/5 space-y-3">
+                <div className="text-xs font-semibold text-emerald-400">Nova Parcela</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Data de Vencimento *</Label>
+                    <Input
+                      type="date"
+                      value={novaParcelaData}
+                      onChange={e => setNovaParcelaData(e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Valor (R$) *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      placeholder={formatarMoeda(valorParcela)}
+                      value={novaParcelaValor}
+                      onChange={e => setNovaParcelaValor(e.target.value)}
+                      className="mt-1 h-8 text-xs"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-8 text-xs"
+                    onClick={() => { setShowNovaParcela(false); setNovaParcelaData(""); setNovaParcelaValor(""); }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700"
+                    onClick={handleCriarParcela}
+                    disabled={criarParcelaMutation.isPending}
+                  >
+                    {criarParcelaMutation.isPending ? 'Criando...' : 'Confirmar Parcela'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
         </div>
         </div>
         {/* Botões fixos no rodapé */}
@@ -304,6 +438,8 @@ function PagamentoModal({
   const [tipo, setTipo] = useState<'total' | 'juros'>(modoInicial);
   const [contaCaixaId, setContaCaixaId] = useState(contas[0]?.id ? String(contas[0].id) : "");
   const [valorCustom, setValorCustom] = useState("");
+  const [jurosCustom, setJurosCustom] = useState(""); // juros editável manualmente
+  const [dataPagamentoCustom, setDataPagamentoCustom] = useState(""); // data manual
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
 
   // TODOS os hooks devem vir ANTES de qualquer early return (Regra dos Hooks do React)
@@ -360,16 +496,20 @@ function PagamentoModal({
   const handleConfirmar = () => {
     if (!contaCaixaId) { toast.error("Selecione uma conta"); return; }
     const contaId = parseInt(contaCaixaId);
+    const dataManual = dataPagamentoCustom || undefined;
 
     if (tipo === 'total') {
       const valor = valorCustom ? parseFloat(valorCustom) : (diasAtraso > 0 ? totalComAtraso : valorTotal);
+      const jurosVal = jurosCustom ? parseFloat(jurosCustom) : undefined;
       pagarTotalMutation.mutate({
         parcelaId: parcela.id,
         valorPago: valor,
         contaCaixaId: contaId,
+        valorJurosCustom: jurosVal,
+        dataPagamento: dataManual,
       });
     } else {
-      const valor = valorCustom ? parseFloat(valorCustom) : valorSoJuros;
+      const valor = valorCustom ? parseFloat(valorCustom) : (jurosCustom ? parseFloat(jurosCustom) : valorSoJuros);
       pagarJurosMutation.mutate({
         parcelaId: parcela.id,
         valorJurosPago: valor,
@@ -382,6 +522,8 @@ function PagamentoModal({
     e.stopPropagation();
     setTipo(modoInicial);
     setValorCustom("");
+    setJurosCustom("");
+    setDataPagamentoCustom("");
     setOpen(true);
   };
 
@@ -436,21 +578,47 @@ function PagamentoModal({
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Resumo Capital / Juros / Total */}
               <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Capital</span>
                   <span>{formatarMoeda(emprestimo.valorPrincipal)}</span>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span>Juros</span>
-                  <span className="text-amber-400">{formatarMoeda(valorSoJuros)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400">{formatarMoeda(jurosCustom ? parseFloat(jurosCustom) : valorSoJuros)}</span>
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted-foreground underline hover:text-foreground"
+                      onClick={() => setJurosCustom(jurosCustom ? "" : valorSoJuros.toFixed(2))}
+                    >
+                      {jurosCustom ? "usar padrão" : "editar"}
+                    </button>
+                  </div>
                 </div>
+                {jurosCustom !== "" && (
+                  <div>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="Valor dos juros (R$)"
+                      value={jurosCustom}
+                      onChange={e => setJurosCustom(e.target.value)}
+                      className="h-8 text-sm"
+                    />
+                  </div>
+                )}
                 <div className="flex justify-between border-t border-border pt-2 font-semibold">
                   <span>Total</span>
-                  <span className="text-emerald-400">{formatarMoeda(valorTotal)}</span>
+                  <span className="text-emerald-400">
+                    {formatarMoeda(valorCustom ? parseFloat(valorCustom) : (diasAtraso > 0 ? totalComAtraso : valorTotal))}
+                  </span>
                 </div>
               </div>
 
+              {/* Tipo de pagamento */}
               <div>
                 <Label className="text-xs">Tipo</Label>
                 <Select value={tipo} onValueChange={(v) => setTipo(v as 'total' | 'juros')}>
@@ -464,6 +632,36 @@ function PagamentoModal({
                 </Select>
               </div>
 
+              {/* Valor personalizado */}
+              <div>
+                <Label className="text-xs">Valor a Pagar (R$)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder={`Padrão: ${formatarMoeda(tipo === 'total' ? (diasAtraso > 0 ? totalComAtraso : valorTotal) : valorSoJuros)}`}
+                  value={valorCustom}
+                  onChange={e => setValorCustom(e.target.value)}
+                  className="mt-1 h-9 text-sm"
+                />
+              </div>
+
+              {/* Data de pagamento manual */}
+              <div>
+                <Label className="text-xs">Data do Pagamento</Label>
+                <Input
+                  type="date"
+                  value={dataPagamentoCustom}
+                  onChange={e => setDataPagamentoCustom(e.target.value)}
+                  className="mt-1 h-9 text-sm"
+                  placeholder="Hoje (padrão)"
+                />
+                {!dataPagamentoCustom && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para usar a data de hoje</p>
+                )}
+              </div>
+
+              {/* Conta de Caixa */}
               <div>
                 <Label className="text-xs">Conta de Caixa</Label>
                 <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
@@ -546,10 +744,10 @@ function EmprestimoCardCobra({
       setNovasTaxaJuros("");
       onRefresh();
       utils.contratos.listComParcelas.invalidate();
+      utils.dashboard.kpis.invalidate();
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });
-
   const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation({
     onSuccess: () => {
       toast.success("Multa aplicada com sucesso!");
@@ -558,15 +756,16 @@ function EmprestimoCardCobra({
       setMotivoMulta("");
       onRefresh();
       utils.contratos.listComParcelas.invalidate();
+      utils.dashboard.kpis.invalidate();
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });
-
   const deletarMutation = trpc.contratos.deletar.useMutation({
     onSuccess: () => {
       toast.success("Empréstimo deletado");
       onRefresh();
       utils.contratos.listComParcelas.invalidate();
+      utils.dashboard.kpis.invalidate();
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });

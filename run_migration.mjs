@@ -9,56 +9,67 @@ if (!url || !key) {
 }
 
 const supabase = createClient(url, key);
-
-// Executar via fetch direto para a Management API do Supabase
-// Extrair o project ref da URL
 const projectRef = url.replace('https://', '').split('.')[0];
 console.log('Project ref:', projectRef);
 
-// Usar o endpoint de SQL do Supabase
-const sql = `
-  ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completo boolean NOT NULL DEFAULT false;
-  ALTER TABLE users ADD COLUMN IF NOT EXISTS nome_empresa varchar(255);
+// Verificar se a tabela já existe
+const { data: check, error: checkErr } = await supabase.from('contrato_historico').select('id').limit(1);
+if (!checkErr) {
+  console.log('✅ Tabela contrato_historico já existe!');
+  process.exit(0);
+}
+console.log('Tabela não existe, criando...');
+
+// Tentar via Management API do Supabase (requer service role)
+const createSQL = `
+CREATE TABLE IF NOT EXISTS contrato_historico (
+  id BIGSERIAL PRIMARY KEY,
+  contrato_id BIGINT NOT NULL,
+  user_id TEXT NOT NULL,
+  tipo TEXT NOT NULL,
+  descricao TEXT,
+  valor_anterior NUMERIC(15,2),
+  valor_novo NUMERIC(15,2),
+  campo_alterado TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_contrato_historico_contrato_id ON contrato_historico(contrato_id);
+CREATE INDEX IF NOT EXISTS idx_contrato_historico_user_id ON contrato_historico(user_id);
 `;
 
-// Tentar via REST API com service role
-const response = await fetch(`${url}/rest/v1/`, {
-  method: 'GET',
-  headers: {
-    'apikey': key,
-    'Authorization': `Bearer ${key}`,
-  }
-});
-console.log('REST status:', response.status);
-
-// Usar o Supabase client para verificar se as colunas já existem
-const { data: cols, error: colsErr } = await supabase
-  .from('users')
-  .select('onboarding_completo, nome_empresa')
-  .limit(1);
-
-if (colsErr) {
-  console.log('Colunas NÃO existem:', colsErr.message);
-  
-  // Tentar via pg direto
+// Tentar via pg direto
+try {
   const { default: postgres } = await import('postgres');
   const dbUrl = process.env.DATABASE_URL;
-  if (!dbUrl) {
-    console.error('DATABASE_URL não definida');
-    process.exit(1);
-  }
+  if (!dbUrl) throw new Error('DATABASE_URL não definida');
   
-  const sql_client = postgres(dbUrl, { ssl: 'require', max: 1 });
+  const sql_client = postgres(dbUrl, { ssl: 'require', max: 1, connect_timeout: 10 });
   try {
-    await sql_client`ALTER TABLE users ADD COLUMN IF NOT EXISTS onboarding_completo boolean NOT NULL DEFAULT false`;
-    console.log('✅ Coluna onboarding_completo adicionada');
-    await sql_client`ALTER TABLE users ADD COLUMN IF NOT EXISTS nome_empresa varchar(255)`;
-    console.log('✅ Coluna nome_empresa adicionada');
-  } catch (err) {
-    console.error('Erro ao adicionar colunas:', err.message);
+    await sql_client.unsafe(createSQL);
+    console.log('✅ Tabela contrato_historico criada via PostgreSQL direto!');
   } finally {
     await sql_client.end();
   }
-} else {
-  console.log('✅ Colunas já existem:', cols);
+} catch (pgErr) {
+  console.log('PostgreSQL direto falhou:', pgErr.message);
+  
+  // Tentar via Management API
+  const mgmtUrl = `https://api.supabase.com/v1/projects/${projectRef}/database/query`;
+  try {
+    const resp = await fetch(mgmtUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+      },
+      body: JSON.stringify({ query: createSQL }),
+    });
+    const result = await resp.text();
+    console.log('Management API status:', resp.status, result.slice(0, 200));
+  } catch (mgmtErr) {
+    console.log('Management API falhou:', mgmtErr.message);
+    console.log('⚠️  Não foi possível criar a tabela automaticamente.');
+    console.log('Execute o seguinte SQL no Supabase Dashboard:');
+    console.log(createSQL);
+  }
 }

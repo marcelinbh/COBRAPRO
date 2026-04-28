@@ -32,6 +32,7 @@ import {
   BarChart3,
   Settings,
   TrendingUp,
+  TrendingDown,
   UserCog,
   RefreshCw,
   Calculator,
@@ -83,6 +84,7 @@ const menuItems = [
   { icon: Tv2, label: "Assinaturas", path: "/assinaturas" },
   { icon: MessageCircle, label: "WhatsApp QR", path: "/whatsapp" },
   { icon: ClipboardList, label: "Relatório Diário", path: "/relatorio-diario" },
+  { icon: TrendingDown, label: "Inadimplência", path: "/inadimplencia" },
   { icon: Bell, label: "Mensagens Auto", path: "/notificacoes-automaticas" },
   { icon: Smartphone, label: "Instalar App", path: "/install" },
 ];

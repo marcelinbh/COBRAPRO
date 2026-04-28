@@ -102,7 +102,7 @@ const dashboardRouter = router({
     const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
       supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true).eq('user_id', userId),
       supabase.from('contratos').select('valor_principal').eq('status', 'ativo').eq('user_id', userId),
-      supabase.from('parcelas').select('valor_original, valor_juros, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
+      supabase.from('parcelas').select('valor_original, valor_juros, valor_multa, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
       supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao').eq('user_id', userId)
     ]);
 
@@ -119,7 +119,7 @@ const dashboardRouter = router({
     const capitalCirculacao = (contratosRes.data ?? []).reduce((s: number, c: any) => s + parseFloat(c.valor_principal ?? '0'), 0);
     
     const parcelasData = parcelasRes.data ?? [];
-    const totalReceber = parcelasData.filter((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+    const totalReceber = parcelasData.filter((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0'), 0);
     
     const atrasadas = parcelasData.filter((p: any) => p.status === 'atrasada');
     const totalInadimplente = atrasadas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
@@ -815,7 +815,7 @@ const contratosRouter = router({
       const contratoIds = filtrados.map((c: any) => c.id);
       const { data: parcelasData } = await supabase
         .from('parcelas')
-        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, data_vencimento, data_pagamento, status')
+        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, data_vencimento, data_pagamento, status')
         .in('contrato_id', contratoIds)
         .order('data_vencimento');
 
@@ -875,8 +875,8 @@ const contratosRouter = router({
           valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
         }
 
-        // Total a receber = soma das parcelas abertas
-        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+        // Total a receber = soma das parcelas abertas (incluindo multas aplicadas)
+        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0'), 0);
         // Total pago = soma das parcelas pagas
         const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
         // Lucro previsto = juros × número de parcelas abertas
@@ -893,11 +893,13 @@ const contratosRouter = router({
           const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
           const jurosDiarios = multaDiaria; // R$/dia configurável em Configurações
           const jurosAtraso = diasAtraso * jurosDiarios;
+          const multaAplicada = parseFloat(p.valor_multa ?? '0');
           return {
             ...p,
             diasAtraso,
             jurosAtraso,
-            totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso,
+            multaAplicada,
+            totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso + multaAplicada,
           };
         });
 
@@ -953,7 +955,7 @@ const contratosRouter = router({
       // Buscar parcelas
       const { data: parcelasData } = await supabase
         .from('parcelas')
-        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, data_vencimento, data_pagamento, status')
+        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, data_vencimento, data_pagamento, status')
         .eq('contrato_id', input.id)
         .order('data_vencimento');
 
@@ -989,7 +991,7 @@ const contratosRouter = router({
       const taxaJuros = parseFloat(contratoData.taxa_juros ?? '0');
       const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
 
-      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0'), 0);
       const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
       const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
       const lucroRealizado = Math.max(0, totalPago - (parcelasPagas.length > 0 ? 0 : 0));
@@ -999,11 +1001,13 @@ const contratosRouter = router({
         const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
         const jurosDiarios = multaDiaria;
         const jurosAtraso = diasAtraso * jurosDiarios;
+        const multaAplicada = parseFloat(p.valor_multa ?? '0');
         return {
           ...p,
           diasAtraso,
           jurosAtraso,
-          totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso,
+          multaAplicada,
+          totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso + multaAplicada,
         };
       });
 
@@ -1859,6 +1863,8 @@ const parcelasRouter = router({
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
       desconto: z.number().default(0),
+      valorJurosCustom: z.number().optional(), // juros editado manualmente
+      dataPagamento: z.string().optional(),    // data manual no formato YYYY-MM-DD
     }))
     .mutation(async ({ input }) => {
       // Usar sempre Supabase REST API (PostgreSQL direto está indisponível neste ambiente)
@@ -1878,11 +1884,19 @@ const parcelasRouter = router({
         dataVencimento: parcelaData.data_vencimento,
       };
 
-      const { juros, multa } = calcularJurosMora(
+      const { juros: jurosCalculado, multa } = calcularJurosMora(
         parseFloat(parcela.valorOriginal),
         new Date(parcela.dataVencimento + 'T00:00:00'),
         new Date()
       );
+
+      // Usar juros customizado se fornecido, senão usar o calculado
+      const juros = input.valorJurosCustom !== undefined ? input.valorJurosCustom : jurosCalculado;
+      // Data de pagamento: usar a fornecida manualmente ou a data atual
+      const dataPagamentoISO = input.dataPagamento
+        ? new Date(input.dataPagamento + 'T12:00:00').toISOString()
+        : new Date().toISOString();
+      const dataPagamentoStr = input.dataPagamento ?? new Date().toISOString().split('T')[0];
 
       const valorOriginal = parseFloat(parcela.valorOriginal);
       const novoStatus = input.valorPago >= valorOriginal ? 'paga' : 'parcial';
@@ -1893,7 +1907,7 @@ const parcelasRouter = router({
         valor_juros: juros.toFixed(2),
         valor_multa: multa.toFixed(2),
         valor_desconto: input.desconto.toFixed(2),
-        data_pagamento: new Date().toISOString(),
+        data_pagamento: dataPagamentoISO,
         status: novoStatus,
         conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
@@ -1910,7 +1924,7 @@ const parcelasRouter = router({
           descricao: `Pagamento parcela #${parcela.numeroParcela} - Contrato #${parcela.contratoId}`,
           parcela_id: input.parcelaId,
           contrato_id: parcela.contratoId,
-          data_transacao: new Date().toISOString().split('T')[0],
+          data_transacao: dataPagamentoStr,
         });
         if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
       }
@@ -2114,6 +2128,48 @@ const parcelasRouter = router({
       }
 
       return { success: true };
+    }),
+
+  // Criar nova parcela manualmente em um contrato existente
+  criarParcela: protectedProcedure
+    .input(z.object({
+      contratoId: z.number(),
+      dataVencimento: z.string(), // YYYY-MM-DD
+      valorOriginal: z.number().positive(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const sb = await getSupabaseClientAsync();
+      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+      // Buscar contrato para obter dados necessários
+      const { data: contrato, error: cErr } = await sb.from('contratos').select('*').eq('id', input.contratoId).eq('user_id', ctx.user.id).single();
+      if (cErr || !contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
+
+      // Descobrir o próximo número de parcela
+      const { data: existentes } = await sb.from('parcelas').select('numero_parcela').eq('contrato_id', input.contratoId).order('numero_parcela', { ascending: false }).limit(1);
+      const ultimoNum = existentes?.[0]?.numero_parcela ?? 0;
+      const novaNumeroParcela = ultimoNum + 1;
+
+      const hoje = new Date().toISOString().split('T')[0];
+      const dataVenc = input.dataVencimento;
+      let status = 'pendente';
+      if (dataVenc < hoje) status = 'atrasada';
+      else if (dataVenc === hoje) status = 'vencendo_hoje';
+
+      const { error } = await sb.from('parcelas').insert({
+        contrato_id: input.contratoId,
+        cliente_id: contrato.cliente_id,
+        koletor_id: contrato.koletor_id ?? null,
+        numero_parcela: novaNumeroParcela,
+        valor_original: input.valorOriginal.toFixed(2),
+        data_vencimento: dataVenc,
+        status,
+        conta_caixa_id: contrato.conta_caixa_id ?? null,
+        user_id: ctx.user.id,
+      });
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+
+      return { success: true, numeroParcela: novaNumeroParcela };
     }),
 });
 
@@ -2724,9 +2780,66 @@ const relatoriosRouter = router({
       qtdInadimplentes: (inadimplentesData ?? []).length,
     };
   }),
+  inadimplentes: protectedProcedure
+    .input(z.object({
+      diasMinimos: z.number().optional().default(1),
+      ordenarPor: z.enum(['valor', 'dias', 'nome']).optional().default('dias'),
+    }).optional())
+    .query(async ({ ctx, input }) => {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) return [];
+      const userId = ctx.user.id;
+      const hoje = new Date().toISOString().split('T')[0];
+      const { data: parcelasAtrasadas } = await supabase
+        .from('parcelas')
+        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_multa, data_vencimento, clientes(nome, whatsapp, telefone)')
+        .eq('status', 'atrasada')
+        .eq('user_id', userId)
+        .order('data_vencimento', { ascending: true });
+      if (!parcelasAtrasadas || parcelasAtrasadas.length === 0) return [];
+      // Agrupar por cliente
+      const clienteMap = new Map<number, any>();
+      for (const p of parcelasAtrasadas) {
+        const cliente = p.clientes as any;
+        const venc = new Date(p.data_vencimento + 'T00:00:00');
+        const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
+        const valorOriginal = parseFloat(p.valor_original ?? '0');
+        const valorMulta = parseFloat(p.valor_multa ?? '0');
+        const totalParcela = valorOriginal + valorMulta;
+        if (!clienteMap.has(p.cliente_id)) {
+          clienteMap.set(p.cliente_id, {
+            clienteId: p.cliente_id,
+            clienteNome: cliente?.nome ?? 'Desconhecido',
+            clienteWhatsapp: cliente?.whatsapp ?? null,
+            clienteTelefone: cliente?.telefone ?? null,
+            parcelas: [],
+            totalDevido: 0,
+            maiorDiasAtraso: 0,
+          });
+        }
+        const entry = clienteMap.get(p.cliente_id)!;
+        entry.parcelas.push({
+          id: p.id,
+          contratoId: p.contrato_id,
+          numeroParcela: p.numero_parcela,
+          valorOriginal,
+          valorMulta,
+          totalParcela,
+          dataVencimento: p.data_vencimento,
+          diasAtraso,
+        });
+        entry.totalDevido += totalParcela;
+        entry.maiorDiasAtraso = Math.max(entry.maiorDiasAtraso, diasAtraso);
+      }
+      let result = Array.from(clienteMap.values());
+      const ord = input?.ordenarPor ?? 'dias';
+      if (ord === 'valor') result.sort((a, b) => b.totalDevido - a.totalDevido);
+      else if (ord === 'dias') result.sort((a, b) => b.maiorDiasAtraso - a.maiorDiasAtraso);
+      else result.sort((a, b) => a.clienteNome.localeCompare(b.clienteNome));
+      return result;
+    }),
 });
-
-// ─── CONFIGURAÇÕES ────────────────────────────────────────────────────────────
+// ─── CONFIGURAÇÕES ─────────────────────────────────────────────────────────────
 const configuracoesRouter = router({
   get: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();

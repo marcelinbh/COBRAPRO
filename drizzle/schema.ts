@@ -487,3 +487,21 @@ export const pagamentosAssinatura = pgTable("pagamentos_assinatura", {
 
 export type PagamentoAssinatura = typeof pagamentosAssinatura.$inferSelect;
 export type InsertPagamentoAssinatura = typeof pagamentosAssinatura.$inferInsert;
+
+// ─── HISTÓRICO DE ALTERAÇÕES DE CONTRATOS ────────────────────────────────────
+export const tipoAlteracaoEnum = pgEnum("tipo_alteracao", [
+  "edicao_juros", "aplicacao_multa", "edicao_parcela", "edicao_contrato",
+  "pagamento", "pagamento_juros", "reparcelamento", "criacao"
+]);
+export const contratoHistorico = pgTable("contrato_historico", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  contratoId: integer("contrato_id").notNull(),
+  tipo: tipoAlteracaoEnum("tipo").notNull(),
+  descricao: text("descricao").notNull(),
+  valorAnterior: text("valor_anterior"),
+  valorNovo: text("valor_novo"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+export type ContratoHistorico = typeof contratoHistorico.$inferSelect;
+export type InsertContratoHistorico = typeof contratoHistorico.$inferInsert;

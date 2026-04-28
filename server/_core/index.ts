@@ -245,6 +245,26 @@ async function startServer() {
     }
   });
 
+  // ─── Endpoint temporário para migration da tabela contrato_historico ───
+  app.post('/api/admin/migration-historico', async (req, res) => {
+    try {
+      const { getSupabaseClientAsync } = await import('../db');
+      const sb = await getSupabaseClientAsync();
+      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
+      // Verificar se a tabela já existe
+      const { data: tableCheck } = await sb.from('contrato_historico').select('id').limit(1);
+      if (tableCheck !== null) {
+        return res.json({ success: true, message: 'Tabela contrato_historico já existe' });
+      }
+      return res.json({ success: false, message: 'Tabela não existe - use o Supabase Dashboard para criar' });
+    } catch (err: any) {
+      if (err?.message?.includes('relation') || err?.code === '42P01') {
+        return res.json({ success: false, message: 'Tabela não existe', error: err.message });
+      }
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

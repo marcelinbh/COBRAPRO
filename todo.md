@@ -768,3 +768,34 @@
 - [ ] Procedimento tRPC contratos.editarParcela (valor + data de vencimento)
 - [ ] Botão de editar em cada linha da tabela de parcelas (página de detalhes e modal)
 - [ ] Modal de edição com campos: Valor da Parcela e Data de Vencimento
+
+## Fase 43: Relatório de Inadimplência + Histórico de Alterações
+
+- [ ] Criar tabela contract_history no banco para registrar alterações
+- [ ] Criar procedimento tRPC relatório de inadimplência
+- [ ] Criar tela /relatorio/inadimplencia com lista de clientes em atraso e botão de cobrança
+- [ ] Registrar histórico ao editar juros, aplicar multa, editar parcela
+- [ ] Adicionar aba Histórico na página de detalhes do empréstimo
+
+## Fase 44: Bugs Críticos - Multa e Histórico
+- [ ] BUGFIX: Aplicar multa não atualiza o valor total exibido no card/lista do empréstimo (valor_multa salvo nas parcelas mas não refletido no valor total do contrato na tela)
+- [ ] Aplicar migration SQL da tabela contrato_historico no banco de dados
+- [ ] Criar procedimento tRPC contratos.historico (buscar histórico de alterações)
+- [ ] Criar procedimento tRPC relatorio.inadimplencia (listar clientes em atraso)
+- [ ] Registrar histórico ao editar juros, aplicar multa, editar parcela, editar contrato, pagar, pagar juros
+- [ ] Criar tela /relatorio/inadimplencia com lista de clientes em atraso e botão de cobrança WhatsApp
+- [ ] Adicionar aba Histórico na página de detalhes do empréstimo
+
+## Fase 5: Melhorias no Modal de Pagamento e Parcelas
+- [ ] Modal de pagamento: adicionar campo editável para valor dos juros manualmente
+- [ ] Modal de pagamento: adicionar campo editável para data do pagamento manualmente
+- [ ] Botão "Criar Parcela" no modal de editar empréstimo (para empréstimos já criados)
+- [x] Bug: multa não atualizava o valor total do empréstimo (corrigido - valor_multa incluído no SELECT e totalReceber)
+- [x] Modal de pagamento: adicionar campo editável para valor dos juros manualmente (CONCLUÍDO)
+- [x] Modal de pagamento: adicionar campo editável para data do pagamento manualmente (CONCLUÍDO)
+- [x] Botão "Criar Parcela" no modal de editar empréstimo (CONCLUÍDO)
+- [x] Procedure criarParcela no backend (CONCLUÍDO)
+- [x] Procedure relatorios.inadimplentes no backend (CONCLUÍDO)
+- [x] Tela /inadimplencia com lista de clientes em atraso e botão WhatsApp (CONCLUÍDO)
+- [x] Dashboard KPIs: corrigir totalReceber para incluir valor_multa (CONCLUÍDO)
+- [x] Invalidações do dashboard após aplicarMulta, editarJuros, deletar (CONCLUÍDO)
