@@ -14,11 +14,36 @@ import { getDb, getSupabaseClientAsync, resetDb } from "./db";
 import { TRPCError } from "@trpc/server";
 import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
-  koletores, configuracoes, contasPagar, produtos, cheques
+  koletores, configuracoes, contasPagar, produtos, cheques, contratoHistorico
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade } from "../shared/finance";
+
+// ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
+async function registrarHistorico(params: {
+  contratoId: number;
+  userId: string;
+  tipo: 'edicao_juros' | 'aplicacao_multa' | 'edicao_parcela' | 'edicao_contrato' | 'pagamento' | 'pagamento_juros' | 'reparcelamento' | 'criacao';
+  descricao: string;
+  valorAnterior?: string;
+  valorNovo?: string;
+}) {
+  try {
+    const sb = await getSupabaseClientAsync();
+    if (!sb) return;
+    await sb.from('contrato_historico').insert({
+      contrato_id: params.contratoId,
+      user_id: params.userId,
+      tipo: params.tipo,
+      descricao: params.descricao,
+      valor_anterior: params.valorAnterior ?? null,
+      valor_novo: params.valorNovo ?? null,
+    });
+  } catch (e) {
+    console.warn('[registrarHistorico] Falha ao registrar histórico:', e);
+  }
+}
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 const dashboardRouter = router({
@@ -1660,9 +1685,31 @@ const contratosRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id).eq('user_id', ctx.user.id);
+       const { error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id).eq('user_id', ctx.user.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      await registrarHistorico({ contratoId: input.id, userId: String(ctx.user.id), tipo: 'edicao_juros', descricao: `Taxa de juros alterada para ${input.novaTaxa}%`, valorNovo: input.novaTaxa });
       return { success: true };
+    }),
+  historico: protectedProcedure
+    .input(z.object({ contratoId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const sb = await getSupabaseClientAsync();
+      if (!sb) return [];
+      const { data, error } = await sb
+        .from('contrato_historico')
+        .select('*')
+        .eq('contrato_id', input.contratoId)
+        .order('created_at', { ascending: false })
+        .limit(100);
+      if (error) return [];
+      return (data ?? []).map((h: any) => ({
+        id: h.id,
+        tipo: h.tipo as string,
+        descricao: h.descricao as string,
+        valorAnterior: h.valor_anterior as string | null,
+        valorNovo: h.valor_novo as string | null,
+        createdAt: h.created_at as string,
+      }));
     }),
 
   aplicarMulta: protectedProcedure
@@ -1695,6 +1742,7 @@ const contratosRouter = router({
         const multaAtual = parcela.valor_multa ? parseFloat(parcela.valor_multa) : 0;
         await supabase.from('parcelas').update({ valor_multa: (multaAtual + parseFloat(input.multa)).toString() }).eq('id', parcela.id);
       }
+      await registrarHistorico({ contratoId: input.id, userId: String(ctx.user.id), tipo: 'aplicacao_multa', descricao: `Multa de R$ ${input.multa} aplicada nas parcelas em atraso`, valorNovo: input.multa });
       return { success: true };
     }),
 });
@@ -1938,6 +1986,15 @@ const parcelasRouter = router({
         await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcela.contratoId);
       }
 
+      // Registrar histórico
+      await registrarHistorico({
+        contratoId: parcela.contratoId,
+        userId: String(parcelaData.user_id ?? parcelaData.koletor_id ?? ''),
+        tipo: 'pagamento',
+        descricao: `Parcela #${parcela.numeroParcela} paga - R$ ${input.valorPago.toFixed(2)}`,
+        valorNovo: input.valorPago.toFixed(2),
+      });
+
       return { success: true, status: novoStatus };
     }),
 
@@ -2088,6 +2145,15 @@ const parcelasRouter = router({
           .update({ numero_parcelas: (contrato.numeroParcelas as number) + 1 })
           .eq('id', parcela.contratoId);
       }
+
+      // Registrar histórico
+      await registrarHistorico({
+        contratoId: parcela.contratoId as number,
+        userId: String(ctx.user.id),
+        tipo: 'pagamento_juros',
+        descricao: `Juros da parcela #${parcela.numeroParcela} pagos - R$ ${input.valorJurosPago.toFixed(2)} - Nova parcela criada com venc. ${novaDataVencStr}`,
+        valorNovo: input.valorJurosPago.toFixed(2),
+      });
 
       return { success: true, novaDataVencimento: novaDataVencStr };
     }),

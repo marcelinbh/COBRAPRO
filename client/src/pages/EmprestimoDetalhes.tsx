@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import {
   MessageCircle, Edit2, AlertTriangle, DollarSign, TrendingUp,
-  Trash2, FileText, Send, ArrowLeft, Download, CheckCircle, Loader2, Pencil, Filter
+  Trash2, FileText, Send, ArrowLeft, Download, CheckCircle, Loader2, Pencil, Filter, History, Clock
 } from 'lucide-react';
 import { formatarMoeda, formatarData } from '../../../shared/finance';
 import { trpc } from '@/lib/trpc';
@@ -23,7 +23,7 @@ import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 
 export default function EmprestimoDetalhes() {
   const [, setLocation] = useLocation();
-  const [aba, setAba] = useState<'etiqueta' | 'detalhes' | 'comprovante'>('etiqueta');
+  const [aba, setAba] = useState<'etiqueta' | 'detalhes' | 'comprovante' | 'historico'>('etiqueta');
   const { id } = useParams<{ id: string }>();
   const emprestimoId = parseInt(id || '0');
 
@@ -250,7 +250,7 @@ export default function EmprestimoDetalhes() {
       {/* Abas */}
       <div className="border-b border-border">
         <div className="flex gap-2">
-          {(['etiqueta', 'detalhes', 'comprovante'] as const).map((tab) => (
+          {(['etiqueta', 'detalhes', 'comprovante', 'historico'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setAba(tab)}
@@ -258,7 +258,7 @@ export default function EmprestimoDetalhes() {
                 aba === tab ? 'text-foreground border-primary' : 'text-muted-foreground border-transparent hover:text-foreground'
               }`}
             >
-              {tab === 'etiqueta' ? '🏷️ Etiqueta' : tab === 'detalhes' ? '📋 Detalhes' : '📄 Comprovante'}
+              {tab === 'etiqueta' ? '🏷️ Etiqueta' : tab === 'detalhes' ? '📋 Detalhes' : tab === 'comprovante' ? '📄 Comprovante' : '📜 Histórico'}
             </button>
           ))}
         </div>
@@ -458,6 +458,9 @@ export default function EmprestimoDetalhes() {
           </div>
         )}
 
+        {aba === 'historico' && (
+          <HistoricoAba contratoId={emprestimoId} />
+        )}
         {aba === 'comprovante' && (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">Gera o comprovante de pagamento com os dados da empresa configurados em Configurações.</p>
@@ -723,6 +726,85 @@ export default function EmprestimoDetalhes() {
         onOpenChange={setModalDeletar}
         onSuccess={() => setLocation('/emprestimos')}
       />
+    </div>
+  );
+}
+
+function HistoricoAba({ contratoId }: { contratoId: number }) {
+  const { data: historico, isLoading } = trpc.contratos.historico.useQuery(
+    { contratoId },
+    { enabled: contratoId > 0 }
+  );
+
+  const tipoLabel: Record<string, string> = {
+    pagamento: 'Pagamento',
+    pagamento_juros: 'Pagamento de Juros',
+    edicao_juros: 'Edição de Juros',
+    aplicacao_multa: 'Multa Aplicada',
+    edicao_parcela: 'Edição de Parcela',
+    edicao_contrato: 'Edição de Contrato',
+    reparcelamento: 'Reparcelamento',
+    criacao: 'Criação',
+  };
+
+  const tipoColor: Record<string, string> = {
+    pagamento: 'text-emerald-400',
+    pagamento_juros: 'text-amber-400',
+    edicao_juros: 'text-blue-400',
+    aplicacao_multa: 'text-red-400',
+    edicao_parcela: 'text-purple-400',
+    edicao_contrato: 'text-cyan-400',
+    reparcelamento: 'text-orange-400',
+    criacao: 'text-green-400',
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!historico || historico.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <History className="h-12 w-12 text-muted-foreground/30 mb-3" />
+        <p className="text-muted-foreground text-sm">Nenhum histórico registrado ainda.</p>
+        <p className="text-muted-foreground/60 text-xs mt-1">As ações futuras (pagamentos, multas, edições) aparecerão aqui.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-semibold text-foreground mb-3">Histórico de Alterações ({historico.length})</p>
+      <div className="space-y-2">
+        {historico.map((h) => (
+          <div key={h.id} className="flex gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
+            <div className="mt-0.5">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-2">
+                <span className={`text-xs font-semibold uppercase tracking-wide ${tipoColor[h.tipo] ?? 'text-foreground'}`}>
+                  {tipoLabel[h.tipo] ?? h.tipo}
+                </span>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {new Date(h.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p className="text-sm text-foreground mt-0.5">{h.descricao}</p>
+              {(h.valorAnterior || h.valorNovo) && (
+                <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
+                  {h.valorAnterior && <span>Antes: <span className="text-foreground">{h.valorAnterior}</span></span>}
+                  {h.valorNovo && <span>Depois: <span className="text-foreground">{h.valorNovo}</span></span>}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
