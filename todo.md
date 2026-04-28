@@ -755,3 +755,11 @@
 - [ ] Corrigir NaN em campos multa/juros mora ao criar contrato
 - [ ] Remover valores padrão 2% e 0.033% dos campos multa/juros mora
 - [ ] Adicionar parcela com valor fixo em empréstimo existente
+
+## Fase 40: Botões Funcionais + Novas Funcionalidades Formulário
+- [x] Corrigir botões da página de detalhes (/emprestimos/:id): Pagar, Pagar Juros, Editar Juros, Aplicar Multa, Cobrar WhatsApp, Enviar Cobrança, Comprovante PDF, Deletar
+- [x] Corrigir botões do modal EmprestimoDetalhesModal: todos os botões conectados às mutations tRPC
+- [x] Novo Contrato: opção de parcela com valor fixo (toggle)
+- [x] Novo Contrato: opção de datas de vencimento manuais por parcela (toggle)
+- [x] Novo Contrato: multa por atraso em valor fixo (R$) além de percentual (%)
+- [x] Novo Contrato: taxa de juros editável mesmo com parcela fixa (calculada automaticamente)
