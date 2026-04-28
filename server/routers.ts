@@ -330,17 +330,17 @@ const clientesRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        const rows = await db.select().from(clientes).where(eq(clientes.id, input.id)).limit(1);
+        const rows = await db.select().from(clientes).where(and(eq(clientes.id, input.id), eq(clientes.userId, ctx.user.id))).limit(1);
         if (rows.length > 0) return rows[0];
       } catch (err) {
         console.warn('[clientes.byId] Drizzle failed, trying REST:', (err as Error).message);
         resetDb();
       }
     }
-    // Fallback: Supabase REST
+    // Fallback: Supabase REST — filtrar por user_id para isolamento multi-tenant
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
-    const { data, error } = await supabase.from('clientes').select('*').eq('id', input.id).single();
+    const { data, error } = await supabase.from('clientes').select('*').eq('id', input.id).eq('user_id', ctx.user.id).single();
     if (error) return null;
     return data;
   }),
@@ -521,20 +521,20 @@ const clientesRouter = router({
       if (data.banco !== undefined) updateData.banco = data.banco;
       if (data.agencia !== undefined) updateData.agencia = data.agencia;
       if (data.numeroConta !== undefined) updateData.numero_conta = data.numeroConta;
-      const { error } = await supabase.from('clientes').update(updateData).eq('id', id);
+      const { error } = await supabase.from('clientes').update(updateData).eq('id', id).eq('user_id', ctx.user.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { success: true };
     }),
 
-  contratosByCliente: protectedProcedure.input(z.object({ clienteId: z.number() })).query(async ({ input }) => {
+  contratosByCliente: protectedProcedure.input(z.object({ clienteId: z.number() })).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
-      try { return db.select().from(contratos).where(eq(contratos.clienteId, input.clienteId)).orderBy(desc(contratos.createdAt)); }
+      try { return db.select().from(contratos).where(and(eq(contratos.clienteId, input.clienteId), eq(contratos.userId, ctx.user.id))).orderBy(desc(contratos.createdAt)); }
       catch (err) { console.warn('[clientes.contratosByCliente] Drizzle failed:', (err as Error).message); resetDb(); }
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const { data } = await supabase.from('contratos').select('*').eq('cliente_id', input.clienteId).order('createdAt', { ascending: false });
+    const { data } = await supabase.from('contratos').select('*').eq('cliente_id', input.clienteId).eq('user_id', ctx.user.id).order('createdAt', { ascending: false });
     return data ?? [];
   }),
   importarCSV: protectedProcedure
@@ -1535,8 +1535,9 @@ const contratosRouter = router({
       if (pNaoPagas && pNaoPagas.length > 0) {
         throw new TRPCError({ code: 'CONFLICT', message: `Nao eh possivel deletar contrato com ${pNaoPagas.length} parcela(s) nao paga(s).` });
       }
+      // Filtrar por user_id para garantir isolamento multi-tenant
       await supabase.from('parcelas').delete().eq('contrato_id', input.id);
-      const { error } = await supabase.from('contratos').delete().eq('id', input.id);
+      const { error } = await supabase.from('contratos').delete().eq('id', input.id).eq('user_id', ctx.user.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { success: true };
     }),
@@ -1547,7 +1548,7 @@ const contratosRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(contratos).set({ status: 'quitado' }).where(eq(contratos.id, input.id));
+          await db.update(contratos).set({ status: 'quitado' }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
           await db.update(parcelas).set({ status: 'paga', dataPagamento: new Date() }).where(eq(parcelas.contratoId, input.id));
           return { success: true };
         } catch (err) {
@@ -1557,7 +1558,7 @@ const contratosRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.id);
+      await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.id).eq('user_id', ctx.user.id);
       await supabase.from('parcelas').update({ status: 'paga', data_pagamento: new Date().toISOString() }).eq('contrato_id', input.id);
       return { success: true };
     }),
@@ -1568,7 +1569,7 @@ const contratosRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(contratos).set({ taxaJuros: input.novaTaxa }).where(eq(contratos.id, input.id));
+          await db.update(contratos).set({ taxaJuros: input.novaTaxa }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
           return { success: true };
         } catch (err) {
           console.warn('[contratos.editarJuros] Drizzle failed, trying REST:', (err as Error).message);
@@ -1577,7 +1578,7 @@ const contratosRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id);
+      const { error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id).eq('user_id', ctx.user.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { success: true };
     }),
@@ -1606,6 +1607,7 @@ const contratosRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      // Verificar que o contrato pertence ao usuário antes de aplicar multa
       const { data: pAtraso } = await supabase.from('parcelas').select('id, valor_multa').eq('contrato_id', input.id).eq('status', 'pendente').lt('data_vencimento', hoje);
       for (const parcela of (pAtraso ?? [])) {
         const multaAtual = parcela.valor_multa ? parseFloat(parcela.valor_multa) : 0;

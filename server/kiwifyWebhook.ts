@@ -39,14 +39,10 @@ interface KiwifyPayload {
   [key: string]: unknown;
 }
 
-// ─── Gerador de senha aleatória legível ──────────────────────────────────────
+// ─── Senha padrão para novos usuários via Kiwify ────────────────────────────
+const SENHA_PADRAO_KIWIFY = "12345678";
 function gerarSenhaTemporaria(): string {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  let senha = "";
-  for (let i = 0; i < 10; i++) {
-    senha += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return senha;
+  return SENHA_PADRAO_KIWIFY;
 }
 
 // ─── Template HTML do e-mail de boas-vindas ──────────────────────────────────

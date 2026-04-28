@@ -1862,13 +1862,9 @@ async function enviarEmail(params) {
 }
 
 // server/kiwifyWebhook.ts
+var SENHA_PADRAO_KIWIFY = "12345678";
 function gerarSenhaTemporaria() {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
-  let senha = "";
-  for (let i = 0; i < 10; i++) {
-    senha += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return senha;
+  return SENHA_PADRAO_KIWIFY;
 }
 function gerarHtmlBoasVindas(dados) {
   return `
@@ -3335,7 +3331,7 @@ var clientesRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        const rows = await db.select().from(clientes).where(eq5(clientes.id, input.id)).limit(1);
+        const rows = await db.select().from(clientes).where(and3(eq5(clientes.id, input.id), eq5(clientes.userId, ctx.user.id))).limit(1);
         if (rows.length > 0) return rows[0];
       } catch (err) {
         console.warn("[clientes.byId] Drizzle failed, trying REST:", err.message);
@@ -3344,7 +3340,7 @@ var clientesRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return null;
-    const { data, error } = await supabase.from("clientes").select("*").eq("id", input.id).single();
+    const { data, error } = await supabase.from("clientes").select("*").eq("id", input.id).eq("user_id", ctx.user.id).single();
     if (error) return null;
     return data;
   }),
@@ -3518,15 +3514,15 @@ var clientesRouter = router({
     if (data.banco !== void 0) updateData.banco = data.banco;
     if (data.agencia !== void 0) updateData.agencia = data.agencia;
     if (data.numeroConta !== void 0) updateData.numero_conta = data.numeroConta;
-    const { error } = await supabase.from("clientes").update(updateData).eq("id", id);
+    const { error } = await supabase.from("clientes").update(updateData).eq("id", id).eq("user_id", ctx.user.id);
     if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
-  contratosByCliente: protectedProcedure.input(z9.object({ clienteId: z9.number() })).query(async ({ input }) => {
+  contratosByCliente: protectedProcedure.input(z9.object({ clienteId: z9.number() })).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
-        return db.select().from(contratos).where(eq5(contratos.clienteId, input.clienteId)).orderBy(desc2(contratos.createdAt));
+        return db.select().from(contratos).where(and3(eq5(contratos.clienteId, input.clienteId), eq5(contratos.userId, ctx.user.id))).orderBy(desc2(contratos.createdAt));
       } catch (err) {
         console.warn("[clientes.contratosByCliente] Drizzle failed:", err.message);
         resetDb();
@@ -3534,7 +3530,7 @@ var clientesRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const { data } = await supabase.from("contratos").select("*").eq("cliente_id", input.clienteId).order("createdAt", { ascending: false });
+    const { data } = await supabase.from("contratos").select("*").eq("cliente_id", input.clienteId).eq("user_id", ctx.user.id).order("createdAt", { ascending: false });
     return data ?? [];
   }),
   importarCSV: protectedProcedure.input(z9.object({
@@ -4395,7 +4391,7 @@ var contratosRouter = router({
       throw new TRPCError9({ code: "CONFLICT", message: `Nao eh possivel deletar contrato com ${pNaoPagas.length} parcela(s) nao paga(s).` });
     }
     await supabase.from("parcelas").delete().eq("contrato_id", input.id);
-    const { error } = await supabase.from("contratos").delete().eq("id", input.id);
+    const { error } = await supabase.from("contratos").delete().eq("id", input.id).eq("user_id", ctx.user.id);
     if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
@@ -4403,7 +4399,7 @@ var contratosRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        await db.update(contratos).set({ status: "quitado" }).where(eq5(contratos.id, input.id));
+        await db.update(contratos).set({ status: "quitado" }).where(and3(eq5(contratos.id, input.id), eq5(contratos.userId, ctx.user.id)));
         await db.update(parcelas).set({ status: "paga", dataPagamento: /* @__PURE__ */ new Date() }).where(eq5(parcelas.contratoId, input.id));
         return { success: true };
       } catch (err) {
@@ -4413,7 +4409,7 @@ var contratosRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    await supabase.from("contratos").update({ status: "quitado" }).eq("id", input.id);
+    await supabase.from("contratos").update({ status: "quitado" }).eq("id", input.id).eq("user_id", ctx.user.id);
     await supabase.from("parcelas").update({ status: "paga", data_pagamento: (/* @__PURE__ */ new Date()).toISOString() }).eq("contrato_id", input.id);
     return { success: true };
   }),
@@ -4421,7 +4417,7 @@ var contratosRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        await db.update(contratos).set({ taxaJuros: input.novaTaxa }).where(eq5(contratos.id, input.id));
+        await db.update(contratos).set({ taxaJuros: input.novaTaxa }).where(and3(eq5(contratos.id, input.id), eq5(contratos.userId, ctx.user.id)));
         return { success: true };
       } catch (err) {
         console.warn("[contratos.editarJuros] Drizzle failed, trying REST:", err.message);
@@ -4430,7 +4426,7 @@ var contratosRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const { error } = await supabase.from("contratos").update({ taxa_juros: input.novaTaxa }).eq("id", input.id);
+    const { error } = await supabase.from("contratos").update({ taxa_juros: input.novaTaxa }).eq("id", input.id).eq("user_id", ctx.user.id);
     if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
