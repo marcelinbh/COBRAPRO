@@ -124,6 +124,8 @@ export const clientes = pgTable("clientes", {
   nomeMae: varchar("nome_mae", { length: 255 }),
   nomePai: varchar("nome_pai", { length: 255 }),
   documentosUrls: text("documentos_urls"),
+  tipoCliente: varchar("tipo_cliente", { length: 50 }).default("emprestimo"),
+  isReferral: boolean("is_referral").default(false),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });

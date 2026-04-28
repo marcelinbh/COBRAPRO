@@ -195,26 +195,30 @@ const dashboardRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        const dias = [];
+        const dias: { dia: string; valor: number }[] = [];
         for (let i = 6; i >= 0; i--) {
-          const d = new Date(); d.setDate(d.getDate() - i);
-          const dStr = d.toISOString().split('T')[0];
+          const now = new Date();
+          now.setDate(now.getDate() - i);
+          const dStr = now.toISOString().split('T')[0];
+          const diaLabel = `${dStr.slice(8, 10)}/${dStr.slice(5, 7)}`;
           const result = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa)
-            .where(and(eq(transacoesCaixa.tipo, 'entrada'), eq(sql`DATE(data_transacao)`, dStr)));
-          dias.push({ dia: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), valor: parseFloat(result[0]?.total ?? '0') });
+            .where(and(eq(transacoesCaixa.tipo, 'entrada'), eq(sql`DATE(data_transacao)`, dStr), eq(transacoesCaixa.userId, ctx.user.id)));
+          dias.push({ dia: diaLabel, valor: parseFloat(result[0]?.total ?? '0') });
         }
         return dias;
       } catch (err) { console.warn('[dashboard.fluxoMensal] Drizzle failed:', (err as Error).message); resetDb(); }
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const dias = [];
+    const dias: { dia: string; valor: number }[] = [];
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(); d.setDate(d.getDate() - i);
-      const dStr = d.toISOString().split('T')[0];
+      const now = new Date();
+      now.setDate(now.getDate() - i);
+      const dStr = now.toISOString().split('T')[0];
+      const diaLabel = `${dStr.slice(8, 10)}/${dStr.slice(5, 7)}`;
       const { data } = await supabase.from('transacoes_caixa').select('valor').eq('tipo', 'entrada').eq('user_id', ctx.user.id).gte('data_transacao', dStr + 'T00:00:00').lte('data_transacao', dStr + 'T23:59:59');
       const total = (data ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor ?? '0'), 0);
-      dias.push({ dia: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), valor: total });
+      dias.push({ dia: diaLabel, valor: total });
     }
     return dias;
   }),
@@ -309,6 +313,8 @@ const clientesRouter = router({
       nomePai: z.string().optional(),
       fotoUrl: z.string().optional(),
       documentosUrls: z.string().optional(),
+      tipoCliente: z.string().optional(),
+      isReferral: z.boolean().optional(),
       banco: z.string().optional(),
       agencia: z.string().optional(),
       numeroConta: z.string().optional(),
@@ -358,6 +364,8 @@ const clientesRouter = router({
       if (input.nomePai) insertData.nome_pai = input.nomePai;
       if (input.fotoUrl) insertData.foto_url = input.fotoUrl;
       if (input.documentosUrls) insertData.documentos_urls = input.documentosUrls;
+      if (input.tipoCliente) insertData.tipo_cliente = input.tipoCliente;
+      if (input.isReferral !== undefined) insertData.is_referral = input.isReferral;
       if (input.banco) insertData.banco = input.banco;
       if (input.agencia) insertData.agencia = input.agencia;
       if (input.numeroConta) insertData.numero_conta = input.numeroConta;
@@ -397,6 +405,8 @@ const clientesRouter = router({
       nomePai: z.string().optional(),
       fotoUrl: z.string().optional(),
       documentosUrls: z.string().optional(),
+      tipoCliente: z.string().optional(),
+      isReferral: z.boolean().optional(),
       banco: z.string().optional(),
       agencia: z.string().optional(),
       numeroConta: z.string().optional(),
@@ -445,6 +455,8 @@ const clientesRouter = router({
       if (data.nomePai !== undefined) updateData.nome_pai = data.nomePai;
       if (data.fotoUrl !== undefined) updateData.foto_url = data.fotoUrl;
       if (data.documentosUrls !== undefined) updateData.documentos_urls = data.documentosUrls;
+      if (data.tipoCliente !== undefined) updateData.tipo_cliente = data.tipoCliente;
+      if (data.isReferral !== undefined) updateData.is_referral = data.isReferral;
       if (data.banco !== undefined) updateData.banco = data.banco;
       if (data.agencia !== undefined) updateData.agencia = data.agencia;
       if (data.numeroConta !== undefined) updateData.numero_conta = data.numeroConta;

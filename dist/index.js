@@ -158,6 +158,8 @@ var init_schema = __esm({
       nomeMae: varchar("nome_mae", { length: 255 }),
       nomePai: varchar("nome_pai", { length: 255 }),
       documentosUrls: text("documentos_urls"),
+      tipoCliente: varchar("tipo_cliente", { length: 50 }).default("emprestimo"),
+      isReferral: boolean("is_referral").default(false),
       createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
       updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
     });
@@ -3253,11 +3255,12 @@ var dashboardRouter = router({
       try {
         const dias2 = [];
         for (let i = 6; i >= 0; i--) {
-          const d = /* @__PURE__ */ new Date();
-          d.setDate(d.getDate() - i);
-          const dStr = d.toISOString().split("T")[0];
-          const result = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(eq5(transacoesCaixa.tipo, "entrada"), eq5(sql3`DATE(data_transacao)`, dStr)));
-          dias2.push({ dia: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), valor: parseFloat(result[0]?.total ?? "0") });
+          const now = /* @__PURE__ */ new Date();
+          now.setDate(now.getDate() - i);
+          const dStr = now.toISOString().split("T")[0];
+          const diaLabel = `${dStr.slice(8, 10)}/${dStr.slice(5, 7)}`;
+          const result = await db.select({ total: sql3`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa).where(and3(eq5(transacoesCaixa.tipo, "entrada"), eq5(sql3`DATE(data_transacao)`, dStr), eq5(transacoesCaixa.userId, ctx.user.id)));
+          dias2.push({ dia: diaLabel, valor: parseFloat(result[0]?.total ?? "0") });
         }
         return dias2;
       } catch (err) {
@@ -3269,12 +3272,13 @@ var dashboardRouter = router({
     if (!supabase) return [];
     const dias = [];
     for (let i = 6; i >= 0; i--) {
-      const d = /* @__PURE__ */ new Date();
-      d.setDate(d.getDate() - i);
-      const dStr = d.toISOString().split("T")[0];
+      const now = /* @__PURE__ */ new Date();
+      now.setDate(now.getDate() - i);
+      const dStr = now.toISOString().split("T")[0];
+      const diaLabel = `${dStr.slice(8, 10)}/${dStr.slice(5, 7)}`;
       const { data } = await supabase.from("transacoes_caixa").select("valor").eq("tipo", "entrada").eq("user_id", ctx.user.id).gte("data_transacao", dStr + "T00:00:00").lte("data_transacao", dStr + "T23:59:59");
       const total = (data ?? []).reduce((s, r) => s + parseFloat(r.valor ?? "0"), 0);
-      dias.push({ dia: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), valor: total });
+      dias.push({ dia: diaLabel, valor: total });
     }
     return dias;
   })
@@ -3356,6 +3360,8 @@ var clientesRouter = router({
     nomePai: z9.string().optional(),
     fotoUrl: z9.string().optional(),
     documentosUrls: z9.string().optional(),
+    tipoCliente: z9.string().optional(),
+    isReferral: z9.boolean().optional(),
     banco: z9.string().optional(),
     agencia: z9.string().optional(),
     numeroConta: z9.string().optional()
@@ -3403,6 +3409,8 @@ var clientesRouter = router({
     if (input.nomePai) insertData.nome_pai = input.nomePai;
     if (input.fotoUrl) insertData.foto_url = input.fotoUrl;
     if (input.documentosUrls) insertData.documentos_urls = input.documentosUrls;
+    if (input.tipoCliente) insertData.tipo_cliente = input.tipoCliente;
+    if (input.isReferral !== void 0) insertData.is_referral = input.isReferral;
     if (input.banco) insertData.banco = input.banco;
     if (input.agencia) insertData.agencia = input.agencia;
     if (input.numeroConta) insertData.numero_conta = input.numeroConta;
@@ -3441,6 +3449,8 @@ var clientesRouter = router({
     nomePai: z9.string().optional(),
     fotoUrl: z9.string().optional(),
     documentosUrls: z9.string().optional(),
+    tipoCliente: z9.string().optional(),
+    isReferral: z9.boolean().optional(),
     banco: z9.string().optional(),
     agencia: z9.string().optional(),
     numeroConta: z9.string().optional()
@@ -3487,6 +3497,8 @@ var clientesRouter = router({
     if (data.nomePai !== void 0) updateData.nome_pai = data.nomePai;
     if (data.fotoUrl !== void 0) updateData.foto_url = data.fotoUrl;
     if (data.documentosUrls !== void 0) updateData.documentos_urls = data.documentosUrls;
+    if (data.tipoCliente !== void 0) updateData.tipo_cliente = data.tipoCliente;
+    if (data.isReferral !== void 0) updateData.is_referral = data.isReferral;
     if (data.banco !== void 0) updateData.banco = data.banco;
     if (data.agencia !== void 0) updateData.agencia = data.agencia;
     if (data.numeroConta !== void 0) updateData.numero_conta = data.numeroConta;

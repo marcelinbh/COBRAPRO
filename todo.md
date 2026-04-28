@@ -712,3 +712,23 @@
 - [x] Dockerfile customizado para Evolution API com patch baileys-version.json persistente
 - [x] build_command no .do/app.yaml atualizado com pnpm build automático
 - [x] Endpoint /api/scheduled/notificacoes criado para disparo automático
+
+## Fase 64: Modal de Cadastro de Clientes Completo (igual CobraFácil)
+- [ ] Modal com 3 abas: Dados Pessoais, Endereço, Documentos
+- [ ] Avatar com upload de foto (salvo no S3)
+- [ ] Campos: Nome*, CPF, CNPJ, RG, E-mail, Telefone, Instagram, Facebook, Profissão, Indicação, Tipo, Ativo, Observações
+- [ ] Busca automática de CEP (ViaCEP) preenchendo Rua, Bairro, Cidade, Estado
+- [ ] Aba Documentos: upload de RG, CNH, Comprovante de Residência (S3)
+- [ ] Máscaras de CPF, CNPJ, RG, CEP, Telefone
+- [ ] Endpoint tRPC para upload de avatar e documentos via S3
+- [ ] Testar fluxo de pagamento completo em cobrapro.online
+
+## Fase 64: Modal de Cadastro Completo de Clientes
+- [x] Replicar modal de 3 abas do CobraFácil (Dados Pessoais, Endereço, Documentos)
+- [x] Upload de foto/avatar para S3
+- [x] Upload de documentos múltiplos para S3 com descrição
+- [x] Busca automática de CEP via ViaCEP
+- [x] Campos: CPF, CNPJ, RG, Instagram, Facebook, Profissão, Tipo Cliente, Indicação
+- [x] Adicionar campos tipoCliente e isReferral no schema e migração
+- [x] Corrigir bug fluxoMensal [Max Depth] no Dashboard
+- [x] Corrigir filtro user_id no fluxoMensal Drizzle
