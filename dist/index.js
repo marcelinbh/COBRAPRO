@@ -491,8 +491,6 @@ __export(db_exports, {
 });
 import dns from "dns";
 import { eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
 import { createClient } from "@supabase/supabase-js";
 async function getCustomFetch() {
   if (_customFetch) return _customFetch;
@@ -555,46 +553,7 @@ function getSupabaseClient() {
   return _supabase;
 }
 async function getDb() {
-  if (_db) return _db;
-  if (_dbInitialized) return null;
-  _dbInitialized = true;
-  const dbUrl = ENV.databaseUrl || process.env.DATABASE_URL;
-  if (!dbUrl || !dbUrl.startsWith("postgresql://") && !dbUrl.startsWith("postgres://")) {
-    console.log("[Database] No PostgreSQL DATABASE_URL found, using Supabase REST API");
-    return null;
-  }
-  try {
-    const urlObj = new URL(dbUrl);
-    const hostname = urlObj.hostname;
-    if (hostname.includes("supabase.co") || hostname.includes("supabase.com")) {
-      const canResolve = await new Promise((resolve) => {
-        const testResolver = new dns.Resolver();
-        testResolver.setServers(["8.8.8.8", "1.1.1.1"]);
-        testResolver.resolve4(hostname, (err) => resolve(!err));
-      });
-      if (!canResolve) {
-        console.log("[Database] Supabase PostgreSQL hostname not resolvable via public DNS, using REST API");
-        _dbInitialized = true;
-        return null;
-      }
-    }
-  } catch (_) {
-  }
-  try {
-    _client = postgres(dbUrl, {
-      ssl: dbUrl.includes("sslmode=require") ? { rejectUnauthorized: false } : false,
-      max: 5,
-      idle_timeout: 20,
-      connect_timeout: 10
-    });
-    _db = drizzle(_client);
-    console.log("[Database] PostgreSQL direct connection initialized");
-    return _db;
-  } catch (err) {
-    console.error("[Database] PostgreSQL connection failed:", err.message);
-    _dbInitialized = false;
-    return null;
-  }
+  return null;
 }
 function resetDb() {
   _dbInitialized = false;
@@ -6698,7 +6657,7 @@ async function startServer() {
     results.nodeVersion = process.version;
     results.nodeOptions = process.env.NODE_OPTIONS || "not set";
     results.platform = process.platform;
-    results.version = "cbe4ac65-diag-v2";
+    results.version = "e7614a81-modal-clientes-v3";
     try {
       const evoUrl = (process.env.EVOLUTION_API_URL || "http://147.182.191.118:8080").replace(/\/$/, "");
       const evoKey = process.env.EVOLUTION_API_KEY || "cobrapro_evo_key_2024";
