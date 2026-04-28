@@ -860,7 +860,20 @@ const contratosRouter = router({
         const valorPrincipal = parseFloat(c.valor_principal ?? '0');
         const valorParcela = parseFloat(c.valor_parcela ?? '0');
         const taxaJuros = parseFloat(c.taxa_juros ?? '0');
-        const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+        const numeroParcelas = parseInt(c.numero_parcelas ?? '1') || 1;
+        // Para contratos com parcela fixa, os juros por parcela = valorParcela - amortização do principal
+        // Para contratos normais, juros = principal × taxa
+        let valorJurosParcela: number;
+        if (valorParcela > 0 && valorPrincipal > 0) {
+          // Amortização por parcela = principal / número de parcelas
+          const amortizacaoPorParcela = valorPrincipal / numeroParcelas;
+          const jurosCalculado = valorParcela - amortizacaoPorParcela;
+          // Usar o maior entre o cálculo pela taxa e o cálculo pela parcela
+          const jurosPelaTaxa = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+          valorJurosParcela = jurosCalculado > 0 ? Math.round(jurosCalculado * 100) / 100 : jurosPelaTaxa;
+        } else {
+          valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+        }
 
         // Total a receber = soma das parcelas abertas
         const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
@@ -1592,7 +1605,7 @@ const contratosRouter = router({
         try {
           const parcelasAtraso = await db.select().from(parcelas).where(and(
             eq(parcelas.contratoId, input.id),
-            eq(parcelas.status, 'pendente'),
+            inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje']),
             lt(sql`DATE(${parcelas.dataVencimento})`, hoje)
           ));
           for (const parcela of parcelasAtraso) {
@@ -1608,7 +1621,7 @@ const contratosRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       // Verificar que o contrato pertence ao usuário antes de aplicar multa
-      const { data: pAtraso } = await supabase.from('parcelas').select('id, valor_multa').eq('contrato_id', input.id).eq('status', 'pendente').lt('data_vencimento', hoje);
+      const { data: pAtraso } = await supabase.from('parcelas').select('id, valor_multa').eq('contrato_id', input.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje']).lt('data_vencimento', hoje);
       for (const parcela of (pAtraso ?? [])) {
         const multaAtual = parcela.valor_multa ? parseFloat(parcela.valor_multa) : 0;
         await supabase.from('parcelas').update({ valor_multa: (multaAtual + parseFloat(input.multa)).toString() }).eq('id', parcela.id);
@@ -1933,6 +1946,8 @@ const parcelasRouter = router({
           });
         }
 
+        // Calcular valorJuros para a nova parcela (juros = valor pago, pois é só juros)
+        const valorJurosNovaParcela = input.valorJurosPago.toFixed(2);
         // Criar nova parcela com o mesmo valor original e nova data
         await db.insert(parcelas).values({
           contratoId: parcela.contratoId as number,
@@ -1940,6 +1955,7 @@ const parcelasRouter = router({
           koletorId: parcela.koletorId ?? undefined,
           numeroParcela: (parcela.numeroParcela as number) + 1,
           valorOriginal: String(parcela.valorOriginal),
+          valorJuros: valorJurosNovaParcela,
           dataVencimento: novaDataVencStr,
           status: 'pendente' as const,
           contaCaixaId: input.contaCaixaId ?? null,
@@ -1983,6 +1999,7 @@ const parcelasRouter = router({
           numero_parcela: novoNumero,
           valor: novoValor,
           valor_original: novoValor,
+          valor_juros: parseFloat(input.valorJurosPago.toFixed(2)),
           data_vencimento: novaDataVencStr,
           status: 'pendente',
           conta_caixa_id: input.contaCaixaId,

@@ -3795,7 +3795,16 @@ var contratosRouter = router({
       const valorPrincipal = parseFloat(c.valor_principal ?? "0");
       const valorParcela = parseFloat(c.valor_parcela ?? "0");
       const taxaJuros = parseFloat(c.taxa_juros ?? "0");
-      const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+      const numeroParcelas = parseInt(c.numero_parcelas ?? "1") || 1;
+      let valorJurosParcela;
+      if (valorParcela > 0 && valorPrincipal > 0) {
+        const amortizacaoPorParcela = valorPrincipal / numeroParcelas;
+        const jurosCalculado = valorParcela - amortizacaoPorParcela;
+        const jurosPelaTaxa = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+        valorJurosParcela = jurosCalculado > 0 ? Math.round(jurosCalculado * 100) / 100 : jurosPelaTaxa;
+      } else {
+        valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
+      }
       const totalReceber = parcelasAbertas.reduce((s, p) => s + parseFloat(p.valor_original ?? "0"), 0);
       const totalPago = parcelasPagas.reduce((s, p) => s + parseFloat(p.valor_pago ?? p.valor_original ?? "0"), 0);
       const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
@@ -4438,7 +4447,7 @@ var contratosRouter = router({
       try {
         const parcelasAtraso = await db.select().from(parcelas).where(and3(
           eq5(parcelas.contratoId, input.id),
-          eq5(parcelas.status, "pendente"),
+          inArray(parcelas.status, ["pendente", "atrasada", "vencendo_hoje"]),
           lt(sql3`DATE(${parcelas.dataVencimento})`, hoje)
         ));
         for (const parcela of parcelasAtraso) {
@@ -4453,7 +4462,7 @@ var contratosRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const { data: pAtraso } = await supabase.from("parcelas").select("id, valor_multa").eq("contrato_id", input.id).eq("status", "pendente").lt("data_vencimento", hoje);
+    const { data: pAtraso } = await supabase.from("parcelas").select("id, valor_multa").eq("contrato_id", input.id).in("status", ["pendente", "atrasada", "vencendo_hoje"]).lt("data_vencimento", hoje);
     for (const parcela of pAtraso ?? []) {
       const multaAtual = parcela.valor_multa ? parseFloat(parcela.valor_multa) : 0;
       await supabase.from("parcelas").update({ valor_multa: (multaAtual + parseFloat(input.multa)).toString() }).eq("id", parcela.id);
@@ -4728,12 +4737,14 @@ var parcelasRouter = router({
           clienteId: parcela.clienteId
         });
       }
+      const valorJurosNovaParcela = input.valorJurosPago.toFixed(2);
       await db.insert(parcelas).values({
         contratoId: parcela.contratoId,
         clienteId: parcela.clienteId,
         koletorId: parcela.koletorId ?? void 0,
         numeroParcela: parcela.numeroParcela + 1,
         valorOriginal: String(parcela.valorOriginal),
+        valorJuros: valorJurosNovaParcela,
         dataVencimento: novaDataVencStr,
         status: "pendente",
         contaCaixaId: input.contaCaixaId ?? null
@@ -4768,6 +4779,7 @@ var parcelasRouter = router({
         numero_parcela: novoNumero,
         valor: novoValor,
         valor_original: novoValor,
+        valor_juros: parseFloat(input.valorJurosPago.toFixed(2)),
         data_vencimento: novaDataVencStr,
         status: "pendente",
         conta_caixa_id: input.contaCaixaId
