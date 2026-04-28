@@ -2092,11 +2092,13 @@ function registerKiwifyWebhookRoutes(app) {
       console.log("[Kiwify] Webhook recebido | signature:", bodySignature ? "presente" : "ausente");
       const payload = req.body;
       const orderData = payload.order;
-      const status = (orderData?.order_status ?? payload.order_status ?? "").toLowerCase();
-      const eventType = (orderData?.webhook_event_type ?? "").toLowerCase();
+      const payloadAny = payload;
+      const status = (orderData?.order_status ?? payloadAny.order_status ?? "").toLowerCase();
+      const eventType = (payloadAny.event ?? orderData?.webhook_event_type ?? "").toLowerCase();
       const orderId = orderData?.order_id ?? payload.order_id ?? "";
+      console.log(`[Kiwify] status: ${status} | event: ${eventType} | order: ${orderId}`);
       res.status(200).json({ received: true });
-      const isApproved = status === "paid" || status === "approved" || status === "complete" || eventType === "order_approved";
+      const isApproved = status === "paid" || status === "approved" || status === "complete" || eventType === "order_approved" || eventType === "compra_aprovada";
       if (isApproved) {
         await processarCompraAprovada(payload);
       } else {
