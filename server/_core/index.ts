@@ -74,6 +74,33 @@ async function startServer() {
     results.nodeOptions = process.env.NODE_OPTIONS || 'not set';
     results.platform = process.platform;
     
+    // Test 4: Evolution API connectivity
+    try {
+      const evoUrl = (process.env.EVOLUTION_API_URL || 'http://147.182.191.118:8080').replace(/\/$/, '');
+      const evoKey = process.env.EVOLUTION_API_KEY || 'cobrapro_evo_key_2024';
+      results.evoUrl = evoUrl;
+      const evoResp = await fetch(`${evoUrl}/instance/fetchInstances`, {
+        headers: { apikey: evoKey },
+        signal: AbortSignal.timeout(8000)
+      });
+      const evoBody = await evoResp.text();
+      results.evolutionApi = `${evoResp.status} - ${evoBody.substring(0, 200)}`;
+    } catch (e) { results.evolutionApi = 'FAILED: ' + (e as Error).message; }
+    
+    // Test 5: Evolution API send test
+    try {
+      const evoUrl = (process.env.EVOLUTION_API_URL || 'http://147.182.191.118:8080').replace(/\/$/, '');
+      const evoKey = process.env.EVOLUTION_API_KEY || 'cobrapro_evo_key_2024';
+      const sendResp = await fetch(`${evoUrl}/message/sendText/user-4682`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: evoKey },
+        body: JSON.stringify({ number: '5511911145280@s.whatsapp.net', textMessage: { text: 'Teste diagnostico producao' } }),
+        signal: AbortSignal.timeout(10000)
+      });
+      const sendBody = await sendResp.text();
+      results.evolutionSend = `${sendResp.status} - ${sendBody.substring(0, 300)}`;
+    } catch (e) { results.evolutionSend = 'FAILED: ' + (e as Error).message; }
+    
     res.json(results);
   });
 
