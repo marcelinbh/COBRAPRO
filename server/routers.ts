@@ -191,6 +191,67 @@ const dashboardRouter = router({
     });
   }),
 
+  scoreNegocio: protectedProcedure.query(async ({ ctx }) => {
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) return { score: 0, taxaRecebimento: 0, inadimplencia: 0, totalRecebido: 0, emAtraso: 0 };
+    const userId = ctx.user.id;
+    const { data: all } = await supabase.from('parcelas').select('valor_original, status').eq('user_id', userId);
+    const pagas = (all ?? []).filter((p: any) => p.status === 'paga');
+    const atrasadasP = (all ?? []).filter((p: any) => p.status === 'atrasada');
+    const totalRecebido = pagas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+    const emAtraso = atrasadasP.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+    const totalGeral = (all ?? []).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
+    const taxaRecebimento = totalGeral > 0 ? (totalRecebido / totalGeral) * 100 : 0;
+    const inadimplencia = totalGeral > 0 ? (emAtraso / totalGeral) * 100 : 0;
+    const score = Math.max(0, Math.min(100, Math.round(taxaRecebimento - inadimplencia * 0.5)));
+    return { score, taxaRecebimento, inadimplencia, totalRecebido, emAtraso };
+  }),
+
+  precisaAtencao: protectedProcedure.query(async ({ ctx }) => {
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) return { venceSemana: { qtd: 0, valor: 0 }, atrasados30: { qtd: 0, valor: 0 } };
+    const userId = ctx.user.id;
+    const hoje = new Date();
+    const em7Dias = new Date(hoje); em7Dias.setDate(hoje.getDate() + 7);
+    const ha30Dias = new Date(hoje); ha30Dias.setDate(hoje.getDate() - 30);
+    const hojeStr = hoje.toISOString().split('T')[0];
+    const em7Str = em7Dias.toISOString().split('T')[0];
+    const ha30Str = ha30Dias.toISOString().split('T')[0];
+    const [semanaRes, atrasadosRes] = await Promise.all([
+      supabase.from('parcelas').select('valor_original, cliente_id').eq('user_id', userId)
+        .in('status', ['pendente','vencendo_hoje']).gte('data_vencimento', hojeStr).lte('data_vencimento', em7Str),
+      supabase.from('parcelas').select('valor_original, cliente_id').eq('user_id', userId)
+        .eq('status', 'atrasada').lte('data_vencimento', ha30Str)
+    ]);
+    const semana = semanaRes.data ?? [];
+    const atrasados = atrasadosRes.data ?? [];
+    return {
+      venceSemana: { qtd: semana.length, valor: semana.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0) },
+      atrasados30: { qtd: new Set(atrasados.map((p: any) => p.cliente_id)).size, valor: atrasados.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0) }
+    };
+  }),
+
+  tendenciaJuros: protectedProcedure.query(async ({ ctx }) => {
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) return [];
+    const userId = ctx.user.id;
+    const meses: { mes: string; valor: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date();
+      d.setMonth(d.getMonth() - i);
+      const ano = d.getFullYear();
+      const mes = d.getMonth() + 1;
+      const inicio = `${ano}-${String(mes).padStart(2,'0')}-01`;
+      const fim = new Date(ano, mes, 0).toISOString().split('T')[0];
+      const label = d.toLocaleString('pt-BR', { month: 'short' }).replace('.','');
+      const { data } = await supabase.from('transacoes_caixa').select('valor').eq('user_id', userId)
+        .eq('tipo', 'entrada').eq('categoria', 'pagamento_parcela').gte('data_transacao', inicio + 'T00:00:00').lte('data_transacao', fim + 'T23:59:59');
+      const total = (data ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor ?? '0'), 0);
+      meses.push({ mes: label, valor: total });
+    }
+    return meses;
+  }),
+
   fluxoMensal: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     if (db) {

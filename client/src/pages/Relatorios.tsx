@@ -1,10 +1,12 @@
 import { useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { BarChart2, TrendingUp, AlertTriangle, DollarSign, Filter, ArrowDownCircle, Plus, Minus } from "lucide-react";
+import { BarChart2, TrendingUp, AlertTriangle, DollarSign, Filter, ArrowDownCircle, Plus, Minus, Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatarMoeda } from "../../../shared/finance";
@@ -139,6 +141,96 @@ export default function Relatorios() {
   })).filter(d => d.value > 0);
 
   // Caixa Extra manual
+  // Exportar PDF do relatório
+  function exportarRelatorioPDF() {
+    const doc = new jsPDF();
+    const pageW = doc.internal.pageSize.getWidth();
+    // Header
+    doc.setFillColor(15, 15, 15);
+    doc.rect(0, 0, pageW, 28, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('COBRAPRO', 14, 12);
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(180, 180, 180);
+    doc.text('Relatório Operacional', 14, 20);
+    doc.text(`Período: ${dataInicio} a ${dataFim}`, pageW - 14, 20, { align: 'right' });
+    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageW - 14, 12, { align: 'right' });
+    // KPIs
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Resumo do Período', 14, 38);
+    const kpiRows = [
+      ['Recebido no Período', `R$ ${recebidoPeriodo.toFixed(2).replace('.', ',')}`],
+      ['Total Previsto', `R$ ${totalPeriodo.toFixed(2).replace('.', ',')}`],
+      ['Inadimplência', `R$ ${inadimplentePeriodo.toFixed(2).replace('.', ',')}`],
+      ['Taxa de Recebimento', `${totalPeriodo > 0 ? ((recebidoPeriodo / totalPeriodo) * 100).toFixed(1) : 0}%`],
+      ['Entradas no Caixa', `R$ ${entradasPeriodo.toFixed(2).replace('.', ',')}`],
+      ['Saídas no Caixa', `R$ ${saidasPeriodo.toFixed(2).replace('.', ',')}`],
+      ['Saldo do Período', `R$ ${(entradasPeriodo - saidasPeriodo).toFixed(2).replace('.', ',')}`],
+    ];
+    autoTable(doc, {
+      startY: 42,
+      head: [['Indicador', 'Valor']],
+      body: kpiRows,
+      theme: 'striped',
+      headStyles: { fillColor: [15, 15, 15], textColor: 255, fontSize: 9 },
+      bodyStyles: { fontSize: 9 },
+      columnStyles: { 1: { halign: 'right', fontStyle: 'bold' } },
+      margin: { left: 14, right: 14 },
+    });
+    // Parcelas por modalidade
+    if (modalidadesData.length > 0) {
+      const finalY = (doc as any).lastAutoTable?.finalY ?? 80;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Recebimentos por Modalidade', 14, finalY + 10);
+      autoTable(doc, {
+        startY: finalY + 14,
+        head: [['Modalidade', 'Parcelas', 'Recebido', 'Total Previsto', 'Taxa']],
+        body: modalidadesData.map(m => [
+          m.name,
+          String(m.parcelas),
+          `R$ ${m.recebido.toFixed(2).replace('.', ',')}`,
+          `R$ ${m.total.toFixed(2).replace('.', ',')}`,
+          `${m.total > 0 ? ((m.recebido / m.total) * 100).toFixed(0) : 0}%`,
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [15, 15, 15], textColor: 255, fontSize: 9 },
+        bodyStyles: { fontSize: 9 },
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } },
+        margin: { left: 14, right: 14 },
+      });
+    }
+    // Parcelas detalhadas
+    if (parcelasPeriodo.length > 0) {
+      const finalY2 = (doc as any).lastAutoTable?.finalY ?? 120;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Parcelas do Período', 14, finalY2 + 10);
+      autoTable(doc, {
+        startY: finalY2 + 14,
+        head: [['Cliente', 'Vencimento', 'Valor', 'Status', 'Pago em']],
+        body: parcelasPeriodo.slice(0, 100).map(p => [
+          p.clienteNome ?? '-',
+          new Date(p.dataVencimento).toLocaleDateString('pt-BR'),
+          `R$ ${parseFloat(p.valorOriginal).toFixed(2).replace('.', ',')}`,
+          p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : p.status === 'pendente' ? 'Pendente' : p.status,
+          p.dataPagamento ? new Date(p.dataPagamento).toLocaleDateString('pt-BR') : '-',
+        ]),
+        theme: 'striped',
+        headStyles: { fillColor: [15, 15, 15], textColor: 255, fontSize: 8 },
+        bodyStyles: { fontSize: 8 },
+        columnStyles: { 2: { halign: 'right' } },
+        margin: { left: 14, right: 14 },
+      });
+    }
+    doc.save(`relatorio-${dataInicio}-a-${dataFim}.pdf`);
+  }
+
   const [caixaExtraValor, setCaixaExtraValor] = useState('');
   const [caixaExtraDesc, setCaixaExtraDesc] = useState('');
   const [caixaExtraTipo, setCaixaExtraTipo] = useState<'entrada' | 'saida'>('entrada');
@@ -173,6 +265,17 @@ export default function Relatorios() {
       <div>
         <h1 className="font-display text-3xl text-foreground tracking-wide">RELATÓRIOS</h1>
         <p className="text-sm text-muted-foreground mt-1">Análise financeira e desempenho</p>
+      </div>
+
+      {/* Botão Exportar PDF */}
+      <div className="flex justify-end">
+        <button
+          onClick={exportarRelatorioPDF}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <Download className="h-4 w-4" />
+          Exportar Relatório PDF
+        </button>
       </div>
 
       {/* Filtros */}

@@ -652,6 +652,11 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
 export default function Clientes() {
   const [, setLocation] = useLocation();
   const [busca, setBusca] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState("todos");
+  const [filtroIndicado, setFiltroIndicado] = useState("todos");
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importando, setImportando] = useState(false);
+  const [importResultado, setImportResultado] = useState<{ ok: number; erros: number; mensagens: string[] } | null>(null);
   const [deleteClienteId, setDeleteClienteId] = useState<number | null>(null);
   const [deleteClienteNome, setDeleteClienteNome] = useState("");
   const [showNovoModal, setShowNovoModal] = useState(false);
@@ -660,6 +665,10 @@ export default function Clientes() {
   const { data: clientesData, isLoading } = trpc.clientes.list.useQuery();
   const clientes = Array.isArray(clientesData) ? clientesData : (clientesData as any)?.clientes ?? [];
   const utils = trpc.useUtils();
+
+  const createClienteMutation = trpc.clientes.create.useMutation({
+    onError: (e) => toast.error("Erro ao criar cliente: " + e.message),
+  });
 
   const deleteClienteMutation = trpc.clientes.deletar.useMutation({
     onSuccess: () => {
@@ -670,11 +679,53 @@ export default function Clientes() {
     onError: (e) => toast.error("Erro ao deletar: " + e.message),
   });
 
-  const filteredClientes = (clientes as any[]).filter((c: any) =>
-    c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-    c.cpfCnpj?.includes(busca) ||
-    c.telefone?.includes(busca)
-  );
+  const filteredClientes = (clientes as any[]).filter((c: any) => {
+    const buscaOk = c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
+      c.cpfCnpj?.includes(busca) ||
+      c.telefone?.includes(busca);
+    const tipoOk = filtroTipo === "todos" || c.tipoCliente === filtroTipo;
+    const indicadoOk = filtroIndicado === "todos" ||
+      (filtroIndicado === "sim" && c.isReferral) ||
+      (filtroIndicado === "nao" && !c.isReferral);
+    return buscaOk && tipoOk && indicadoOk;
+  });
+
+  function exportarCSV() {
+    const headers = ['Nome', 'CPF/CNPJ', 'RG', 'Telefone', 'E-mail', 'Instagram', 'Facebook', 'Profissão', 'Tipo', 'Indicado', 'CEP', 'Endereço', 'Número', 'Complemento', 'Bairro', 'Cidade', 'Estado', 'Score', 'Cadastrado em'];
+    const rows = filteredClientes.map((c: any) => [
+      c.nome ?? '',
+      c.cpfCnpj ?? '',
+      c.rg ?? '',
+      c.telefone ?? '',
+      c.email ?? '',
+      c.instagram ?? '',
+      c.facebook ?? '',
+      c.profissao ?? '',
+      c.tipoCliente ?? '',
+      c.isReferral ? 'Sim' : 'Não',
+      c.cep ?? '',
+      c.endereco ?? '',
+      c.numero ?? '',
+      c.complemento ?? '',
+      c.bairro ?? '',
+      c.cidade ?? '',
+      c.estado ?? '',
+      String(c.score ?? 0),
+      c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-BR') : '',
+    ]);
+    const csvContent = [headers, ...rows].map(row =>
+      row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    ).join('\n');
+    const bom = '\uFEFF';
+    const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `clientes-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success(`${filteredClientes.length} clientes exportados!`);
+  }
 
   return (
     <div className="space-y-6">
@@ -684,22 +735,55 @@ export default function Clientes() {
           <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
           <p className="text-sm text-muted-foreground mt-1">Gerencie seus clientes</p>
         </div>
-        <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }}>
-          <Plus className="h-4 w-4" />
-          Novo Cliente
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={exportarCSV}>
+            <Download className="h-4 w-4" />
+            Exportar CSV
+          </Button>
+          <Button variant="outline" className="gap-2" onClick={() => setShowImportModal(true)}>
+            <Upload className="h-4 w-4" />
+            Importar CSV
+          </Button>
+          <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }}>
+            <Plus className="h-4 w-4" />
+            Novo Cliente
+          </Button>
+        </div>
       </div>
 
-      {/* Busca */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="pl-9"
-          placeholder="Buscar clientes por nome, CPF ou telefone..."
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-        />
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+      {/* Filtros e Busca */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Buscar clientes por nome, CPF ou telefone..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+          />
+        </div>
+        <Select value={filtroTipo} onValueChange={setFiltroTipo}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Tipo de cliente" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os tipos</SelectItem>
+            <SelectItem value="emprestimo">Empréstimo</SelectItem>
+            <SelectItem value="mensalidade">Mensalidade</SelectItem>
+            <SelectItem value="ambos">Ambos</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={filtroIndicado} onValueChange={setFiltroIndicado}>
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue placeholder="Indicação" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos</SelectItem>
+            <SelectItem value="sim">Indicados</SelectItem>
+            <SelectItem value="nao">Não indicados</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="flex items-center text-xs text-muted-foreground whitespace-nowrap">
           {filteredClientes.length} clientes
         </div>
       </div>
@@ -828,6 +912,126 @@ export default function Clientes() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Importação CSV */}
+      <Dialog open={showImportModal} onOpenChange={(open) => { if (!open) { setShowImportModal(false); setImportResultado(null); } }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Importar Clientes via CSV</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {!importResultado ? (
+              <>
+                <div className="p-3 rounded-lg bg-muted/50 border border-border text-xs text-muted-foreground space-y-1">
+                  <p className="font-medium text-foreground">Formato esperado do CSV:</p>
+                  <p>Colunas (1ª linha = cabeçalho):</p>
+                  <code className="block bg-background p-2 rounded text-[10px] font-mono overflow-x-auto">
+                    nome,telefone,cpfCnpj,email,profissao,tipoCliente
+                  </code>
+                  <p>• Apenas <strong>nome</strong> é obrigatório</p>
+                  <p>• tipoCliente: emprestimo, mensalidade ou ambos</p>
+                  <p>• Separador: vírgula ou ponto-e-vírgula</p>
+                </div>
+                <div
+                  className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => document.getElementById('csv-import-input')?.click()}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={async e => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files[0];
+                    if (file) processarCSV(file);
+                  }}
+                >
+                  <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm font-medium">Clique ou arraste o arquivo CSV aqui</p>
+                  <p className="text-xs text-muted-foreground mt-1">Aceita .csv e .txt</p>
+                  <input
+                    id="csv-import-input"
+                    type="file"
+                    accept=".csv,.txt"
+                    className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) processarCSV(f); }}
+                  />
+                </div>
+                {importando && (
+                  <div className="flex items-center justify-center gap-2 py-4">
+                    <div className="h-4 w-4 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    <span className="text-sm">Importando clientes...</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-4 rounded-lg bg-success/10 border border-success/20">
+                  <div className="text-center flex-1">
+                    <div className="text-2xl font-bold text-success">{importResultado.ok}</div>
+                    <div className="text-xs text-muted-foreground">importados com sucesso</div>
+                  </div>
+                  {importResultado.erros > 0 && (
+                    <div className="text-center flex-1">
+                      <div className="text-2xl font-bold text-destructive">{importResultado.erros}</div>
+                      <div className="text-xs text-muted-foreground">erros</div>
+                    </div>
+                  )}
+                </div>
+                {importResultado.mensagens.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {importResultado.mensagens.map((m, i) => (
+                      <div key={i} className="text-xs text-destructive bg-destructive/10 px-2 py-1 rounded">{m}</div>
+                    ))}
+                  </div>
+                )}
+                <Button className="w-full" onClick={() => { setShowImportModal(false); setImportResultado(null); utils.clientes.list.invalidate(); }}>
+                  Fechar
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
+
+  async function processarCSV(file: File) {
+    setImportando(true);
+    try {
+      const text = await file.text();
+      const linhas = text.split(/\r?\n/).filter(l => l.trim());
+      if (linhas.length < 2) { toast.error('CSV vazio ou sem dados'); setImportando(false); return; }
+      const sep = linhas[0].includes(';') ? ';' : ',';
+      const headers = linhas[0].split(sep).map(h => h.trim().toLowerCase().replace(/["']/g, ''));
+      const idxNome = headers.findIndex(h => h.includes('nome'));
+      const idxTel = headers.findIndex(h => h.includes('telefone') || h.includes('fone') || h.includes('celular'));
+      const idxCpf = headers.findIndex(h => h.includes('cpf') || h.includes('cnpj'));
+      const idxEmail = headers.findIndex(h => h.includes('email') || h.includes('e-mail'));
+      const idxProf = headers.findIndex(h => h.includes('profissao') || h.includes('profissão'));
+      const idxTipo = headers.findIndex(h => h.includes('tipo'));
+      if (idxNome === -1) { toast.error('Coluna "nome" não encontrada'); setImportando(false); return; }
+      let ok = 0; let erros = 0; const mensagens: string[] = [];
+      for (let i = 1; i < linhas.length; i++) {
+        const cols = linhas[i].split(sep).map(c => c.trim().replace(/^["']|["']$/g, ''));
+        const nome = idxNome >= 0 ? cols[idxNome] : '';
+        if (!nome) { erros++; mensagens.push(`Linha ${i + 1}: nome vazio`); continue; }
+        try {
+          await createClienteMutation.mutateAsync({
+            nome,
+            telefone: idxTel >= 0 ? cols[idxTel] : undefined,
+            cpfCnpj: idxCpf >= 0 ? cols[idxCpf] : undefined,
+            email: idxEmail >= 0 ? cols[idxEmail] : undefined,
+            profissao: idxProf >= 0 ? cols[idxProf] : undefined,
+            tipoCliente: idxTipo >= 0 && ['emprestimo','mensalidade','ambos'].includes(cols[idxTipo]) ? cols[idxTipo] as any : 'emprestimo',
+          });
+          ok++;
+        } catch (e: any) {
+          erros++;
+          mensagens.push(`Linha ${i + 1} (${nome}): ${e.message}`);
+        }
+      }
+      setImportResultado({ ok, erros, mensagens });
+    } catch (e: any) {
+      toast.error('Erro ao processar CSV: ' + e.message);
+    } finally {
+      setImportando(false);
+    }
+  }
 }

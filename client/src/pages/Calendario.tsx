@@ -449,6 +449,24 @@ export default function Calendario() {
                 </div>
               </CardHeader>
               <CardContent className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
+                {/* Envio em massa */}
+                {parcelasDiaSelecionado.filter((p: Parcela) => p.status !== 'paga').length > 1 && (
+                  <button
+                    className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-green-600/15 border border-green-600/30 text-green-500 text-xs font-medium hover:bg-green-600/25 transition-colors"
+                    onClick={() => {
+                      const pendentes = parcelasDiaSelecionado.filter((p: Parcela) => p.status !== 'paga');
+                      pendentes.forEach((p: Parcela, idx: number) => {
+                        setTimeout(() => {
+                          const msg = `Olá ${p.clienteNome || 'cliente'}, sua parcela ${p.numeroParcela}/${p.totalParcelas} de ${formatarMoeda(parseFloat(p.valorOriginal))} vence hoje. Por favor, efetue o pagamento. Obrigado!`;
+                          window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+                        }, idx * 500);
+                      });
+                    }}
+                  >
+                    <MessageCircle className="h-3.5 w-3.5" />
+                    Enviar WhatsApp para todos ({parcelasDiaSelecionado.filter((p: Parcela) => p.status !== 'paga').length} pendentes)
+                  </button>
+                )}
                 {parcelasDiaSelecionado.map((p: Parcela) => (
                   <div key={p.id} className="p-2 rounded-lg border border-border bg-muted/10 space-y-1.5">
                     <div className="flex items-center justify-between">

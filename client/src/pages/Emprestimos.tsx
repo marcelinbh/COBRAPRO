@@ -14,9 +14,10 @@ import { toast } from "sonner";
 import {
   Search, Plus, MessageCircle, CheckCircle, Clock, AlertTriangle,
   TrendingUp, DollarSign, Filter, RefreshCw, FileText, ChevronDown, ChevronUp,
-  Edit, Trash2, Send, Phone, Eye, List, Zap, Users, ExternalLink, Loader2, Tag, X, Check, FolderOpen, LayoutGrid
+  Edit, Trash2, Send, Phone, Eye, List, Zap, Users, ExternalLink, Loader2, Tag, X, Check, FolderOpen, LayoutGrid, Download
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
+import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 import { useLocation } from "wouter";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 
@@ -280,14 +281,17 @@ function PagamentoModal({
   const [tipo, setTipo] = useState<'total' | 'juros'>(modoInicial);
   const [contaCaixaId, setContaCaixaId] = useState(contas[0]?.id ? String(contas[0].id) : "");
   const [valorCustom, setValorCustom] = useState("");
+  const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
 
   // TODOS os hooks devem vir ANTES de qualquer early return (Regra dos Hooks do React)
   const utils = trpc.useUtils();
 
   const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const valorPago = variables.valorPago;
+      const parcelaNum = parcela?.numero_parcela ?? 1;
+      setPagamentoRealizado({ valorPago, parcelaNum });
       toast.success("Pagamento registrado!");
-      setOpen(false);
       setTimeout(() => {
         onSuccess();
         utils.contratos.listComParcelas.invalidate();
@@ -296,7 +300,6 @@ function PagamentoModal({
     },
     onError: (e) => {
       toast.error("Erro ao registrar pagamento: " + e.message);
-      setOpen(false);
     },
   });
 
@@ -377,62 +380,95 @@ function PagamentoModal({
             <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Capital</span>
-                <span>{formatarMoeda(emprestimo.valorPrincipal)}</span>
+          {pagamentoRealizado ? (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center gap-3 py-4">
+                <div className="w-16 h-16 rounded-full bg-success/15 flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-success" />
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-success">Pagamento Registrado!</div>
+                  <div className="text-sm text-muted-foreground">{emprestimo.clienteNome}</div>
+                  <div className="text-2xl font-bold text-foreground mt-1">{formatarMoeda(pagamentoRealizado.valorPago)}</div>
+                  <div className="text-xs text-muted-foreground">Parcela {pagamentoRealizado.parcelaNum}</div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span>Juros</span>
-                <span className="text-amber-400">{formatarMoeda(valorSoJuros)}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1 gap-1.5" onClick={() => {
+                  gerarComprovantePDF({
+                    clienteNome: emprestimo.clienteNome,
+                    contratoId: emprestimo.id,
+                    parcelaNumero: pagamentoRealizado.parcelaNum,
+                    valorOriginal: valorTotal,
+                    juros: valorSoJuros,
+                    valorPago: pagamentoRealizado.valorPago,
+                    dataPagamento: new Date().toISOString(),
+                    modalidade: emprestimo.modalidade,
+                  });
+                }}>
+                  <Download className="h-3.5 w-3.5" /> Comprovante PDF
+                </Button>
+                <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setOpen(false); }}>Fechar</Button>
               </div>
-              <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                <span>Total</span>
-                <span className="text-emerald-400">{formatarMoeda(valorTotal)}</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Capital</span>
+                  <span>{formatarMoeda(emprestimo.valorPrincipal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Juros</span>
+                  <span className="text-amber-400">{formatarMoeda(valorSoJuros)}</span>
+                </div>
+                <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                  <span>Total</span>
+                  <span className="text-emerald-400">{formatarMoeda(valorTotal)}</span>
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-xs">Tipo</Label>
+                <Select value={tipo} onValueChange={(v) => setTipo(v as 'total' | 'juros')}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="total">Pagar Total</SelectItem>
+                    <SelectItem value="juros">Só Juros</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs">Conta de Caixa</Label>
+                <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {contas.map(c => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={!contaCaixaId || isPending}
+                  onClick={handleConfirmar}
+                >
+                  {isPending ? "Processando..." : "Confirmar"}
+                </Button>
               </div>
             </div>
-
-            <div>
-              <Label className="text-xs">Tipo</Label>
-              <Select value={tipo} onValueChange={(v) => setTipo(v as 'total' | 'juros')}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="total">Pagar Total</SelectItem>
-                  <SelectItem value="juros">Só Juros</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label className="text-xs">Conta de Caixa</Label>
-              <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {contas.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.nome}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
-              <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                disabled={!contaCaixaId || isPending}
-                onClick={handleConfirmar}
-              >
-                {isPending ? "Processando..." : "Confirmar"}
-              </Button>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </>

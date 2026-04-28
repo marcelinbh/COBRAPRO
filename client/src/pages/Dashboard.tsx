@@ -1,14 +1,12 @@
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
 import { formatarMoeda } from "../../../shared/finance";
 import {
   TrendingUp, TrendingDown, Wallet, Users, AlertTriangle,
   Clock, DollarSign, CalendarClock, ArrowUpRight, ArrowDownRight,
-  Plus, ChevronRight, Send
+  Plus, ChevronRight, Send, Target, Zap, ShieldAlert, BarChart2
 } from "lucide-react";
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import {
@@ -85,15 +83,44 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function ScoreCircle({ score }: { score: number }) {
+  const cor = score >= 75 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-primary';
+  const label = score >= 75 ? 'Excelente' : score >= 50 ? 'Bom' : score >= 25 ? 'Regular' : 'Ruim';
+  const corBg = score >= 75 ? 'bg-success/10 border-success/30' : score >= 50 ? 'bg-warning/10 border-warning/30' : 'bg-primary/10 border-primary/30';
+  const circumference = 2 * Math.PI * 40;
+  const offset = circumference - (score / 100) * circumference;
+  const strokeColor = score >= 75 ? 'oklch(0.55 0.18 145)' : score >= 50 ? 'oklch(0.75 0.18 80)' : 'oklch(0.55 0.22 25)';
+  return (
+    <div className={`flex flex-col items-center justify-center p-4 rounded-xl border ${corBg}`}>
+      <div className="relative w-24 h-24">
+        <svg className="w-24 h-24 -rotate-90" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="40" fill="none" stroke="oklch(0.22 0.01 240)" strokeWidth="8" />
+          <circle cx="50" cy="50" r="40" fill="none" stroke={strokeColor} strokeWidth="8"
+            strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+            style={{ transition: 'stroke-dashoffset 1s ease' }} />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={`text-2xl font-bold ${cor}`}>{score}</span>
+          <span className="text-[10px] text-muted-foreground">/100</span>
+        </div>
+      </div>
+      <div className={`text-xs font-semibold mt-1 ${cor}`}>{label}</div>
+      <div className="text-[10px] text-muted-foreground mt-0.5">Score do Negócio</div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: meuKoletor } = trpc.cobradores.me.useQuery();
-  // Perfil koletor = funcionário com acesso restrito (sem KPIs financeiros globais)
   const isKoletor = meuKoletor?.perfil === 'koletor';
   const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
   const { data: parcelasHoje } = trpc.dashboard.parcelasHoje.useQuery();
   const { data: atrasadas } = trpc.dashboard.parcelasAtrasadas.useQuery();
   const { data: fluxoMensal } = trpc.dashboard.fluxoMensal.useQuery();
+  const { data: scoreData } = trpc.dashboard.scoreNegocio.useQuery();
+  const { data: atencao } = trpc.dashboard.precisaAtencao.useQuery();
+  const { data: tendencia } = trpc.dashboard.tendenciaJuros.useQuery();
   const relatorioDiarioMutation = trpc.whatsapp.relatorioDiario.useMutation({
     onSuccess: (data) => {
       window.open(data.whatsappUrl, '_blank');
@@ -103,16 +130,11 @@ export default function Dashboard() {
   });
 
   const chartData = fluxoMensal ?? [];
+  const tendenciaData = tendencia ?? [];
 
-  // Calcular taxa de inadimplência
   const taxaInadimplencia = kpis && kpis.capitalCirculacao > 0
     ? ((kpis.totalInadimplente / kpis.capitalCirculacao) * 100).toFixed(1)
     : '0.0';
-
-  // Calcular taxa de recebimento hoje
-  const taxaRecebimentoHoje = kpis && kpis.valorVenceHoje > 0
-    ? ((kpis.recebidoHoje / kpis.valorVenceHoje) * 100).toFixed(0)
-    : '0';
 
   return (
     <div className="space-y-4">
@@ -157,51 +179,15 @@ export default function Dashboard() {
 
       {/* KPI Cards - ocultos para koletores */}
       {!isKoletor && <div className="grid grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
-        <KPICard
-          title="Saldo em Contas"
-          value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)}
-          icon={Wallet}
-          variant="default"
-          subtitle="Todas as contas"
-        />
-        <KPICard
-          title="Capital em Circulação"
-          value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)}
-          icon={TrendingUp}
-          variant="primary"
-          subtitle={`${kpis?.contratosAtivos ?? 0} contratos ativos`}
-        />
-        <KPICard
-          title="Total a Receber"
-          value={kpisLoading ? "..." : formatarMoeda(kpis?.totalReceber ?? 0)}
-          icon={DollarSign}
-          variant="success"
-          subtitle="Parcelas pendentes"
-        />
-        <KPICard
-          title="Inadimplência"
-          value={kpisLoading ? "..." : formatarMoeda(kpis?.totalInadimplente ?? 0)}
-          icon={AlertTriangle}
-          variant="danger"
-          subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes · ${taxaInadimplencia}%`}
-        />
-        <KPICard
-          title="Juros Pendentes"
-          value={kpisLoading ? "..." : formatarMoeda(kpis?.jurosPendentes ?? 0)}
-          icon={TrendingDown}
-          variant="warning"
-          subtitle="Acumulados"
-        />
-        <KPICard
-          title="Vence Hoje"
-          value={kpisLoading ? "..." : `${kpis?.qtdVenceHoje ?? 0}`}
-          icon={CalendarClock}
-          variant={kpis?.qtdVenceHoje ? "warning" : "default"}
-          subtitle={formatarMoeda(kpis?.valorVenceHoje ?? 0)}
-        />
+        <KPICard title="Saldo em Contas" value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)} icon={Wallet} variant="default" subtitle="Todas as contas" />
+        <KPICard title="Capital em Circulação" value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)} icon={TrendingUp} variant="primary" subtitle={`${kpis?.contratosAtivos ?? 0} contratos ativos`} />
+        <KPICard title="Total a Receber" value={kpisLoading ? "..." : formatarMoeda(kpis?.totalReceber ?? 0)} icon={DollarSign} variant="success" subtitle="Parcelas pendentes" />
+        <KPICard title="Inadimplência" value={kpisLoading ? "..." : formatarMoeda(kpis?.totalInadimplente ?? 0)} icon={AlertTriangle} variant="danger" subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes · ${taxaInadimplencia}%`} />
+        <KPICard title="Juros Pendentes" value={kpisLoading ? "..." : formatarMoeda(kpis?.jurosPendentes ?? 0)} icon={TrendingDown} variant="warning" subtitle="Acumulados" />
+        <KPICard title="Vence Hoje" value={kpisLoading ? "..." : `${kpis?.qtdVenceHoje ?? 0}`} icon={CalendarClock} variant={kpis?.qtdVenceHoje ? "warning" : "default"} subtitle={formatarMoeda(kpis?.valorVenceHoje ?? 0)} />
       </div>}
 
-      {/* Barra de saúde financeira - oculta para koletores */}
+      {/* Barra de saúde financeira */}
       {!isKoletor && kpis && kpis.capitalCirculacao > 0 && (
         <Card className="border-border">
           <CardContent className="p-4">
@@ -210,8 +196,8 @@ export default function Dashboard() {
               <span className="text-xs text-muted-foreground">Taxa de inadimplência: <span className={`font-bold ${parseFloat(taxaInadimplencia) > 15 ? 'text-primary' : parseFloat(taxaInadimplencia) > 8 ? 'text-warning' : 'text-success'}`}>{taxaInadimplencia}%</span></span>
             </div>
             <div className="flex gap-1 h-3 rounded-full overflow-hidden">
-              <div className="bg-success rounded-l-full transition-all" style={{ width: `${Math.max(0, 100 - parseFloat(taxaInadimplencia))}%` }} title="Em dia" />
-              <div className="bg-primary rounded-r-full transition-all" style={{ width: `${Math.min(100, parseFloat(taxaInadimplencia))}%` }} title="Inadimplente" />
+              <div className="bg-success rounded-l-full transition-all" style={{ width: `${Math.max(0, 100 - parseFloat(taxaInadimplencia))}%` }} />
+              <div className="bg-primary rounded-r-full transition-all" style={{ width: `${Math.min(100, parseFloat(taxaInadimplencia))}%` }} />
             </div>
             <div className="flex justify-between mt-1.5">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -223,7 +209,101 @@ export default function Dashboard() {
             </div>
           </CardContent>
         </Card>
-       )}
+      )}
+
+      {/* Score do Negócio + Precisa de Atenção */}
+      {!isKoletor && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Score do Negócio */}
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Target className="h-3.5 w-3.5" /> Score do Negócio
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-3">
+              <ScoreCircle score={scoreData?.score ?? 0} />
+              <div className="w-full space-y-1.5">
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Taxa de recebimento</span>
+                  <span className="text-success font-medium">{(scoreData?.taxaRecebimento ?? 0).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Inadimplência</span>
+                  <span className="text-primary font-medium">{(scoreData?.inadimplencia ?? 0).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-muted-foreground">Total recebido</span>
+                  <span className="text-foreground font-medium">{formatarMoeda(scoreData?.totalRecebido ?? 0)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Precisa de Atenção */}
+          <Card className="border-warning/20 md:col-span-2">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-xs font-medium text-warning uppercase tracking-wide flex items-center gap-2">
+                <ShieldAlert className="h-3.5 w-3.5" /> Precisa de Atenção
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Vence esta semana */}
+              <div
+                className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20 cursor-pointer hover:border-warning/40 transition-colors"
+                onClick={() => setLocation('/parcelas')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-warning/15">
+                    <Clock className="h-4 w-4 text-warning" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground">Vence esta semana</div>
+                    <div className="text-xs text-muted-foreground">{atencao?.venceSemana.qtd ?? 0} parcelas nos próximos 7 dias</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-warning">{formatarMoeda(atencao?.venceSemana.valor ?? 0)}</div>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+                </div>
+              </div>
+
+              {/* Inadimplentes +30 dias */}
+              <div
+                className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 cursor-pointer hover:border-primary/40 transition-colors"
+                onClick={() => setLocation('/parcelas?status=atrasada')}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/15">
+                    <AlertTriangle className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <div className="text-sm font-medium text-foreground">Inadimplentes +30 dias</div>
+                    <div className="text-xs text-muted-foreground">{atencao?.atrasados30.qtd ?? 0} clientes com atraso grave</div>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-bold text-primary">{formatarMoeda(atencao?.atrasados30.valor ?? 0)}</div>
+                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
+                </div>
+              </div>
+
+              {/* Atalhos rápidos */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <Button variant="outline" size="sm" className="text-xs h-8 gap-1" onClick={() => setLocation('/emprestimos')}>
+                  <Zap className="h-3 w-3" /> Empréstimos
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs h-8 gap-1" onClick={() => setLocation('/clientes')}>
+                  <Users className="h-3 w-3" /> Clientes
+                </Button>
+                <Button variant="outline" size="sm" className="text-xs h-8 gap-1" onClick={() => setLocation('/caixa')}>
+                  <Wallet className="h-3 w-3" /> Caixa
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Charts + Lists */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -235,7 +315,7 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={200}>
+            <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorEntrada" x1="0" y1="0" x2="0" y2="1">
@@ -289,6 +369,32 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Tendência de Juros Recebidos (últimos 6 meses) */}
+      {!isKoletor && (
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <BarChart2 className="h-3.5 w-3.5" /> Tendência de Recebimentos - Últimos 6 Meses
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={160}>
+              <BarChart data={tendenciaData} barSize={28}>
+                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.01 240)" vertical={false} />
+                <XAxis dataKey="mes" tick={{ fill: 'oklch(0.55 0.01 240)', fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'oklch(0.55 0.01 240)', fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(v) => `R$${(v/1000).toFixed(0)}k`} />
+                <Tooltip
+                  contentStyle={{ background: 'oklch(0.14 0.008 240)', border: '1px solid oklch(0.22 0.01 240)', borderRadius: '8px' }}
+                  labelStyle={{ color: 'oklch(0.95 0.005 240)' }}
+                  formatter={(v: number) => [formatarMoeda(v), 'Recebido']}
+                />
+                <Bar dataKey="valor" fill="oklch(0.55 0.22 25)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Parcelas Vencendo Hoje + Atrasadas */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
