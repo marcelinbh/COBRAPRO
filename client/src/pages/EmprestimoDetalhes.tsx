@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/select';
 import {
   MessageCircle, Edit2, AlertTriangle, DollarSign, TrendingUp,
-  Trash2, FileText, Send, ArrowLeft, Download, CheckCircle, Loader2
+  Trash2, FileText, Send, ArrowLeft, Download, CheckCircle, Loader2, Pencil, Filter
 } from 'lucide-react';
 import { formatarMoeda, formatarData } from '../../../shared/finance';
 import { trpc } from '@/lib/trpc';
@@ -43,6 +43,10 @@ export default function EmprestimoDetalhes() {
   const [loadingWpp, setLoadingWpp] = useState(false);
   const [gerandoPDF, setGerandoPDF] = useState(false);
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
+
+  // Estado para editar parcela individualmente
+  const [parcelaEditando, setParcelaEditando] = useState<{ id: number; valor: string; data: string } | null>(null);
+  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada'>('todas');
 
   const utils = trpc.useUtils();
   const { data: contas } = trpc.caixa.contas.useQuery();
@@ -84,6 +88,16 @@ export default function EmprestimoDetalhes() {
       utils.contratos.listComParcelas.invalidate();
     },
     onError: (e) => toast.error('Erro: ' + e.message),
+  });
+
+  const editarParcelaMutation = trpc.parcelas.editarParcela.useMutation({
+    onSuccess: () => {
+      toast.success('Parcela atualizada!');
+      setParcelaEditando(null);
+      refetch();
+      utils.contratos.listComParcelas.invalidate();
+    },
+    onError: (e: any) => toast.error('Erro ao atualizar parcela: ' + e.message),
   });
 
   const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation({
@@ -325,7 +339,24 @@ export default function EmprestimoDetalhes() {
               ))}
             </div>
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-foreground">Todas as Parcelas</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-foreground">Todas as Parcelas</p>
+                <div className="flex gap-1">
+                  {(['todas', 'pendente', 'paga', 'atrasada'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setFiltroStatus(f)}
+                      className={`px-2 py-1 text-xs rounded-md border transition-colors ${
+                        filtroStatus === f
+                          ? 'bg-emerald-600 border-emerald-600 text-white'
+                          : 'border-border text-muted-foreground hover:bg-muted/50'
+                      }`}
+                    >
+                      {f === 'todas' ? 'Todas' : f === 'pendente' ? 'Pendentes' : f === 'paga' ? 'Pagas' : 'Atrasadas'}
+                    </button>
+                  ))}
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -334,20 +365,91 @@ export default function EmprestimoDetalhes() {
                       <th className="text-left px-3 py-2 text-muted-foreground font-medium">Vencimento</th>
                       <th className="text-right px-3 py-2 text-muted-foreground font-medium">Valor</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Status</th>
+                      <th className="text-center px-3 py-2 text-muted-foreground font-medium">Editar</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {emprestimo.todasParcelas?.map((p: any) => (
-                      <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="px-3 py-2 text-foreground">#{p.numero_parcela}</td>
-                        <td className="px-3 py-2 text-foreground">{formatarData(p.data_vencimento)}</td>
-                        <td className="px-3 py-2 text-right text-foreground">{formatarMoeda(p.valor_original)}</td>
-                        <td className="px-3 py-2 text-center">
-                          <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
-                            {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
-                          </Badge>
-                        </td>
-                      </tr>
+                    {emprestimo.todasParcelas
+                      ?.filter((p: any) => filtroStatus === 'todas' || p.status === filtroStatus)
+                      .map((p: any) => (
+                        parcelaEditando?.id === p.id ? (
+                          <tr key={p.id} className="border-b border-border/50 bg-muted/20">
+                            <td className="px-3 py-2 text-foreground">#{p.numero_parcela}</td>
+                            <td className="px-2 py-1">
+                              <Input
+                                type="date"
+                                value={parcelaEditando!.data}
+                                onChange={e => setParcelaEditando(prev => prev ? { ...prev, data: e.target.value } : null)}
+                                className="h-7 text-xs w-36"
+                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                              />
+                            </td>
+                            <td className="px-2 py-1 text-right">
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={parcelaEditando!.valor}
+                                onChange={e => setParcelaEditando(prev => prev ? { ...prev, valor: e.target.value } : null)}
+                                className="h-7 text-xs w-28 text-right"
+                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+                              />
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
+                                {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
+                              </Badge>
+                            </td>
+                            <td className="px-2 py-1 text-center">
+                              <div className="flex gap-1 justify-center">
+                                <button
+                                  onClick={() => editarParcelaMutation.mutate({
+                                    parcelaId: p.id,
+                                    novoValor: parcelaEditando ? (parseFloat(parcelaEditando.valor) || undefined) : undefined,
+                                    novaDataVencimento: parcelaEditando ? (parcelaEditando.data || undefined) : undefined,
+                                  })}
+                                  disabled={editarParcelaMutation.isPending}
+                                  className="p-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  title="Salvar"
+                                >
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => setParcelaEditando(null)}
+                                  className="p-1 rounded bg-muted hover:bg-muted/80 text-foreground"
+                                  title="Cancelar"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
+                            <td className="px-3 py-2 text-foreground">#{p.numero_parcela}</td>
+                            <td className="px-3 py-2 text-foreground">{formatarData(p.data_vencimento)}</td>
+                            <td className="px-3 py-2 text-right text-foreground">{formatarMoeda(p.valor_original)}</td>
+                            <td className="px-3 py-2 text-center">
+                              <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
+                                {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
+                              </Badge>
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {p.status !== 'paga' && (
+                                <button
+                                  onClick={() => setParcelaEditando({
+                                    id: p.id,
+                                    valor: String(parseFloat(p.valor_original).toFixed(2)),
+                                    data: p.data_vencimento?.split('T')[0] ?? '',
+                                  })}
+                                  className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
+                                  title="Editar parcela"
+                                >
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        )
                     ))}
                   </tbody>
                 </table>

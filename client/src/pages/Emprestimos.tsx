@@ -115,12 +115,14 @@ function EditarEmprestimoModal({
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Editar Empréstimo</DialogTitle>
-          <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
-        </DialogHeader>
-
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden p-0">
+        <div className="px-6 pt-6 pb-4 border-b border-border shrink-0">
+          <DialogHeader>
+            <DialogTitle>Editar Empréstimo</DialogTitle>
+            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
+          </DialogHeader>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-4">
         <div className="space-y-6">
           {/* Cliente */}
           <div>
@@ -260,18 +262,20 @@ function EditarEmprestimoModal({
             </div>
           </div>
 
-          {/* Botões */}
-          <div className="flex gap-3 pt-4">
-            <Button variant="outline" className="flex-1" onClick={onClose}>
-              Cancelar
-            </Button>
-            <Button
-              className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-              onClick={handleSalvar}
-            >
-              Salvar Alterações
-            </Button>
-          </div>
+        </div>
+        </div>
+        {/* Botões fixos no rodapé */}
+        <div className="px-6 py-4 border-t border-border shrink-0 flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+            onClick={handleSalvar}
+            disabled={editarMutation.isPending}
+          >
+            {editarMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

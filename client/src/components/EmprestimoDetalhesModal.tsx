@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import {
   MessageCircle, Edit2, AlertTriangle, DollarSign, TrendingUp,
-  Trash2, FileText, Send, CheckCircle, Download, Loader2
+  Trash2, FileText, Send, CheckCircle, Download, Loader2, Pencil
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { trpc } from '@/lib/trpc';
@@ -53,6 +53,8 @@ export function EmprestimoDetalhesModal({
   const [novaTaxa, setNovaTaxa] = useState('');
   const [valorMulta, setValorMulta] = useState('');
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
+  const [parcelaEditando, setParcelaEditando] = useState<{ id: number; valor: string; data: string } | null>(null);
+  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada'>('todas');
 
   const { data: config } = trpc.configuracoes.get.useQuery();
   const utils = trpc.useUtils();
@@ -101,6 +103,16 @@ export function EmprestimoDetalhesModal({
       utils.contratos.listComParcelas.invalidate();
     },
     onError: (e) => toast.error('Erro: ' + e.message),
+  });
+
+  const editarParcelaMutation = trpc.parcelas.editarParcela.useMutation({
+    onSuccess: () => {
+      toast.success('Parcela atualizada!');
+      setParcelaEditando(null);
+      onRefresh();
+      utils.contratos.listComParcelas.invalidate();
+    },
+    onError: (e: any) => toast.error('Erro ao atualizar parcela: ' + e.message),
   });
 
   if (!emprestimo) return null;
@@ -295,17 +307,87 @@ export function EmprestimoDetalhesModal({
                   <div><p className="text-xs text-muted-foreground">Nº de Parcelas</p><p className="text-lg font-bold">{emprestimo.numeroParcelas}</p></div>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold text-foreground">Todas as Parcelas</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-foreground">Todas as Parcelas</p>
+                    <div className="flex gap-1">
+                      {(['todas', 'pendente', 'paga', 'atrasada'] as const).map(f => (
+                        <button
+                          key={f}
+                          onClick={() => setFiltroStatus(f)}
+                          className={`px-2 py-0.5 text-xs rounded-md border transition-colors ${
+                            filtroStatus === f
+                              ? 'bg-emerald-600 border-emerald-600 text-white'
+                              : 'border-border text-muted-foreground hover:bg-muted/50'
+                          }`}
+                        >
+                          {f === 'todas' ? 'Todas' : f === 'pendente' ? 'Pendentes' : f === 'paga' ? 'Pagas' : 'Atrasadas'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {emprestimo.todasParcelas?.map((p: any) => (
-                      <div key={p.id} className="flex justify-between text-xs p-2 rounded bg-muted/50">
-                        <span>#{p.numero_parcela}</span>
-                        <span className="text-muted-foreground">{formatarData(p.data_vencimento)}</span>
-                        <span>{formatarMoeda(p.valor_original)}</span>
-                        <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
-                          {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
-                        </Badge>
-                      </div>
+                    {emprestimo.todasParcelas
+                      ?.filter((p: any) => filtroStatus === 'todas' || p.status === filtroStatus)
+                      .map((p: any) => (
+                        parcelaEditando?.id === p.id ? (
+                          <div key={p.id} className="flex items-center gap-2 text-xs p-2 rounded bg-muted/30 border border-border">
+                            <span className="w-8">#{p.numero_parcela}</span>
+                            <Input
+                              type="date"
+                              value={parcelaEditando!.data}
+                              onChange={e => setParcelaEditando(prev => prev ? { ...prev, data: e.target.value } : null)}
+                              className="h-6 text-xs w-32 px-1"
+                            />
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={parcelaEditando!.valor}
+                              onChange={e => setParcelaEditando(prev => prev ? { ...prev, valor: e.target.value } : null)}
+                              className="h-6 text-xs w-24 px-1 text-right"
+                            />
+                            <div className="flex gap-1 ml-auto">
+                              <button
+                                onClick={() => editarParcelaMutation.mutate({
+                                  parcelaId: p.id,
+                                  novoValor: parcelaEditando ? (parseFloat(parcelaEditando.valor) || undefined) : undefined,
+                                  novaDataVencimento: parcelaEditando ? (parcelaEditando.data || undefined) : undefined,
+                                })}
+                                disabled={editarParcelaMutation.isPending}
+                                className="p-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
+                              >
+                                <CheckCircle className="h-3 w-3" />
+                              </button>
+                              <button
+                                onClick={() => setParcelaEditando(null)}
+                                className="p-1 rounded bg-muted hover:bg-muted/80 text-foreground"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div key={p.id} className="flex justify-between items-center text-xs p-2 rounded bg-muted/50 hover:bg-muted/70">
+                            <span>#{p.numero_parcela}</span>
+                            <span className="text-muted-foreground">{formatarData(p.data_vencimento)}</span>
+                            <span>{formatarMoeda(p.valor_original)}</span>
+                            <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
+                              {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
+                            </Badge>
+                            {p.status !== 'paga' && (
+                              <button
+                                onClick={() => setParcelaEditando({
+                                  id: p.id,
+                                  valor: String(parseFloat(p.valor_original).toFixed(2)),
+                                  data: p.data_vencimento?.split('T')[0] ?? '',
+                                })}
+                                className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                                title="Editar parcela"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </button>
+                            )}
+                          </div>
+                        )
                     ))}
                   </div>
                 </div>
