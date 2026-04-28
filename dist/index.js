@@ -1,187 +1,3 @@
-var __defProp = Object.defineProperty;
-var __getOwnPropNames = Object.getOwnPropertyNames;
-var __esm = (fn, res) => function __init() {
-  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
-};
-var __export = (target, all) => {
-  for (var name in all)
-    __defProp(target, name, { get: all[name], enumerable: true });
-};
-
-// vite.config.ts
-var vite_config_exports = {};
-__export(vite_config_exports, {
-  default: () => vite_config_default
-});
-import { jsxLocPlugin } from "@builder.io/vite-plugin-jsx-loc";
-import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
-import fs from "node:fs";
-import path from "node:path";
-import { defineConfig } from "vite";
-import { vitePluginManusRuntime } from "vite-plugin-manus-runtime";
-function ensureLogDir() {
-  if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-  }
-}
-function trimLogFile(logPath, maxSize) {
-  try {
-    if (!fs.existsSync(logPath) || fs.statSync(logPath).size <= maxSize) {
-      return;
-    }
-    const lines = fs.readFileSync(logPath, "utf-8").split("\n");
-    const keptLines = [];
-    let keptBytes = 0;
-    const targetSize = TRIM_TARGET_BYTES;
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const lineBytes = Buffer.byteLength(`${lines[i]}
-`, "utf-8");
-      if (keptBytes + lineBytes > targetSize) break;
-      keptLines.unshift(lines[i]);
-      keptBytes += lineBytes;
-    }
-    fs.writeFileSync(logPath, keptLines.join("\n"), "utf-8");
-  } catch {
-  }
-}
-function writeToLogFile(source, entries) {
-  if (entries.length === 0) return;
-  ensureLogDir();
-  const logPath = path.join(LOG_DIR, `${source}.log`);
-  const lines = entries.map((entry) => {
-    const ts = (/* @__PURE__ */ new Date()).toISOString();
-    return `[${ts}] ${JSON.stringify(entry)}`;
-  });
-  fs.appendFileSync(logPath, `${lines.join("\n")}
-`, "utf-8");
-  trimLogFile(logPath, MAX_LOG_SIZE_BYTES);
-}
-function vitePluginManusDebugCollector() {
-  return {
-    name: "manus-debug-collector",
-    transformIndexHtml(html) {
-      if (process.env.NODE_ENV === "production") {
-        return html;
-      }
-      return {
-        html,
-        tags: [
-          {
-            tag: "script",
-            attrs: {
-              src: "/__manus__/debug-collector.js",
-              defer: true
-            },
-            injectTo: "head"
-          }
-        ]
-      };
-    },
-    configureServer(server) {
-      server.middlewares.use("/__manus__/logs", (req, res, next) => {
-        if (req.method !== "POST") {
-          return next();
-        }
-        const handlePayload = (payload) => {
-          if (payload.consoleLogs?.length > 0) {
-            writeToLogFile("browserConsole", payload.consoleLogs);
-          }
-          if (payload.networkRequests?.length > 0) {
-            writeToLogFile("networkRequests", payload.networkRequests);
-          }
-          if (payload.sessionEvents?.length > 0) {
-            writeToLogFile("sessionReplay", payload.sessionEvents);
-          }
-          res.writeHead(200, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: true }));
-        };
-        const reqBody = req.body;
-        if (reqBody && typeof reqBody === "object") {
-          try {
-            handlePayload(reqBody);
-          } catch (e) {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: false, error: String(e) }));
-          }
-          return;
-        }
-        let body = "";
-        req.on("data", (chunk) => {
-          body += chunk.toString();
-        });
-        req.on("end", () => {
-          try {
-            const payload = JSON.parse(body);
-            handlePayload(payload);
-          } catch (e) {
-            res.writeHead(400, { "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: false, error: String(e) }));
-          }
-        });
-      });
-    }
-  };
-}
-var PROJECT_ROOT, LOG_DIR, MAX_LOG_SIZE_BYTES, TRIM_TARGET_BYTES, plugins, vite_config_default;
-var init_vite_config = __esm({
-  "vite.config.ts"() {
-    "use strict";
-    PROJECT_ROOT = import.meta.dirname;
-    LOG_DIR = path.join(PROJECT_ROOT, ".manus-logs");
-    MAX_LOG_SIZE_BYTES = 1 * 1024 * 1024;
-    TRIM_TARGET_BYTES = Math.floor(MAX_LOG_SIZE_BYTES * 0.6);
-    plugins = [react(), tailwindcss(), jsxLocPlugin(), vitePluginManusRuntime(), vitePluginManusDebugCollector()];
-    vite_config_default = defineConfig({
-      plugins,
-      resolve: {
-        alias: {
-          "@": path.resolve(import.meta.dirname, "client", "src"),
-          "@shared": path.resolve(import.meta.dirname, "shared"),
-          "@assets": path.resolve(import.meta.dirname, "attached_assets")
-        }
-      },
-      envDir: path.resolve(import.meta.dirname),
-      root: path.resolve(import.meta.dirname, "client"),
-      publicDir: path.resolve(import.meta.dirname, "client", "public"),
-      build: {
-        outDir: path.resolve(import.meta.dirname, "dist/public"),
-        emptyOutDir: true,
-        rollupOptions: {
-          output: {
-            manualChunks(id) {
-              if (id.includes("node_modules/xlsx")) return "vendor-xlsx";
-              if (id.includes("node_modules/jspdf")) return "vendor-jspdf";
-              if (id.includes("node_modules/jspdf-autotable")) return "vendor-jspdf";
-              if (id.includes("node_modules/@tanstack") || id.includes("node_modules/@trpc")) return "vendor-tanstack";
-              if (id.includes("node_modules/lucide-react")) return "vendor-icons";
-              if (id.includes("node_modules")) return "vendor-libs";
-            }
-          }
-        },
-        // Aumentar o limite de aviso de chunk (chunks grandes são esperados com lazy loading)
-        chunkSizeWarningLimit: 600
-      },
-      server: {
-        host: true,
-        allowedHosts: [
-          ".manuspre.computer",
-          ".manus.computer",
-          ".manus-asia.computer",
-          ".manuscomputer.ai",
-          ".manusvm.computer",
-          "localhost",
-          "127.0.0.1"
-        ],
-        fs: {
-          strict: true,
-          deny: ["**/.*"]
-        }
-      }
-    });
-  }
-});
-
 // server/_core/index.ts
 import "dotenv/config";
 import compression from "compression";
@@ -2354,8 +2170,8 @@ function getGlobalConfig(userId) {
     instanceName: `user-${userId}`
   };
 }
-async function evolutionRequest(config, method, path3, body) {
-  const fullPath = path3.replace("{instance}", config.instanceName);
+async function evolutionRequest(config, method, path2, body) {
+  const fullPath = path2.replace("{instance}", config.instanceName);
   const res = await fetch(`${config.url}${fullPath}`, {
     method,
     headers: {
@@ -2466,7 +2282,7 @@ var whatsappEvolutionRouter = router({
     if (!phone.endsWith("@s.whatsapp.net")) phone = phone + "@s.whatsapp.net";
     const result = await evolutionRequest(config, "POST", "/message/sendText/{instance}", {
       number: phone,
-      text: input.message
+      textMessage: { text: input.message }
     });
     if (result?.error || result?.status === 400) {
       throw new TRPCError5({ code: "INTERNAL_SERVER_ERROR", message: result?.message || "Erro ao enviar mensagem" });
@@ -2642,7 +2458,7 @@ async function sendWhatsAppMessage(phone, text2, userId) {
   const res = await fetch(`${config.url}/message/sendText/${config.instanceName}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: config.apiKey },
-    body: JSON.stringify({ number: p + "@s.whatsapp.net", text: text2 })
+    body: JSON.stringify({ number: p + "@s.whatsapp.net", textMessage: { text: text2 } })
   });
   return res.ok;
 }
@@ -2872,7 +2688,7 @@ async function enviarWhatsApp(userId, telefone, mensagem) {
       {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
-        body: JSON.stringify({ number: phone + "@s.whatsapp.net", text: mensagem })
+        body: JSON.stringify({ number: phone + "@s.whatsapp.net", textMessage: { text: mensagem } })
       }
     );
     const data = await res.json();
@@ -6516,12 +6332,12 @@ async function createContext(opts) {
 
 // server/_core/vite.ts
 import express from "express";
-import fs2 from "fs";
-import path2 from "path";
+import fs from "fs";
+import path from "path";
 async function setupVite(app, server) {
   const { createServer: createViteServer } = await import("vite");
   const { nanoid: nanoid2 } = await import("nanoid");
-  const { default: viteConfig } = await Promise.resolve().then(() => (init_vite_config(), vite_config_exports));
+  const { default: viteConfig } = await import("../../vite.config");
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },
@@ -6537,13 +6353,13 @@ async function setupVite(app, server) {
   app.use("*", async (req, res, next) => {
     const url = req.originalUrl;
     try {
-      const clientTemplate = path2.resolve(
+      const clientTemplate = path.resolve(
         import.meta.dirname,
         "../..",
         "client",
         "index.html"
       );
-      let template = await fs2.promises.readFile(clientTemplate, "utf-8");
+      let template = await fs.promises.readFile(clientTemplate, "utf-8");
       template = template.replace(
         `src="/src/main.tsx"`,
         `src="/src/main.tsx?v=${nanoid2()}"`
@@ -6557,13 +6373,13 @@ async function setupVite(app, server) {
   });
 }
 function serveStatic(app) {
-  const distPath = process.env.NODE_ENV === "development" ? path2.resolve(import.meta.dirname, "../..", "dist", "public") : path2.resolve(import.meta.dirname, "public");
-  if (!fs2.existsSync(distPath)) {
+  const distPath = process.env.NODE_ENV === "development" ? path.resolve(import.meta.dirname, "../..", "dist", "public") : path.resolve(import.meta.dirname, "public");
+  if (!fs.existsSync(distPath)) {
     console.error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
-  app.use("/assets", express.static(path2.join(distPath, "assets"), {
+  app.use("/assets", express.static(path.join(distPath, "assets"), {
     maxAge: "1y",
     immutable: true,
     etag: false,
@@ -6578,7 +6394,7 @@ function serveStatic(app) {
   }));
   app.use("*", (_req, res) => {
     res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
-    res.sendFile(path2.resolve(distPath, "index.html"));
+    res.sendFile(path.resolve(distPath, "index.html"));
   });
 }
 
@@ -6633,6 +6449,34 @@ async function startServer() {
     results.nodeVersion = process.version;
     results.nodeOptions = process.env.NODE_OPTIONS || "not set";
     results.platform = process.platform;
+    results.version = "cbe4ac65-diag-v2";
+    try {
+      const evoUrl = (process.env.EVOLUTION_API_URL || "http://147.182.191.118:8080").replace(/\/$/, "");
+      const evoKey = process.env.EVOLUTION_API_KEY || "cobrapro_evo_key_2024";
+      results.evoUrl = evoUrl;
+      const evoResp = await fetch(`${evoUrl}/instance/fetchInstances`, {
+        headers: { apikey: evoKey },
+        signal: AbortSignal.timeout(8e3)
+      });
+      const evoBody = await evoResp.text();
+      results.evolutionApi = `${evoResp.status} - ${evoBody.substring(0, 200)}`;
+    } catch (e) {
+      results.evolutionApi = "FAILED: " + e.message;
+    }
+    try {
+      const evoUrl = (process.env.EVOLUTION_API_URL || "http://147.182.191.118:8080").replace(/\/$/, "");
+      const evoKey = process.env.EVOLUTION_API_KEY || "cobrapro_evo_key_2024";
+      const sendResp = await fetch(`${evoUrl}/message/sendText/user-4682`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: evoKey },
+        body: JSON.stringify({ number: "5511911145280@s.whatsapp.net", textMessage: { text: "Teste diagnostico producao" } }),
+        signal: AbortSignal.timeout(1e4)
+      });
+      const sendBody = await sendResp.text();
+      results.evolutionSend = `${sendResp.status} - ${sendBody.substring(0, 300)}`;
+    } catch (e) {
+      results.evolutionSend = "FAILED: " + e.message;
+    }
     res.json(results);
   });
   app.use(
