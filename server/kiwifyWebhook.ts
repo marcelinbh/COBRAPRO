@@ -18,6 +18,8 @@ import { getDb, getSupabaseClientAsync } from "./db";
 import { enviarEmail } from "./_core/email";
 
 // ─── Tipos do payload da Kiwify ──────────────────────────────────────────────
+// A Kiwify envia os dados dentro de um campo "order" aninhado
+// e o cliente em "Customer" com C maiúsculo
 interface KiwifyCustomer {
   name?: string;
   full_name?: string;
@@ -26,13 +28,30 @@ interface KiwifyCustomer {
   CPF?: string;
 }
 
+interface KiwifyOrderInner {
+  order_id?: string;
+  order_ref?: string;
+  order_status?: string;
+  payment_method?: string;
+  webhook_event_type?: string;
+  Customer?: KiwifyCustomer;
+  // campos do produto
+  Product?: { product_id?: string; product_name?: string };
+  Subscription?: { status?: string };
+  [key: string]: unknown;
+}
+
 interface KiwifyPayload {
+  // Formato novo: dados dentro de "order"
+  order?: KiwifyOrderInner;
+  // Formato legado / testes manuais: dados no nível raiz
   order_id?: string;
   order_status?: string;
   payment_method?: string;
   product_id?: string;
   product_title?: string;
   customer?: KiwifyCustomer;
+  Customer?: KiwifyCustomer;
   // Assinatura
   subscription?: { id?: string; status?: string };
   // Campos extras que a Kiwify pode enviar
@@ -154,11 +173,14 @@ async function logWebhook(dados: {
 
 // ─── Processamento principal ─────────────────────────────────────────────────
 async function processarCompraAprovada(payload: KiwifyPayload) {
-  const orderId = payload.order_id ?? "";
-  const customer = payload.customer ?? {};
+  // Suporta tanto o formato novo (dados dentro de "order") quanto o formato legado
+  const order = payload.order;
+  const orderId = (order?.order_id ?? payload.order_id ?? "").trim();
+  // Customer pode vir como "Customer" (C maiúsculo) dentro de order, ou como "customer" na raiz
+  const customer = order?.Customer ?? payload.Customer ?? payload.customer ?? {};
   const email = (customer.email ?? "").trim().toLowerCase();
   const nome = (customer.full_name ?? customer.name ?? "Cliente").trim();
-  const produto = (payload.product_title ?? "CobraPro").trim();
+  const produto = (order?.Product?.product_name ?? payload.product_title ?? "CobraPro").trim();
 
   if (!email) {
     console.error("[Kiwify] Compra sem e-mail do cliente:", orderId);
@@ -332,16 +354,22 @@ export function registerKiwifyWebhookRoutes(app: Express) {
       }
 
       const payload = req.body as KiwifyPayload;
-      const status = payload.order_status ?? "";
+      // Suporta formato novo (dados em "order") e legado (dados na raiz)
+      const orderData = payload.order;
+      const status = (orderData?.order_status ?? payload.order_status ?? "").toLowerCase();
+      const eventType = (orderData?.webhook_event_type ?? "").toLowerCase();
+      const orderId = orderData?.order_id ?? payload.order_id ?? "";
 
       // Responder imediatamente com 200 (Kiwify exige resposta rápida)
       res.status(200).json({ received: true });
 
       // Processar apenas compras aprovadas
-      if (status === "paid" || status === "approved" || status === "complete") {
+      const isApproved = status === "paid" || status === "approved" || status === "complete"
+        || eventType === "order_approved";
+      if (isApproved) {
         await processarCompraAprovada(payload);
       } else {
-        console.log(`[Kiwify] Evento ignorado (status: ${status}) | order: ${payload.order_id}`);
+        console.log(`[Kiwify] Evento ignorado (status: ${status}, event: ${eventType}) | order: ${orderId}`);
       }
     } catch (err) {
       console.error("[Kiwify] Erro no endpoint:", err);
