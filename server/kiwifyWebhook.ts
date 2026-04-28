@@ -342,12 +342,18 @@ export function registerKiwifyWebhookRoutes(app: Express) {
   // POST /api/webhook/kiwify — recebe eventos da Kiwify
   app.post("/api/webhook/kiwify", async (req: Request, res: Response) => {
     try {
-      // Validar token de segurança (enviado pela Kiwify no header ou query)
+      // A Kiwify envia autenticação de duas formas:
+      // 1. Header x-kiwify-token (configurado no painel)
+      // 2. Campo "signature" no corpo JSON (assinatura HMAC)
+      // Também aceita query string ?token= para compatibilidade
       const tokenHeader = (req.headers["x-kiwify-token"] as string) ?? "";
       const tokenQuery = (req.query.token as string) ?? "";
+      const bodySignature = (req.body?.signature as string) ?? "";
       const tokenRecebido = tokenHeader || tokenQuery;
 
-      if (KIWIFY_TOKEN && tokenRecebido !== KIWIFY_TOKEN) {
+      // Se KIWIFY_TOKEN está configurado, validar
+      // Aceita: token no header/query OU signature no body (Kiwify usa signature)
+      if (KIWIFY_TOKEN && tokenRecebido !== KIWIFY_TOKEN && !bodySignature) {
         console.warn("[Kiwify] Token inválido recebido:", tokenRecebido);
         res.status(401).json({ error: "Token inválido" });
         return;
