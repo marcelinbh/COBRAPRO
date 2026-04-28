@@ -336,7 +336,7 @@ export function EmprestimoDetalhesModal({
               <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorCustomJuros(''); setModalPagarJuros(true); }} disabled={isQuitado}>
                 <TrendingUp className="h-4 w-4" /> Pagar Juros
               </Button>
-              <Button className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(emprestimo.taxaJuros); setModalEditarJuros(true); }}>
+              <Button className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
                 <Edit2 className="h-4 w-4" /> Editar Juros
               </Button>
               <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorMulta(''); setModalMulta(true); }} disabled={isQuitado}>
@@ -515,7 +515,7 @@ export function EmprestimoDetalhesModal({
               <Button variant="outline" className="flex-1" onClick={() => setModalEditarJuros(false)}>Cancelar</Button>
               <Button
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
-                disabled={!novaTaxa.trim() || editarJurosMutation.isPending}
+                disabled={!String(novaTaxa).trim() || editarJurosMutation.isPending}
                 onClick={() => editarJurosMutation.mutate({ id: emprestimo.id, novaTaxa })}
               >
                 {editarJurosMutation.isPending ? 'Salvando...' : 'Salvar'}
