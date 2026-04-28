@@ -20,6 +20,7 @@ import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 import { useLocation } from "wouter";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
+import { EmprestimoDetalhesModal } from "@/components/EmprestimoDetalhesModal";
 
 type EmprestimoCard = {
   id: number;
@@ -491,6 +492,7 @@ function EmprestimoCardCobra({
   const [showAplicarMultaModal, setShowAplicarMultaModal] = useState<number | null>(null);
   const [showEtiquetasModal, setShowEtiquetasModal] = useState(false);
   const [showDetalhesModal, setShowDetalhesModal] = useState(false);
+  const [showDetalhesCompleto, setShowDetalhesCompleto] = useState(false);
   const [showComprovanteModal, setShowComprovanteModal] = useState(false);
   const [novasTaxaJuros, setNovasTaxaJuros] = useState<string>("");
   const [valorMulta, setValorMulta] = useState<string>("");
@@ -619,7 +621,11 @@ function EmprestimoCardCobra({
         {/* ── HEADER: Nome + Status + Modalidade ── */}
         <div className="bg-[#0a1520] px-4 pt-4 pb-3 border-b border-border/40">
           {/* Nome centralizado */}
-          <h3 className="text-center font-bold text-white text-base tracking-wide mb-2">
+          <h3 
+            className="text-center font-bold text-white text-base tracking-wide mb-2 cursor-pointer hover:text-emerald-400 transition-colors"
+            onClick={() => setShowDetalhesCompleto(true)}
+            title="Clique para ver detalhes"
+          >
             {emp.clienteNome.toUpperCase()}
           </h3>
 
@@ -1047,6 +1053,15 @@ function EmprestimoCardCobra({
       )}
 
       {/* Modal de Etiquetas */}
+      {showDetalhesCompleto && (
+        <EmprestimoDetalhesModal
+          emprestimo={emp}
+          open={showDetalhesCompleto}
+          onOpenChange={setShowDetalhesCompleto}
+          contas={contas}
+          onRefresh={onRefresh}
+        />
+      )}
       {showEtiquetasModal && (
         <Dialog open={true} onOpenChange={() => setShowEtiquetasModal(false)}>
           <DialogContent className="max-w-md">
