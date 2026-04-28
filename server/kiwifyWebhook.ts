@@ -348,35 +348,32 @@ export function registerKiwifyWebhookRoutes(app: Express) {
       const bodySignature = (req.body?.signature as string) ?? "";
       console.log("[Kiwify] Webhook recebido | signature:", bodySignature ? "presente" : "ausente");
 
-      const payload = req.body as KiwifyPayload;
+      const reqBody = req.body as KiwifyPayload;
       // Suporta formato novo (dados em "order") e legado (dados na raiz)
-      const orderData = payload.order;
+      const orderData = reqBody.order;
       // Status pode vir em vários campos dependendo da versão do payload
-      const payloadAny = payload as Record<string, unknown>;
+      const reqBodyAny = reqBody as Record<string, unknown>;
       const status = (
         orderData?.order_status ??
-        (payloadAny.order_status as string | undefined) ??
+        (reqBodyAny.order_status as string | undefined) ??
         ""
       ).toLowerCase();
       // Evento pode vir como "event" na raiz ou "webhook_event_type" dentro de order
       const eventType = (
-        (payloadAny.event as string | undefined) ??
+        (reqBodyAny.event as string | undefined) ??
         orderData?.webhook_event_type ??
         ""
       ).toLowerCase();
-      const orderId = orderData?.order_id ?? payload.order_id ?? "";
-
+      const orderId = orderData?.order_id ?? reqBody.order_id ?? "";
       console.log(`[Kiwify] status: ${status} | event: ${eventType} | order: ${orderId}`);
-
       // Responder imediatamente com 200 (Kiwify exige resposta rápida)
       res.status(200).json({ received: true });
-
       // Processar apenas compras aprovadas
       const isApproved =
         status === "paid" || status === "approved" || status === "complete" ||
         eventType === "order_approved" || eventType === "compra_aprovada";
       if (isApproved) {
-        await processarCompraAprovada(payload);
+        await processarCompraAprovada(reqBody);
       } else {
         console.log(`[Kiwify] Evento ignorado (status: ${status}, event: ${eventType}) | order: ${orderId}`);
       }

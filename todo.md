@@ -763,3 +763,8 @@
 - [x] Novo Contrato: opção de datas de vencimento manuais por parcela (toggle)
 - [x] Novo Contrato: multa por atraso em valor fixo (R$) além de percentual (%)
 - [x] Novo Contrato: taxa de juros editável mesmo com parcela fixa (calculada automaticamente)
+
+## Fase 41: Editar Parcela Individual
+- [ ] Procedimento tRPC contratos.editarParcela (valor + data de vencimento)
+- [ ] Botão de editar em cada linha da tabela de parcelas (página de detalhes e modal)
+- [ ] Modal de edição com campos: Valor da Parcela e Data de Vencimento

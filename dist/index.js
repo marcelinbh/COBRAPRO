@@ -2090,17 +2090,17 @@ function registerKiwifyWebhookRoutes(app) {
     try {
       const bodySignature = req.body?.signature ?? "";
       console.log("[Kiwify] Webhook recebido | signature:", bodySignature ? "presente" : "ausente");
-      const payload = req.body;
-      const orderData = payload.order;
-      const payloadAny = payload;
-      const status = (orderData?.order_status ?? payloadAny.order_status ?? "").toLowerCase();
-      const eventType = (payloadAny.event ?? orderData?.webhook_event_type ?? "").toLowerCase();
-      const orderId = orderData?.order_id ?? payload.order_id ?? "";
+      const reqBody = req.body;
+      const orderData = reqBody.order;
+      const reqBodyAny = reqBody;
+      const status = (orderData?.order_status ?? reqBodyAny.order_status ?? "").toLowerCase();
+      const eventType = (reqBodyAny.event ?? orderData?.webhook_event_type ?? "").toLowerCase();
+      const orderId = orderData?.order_id ?? reqBody.order_id ?? "";
       console.log(`[Kiwify] status: ${status} | event: ${eventType} | order: ${orderId}`);
       res.status(200).json({ received: true });
       const isApproved = status === "paid" || status === "approved" || status === "complete" || eventType === "order_approved" || eventType === "compra_aprovada";
       if (isApproved) {
-        await processarCompraAprovada(payload);
+        await processarCompraAprovada(reqBody);
       } else {
         console.log(`[Kiwify] Evento ignorado (status: ${status}, event: ${eventType}) | order: ${orderId}`);
       }
@@ -4405,6 +4405,58 @@ var contratosRouter = router({
     if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     return { success: true };
   }),
+  editar: protectedProcedure.input(z9.object({
+    id: z9.number(),
+    valorPrincipal: z9.number().positive(),
+    taxaJuros: z9.string(),
+    tipoTaxa: z9.string(),
+    numeroParcelas: z9.number().int().positive(),
+    dataInicio: z9.string().optional(),
+    dataPrimeiraParcela: z9.string().optional(),
+    datasParcelasCustom: z9.array(z9.string()).optional()
+  })).mutation(async ({ ctx, input }) => {
+    const db = await getDb();
+    if (db) {
+      try {
+        await db.update(contratos).set({
+          valorPrincipal: input.valorPrincipal.toString(),
+          taxaJuros: input.taxaJuros,
+          tipoTaxa: input.tipoTaxa,
+          numeroParcelas: input.numeroParcelas
+        }).where(and3(eq5(contratos.id, input.id), eq5(contratos.userId, ctx.user.id)));
+        if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
+          const parcelasPendentes = await db.select().from(parcelas).where(and3(eq5(parcelas.contratoId, input.id), inArray(parcelas.status, ["pendente", "atrasada", "vencendo_hoje"]))).orderBy(parcelas.numeroParcela);
+          for (let i = 0; i < parcelasPendentes.length; i++) {
+            if (input.datasParcelasCustom[i]) {
+              await db.update(parcelas).set({ dataVencimento: input.datasParcelasCustom[i] }).where(eq5(parcelas.id, parcelasPendentes[i].id));
+            }
+          }
+        }
+        return { success: true };
+      } catch (err) {
+        console.warn("[contratos.editar] Drizzle failed, trying REST:", err.message);
+        resetDb();
+      }
+    }
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+    const { error } = await supabase.from("contratos").update({
+      valor_principal: input.valorPrincipal,
+      taxa_juros: input.taxaJuros,
+      tipo_taxa: input.tipoTaxa,
+      numero_parcelas: input.numeroParcelas
+    }).eq("id", input.id).eq("user_id", ctx.user.id);
+    if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
+      const { data: parcelasPendentes } = await supabase.from("parcelas").select("id, numero_parcela").eq("contrato_id", input.id).in("status", ["pendente", "atrasada", "vencendo_hoje"]).order("numero_parcela", { ascending: true });
+      for (let i = 0; i < (parcelasPendentes ?? []).length; i++) {
+        if (input.datasParcelasCustom[i]) {
+          await supabase.from("parcelas").update({ data_vencimento: input.datasParcelasCustom[i] }).eq("id", parcelasPendentes[i].id);
+        }
+      }
+    }
+    return { success: true };
+  }),
   pagarTotal: protectedProcedure.input(z9.object({ id: z9.number(), valor: z9.number() })).mutation(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
@@ -4787,6 +4839,35 @@ var parcelasRouter = router({
       await supabase.from("contratos").update({ numero_parcelas: contrato.numeroParcelas + 1 }).eq("id", parcela.contratoId);
     }
     return { success: true, novaDataVencimento: novaDataVencStr };
+  }),
+  editarParcela: protectedProcedure.input(z9.object({
+    parcelaId: z9.number(),
+    novoValor: z9.number().positive().optional(),
+    novaDataVencimento: z9.string().optional()
+    // formato YYYY-MM-DD
+  })).mutation(async ({ ctx, input }) => {
+    if (!input.novoValor && !input.novaDataVencimento) {
+      throw new TRPCError9({ code: "BAD_REQUEST", message: "Informe ao menos um campo para editar" });
+    }
+    const db = await getDb();
+    if (db) {
+      const rows = await db.select().from(parcelas).where(eq5(parcelas.id, input.parcelaId)).limit(1);
+      const parcela = rows[0];
+      if (!parcela) throw new TRPCError9({ code: "NOT_FOUND", message: "Parcela n\xE3o encontrada" });
+      const updateData = {};
+      if (input.novoValor) updateData.valorOriginal = input.novoValor.toFixed(2);
+      if (input.novaDataVencimento) updateData.dataVencimento = input.novaDataVencimento;
+      await db.update(parcelas).set(updateData).where(eq5(parcelas.id, input.parcelaId));
+    } else {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const updateData = {};
+      if (input.novoValor) updateData.valor_original = input.novoValor;
+      if (input.novaDataVencimento) updateData.data_vencimento = input.novaDataVencimento;
+      const { error } = await supabase.from("parcelas").update(updateData).eq("id", input.parcelaId);
+      if (error) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+    }
+    return { success: true };
   })
 });
 var caixaRouter = router({

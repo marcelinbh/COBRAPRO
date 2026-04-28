@@ -1555,6 +1555,71 @@ const contratosRouter = router({
       return { success: true };
     }),
 
+  editar: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      valorPrincipal: z.number().positive(),
+      taxaJuros: z.string(),
+      tipoTaxa: z.string(),
+      numeroParcelas: z.number().int().positive(),
+      dataInicio: z.string().optional(),
+      dataPrimeiraParcela: z.string().optional(),
+      datasParcelasCustom: z.array(z.string()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (db) {
+        try {
+          await db.update(contratos).set({
+            valorPrincipal: input.valorPrincipal.toString(),
+            taxaJuros: input.taxaJuros,
+            tipoTaxa: input.tipoTaxa as 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'anual',
+            numeroParcelas: input.numeroParcelas,
+          }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
+
+          // Atualizar parcelas pendentes com nova data se fornecida
+          if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
+            const parcelasPendentes = await db.select().from(parcelas)
+              .where(and(eq(parcelas.contratoId, input.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
+              .orderBy(parcelas.numeroParcela);
+            for (let i = 0; i < parcelasPendentes.length; i++) {
+              if (input.datasParcelasCustom[i]) {
+                await db.update(parcelas).set({ dataVencimento: input.datasParcelasCustom[i] }).where(eq(parcelas.id, parcelasPendentes[i].id));
+              }
+            }
+          }
+          return { success: true };
+        } catch (err) {
+          console.warn('[contratos.editar] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
+      }
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { error } = await supabase.from('contratos').update({
+        valor_principal: input.valorPrincipal,
+        taxa_juros: input.taxaJuros,
+        tipo_taxa: input.tipoTaxa,
+        numero_parcelas: input.numeroParcelas,
+      }).eq('id', input.id).eq('user_id', ctx.user.id);
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+
+      // Atualizar datas das parcelas pendentes via Supabase
+      if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
+        const { data: parcelasPendentes } = await supabase.from('parcelas')
+          .select('id, numero_parcela')
+          .eq('contrato_id', input.id)
+          .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
+          .order('numero_parcela', { ascending: true });
+        for (let i = 0; i < (parcelasPendentes ?? []).length; i++) {
+          if (input.datasParcelasCustom[i]) {
+            await supabase.from('parcelas').update({ data_vencimento: input.datasParcelasCustom[i] }).eq('id', parcelasPendentes![i].id);
+          }
+        }
+      }
+      return { success: true };
+    }),
+
   pagarTotal: protectedProcedure
     .input(z.object({ id: z.number(), valor: z.number() }))
     .mutation(async ({ ctx, input }) => {
@@ -2011,6 +2076,44 @@ const parcelasRouter = router({
       }
 
       return { success: true, novaDataVencimento: novaDataVencStr };
+    }),
+
+  editarParcela: protectedProcedure
+    .input(z.object({
+      parcelaId: z.number(),
+      novoValor: z.number().positive().optional(),
+      novaDataVencimento: z.string().optional(), // formato YYYY-MM-DD
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!input.novoValor && !input.novaDataVencimento) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Informe ao menos um campo para editar' });
+      }
+
+      const db = await getDb();
+      if (db) {
+        // Verificar que a parcela pertence ao usuário
+        const rows = await db.select().from(parcelas).where(eq(parcelas.id, input.parcelaId)).limit(1);
+        const parcela = rows[0];
+        if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+
+        const updateData: Record<string, any> = {};
+        if (input.novoValor) updateData.valorOriginal = input.novoValor.toFixed(2);
+        if (input.novaDataVencimento) updateData.dataVencimento = input.novaDataVencimento;
+
+        await db.update(parcelas).set(updateData).where(eq(parcelas.id, input.parcelaId));
+      } else {
+        const supabase = await getSupabaseClientAsync();
+        if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+        const updateData: Record<string, any> = {};
+        if (input.novoValor) updateData.valor_original = input.novoValor;
+        if (input.novaDataVencimento) updateData.data_vencimento = input.novaDataVencimento;
+
+        const { error } = await supabase.from('parcelas').update(updateData).eq('id', input.parcelaId);
+        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      }
+
+      return { success: true };
     }),
 });
 

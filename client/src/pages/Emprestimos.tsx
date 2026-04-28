@@ -89,10 +89,28 @@ function EditarEmprestimoModal({
   const valorParcela = (valor + jurosTotal) / parcelas;
   const totalReceber = valor + jurosTotal;
 
+  const utils = trpc.useUtils();
+  const editarMutation = trpc.contratos.editar.useMutation({
+    onSuccess: () => {
+      toast.success('Empréstimo atualizado com sucesso!');
+      utils.contratos.list.invalidate();
+      onSuccess();
+      onClose();
+    },
+    onError: (err) => {
+      toast.error('Erro ao atualizar: ' + err.message);
+    },
+  });
+
   const handleSalvar = () => {
-    toast.success("Empréstimo atualizado com sucesso!");
-    onSuccess();
-    onClose();
+    editarMutation.mutate({
+      id: emprestimo.id,
+      valorPrincipal: valor,
+      taxaJuros: String(juros),
+      tipoTaxa: tipo,
+      numeroParcelas: parcelas,
+      dataPrimeiraParcela: dataPrimeiraParcela || undefined,
+    });
   };
 
   return (
