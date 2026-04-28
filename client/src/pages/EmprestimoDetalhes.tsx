@@ -376,13 +376,13 @@ export default function EmprestimoDetalhes() {
 
       {/* Botões de Ação */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-6 border-t border-border">
-        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" size="sm" onClick={() => { setValorCustomPagar(''); setModalPagar(true); }} disabled={isQuitado}>
+        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" size="sm" onClick={() => { setValorCustomPagar(''); setContaCaixaId(''); setPagamentoRealizado(null); setModalPagar(true); }} disabled={isQuitado}>
           <DollarSign className="h-4 w-4" /> Pagar
         </Button>
-        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorCustomJuros(''); setModalPagarJuros(true); }} disabled={isQuitado}>
+        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorCustomJuros(''); setContaCaixaId(''); setModalPagarJuros(true); }} disabled={isQuitado}>
           <TrendingUp className="h-4 w-4" /> Pagar Juros
         </Button>
-        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(emprestimo.taxaJuros); setModalEditarJuros(true); }}>
+        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
           <Edit2 className="h-4 w-4" /> Editar Juros
         </Button>
         <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorMulta(''); setModalMulta(true); }} disabled={isQuitado}>
@@ -493,7 +493,7 @@ export default function EmprestimoDetalhes() {
       </Dialog>
 
       {/* ── MODAL PAGAR JUROS ── */}
-      <Dialog open={modalPagarJuros} onOpenChange={setModalPagarJuros}>
+      <Dialog open={modalPagarJuros} onOpenChange={(v) => { setModalPagarJuros(v); if (!v) { setValorCustomJuros(''); setContaCaixaId(''); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>PAGAR SÓ JUROS</DialogTitle>
@@ -537,7 +537,7 @@ export default function EmprestimoDetalhes() {
       </Dialog>
 
       {/* ── MODAL EDITAR JUROS ── */}
-      <Dialog open={modalEditarJuros} onOpenChange={setModalEditarJuros}>
+      <Dialog open={modalEditarJuros} onOpenChange={(v) => { setModalEditarJuros(v); if (!v) setNovaTaxa(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>EDITAR TAXA DE JUROS</DialogTitle>
@@ -574,7 +574,7 @@ export default function EmprestimoDetalhes() {
       </Dialog>
 
       {/* ── MODAL APLICAR MULTA ── */}
-      <Dialog open={modalMulta} onOpenChange={setModalMulta}>
+      <Dialog open={modalMulta} onOpenChange={(v) => { setModalMulta(v); if (!v) setValorMulta(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>APLICAR MULTA POR ATRASO</DialogTitle>
