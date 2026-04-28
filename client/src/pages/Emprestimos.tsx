@@ -490,11 +490,14 @@ function EmprestimoCardCobra({
   const [showEditarJurosModal, setShowEditarJurosModal] = useState<number | null>(null);
   const [showAplicarMultaModal, setShowAplicarMultaModal] = useState<number | null>(null);
   const [showEtiquetasModal, setShowEtiquetasModal] = useState(false);
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false);
+  const [showComprovanteModal, setShowComprovanteModal] = useState(false);
   const [novasTaxaJuros, setNovasTaxaJuros] = useState<string>("");
   const [valorMulta, setValorMulta] = useState<string>("");
   const [motivoMulta, setMotivoMulta] = useState<string>("");
   const [novaEtiquetaNome, setNovaEtiquetaNome] = useState("");
   const [novaEtiquetaCor, setNovaEtiquetaCor] = useState("#6366f1");
+  const [gerandoPDF, setGerandoPDF] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: todasEtiquetas = [] } = trpc.etiquetas.listar.useQuery();
@@ -584,170 +587,297 @@ function EmprestimoCardCobra({
     }
   };
 
+  const handleGerarComprovante = async () => {
+    setGerandoPDF(true);
+    try {
+      const parcelaPaga = emp.todasParcelas?.find((p: any) => p.status === 'paga') || emp.todasParcelas?.[0];
+      await gerarComprovantePDF({
+        clienteNome: emp.clienteNome,
+        contratoId: emp.id,
+        parcelaNumero: parcelaPaga?.numero_parcela ?? 1,
+        valorOriginal: parcelaPaga?.valor_original ?? emp.valorPrincipal,
+        juros: parcelaPaga?.valor_juros ?? 0,
+        valorPago: parcelaPaga?.valor_pago ?? parcelaPaga?.valor_original ?? emp.valorPrincipal,
+        dataPagamento: parcelaPaga?.data_pagamento ?? new Date().toISOString(),
+        modalidade: emp.modalidade,
+      });
+      toast.success('Comprovante gerado!');
+    } catch {
+      toast.error('Erro ao gerar comprovante');
+    } finally {
+      setGerandoPDF(false);
+    }
+  };
+
   return (
     <>
-      <div className="relative rounded-lg border border-border overflow-hidden bg-gradient-to-br from-red-900/20 via-slate-900 to-cyan-900/20 shadow-lg hover:shadow-xl transition-all">
-        {/* Header com nome e status */}
-        <div className="p-4 border-b border-border/50">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full ${bgColor} flex items-center justify-center text-white font-bold text-sm`}>
+      {/* ═══════════════════════════════════════════════════════════
+           CARD ESTILO COBRA FÁCIL
+      ═══════════════════════════════════════════════════════════ */}
+      <div className="rounded-xl border border-border/60 overflow-hidden bg-[#0f1923] shadow-xl hover:shadow-2xl transition-all">
+
+        {/* ── HEADER: Nome + Status + Modalidade ── */}
+        <div className="bg-[#0a1520] px-4 pt-4 pb-3 border-b border-border/40">
+          {/* Nome centralizado */}
+          <h3 className="text-center font-bold text-white text-base tracking-wide mb-2">
+            {emp.clienteNome.toUpperCase()}
+          </h3>
+
+          {/* Avatar + badges + botões de ação */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className={`w-9 h-9 rounded-full ${bgColor} flex items-center justify-center text-white font-bold text-xs shrink-0`}>
                 {initials}
               </div>
-              <div>
-                <h3 className="font-bold text-white text-sm">{emp.clienteNome.toUpperCase()}</h3>
-                <p className="text-xs text-muted-foreground">{diasAtraso > 0 ? '🔴 Atrasado' : '🟢 Em Dia'}</p>
+              <div className="flex flex-col gap-0.5">
+                <span className={`text-xs font-semibold ${diasAtraso > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {diasAtraso > 0 ? 'Atrasado' : 'Em Dia'}
+                </span>
+                <Badge className={`text-[10px] px-1.5 py-0 h-4 ${emp.modalidade === 'quinzenal' ? 'bg-cyan-700' : emp.modalidade === 'semanal' ? 'bg-purple-700' : emp.modalidade === 'diario' ? 'bg-orange-700' : 'bg-blue-700'} text-white border-0`}>
+                  {emp.modalidade?.toUpperCase()}
+                </Badge>
               </div>
             </div>
+
+            {/* Botões Etiqueta | Detalhes | Comprovante */}
             <div className="flex gap-1">
-              <Badge className={`text-xs ${diasAtraso > 0 ? 'bg-red-600 text-white' : 'bg-cyan-600 text-white'}`}>
-                {emp.tipoTaxa?.toUpperCase() || 'MENSAL'}
-              </Badge>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[10px] gap-1 border-border/50 bg-transparent hover:bg-accent/20"
+                onClick={() => setShowEtiquetasModal(true)}
+              >
+                <Tag className="w-3 h-3" /> Etiqueta
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[10px] gap-1 border-border/50 bg-transparent hover:bg-accent/20"
+                onClick={() => setLocation(`/emprestimos/${emp.id}`)}
+              >
+                <Eye className="w-3 h-3" /> Detalhes
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[10px] gap-1 border-border/50 bg-transparent hover:bg-accent/20"
+                onClick={handleGerarComprovante}
+                disabled={gerandoPDF}
+              >
+                <FileText className="w-3 h-3" /> Comprovante
+              </Button>
             </div>
           </div>
 
-          {/* Etiquetas */}
+          {/* Etiquetas aplicadas */}
           {etiquetasSelecionadas.length > 0 && (
-            <div className="flex flex-wrap gap-1 mb-2">
+            <div className="flex flex-wrap gap-1 mt-2">
               {etiquetasSelecionadas.map((nome) => {
                 const et = todasEtiquetas.find((e: any) => e.nome === nome);
                 return (
-                  <span key={nome} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: et?.cor ?? '#6366f1' }}>
-                    <Tag className="w-2.5 h-2.5" />{nome}
+                  <span key={nome} className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-medium text-white" style={{ backgroundColor: et?.cor ?? '#6366f1' }}>
+                    <Tag className="w-2 h-2" />{nome}
                   </span>
                 );
               })}
             </div>
           )}
-
-          {/* Valor principal em destaque */}
-          <div className="text-center mb-2">
-            <div className="text-2xl font-bold text-emerald-400">{formatarMoeda(emp.totalReceber)}</div>
-            <div className="text-xs text-muted-foreground">restante a receber</div>
-            {diasAtraso > 0 && (
-              <div className="text-xs text-red-400 mt-1">contém {formatarMoeda(jurosAtraso)} de juros por atraso</div>
-            )}
-          </div>
         </div>
 
-        {/* Informações principais */}
-        <div className="p-4 space-y-3 border-b border-border/50">
-          <div className="grid grid-cols-2 gap-3 text-xs">
+        {/* ── VALOR PRINCIPAL ── */}
+        <div className="px-4 py-4 text-center border-b border-border/40">
+          <div className="text-3xl font-bold text-emerald-400">{formatarMoeda(emp.totalReceber)}</div>
+          <div className="text-xs text-muted-foreground mt-0.5">restante a receber</div>
+          {diasAtraso > 0 && (
+            <div className="text-xs text-red-400 mt-1 font-medium">
+              contém {formatarMoeda(jurosAtraso)} de juros por atraso
+            </div>
+          )}
+        </div>
+
+        {/* ── KPIs: Emprestado | Total a Receber | Lucro Previsto | Lucro Realizado ── */}
+        <div className="px-4 py-3 border-b border-border/40">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
             <div>
               <div className="text-muted-foreground">Emprestado</div>
-              <div className="font-semibold text-white">{formatarMoeda(emp.valorPrincipal)}</div>
+              <div className="font-bold text-white">{formatarMoeda(emp.valorPrincipal)}</div>
             </div>
             <div>
               <div className="text-muted-foreground">Total a Receber</div>
-              <div className="font-semibold text-white">{formatarMoeda(emp.totalReceber)}</div>
+              <div className="font-bold text-white">{formatarMoeda(emp.totalReceber)}</div>
             </div>
             <div>
               <div className="text-muted-foreground">💰 Lucro Previsto</div>
-              <div className="font-semibold text-emerald-400">{formatarMoeda(emp.lucroPrevisto)}</div>
+              <div className="font-bold text-emerald-400">{formatarMoeda(emp.lucroPrevisto)}</div>
             </div>
             <div>
               <div className="text-muted-foreground">✅ Lucro Realizado</div>
-              <div className="font-semibold text-emerald-400">{formatarMoeda(emp.lucroRealizado)} {emp.lucroPrevisto > 0 ? `${Math.round((emp.lucroRealizado / emp.lucroPrevisto) * 100)}%` : '0%'}</div>
+              <div className="font-bold text-emerald-400">
+                {formatarMoeda(emp.lucroRealizado)}{' '}
+                <span className="text-muted-foreground font-normal">
+                  {emp.lucroPrevisto > 0 ? `${Math.round((emp.lucroRealizado / emp.lucroPrevisto) * 100)}%` : '0%'}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Vencimento e Pagamento */}
-          <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-border/30">
-            <div className="flex items-center gap-1">
-              <Clock className="w-3 h-3 text-muted-foreground" />
-              <span className="text-muted-foreground">Venc:</span>
-              <span className="font-semibold">{parcela ? formatarData(parcela.data_vencimento) : 'N/A'}</span>
+          {/* Venc + Pago */}
+          <div className="flex items-center justify-between mt-3 pt-2 border-t border-border/30 text-xs">
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <Clock className="w-3 h-3" />
+              <span>Venc: <span className="text-foreground font-medium">{parcela ? formatarData(parcela.data_vencimento) : 'N/A'}</span></span>
+              <button className="ml-1 text-muted-foreground hover:text-foreground">
+                <Edit className="w-3 h-3" />
+              </button>
             </div>
-            <div className="flex items-center gap-1">
-              <DollarSign className="w-3 h-3 text-muted-foreground" />
-              <span className="text-muted-foreground">Pago:</span>
-              <span className="font-semibold">{formatarMoeda(emp.totalPago)}</span>
+            <div className="flex items-center gap-1 text-muted-foreground">
+              <DollarSign className="w-3 h-3 text-emerald-400" />
+              <span>Pago: <span className="text-emerald-400 font-medium">{formatarMoeda(emp.totalPago)}</span></span>
             </div>
-          </div>
-
-          {/* Só Juros */}
-          <div className="p-2 rounded bg-purple-900/30 border border-purple-500/30 text-xs">
-            <div className="text-muted-foreground">Só Juros (por parcela):</div>
-            <div className="font-semibold text-purple-300">{formatarMoeda(emp.valorJurosParcela)}</div>
           </div>
         </div>
 
-        {/* Informação de atraso (se houver) */}
+        {/* ── SÓ JUROS ── */}
+        <div className="mx-4 my-3 px-4 py-2.5 rounded-lg bg-purple-900/30 border border-purple-500/30 flex items-center justify-between">
+          <span className="text-sm text-purple-200">Só Juros (por parcela):</span>
+          <span className="text-sm font-bold text-purple-300">{formatarMoeda(emp.valorJurosParcela)}</span>
+        </div>
+
+        {/* ── BLOCO DE ATRASO ── */}
         {diasAtraso > 0 && parcelaComAtraso && (
-          <div className="p-4 bg-red-900/30 border-t border-red-500/30 border-b border-red-500/30 space-y-2">
-            <div className="text-sm font-bold text-red-400">Parcela {parcelaComAtraso.numero_parcela}/1 em atraso</div>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <div className="text-red-400 font-bold">{diasAtraso} dias</div>
-                <div className="text-muted-foreground">Vencimento: {formatarData(parcelaComAtraso.data_vencimento)}</div>
+          <div className="mx-4 mb-3 rounded-lg bg-red-950/60 border border-red-500/40 overflow-hidden">
+            {/* Cabeçalho do atraso */}
+            <div className="px-4 py-2 flex items-center justify-between border-b border-red-500/30">
+              <span className="text-sm font-bold text-red-300">
+                Parcela {parcelaComAtraso.numero_parcela}/{emp.numeroParcelas} em atraso
+              </span>
+              <span className="text-sm font-bold text-red-400">{diasAtraso} dias</span>
+            </div>
+
+            {/* Detalhes do atraso */}
+            <div className="px-4 py-3 space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Vencimento: {formatarData(parcelaComAtraso.data_vencimento)}</span>
+                <span className="text-white font-medium">Valor: {formatarMoeda(parcelaComAtraso.valor_original)}</span>
               </div>
-              <div>
-                <div className="text-muted-foreground">Valor: {formatarMoeda(parcelaComAtraso.valor_original)}</div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">% Juros (R$ {diasAtraso > 0 ? (jurosAtraso / diasAtraso).toFixed(2) : '0,00'}/dia)</span>
+                <span className="text-orange-400 font-bold">+{formatarMoeda(jurosAtraso)}</span>
+              </div>
+              <div className="flex items-center justify-between pt-1.5 border-t border-red-500/30">
+                <span className="text-white font-semibold">Total com Atraso:</span>
+                <span className="text-white font-bold">{formatarMoeda(totalComAtraso)}</span>
               </div>
             </div>
-            <div className="text-xs text-red-300 pt-2">
-              <div>% Juros (R$ {(jurosAtraso / diasAtraso).toFixed(2)}/dia)</div>
-              <div className="font-bold">+{formatarMoeda(jurosAtraso)}</div>
+
+            {/* Botões Editar Juros e Aplicar Multa */}
+            <div className="px-4 pb-3 flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-8 text-xs gap-1 border-border/50 bg-transparent hover:bg-accent/20 text-purple-300 hover:text-purple-200"
+                onClick={() => setShowEditarJurosModal(emp.id)}
+              >
+                <Edit className="w-3 h-3" /> Editar Juros
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-8 text-xs gap-1 border-border/50 bg-transparent hover:bg-accent/20 text-emerald-300 hover:text-emerald-200"
+                onClick={() => setShowAplicarMultaModal(emp.id)}
+              >
+                <DollarSign className="w-3 h-3" /> Aplicar Multa
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0 text-muted-foreground hover:text-red-400"
+                onClick={() => { if (confirm('Deletar este empréstimo?')) deletarMutation.mutate({ id: emp.id }); }}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
             </div>
-            <div className="text-sm font-bold text-red-400 pt-2 border-t border-red-500/30">
-              Total com Atraso: {formatarMoeda(totalComAtraso)}
+
+            {/* Mensagem de regularização */}
+            <div className="px-4 pb-2 text-[10px] text-muted-foreground">
+              Pague a parcela em atraso para regularizar o empréstimo
             </div>
           </div>
         )}
 
-        {/* Mensagem de atraso */}
-        {diasAtraso > 0 && (
-          <div className="p-2 bg-red-900/20 border-t border-red-500/30 text-xs text-red-300 text-center">
-            Pague a parcela em atraso para regularizar o empréstimo
-          </div>
-        )}
-
-        {/* Botões de ação principais */}
-        <div className="p-4 space-y-2 border-t border-border/50">
-          {diasAtraso > 0 ? (
-            <Button
-              size="sm"
-              className="w-full h-9 text-xs bg-red-700 hover:bg-red-800 text-white gap-1"
-              onClick={() => handleWhatsApp('atraso')}
-              disabled={loadingWpp}
-            >
-              {loadingWpp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-              Cobrar Atraso (WhatsApp)
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              className="w-full h-9 text-xs bg-green-700 hover:bg-green-800 text-white gap-1"
-              onClick={() => handleWhatsApp('preventivo')}
-              disabled={loadingWpp}
-            >
-              {loadingWpp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <MessageCircle className="h-3.5 w-3.5" />}
-              Cobrança Preventiva
-            </Button>
-          )}
-
+        {/* ── BARRA DE AÇÕES INFERIOR ── */}
+        <div className="px-4 pb-4 flex items-center gap-2 border-t border-border/40 pt-3">
+          {/* Pagar */}
           <PagamentoModal
             emprestimo={emp}
             contas={contas}
             onSuccess={onRefresh}
-            triggerClassName="w-full h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white"
+            triggerClassName="flex-1 h-9 text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1"
             triggerLabel="Pagar"
             triggerIcon={<CheckCircle className="h-3.5 w-3.5" />}
           />
 
+          {/* Pagar Juros */}
           <PagamentoModal
             emprestimo={emp}
             contas={contas}
             onSuccess={onRefresh}
             modoInicial="juros"
-            triggerClassName="w-full h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white"
+            triggerClassName="flex-1 h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1"
             triggerLabel="Pagar Juros"
             triggerIcon={<DollarSign className="h-3.5 w-3.5" />}
           />
+
+          {/* Ícones de ação */}
+          <div className="flex gap-1">
+            {/* Histórico */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20"
+              title="Histórico de pagamentos"
+              onClick={() => setLocation(`/emprestimos/${emp.id}`)}
+            >
+              <Clock className="h-4 w-4" />
+            </Button>
+
+            {/* Editar */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20"
+              title="Editar empréstimo"
+              onClick={() => setShowEditarModal(true)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+
+            {/* Renegociar / Cobrar WhatsApp */}
+            <Button
+              size="sm"
+              variant="outline"
+              className={`h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20 ${diasAtraso > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300'}`}
+              title={diasAtraso > 0 ? 'Cobrar via WhatsApp' : 'Cobrança preventiva'}
+              onClick={() => handleWhatsApp(diasAtraso > 0 ? 'atraso' : 'preventivo')}
+              disabled={loadingWpp}
+            >
+              {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+
+            {/* Deletar (vermelho) */}
+            <Button
+              size="sm"
+              className="h-9 w-9 p-0 bg-red-700 hover:bg-red-800 text-white border-0"
+              title="Deletar empréstimo"
+              onClick={() => { if (confirm('Tem certeza que deseja deletar este empréstimo?')) deletarMutation.mutate({ id: emp.id }); }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
-        {/* Botões de ação secundários */}
-        <div className="p-4 border-t border-border/50 grid grid-cols-3 sm:grid-cols-6 gap-2">
+        {/* Botões de ação secundários - REMOVIDO (integrado na barra inferior) */}
+        <div className="hidden">
           <Button
             size="sm"
             variant="outline"
