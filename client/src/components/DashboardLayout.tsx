@@ -117,18 +117,7 @@ export default function DashboardLayout({
     }
   }, [loading, user, setLocation]);
 
-  // Check de onboarding para novos usuários
-  const { data: onboardingData, isLoading: onboardingLoading } = trpc.onboarding.check.useQuery(
-    undefined,
-    { enabled: !!user && !loading }
-  );
-  useEffect(() => {
-    if (!onboardingLoading && onboardingData && !onboardingData.completo && location !== '/onboarding') {
-      setLocation('/onboarding');
-    }
-  }, [onboardingLoading, onboardingData, location, setLocation]);
-
-  if (loading || !user || onboardingLoading) {
+  if (loading || !user) {
     return <DashboardLayoutSkeleton />;
   }
 
