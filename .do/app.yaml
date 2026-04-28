@@ -7,7 +7,7 @@ services:
       repo: marcelinbh/COBRAPRO
       branch: main
       deploy_on_push: true
-    build_command: npm install -g pnpm && pnpm install --prod=false
+    build_command: npm install -g pnpm && pnpm install --prod=false && pnpm build
     run_command: pnpm start
     http_port: 8080
     instance_count: 1

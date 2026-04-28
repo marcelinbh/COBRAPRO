@@ -706,3 +706,9 @@
 
 ## Fase 62: Persistência da Versão WA Web (Evolution API)
 - [ ] Criar Dockerfile customizado para Evolution API com baileys-version.json [2,3000,1035194821] para persistir a versão WA Web correta mesmo se o container for recriado no Droplet
+
+## Fase 63: Correção Crítica - Crash React Pagar + Melhorias
+- [x] BUGFIX: Corrigir violação da Regra dos Hooks no PagamentoModal (Emprestimos.tsx)
+- [x] Dockerfile customizado para Evolution API com patch baileys-version.json persistente
+- [x] build_command no .do/app.yaml atualizado com pnpm build automático
+- [x] Endpoint /api/scheduled/notificacoes criado para disparo automático

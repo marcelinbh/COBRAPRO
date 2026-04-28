@@ -105,6 +105,146 @@ async function startServer() {
     res.json(results);
   });
 
+  // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
+  // Chamado pela scheduled task do Manus diariamente
+  // Autentica via cookie app_session_id (injetado automaticamente pela plataforma)
+  app.post('/api/scheduled/notificacoes', async (req, res) => {
+    try {
+      const { parse: parseCookieHeader } = await import('cookie');
+      const { jwtVerify } = await import('jose');
+      const { getSupabaseClientAsync } = await import('../db');
+      const { substituirVariaveis, TIPOS_NOTIFICACAO } = await import('../routers/notificacoes');
+      const { ENV } = await import('./env');
+
+      // Verificar autenticação via cookie
+      const cookies = parseCookieHeader(req.headers.cookie || '');
+      const sessionCookie = cookies['app_session_id'];
+      if (!sessionCookie) {
+        return res.status(401).json({ error: 'Não autenticado' });
+      }
+
+      const sb = await getSupabaseClientAsync();
+      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
+
+      // Buscar todos os usuários com notificações ativas globalmente
+      const { data: configsAtivos } = await sb
+        .from('configuracoes')
+        .select('user_id')
+        .eq('chave', 'notificacoes_auto_ativo')
+        .eq('valor', 'true');
+
+      if (!configsAtivos || configsAtivos.length === 0) {
+        return res.json({ processados: 0, mensagem: 'Nenhum usuário com notificações ativas' });
+      }
+
+      let totalEnviados = 0;
+      const hoje = new Date();
+      hoje.setHours(0, 0, 0, 0);
+
+      for (const cfg of configsAtivos) {
+        const userId = cfg.user_id;
+
+        // Buscar regras ativas do usuário
+        const { data: regras } = await sb
+          .from('notificacoes_automaticas')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('ativo', true);
+
+        if (!regras || regras.length === 0) continue;
+
+        // Pegar nome da empresa
+        const { data: empresaConfig } = await sb
+          .from('configuracoes')
+          .select('valor')
+          .eq('chave', 'nomeEmpresa')
+          .eq('user_id', userId)
+          .maybeSingle();
+        const nomeEmpresa = empresaConfig?.valor || 'Empresa';
+
+        for (const regra of regras as { tipo: string; dias_antes: number; mensagem_template: string }[]) {
+          const dataAlvo = new Date(hoje);
+          dataAlvo.setDate(dataAlvo.getDate() + regra.dias_antes);
+          const dataAlvoStr = dataAlvo.toISOString().split('T')[0];
+
+          const { data: parcelasData } = await sb
+            .from('parcelas')
+            .select('id, valor, numero_parcela, contrato_id, contratos!inner(numero_parcelas, cliente_id, clientes!inner(id, nome, whatsapp, telefone))')
+            .eq('user_id', userId)
+            .eq('data_vencimento', dataAlvoStr)
+            .in('status', ['pendente', 'atrasada']);
+
+          if (!parcelasData || parcelasData.length === 0) continue;
+
+          for (const parcela of (parcelasData as any[])) {
+            const cliente = parcela.contratos?.clientes;
+            if (!cliente) continue;
+            const telefone = cliente.whatsapp || cliente.telefone;
+            if (!telefone) continue;
+
+            // Verificar se já enviamos hoje
+            const { data: logExistente } = await sb
+              .from('notificacoes_log')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('parcela_id', parcela.id)
+              .eq('tipo', regra.tipo)
+              .gte('createdAt', hoje.toISOString())
+              .maybeSingle();
+            if (logExistente) continue;
+
+            const mensagem = substituirVariaveis(regra.mensagem_template, {
+              nome: cliente.nome,
+              valor: parcela.valor,
+              data_vencimento: dataAlvoStr.split('-').reverse().join('/'),
+              dias_atraso: regra.dias_antes < 0 ? Math.abs(regra.dias_antes) : 0,
+              empresa: nomeEmpresa,
+              parcela: parcela.numero_parcela,
+              total_parcelas: parcela.contratos?.numero_parcelas,
+            });
+
+            // Enviar via Evolution API
+            const evoUrl = ENV.evolutionApiUrl.replace(/\/$/, '');
+            const evoKey = ENV.evolutionApiKey;
+            const instanceName = `user-${userId}`;
+            let phone = telefone.replace(/\D/g, '');
+            if (!phone.startsWith('55')) phone = '55' + phone;
+
+            try {
+              const sendRes = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', apikey: evoKey },
+                body: JSON.stringify({ number: phone + '@s.whatsapp.net', textMessage: { text: mensagem } }),
+                signal: AbortSignal.timeout(10000),
+              });
+              const ok = sendRes.ok;
+
+              await sb.from('notificacoes_log').insert({
+                user_id: userId,
+                parcela_id: parcela.id,
+                cliente_id: cliente.id,
+                tipo: regra.tipo,
+                telefone,
+                mensagem,
+                status: ok ? 'enviado' : 'erro',
+                erro: ok ? null : 'Falha no envio',
+              });
+
+              if (ok) totalEnviados++;
+            } catch (e) {
+              console.error('[scheduled/notificacoes] Erro ao enviar:', e);
+            }
+          }
+        }
+      }
+
+      res.json({ success: true, enviados: totalEnviados, processados: configsAtivos.length });
+    } catch (err) {
+      console.error('[scheduled/notificacoes] Erro:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

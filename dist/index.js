@@ -1,24 +1,25 @@
-// server/_core/index.ts
-import "dotenv/config";
-import compression from "compression";
-import express2 from "express";
-import { createServer } from "http";
-import net from "net";
-import { createExpressMiddleware } from "@trpc/server/adapters/express";
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
 
 // shared/const.ts
-var COOKIE_NAME = "app_session_id";
-var ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
-var AXIOS_TIMEOUT_MS = 3e4;
-var UNAUTHED_ERR_MSG = "Please login (10001)";
-var NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
-
-// server/db.ts
-import dns from "dns";
-import { eq, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-import { createClient } from "@supabase/supabase-js";
+var COOKIE_NAME, ONE_YEAR_MS, AXIOS_TIMEOUT_MS, UNAUTHED_ERR_MSG, NOT_ADMIN_ERR_MSG;
+var init_const = __esm({
+  "shared/const.ts"() {
+    "use strict";
+    COOKIE_NAME = "app_session_id";
+    ONE_YEAR_MS = 1e3 * 60 * 60 * 24 * 365;
+    AXIOS_TIMEOUT_MS = 3e4;
+    UNAUTHED_ERR_MSG = "Please login (10001)";
+    NOT_ADMIN_ERR_MSG = "You do not have required permission (10002)";
+  }
+});
 
 // drizzle/schema.ts
 import {
@@ -33,431 +34,464 @@ import {
   timestamp,
   pgEnum
 } from "drizzle-orm/pg-core";
-var roleEnum = pgEnum("role", ["user", "admin"]);
-var perfilEnum = pgEnum("perfil", ["admin", "gerente", "koletor"]);
-var categoriaClienteEnum = pgEnum("categoria_cliente", ["bronze", "prata", "ouro", "prefeitura", "padrao"]);
-var qualificacaoEnum = pgEnum("qualificacao", ["bom", "medio", "ruim"]);
-var tipoChavePixEnum = pgEnum("tipo_chave_pix", ["cpf", "cnpj", "email", "telefone", "aleatoria"]);
-var tipoCaixaEnum = pgEnum("tipo_caixa", ["caixa", "banco", "digital"]);
-var modalidadeEnum = pgEnum("modalidade", [
-  "emprestimo_padrao",
-  "emprestimo_diario",
-  "tabela_price",
-  "venda_produto",
-  "desconto_cheque",
-  "reparcelamento"
-]);
-var statusContratoEnum = pgEnum("status_contrato", ["ativo", "quitado", "inadimplente", "cancelado"]);
-var tipoTaxaEnum = pgEnum("tipo_taxa", ["diaria", "semanal", "quinzenal", "mensal", "anual"]);
-var statusParcelaEnum = pgEnum("status_parcela", ["pendente", "paga", "atrasada", "vencendo_hoje", "parcial"]);
-var tipoTransacaoEnum = pgEnum("tipo_transacao", ["entrada", "saida", "transferencia"]);
-var categoriaTransacaoEnum = pgEnum("categoria_transacao", [
-  "pagamento_parcela",
-  "emprestimo_liberado",
-  "despesa_operacional",
-  "transferencia_conta",
-  "ajuste_manual",
-  "outros"
-]);
-var tipoTemplateEnum = pgEnum("tipo_template", [
-  "cobranca_geral",
-  "cobranca_vencida",
-  "lembrete_vencimento",
-  "confirmacao_pagamento",
-  "boas_vindas",
-  "pix_transferencia",
-  "personalizado"
-]);
-var categoriaContaPagarEnum = pgEnum("categoria_conta_pagar", [
-  "aluguel",
-  "salario",
-  "servicos",
-  "impostos",
-  "fornecedores",
-  "marketing",
-  "tecnologia",
-  "outros"
-]);
-var statusContaPagarEnum = pgEnum("status_conta_pagar", ["pendente", "paga", "atrasada", "cancelada"]);
-var periodicidadeEnum = pgEnum("periodicidade", ["mensal", "semanal", "anual", "unica"]);
-var tipoTaxaChequeEnum = pgEnum("tipo_taxa_cheque", ["mensal", "diaria", "anual"]);
-var statusChequeEnum = pgEnum("status_cheque", ["aguardando", "compensado", "devolvido", "cancelado"]);
-var sexoEnum = pgEnum("sexo", ["masculino", "feminino", "outro"]);
-var estadoCivilEnum = pgEnum("estado_civil", ["solteiro", "casado", "divorciado", "viuvo", "outro"]);
-var users = pgTable("users", {
-  id: serial("id").primaryKey(),
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
-  name: text("name"),
-  email: varchar("email", { length: 320 }),
-  passwordHash: varchar("passwordHash", { length: 255 }),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: roleEnum("role").default("user").notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
-  onboardingCompleto: boolean("onboarding_completo").default(false).notNull(),
-  nomeEmpresa: varchar("nome_empresa", { length: 255 })
-});
-var koletores = pgTable("koletores", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 255 }).notNull(),
-  email: varchar("email", { length: 320 }),
-  telefone: varchar("telefone", { length: 20 }),
-  whatsapp: varchar("whatsapp", { length: 20 }),
-  perfil: perfilEnum("perfil").default("koletor").notNull(),
-  limiteEmprestimo: decimal("limite_emprestimo", { precision: 15, scale: 2 }).default("0.00"),
-  comissaoPercentual: decimal("comissao_percentual", { precision: 8, scale: 4 }).default("0.00"),
-  ativo: boolean("ativo").default(true).notNull(),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var clientes = pgTable("clientes", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 255 }).notNull(),
-  cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
-  telefone: varchar("telefone", { length: 20 }),
-  whatsapp: varchar("whatsapp", { length: 20 }),
-  email: varchar("email", { length: 320 }),
-  chavePix: varchar("chave_pix", { length: 255 }),
-  tipoChavePix: tipoChavePixEnum("tipo_chave_pix"),
-  endereco: text("endereco"),
-  numero: varchar("numero", { length: 20 }),
-  complemento: varchar("complemento", { length: 100 }),
-  bairro: varchar("bairro", { length: 100 }),
-  cidade: varchar("cidade", { length: 100 }),
-  estado: varchar("estado", { length: 2 }),
-  cep: varchar("cep", { length: 9 }),
-  observacoes: text("observacoes"),
-  score: integer("score").default(100),
-  fotoUrl: varchar("foto_url", { length: 500 }),
-  categoria: categoriaClienteEnum("categoria").default("padrao"),
-  qualificacao: qualificacaoEnum("qualificacao").default("bom"),
-  limiteCredito: decimal("limite_credito", { precision: 15, scale: 2 }).default("0.00"),
-  limiteDisponivel: decimal("limite_disponivel", { precision: 15, scale: 2 }).default("0.00"),
-  koletorId: integer("koletor_id"),
-  banco: varchar("banco", { length: 100 }),
-  agencia: varchar("agencia", { length: 20 }),
-  numeroConta: varchar("numero_conta", { length: 30 }),
-  ativo: boolean("ativo").default(true).notNull(),
-  rg: varchar("rg", { length: 20 }),
-  cnpj: varchar("cnpj", { length: 20 }),
-  instagram: varchar("instagram", { length: 100 }),
-  facebook: varchar("facebook", { length: 255 }),
-  profissao: varchar("profissao", { length: 100 }),
-  dataNascimento: date("data_nascimento"),
-  sexo: sexoEnum("sexo"),
-  estadoCivil: estadoCivilEnum("estado_civil"),
-  nomeMae: varchar("nome_mae", { length: 255 }),
-  nomePai: varchar("nome_pai", { length: 255 }),
-  documentosUrls: text("documentos_urls"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var contasCaixa = pgTable("contas_caixa", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 100 }).notNull(),
-  tipo: tipoCaixaEnum("tipo").default("caixa").notNull(),
-  banco: varchar("banco", { length: 100 }),
-  agencia: varchar("agencia", { length: 20 }),
-  numeroConta: varchar("numero_conta", { length: 30 }),
-  saldoInicial: decimal("saldo_inicial", { precision: 15, scale: 2 }).default("0.00").notNull(),
-  ativa: boolean("ativa").default(true).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var contratos = pgTable("contratos", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  koletorId: integer("koletor_id"),
-  modalidade: modalidadeEnum("modalidade").notNull(),
-  status: statusContratoEnum("status").default("ativo").notNull(),
-  valorPrincipal: decimal("valor_principal", { precision: 15, scale: 2 }).notNull(),
-  taxaJuros: decimal("taxa_juros", { precision: 8, scale: 4 }).notNull(),
-  tipoTaxa: tipoTaxaEnum("tipo_taxa").default("mensal").notNull(),
-  numeroParcelas: integer("numero_parcelas").notNull(),
-  valorParcela: decimal("valor_parcela", { precision: 15, scale: 2 }).notNull(),
-  totalContrato: decimal("total_contrato", { precision: 15, scale: 2 }).notNull(),
-  multaAtraso: decimal("multa_atraso", { precision: 8, scale: 4 }).default("2.00"),
-  jurosMoraDiario: decimal("juros_mora_diario", { precision: 8, scale: 4 }).default("0.033"),
-  dataInicio: date("data_inicio").notNull(),
-  dataVencimentoPrimeira: date("data_vencimento_primeira").notNull(),
-  diaVencimento: integer("dia_vencimento"),
-  descricao: text("descricao"),
-  observacoes: text("observacoes"),
-  contaCaixaId: integer("conta_caixa_id"),
-  contratoOrigemId: integer("contrato_origem_id"),
-  contratoAssinado: boolean("contrato_assinado").default(false),
-  contratoUrl: varchar("contrato_url", { length: 500 }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var parcelas = pgTable("parcelas", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  contratoId: integer("contrato_id").notNull(),
-  clienteId: integer("cliente_id").notNull(),
-  koletorId: integer("koletor_id"),
-  numeroParcela: integer("numero_parcela").notNull(),
-  valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
-  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
-  valorJuros: decimal("valor_juros", { precision: 15, scale: 2 }).default("0.00"),
-  valorMulta: decimal("valor_multa", { precision: 15, scale: 2 }).default("0.00"),
-  valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).default("0.00"),
-  multaManual: decimal("multa_manual", { precision: 15, scale: 2 }).default("0.00"),
-  dataVencimento: date("data_vencimento").notNull(),
-  dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
-  status: statusParcelaEnum("status").default("pendente").notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var transacoesCaixa = pgTable("transacoes_caixa", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  contaCaixaId: integer("conta_caixa_id").notNull(),
-  tipo: tipoTransacaoEnum("tipo").notNull(),
-  categoria: categoriaTransacaoEnum("categoria").notNull(),
-  valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
-  descricao: text("descricao"),
-  parcelaId: integer("parcela_id"),
-  contratoId: integer("contrato_id"),
-  clienteId: integer("cliente_id"),
-  contaDestinoId: integer("conta_destino_id"),
-  dataTransacao: timestamp("data_transacao", { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
-});
-var magicLinks = pgTable("magic_links", {
-  id: serial("id").primaryKey(),
-  clienteId: integer("cliente_id").notNull(),
-  token: varchar("token", { length: 128 }).notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  usado: boolean("usado").default(false).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
-});
-var templatesWhatsapp = pgTable("templates_whatsapp", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 100 }).notNull(),
-  tipo: tipoTemplateEnum("tipo").notNull(),
-  mensagem: text("mensagem").notNull(),
-  ativo: boolean("ativo").default(true).notNull(),
-  padrao: boolean("padrao").default(false).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var configuracoes = pgTable("configuracoes", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  chave: varchar("chave", { length: 100 }).notNull(),
-  valor: text("valor"),
-  descricao: text("descricao"),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var contasPagar = pgTable("contas_pagar", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  descricao: varchar("descricao", { length: 255 }).notNull(),
-  categoria: categoriaContaPagarEnum("categoria").default("outros").notNull(),
-  valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
-  dataVencimento: date("data_vencimento").notNull(),
-  dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
-  status: statusContaPagarEnum("status").default("pendente").notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  recorrente: boolean("recorrente").default(false).notNull(),
-  periodicidade: periodicidadeEnum("periodicidade").default("unica"),
-  observacoes: text("observacoes"),
-  comprovante: varchar("comprovante", { length: 500 }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var produtos = pgTable("produtos", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  nome: varchar("nome", { length: 255 }).notNull(),
-  descricao: text("descricao"),
-  preco: decimal("preco", { precision: 15, scale: 2 }).notNull(),
-  estoque: integer("estoque").default(0).notNull(),
-  ativo: boolean("ativo").default(true).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
-});
-var cheques = pgTable("cheques", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  numeroCheque: varchar("numero_cheque", { length: 50 }),
-  banco: varchar("banco", { length: 100 }),
-  agencia: varchar("agencia", { length: 20 }),
-  conta: varchar("conta", { length: 30 }),
-  emitente: varchar("emitente", { length: 255 }).notNull(),
-  cpfCnpjEmitente: varchar("cpf_cnpj_emitente", { length: 20 }),
-  valorNominal: decimal("valor_nominal", { precision: 15, scale: 2 }).notNull(),
-  dataVencimento: date("data_vencimento").notNull(),
-  taxaDesconto: decimal("taxa_desconto", { precision: 8, scale: 4 }).notNull(),
-  tipoTaxa: tipoTaxaChequeEnum("tipo_taxa_cheque").default("mensal").notNull(),
-  valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).notNull(),
-  valorLiquido: decimal("valor_liquido", { precision: 15, scale: 2 }).notNull(),
-  status: statusChequeEnum("status_cheque").default("aguardando").notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  dataCompensacao: timestamp("data_compensacao", { withTimezone: true }),
-  motivoDevolucao: varchar("motivo_devolucao", { length: 255 }),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var passwordResets = pgTable("password_resets", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  token: varchar("token", { length: 128 }).notNull().unique(),
-  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-  usado: boolean("usado").default(false).notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
-});
-var veiculos = pgTable("veiculos", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  placa: varchar("placa", { length: 10 }).notNull(),
-  marca: varchar("marca", { length: 50 }),
-  modelo: varchar("modelo", { length: 100 }),
-  ano: integer("ano"),
-  cor: varchar("cor", { length: 50 }),
-  renavam: varchar("renavam", { length: 20 }),
-  chassi: varchar("chassi", { length: 50 }),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var parcelasVeiculo = pgTable("parcelas_veiculo", {
-  id: serial("id").primaryKey(),
-  veiculoId: integer("veiculo_id").notNull(),
-  numero: integer("numero").notNull(),
-  valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
-  juros: decimal("juros", { precision: 15, scale: 2 }).default("0.00"),
-  vencimento: date("vencimento").notNull(),
-  status: statusParcelaEnum("status").default("pendente").notNull(),
-  pagamentoData: date("pagamento_data"),
-  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var statusVendaTelefoneEnum = pgEnum("status_venda_telefone", [
-  "ativo",
-  "quitado",
-  "inadimplente",
-  "cancelado"
-]);
-var vendas_telefone = pgTable("vendas_telefone", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  // Produto
-  marca: varchar("marca", { length: 100 }).notNull(),
-  modelo: varchar("modelo", { length: 200 }).notNull(),
-  imei: varchar("imei", { length: 20 }),
-  cor: varchar("cor", { length: 50 }),
-  armazenamento: varchar("armazenamento", { length: 20 }),
-  custo: decimal("custo", { precision: 12, scale: 2 }).notNull(),
-  preco_venda: decimal("preco_venda", { precision: 12, scale: 2 }).notNull(),
-  // Financiamento
-  entrada_percentual: decimal("entrada_percentual", { precision: 5, scale: 2 }).notNull(),
-  entrada_valor: decimal("entrada_valor", { precision: 12, scale: 2 }).notNull(),
-  num_parcelas: integer("num_parcelas").notNull(),
-  juros_mensal: decimal("juros_mensal", { precision: 5, scale: 2 }).notNull(),
-  valor_parcela: decimal("valor_parcela", { precision: 12, scale: 2 }).notNull(),
-  total_juros: decimal("total_juros", { precision: 12, scale: 2 }).notNull(),
-  total_a_receber: decimal("total_a_receber", { precision: 12, scale: 2 }).notNull(),
-  lucro_bruto: decimal("lucro_bruto", { precision: 12, scale: 2 }).notNull(),
-  roi: decimal("roi", { precision: 8, scale: 2 }),
-  payback_meses: decimal("payback_meses", { precision: 5, scale: 2 }),
-  // Comprador
-  comprador_nome: varchar("comprador_nome", { length: 200 }).notNull(),
-  comprador_cpf: varchar("comprador_cpf", { length: 14 }),
-  comprador_rg: varchar("comprador_rg", { length: 20 }),
-  comprador_telefone: varchar("comprador_telefone", { length: 20 }),
-  comprador_email: varchar("comprador_email", { length: 320 }),
-  comprador_estado_civil: varchar("comprador_estado_civil", { length: 30 }),
-  comprador_profissao: varchar("comprador_profissao", { length: 100 }),
-  comprador_instagram: varchar("comprador_instagram", { length: 100 }),
-  comprador_cep: varchar("comprador_cep", { length: 9 }),
-  comprador_cidade: varchar("comprador_cidade", { length: 100 }),
-  comprador_estado: varchar("comprador_estado", { length: 2 }),
-  comprador_endereco: varchar("comprador_endereco", { length: 300 }),
-  comprador_local_trabalho: varchar("comprador_local_trabalho", { length: 200 }),
-  // Status
-  status: statusVendaTelefoneEnum("status").default("ativo").notNull(),
-  data_venda: timestamp("data_venda", { withTimezone: true }).defaultNow().notNull(),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
-});
-var parcelas_venda_telefone = pgTable("parcelas_venda_telefone", {
-  id: serial("id").primaryKey(),
-  venda_id: integer("venda_id").notNull(),
-  numero: integer("numero").notNull(),
-  valor: decimal("valor", { precision: 12, scale: 2 }).notNull(),
-  vencimento: timestamp("vencimento", { withTimezone: true }).notNull(),
-  status: statusParcelaEnum("status").default("pendente").notNull(),
-  pago_em: timestamp("pago_em", { withTimezone: true }),
-  valor_pago: decimal("valor_pago", { precision: 12, scale: 2 }),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
-});
-var statusAssinaturaEnum = pgEnum("status_assinatura", [
-  "ativa",
-  "cancelada",
-  "suspensa",
-  "inadimplente"
-]);
-var assinaturas = pgTable("assinaturas", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id"),
-  clienteId: integer("cliente_id").notNull(),
-  servico: varchar("servico", { length: 200 }).notNull(),
-  descricao: text("descricao"),
-  valorMensal: decimal("valor_mensal", { precision: 15, scale: 2 }).notNull(),
-  diaVencimento: integer("dia_vencimento").notNull().default(10),
-  status: statusAssinaturaEnum("status").default("ativa").notNull(),
-  dataInicio: date("data_inicio").notNull(),
-  dataCancelamento: date("data_cancelamento"),
-  contaCaixaId: integer("conta_caixa_id"),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
-});
-var pagamentosAssinatura = pgTable("pagamentos_assinatura", {
-  id: serial("id").primaryKey(),
-  assinaturaId: integer("assinatura_id").notNull(),
-  clienteId: integer("cliente_id").notNull(),
-  valorPago: decimal("valor_pago", { precision: 15, scale: 2 }).notNull(),
-  dataPagamento: timestamp("data_pagamento", { withTimezone: true }).defaultNow().notNull(),
-  mesReferencia: varchar("mes_referencia", { length: 7 }).notNull(),
-  contaCaixaId: integer("conta_caixa_id"),
-  observacoes: text("observacoes"),
-  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+var roleEnum, perfilEnum, categoriaClienteEnum, qualificacaoEnum, tipoChavePixEnum, tipoCaixaEnum, modalidadeEnum, statusContratoEnum, tipoTaxaEnum, statusParcelaEnum, tipoTransacaoEnum, categoriaTransacaoEnum, tipoTemplateEnum, categoriaContaPagarEnum, statusContaPagarEnum, periodicidadeEnum, tipoTaxaChequeEnum, statusChequeEnum, sexoEnum, estadoCivilEnum, users, koletores, clientes, contasCaixa, contratos, parcelas, transacoesCaixa, magicLinks, templatesWhatsapp, configuracoes, contasPagar, produtos, cheques, passwordResets, veiculos, parcelasVeiculo, statusVendaTelefoneEnum, vendas_telefone, parcelas_venda_telefone, statusAssinaturaEnum, assinaturas, pagamentosAssinatura;
+var init_schema = __esm({
+  "drizzle/schema.ts"() {
+    "use strict";
+    roleEnum = pgEnum("role", ["user", "admin"]);
+    perfilEnum = pgEnum("perfil", ["admin", "gerente", "koletor"]);
+    categoriaClienteEnum = pgEnum("categoria_cliente", ["bronze", "prata", "ouro", "prefeitura", "padrao"]);
+    qualificacaoEnum = pgEnum("qualificacao", ["bom", "medio", "ruim"]);
+    tipoChavePixEnum = pgEnum("tipo_chave_pix", ["cpf", "cnpj", "email", "telefone", "aleatoria"]);
+    tipoCaixaEnum = pgEnum("tipo_caixa", ["caixa", "banco", "digital"]);
+    modalidadeEnum = pgEnum("modalidade", [
+      "emprestimo_padrao",
+      "emprestimo_diario",
+      "tabela_price",
+      "venda_produto",
+      "desconto_cheque",
+      "reparcelamento"
+    ]);
+    statusContratoEnum = pgEnum("status_contrato", ["ativo", "quitado", "inadimplente", "cancelado"]);
+    tipoTaxaEnum = pgEnum("tipo_taxa", ["diaria", "semanal", "quinzenal", "mensal", "anual"]);
+    statusParcelaEnum = pgEnum("status_parcela", ["pendente", "paga", "atrasada", "vencendo_hoje", "parcial"]);
+    tipoTransacaoEnum = pgEnum("tipo_transacao", ["entrada", "saida", "transferencia"]);
+    categoriaTransacaoEnum = pgEnum("categoria_transacao", [
+      "pagamento_parcela",
+      "emprestimo_liberado",
+      "despesa_operacional",
+      "transferencia_conta",
+      "ajuste_manual",
+      "outros"
+    ]);
+    tipoTemplateEnum = pgEnum("tipo_template", [
+      "cobranca_geral",
+      "cobranca_vencida",
+      "lembrete_vencimento",
+      "confirmacao_pagamento",
+      "boas_vindas",
+      "pix_transferencia",
+      "personalizado"
+    ]);
+    categoriaContaPagarEnum = pgEnum("categoria_conta_pagar", [
+      "aluguel",
+      "salario",
+      "servicos",
+      "impostos",
+      "fornecedores",
+      "marketing",
+      "tecnologia",
+      "outros"
+    ]);
+    statusContaPagarEnum = pgEnum("status_conta_pagar", ["pendente", "paga", "atrasada", "cancelada"]);
+    periodicidadeEnum = pgEnum("periodicidade", ["mensal", "semanal", "anual", "unica"]);
+    tipoTaxaChequeEnum = pgEnum("tipo_taxa_cheque", ["mensal", "diaria", "anual"]);
+    statusChequeEnum = pgEnum("status_cheque", ["aguardando", "compensado", "devolvido", "cancelado"]);
+    sexoEnum = pgEnum("sexo", ["masculino", "feminino", "outro"]);
+    estadoCivilEnum = pgEnum("estado_civil", ["solteiro", "casado", "divorciado", "viuvo", "outro"]);
+    users = pgTable("users", {
+      id: serial("id").primaryKey(),
+      openId: varchar("openId", { length: 64 }).notNull().unique(),
+      name: text("name"),
+      email: varchar("email", { length: 320 }),
+      passwordHash: varchar("passwordHash", { length: 255 }),
+      loginMethod: varchar("loginMethod", { length: 64 }),
+      role: roleEnum("role").default("user").notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+      lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
+      onboardingCompleto: boolean("onboarding_completo").default(false).notNull(),
+      nomeEmpresa: varchar("nome_empresa", { length: 255 })
+    });
+    koletores = pgTable("koletores", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      email: varchar("email", { length: 320 }),
+      telefone: varchar("telefone", { length: 20 }),
+      whatsapp: varchar("whatsapp", { length: 20 }),
+      perfil: perfilEnum("perfil").default("koletor").notNull(),
+      limiteEmprestimo: decimal("limite_emprestimo", { precision: 15, scale: 2 }).default("0.00"),
+      comissaoPercentual: decimal("comissao_percentual", { precision: 8, scale: 4 }).default("0.00"),
+      ativo: boolean("ativo").default(true).notNull(),
+      observacoes: text("observacoes"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    clientes = pgTable("clientes", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      cpfCnpj: varchar("cpf_cnpj", { length: 20 }),
+      telefone: varchar("telefone", { length: 20 }),
+      whatsapp: varchar("whatsapp", { length: 20 }),
+      email: varchar("email", { length: 320 }),
+      chavePix: varchar("chave_pix", { length: 255 }),
+      tipoChavePix: tipoChavePixEnum("tipo_chave_pix"),
+      endereco: text("endereco"),
+      numero: varchar("numero", { length: 20 }),
+      complemento: varchar("complemento", { length: 100 }),
+      bairro: varchar("bairro", { length: 100 }),
+      cidade: varchar("cidade", { length: 100 }),
+      estado: varchar("estado", { length: 2 }),
+      cep: varchar("cep", { length: 9 }),
+      observacoes: text("observacoes"),
+      score: integer("score").default(100),
+      fotoUrl: varchar("foto_url", { length: 500 }),
+      categoria: categoriaClienteEnum("categoria").default("padrao"),
+      qualificacao: qualificacaoEnum("qualificacao").default("bom"),
+      limiteCredito: decimal("limite_credito", { precision: 15, scale: 2 }).default("0.00"),
+      limiteDisponivel: decimal("limite_disponivel", { precision: 15, scale: 2 }).default("0.00"),
+      koletorId: integer("koletor_id"),
+      banco: varchar("banco", { length: 100 }),
+      agencia: varchar("agencia", { length: 20 }),
+      numeroConta: varchar("numero_conta", { length: 30 }),
+      ativo: boolean("ativo").default(true).notNull(),
+      rg: varchar("rg", { length: 20 }),
+      cnpj: varchar("cnpj", { length: 20 }),
+      instagram: varchar("instagram", { length: 100 }),
+      facebook: varchar("facebook", { length: 255 }),
+      profissao: varchar("profissao", { length: 100 }),
+      dataNascimento: date("data_nascimento"),
+      sexo: sexoEnum("sexo"),
+      estadoCivil: estadoCivilEnum("estado_civil"),
+      nomeMae: varchar("nome_mae", { length: 255 }),
+      nomePai: varchar("nome_pai", { length: 255 }),
+      documentosUrls: text("documentos_urls"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    contasCaixa = pgTable("contas_caixa", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      nome: varchar("nome", { length: 100 }).notNull(),
+      tipo: tipoCaixaEnum("tipo").default("caixa").notNull(),
+      banco: varchar("banco", { length: 100 }),
+      agencia: varchar("agencia", { length: 20 }),
+      numeroConta: varchar("numero_conta", { length: 30 }),
+      saldoInicial: decimal("saldo_inicial", { precision: 15, scale: 2 }).default("0.00").notNull(),
+      ativa: boolean("ativa").default(true).notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    contratos = pgTable("contratos", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      clienteId: integer("cliente_id").notNull(),
+      koletorId: integer("koletor_id"),
+      modalidade: modalidadeEnum("modalidade").notNull(),
+      status: statusContratoEnum("status").default("ativo").notNull(),
+      valorPrincipal: decimal("valor_principal", { precision: 15, scale: 2 }).notNull(),
+      taxaJuros: decimal("taxa_juros", { precision: 8, scale: 4 }).notNull(),
+      tipoTaxa: tipoTaxaEnum("tipo_taxa").default("mensal").notNull(),
+      numeroParcelas: integer("numero_parcelas").notNull(),
+      valorParcela: decimal("valor_parcela", { precision: 15, scale: 2 }).notNull(),
+      totalContrato: decimal("total_contrato", { precision: 15, scale: 2 }).notNull(),
+      multaAtraso: decimal("multa_atraso", { precision: 8, scale: 4 }).default("2.00"),
+      jurosMoraDiario: decimal("juros_mora_diario", { precision: 8, scale: 4 }).default("0.033"),
+      dataInicio: date("data_inicio").notNull(),
+      dataVencimentoPrimeira: date("data_vencimento_primeira").notNull(),
+      diaVencimento: integer("dia_vencimento"),
+      descricao: text("descricao"),
+      observacoes: text("observacoes"),
+      contaCaixaId: integer("conta_caixa_id"),
+      contratoOrigemId: integer("contrato_origem_id"),
+      contratoAssinado: boolean("contrato_assinado").default(false),
+      contratoUrl: varchar("contrato_url", { length: 500 }),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    parcelas = pgTable("parcelas", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      contratoId: integer("contrato_id").notNull(),
+      clienteId: integer("cliente_id").notNull(),
+      koletorId: integer("koletor_id"),
+      numeroParcela: integer("numero_parcela").notNull(),
+      valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
+      valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
+      valorJuros: decimal("valor_juros", { precision: 15, scale: 2 }).default("0.00"),
+      valorMulta: decimal("valor_multa", { precision: 15, scale: 2 }).default("0.00"),
+      valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).default("0.00"),
+      multaManual: decimal("multa_manual", { precision: 15, scale: 2 }).default("0.00"),
+      dataVencimento: date("data_vencimento").notNull(),
+      dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
+      status: statusParcelaEnum("status").default("pendente").notNull(),
+      contaCaixaId: integer("conta_caixa_id"),
+      observacoes: text("observacoes"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    transacoesCaixa = pgTable("transacoes_caixa", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      contaCaixaId: integer("conta_caixa_id").notNull(),
+      tipo: tipoTransacaoEnum("tipo").notNull(),
+      categoria: categoriaTransacaoEnum("categoria").notNull(),
+      valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
+      descricao: text("descricao"),
+      parcelaId: integer("parcela_id"),
+      contratoId: integer("contrato_id"),
+      clienteId: integer("cliente_id"),
+      contaDestinoId: integer("conta_destino_id"),
+      dataTransacao: timestamp("data_transacao", { withTimezone: true }).defaultNow().notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    magicLinks = pgTable("magic_links", {
+      id: serial("id").primaryKey(),
+      clienteId: integer("cliente_id").notNull(),
+      token: varchar("token", { length: 128 }).notNull().unique(),
+      expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+      usado: boolean("usado").default(false).notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    templatesWhatsapp = pgTable("templates_whatsapp", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      nome: varchar("nome", { length: 100 }).notNull(),
+      tipo: tipoTemplateEnum("tipo").notNull(),
+      mensagem: text("mensagem").notNull(),
+      ativo: boolean("ativo").default(true).notNull(),
+      padrao: boolean("padrao").default(false).notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    configuracoes = pgTable("configuracoes", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      chave: varchar("chave", { length: 100 }).notNull(),
+      valor: text("valor"),
+      descricao: text("descricao"),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    contasPagar = pgTable("contas_pagar", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      descricao: varchar("descricao", { length: 255 }).notNull(),
+      categoria: categoriaContaPagarEnum("categoria").default("outros").notNull(),
+      valor: decimal("valor", { precision: 15, scale: 2 }).notNull(),
+      dataVencimento: date("data_vencimento").notNull(),
+      dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
+      status: statusContaPagarEnum("status").default("pendente").notNull(),
+      contaCaixaId: integer("conta_caixa_id"),
+      recorrente: boolean("recorrente").default(false).notNull(),
+      periodicidade: periodicidadeEnum("periodicidade").default("unica"),
+      observacoes: text("observacoes"),
+      comprovante: varchar("comprovante", { length: 500 }),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    produtos = pgTable("produtos", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      nome: varchar("nome", { length: 255 }).notNull(),
+      descricao: text("descricao"),
+      preco: decimal("preco", { precision: 15, scale: 2 }).notNull(),
+      estoque: integer("estoque").default(0).notNull(),
+      ativo: boolean("ativo").default(true).notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    cheques = pgTable("cheques", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      clienteId: integer("cliente_id").notNull(),
+      numeroCheque: varchar("numero_cheque", { length: 50 }),
+      banco: varchar("banco", { length: 100 }),
+      agencia: varchar("agencia", { length: 20 }),
+      conta: varchar("conta", { length: 30 }),
+      emitente: varchar("emitente", { length: 255 }).notNull(),
+      cpfCnpjEmitente: varchar("cpf_cnpj_emitente", { length: 20 }),
+      valorNominal: decimal("valor_nominal", { precision: 15, scale: 2 }).notNull(),
+      dataVencimento: date("data_vencimento").notNull(),
+      taxaDesconto: decimal("taxa_desconto", { precision: 8, scale: 4 }).notNull(),
+      tipoTaxa: tipoTaxaChequeEnum("tipo_taxa_cheque").default("mensal").notNull(),
+      valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).notNull(),
+      valorLiquido: decimal("valor_liquido", { precision: 15, scale: 2 }).notNull(),
+      status: statusChequeEnum("status_cheque").default("aguardando").notNull(),
+      contaCaixaId: integer("conta_caixa_id"),
+      dataCompensacao: timestamp("data_compensacao", { withTimezone: true }),
+      motivoDevolucao: varchar("motivo_devolucao", { length: 255 }),
+      observacoes: text("observacoes"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    passwordResets = pgTable("password_resets", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id").notNull(),
+      token: varchar("token", { length: 128 }).notNull().unique(),
+      expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+      usado: boolean("usado").default(false).notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    veiculos = pgTable("veiculos", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      clienteId: integer("cliente_id").notNull(),
+      placa: varchar("placa", { length: 10 }).notNull(),
+      marca: varchar("marca", { length: 50 }),
+      modelo: varchar("modelo", { length: 100 }),
+      ano: integer("ano"),
+      cor: varchar("cor", { length: 50 }),
+      renavam: varchar("renavam", { length: 20 }),
+      chassi: varchar("chassi", { length: 50 }),
+      observacoes: text("observacoes"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    parcelasVeiculo = pgTable("parcelas_veiculo", {
+      id: serial("id").primaryKey(),
+      veiculoId: integer("veiculo_id").notNull(),
+      numero: integer("numero").notNull(),
+      valorOriginal: decimal("valor_original", { precision: 15, scale: 2 }).notNull(),
+      juros: decimal("juros", { precision: 15, scale: 2 }).default("0.00"),
+      vencimento: date("vencimento").notNull(),
+      status: statusParcelaEnum("status").default("pendente").notNull(),
+      pagamentoData: date("pagamento_data"),
+      valorPago: decimal("valor_pago", { precision: 15, scale: 2 }),
+      observacoes: text("observacoes"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    statusVendaTelefoneEnum = pgEnum("status_venda_telefone", [
+      "ativo",
+      "quitado",
+      "inadimplente",
+      "cancelado"
+    ]);
+    vendas_telefone = pgTable("vendas_telefone", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      // Produto
+      marca: varchar("marca", { length: 100 }).notNull(),
+      modelo: varchar("modelo", { length: 200 }).notNull(),
+      imei: varchar("imei", { length: 20 }),
+      cor: varchar("cor", { length: 50 }),
+      armazenamento: varchar("armazenamento", { length: 20 }),
+      custo: decimal("custo", { precision: 12, scale: 2 }).notNull(),
+      preco_venda: decimal("preco_venda", { precision: 12, scale: 2 }).notNull(),
+      // Financiamento
+      entrada_percentual: decimal("entrada_percentual", { precision: 5, scale: 2 }).notNull(),
+      entrada_valor: decimal("entrada_valor", { precision: 12, scale: 2 }).notNull(),
+      num_parcelas: integer("num_parcelas").notNull(),
+      juros_mensal: decimal("juros_mensal", { precision: 5, scale: 2 }).notNull(),
+      valor_parcela: decimal("valor_parcela", { precision: 12, scale: 2 }).notNull(),
+      total_juros: decimal("total_juros", { precision: 12, scale: 2 }).notNull(),
+      total_a_receber: decimal("total_a_receber", { precision: 12, scale: 2 }).notNull(),
+      lucro_bruto: decimal("lucro_bruto", { precision: 12, scale: 2 }).notNull(),
+      roi: decimal("roi", { precision: 8, scale: 2 }),
+      payback_meses: decimal("payback_meses", { precision: 5, scale: 2 }),
+      // Comprador
+      comprador_nome: varchar("comprador_nome", { length: 200 }).notNull(),
+      comprador_cpf: varchar("comprador_cpf", { length: 14 }),
+      comprador_rg: varchar("comprador_rg", { length: 20 }),
+      comprador_telefone: varchar("comprador_telefone", { length: 20 }),
+      comprador_email: varchar("comprador_email", { length: 320 }),
+      comprador_estado_civil: varchar("comprador_estado_civil", { length: 30 }),
+      comprador_profissao: varchar("comprador_profissao", { length: 100 }),
+      comprador_instagram: varchar("comprador_instagram", { length: 100 }),
+      comprador_cep: varchar("comprador_cep", { length: 9 }),
+      comprador_cidade: varchar("comprador_cidade", { length: 100 }),
+      comprador_estado: varchar("comprador_estado", { length: 2 }),
+      comprador_endereco: varchar("comprador_endereco", { length: 300 }),
+      comprador_local_trabalho: varchar("comprador_local_trabalho", { length: 200 }),
+      // Status
+      status: statusVendaTelefoneEnum("status").default("ativo").notNull(),
+      data_venda: timestamp("data_venda", { withTimezone: true }).defaultNow().notNull(),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    parcelas_venda_telefone = pgTable("parcelas_venda_telefone", {
+      id: serial("id").primaryKey(),
+      venda_id: integer("venda_id").notNull(),
+      numero: integer("numero").notNull(),
+      valor: decimal("valor", { precision: 12, scale: 2 }).notNull(),
+      vencimento: timestamp("vencimento", { withTimezone: true }).notNull(),
+      status: statusParcelaEnum("status").default("pendente").notNull(),
+      pago_em: timestamp("pago_em", { withTimezone: true }),
+      valor_pago: decimal("valor_pago", { precision: 12, scale: 2 }),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    statusAssinaturaEnum = pgEnum("status_assinatura", [
+      "ativa",
+      "cancelada",
+      "suspensa",
+      "inadimplente"
+    ]);
+    assinaturas = pgTable("assinaturas", {
+      id: serial("id").primaryKey(),
+      userId: integer("user_id"),
+      clienteId: integer("cliente_id").notNull(),
+      servico: varchar("servico", { length: 200 }).notNull(),
+      descricao: text("descricao"),
+      valorMensal: decimal("valor_mensal", { precision: 15, scale: 2 }).notNull(),
+      diaVencimento: integer("dia_vencimento").notNull().default(10),
+      status: statusAssinaturaEnum("status").default("ativa").notNull(),
+      dataInicio: date("data_inicio").notNull(),
+      dataCancelamento: date("data_cancelamento"),
+      contaCaixaId: integer("conta_caixa_id"),
+      observacoes: text("observacoes"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+      updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull()
+    });
+    pagamentosAssinatura = pgTable("pagamentos_assinatura", {
+      id: serial("id").primaryKey(),
+      assinaturaId: integer("assinatura_id").notNull(),
+      clienteId: integer("cliente_id").notNull(),
+      valorPago: decimal("valor_pago", { precision: 15, scale: 2 }).notNull(),
+      dataPagamento: timestamp("data_pagamento", { withTimezone: true }).defaultNow().notNull(),
+      mesReferencia: varchar("mes_referencia", { length: 7 }).notNull(),
+      contaCaixaId: integer("conta_caixa_id"),
+      observacoes: text("observacoes"),
+      createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull()
+    });
+  }
 });
 
 // server/_core/env.ts
-var ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
-  cookieSecret: process.env.JWT_SECRET ?? "",
-  databaseUrl: process.env.DATABASE_URL ?? "",
-  oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
-  ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
-  isProduction: process.env.NODE_ENV === "production",
-  forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
-  forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  supabaseUrl: process.env.SUPABASE_URL ?? "",
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
-  evolutionApiUrl: process.env.EVOLUTION_API_URL ?? "http://147.182.191.118:8080",
-  evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "cobrapro_evo_key_2024"
-};
+var env_exports = {};
+__export(env_exports, {
+  ENV: () => ENV
+});
+var ENV;
+var init_env = __esm({
+  "server/_core/env.ts"() {
+    "use strict";
+    ENV = {
+      appId: process.env.VITE_APP_ID ?? "",
+      cookieSecret: process.env.JWT_SECRET ?? "",
+      databaseUrl: process.env.DATABASE_URL ?? "",
+      oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
+      ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
+      isProduction: process.env.NODE_ENV === "production",
+      forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
+      forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+      supabaseUrl: process.env.SUPABASE_URL ?? "",
+      supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+      evolutionApiUrl: process.env.EVOLUTION_API_URL ?? "http://147.182.191.118:8080",
+      evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "cobrapro_evo_key_2024"
+    };
+  }
+});
 
 // server/db.ts
-dns.setDefaultResultOrder("ipv4first");
-var _customFetch = null;
+var db_exports = {};
+__export(db_exports, {
+  findUserByEmail: () => findUserByEmail,
+  findUserById: () => findUserById,
+  findUserByOpenId: () => findUserByOpenId,
+  getDb: () => getDb,
+  getSupabaseClient: () => getSupabaseClient,
+  getSupabaseClientAsync: () => getSupabaseClientAsync,
+  getUserByOpenId: () => getUserByOpenId,
+  getUserCount: () => getUserCount,
+  resetDb: () => resetDb,
+  updateUserLastSignedIn: () => updateUserLastSignedIn,
+  upsertUser: () => upsertUser
+});
+import dns from "dns";
+import { eq, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
+import { createClient } from "@supabase/supabase-js";
 async function getCustomFetch() {
   if (_customFetch) return _customFetch;
   try {
@@ -493,12 +527,6 @@ async function getCustomFetch() {
   }
   return _customFetch;
 }
-var _db = null;
-var _client = null;
-var _supabase = null;
-var _dbInitialized = false;
-var _supabaseInitializing = false;
-var _supabaseInitialized = false;
 async function getSupabaseClientAsync() {
   if (_supabase) return _supabase;
   if (_supabaseInitialized) return null;
@@ -519,6 +547,9 @@ async function getSupabaseClientAsync() {
   }
   _supabaseInitialized = true;
   _supabaseInitializing = false;
+  return _supabase;
+}
+function getSupabaseClient() {
   return _supabase;
 }
 async function getDb() {
@@ -615,7 +646,24 @@ async function upsertUser(user) {
   }, { onConflict: "openId" });
   if (error) throw new Error(`Supabase upsertUser failed: ${error.message}`);
 }
-var getUserByOpenId = findUserByOpenId;
+async function findUserByEmail(email) {
+  const db = await getDb();
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      return result[0] || null;
+    } catch (err) {
+      console.error("[Auth] Drizzle findUserByEmail failed, trying REST:", err.message);
+      console.error("[Auth] Full error:", JSON.stringify(err, Object.getOwnPropertyNames(err)));
+    }
+  }
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("users").select("*").eq("email", email).limit(1);
+  console.log(`[Auth] Supabase findUserByEmail - data: ${data ? "found" : "null"} error: ${error ? error.message || JSON.stringify(error) : "none"}`);
+  if (error) return null;
+  return data?.[0] || null;
+}
 async function findUserByOpenId(openId) {
   const db = await getDb();
   if (db) {
@@ -632,6 +680,368 @@ async function findUserByOpenId(openId) {
   if (error) return null;
   return data?.[0] || null;
 }
+async function updateUserLastSignedIn(openId) {
+  const db = await getDb();
+  if (db) {
+    try {
+      await db.update(users).set({ lastSignedIn: /* @__PURE__ */ new Date() }).where(eq(users.openId, openId));
+      return;
+    } catch (err) {
+      console.error("[Database] Drizzle updateUserLastSignedIn failed:", err.message);
+    }
+  }
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return;
+  await supabase.from("users").update({ lastSignedIn: (/* @__PURE__ */ new Date()).toISOString() }).eq("openId", openId);
+}
+async function findUserById(id) {
+  const db = await getDb();
+  if (db) {
+    try {
+      const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+      return result[0] || null;
+    } catch (err) {
+      console.error("[Database] Drizzle findUserById failed:", err.message);
+    }
+  }
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return null;
+  const { data, error } = await supabase.from("users").select("*").eq("id", id).limit(1);
+  if (error) return null;
+  return data?.[0] || null;
+}
+async function getUserCount() {
+  const db = await getDb();
+  if (db) {
+    try {
+      const result = await db.select({ count: sql`count(*)` }).from(users);
+      return Number(result[0]?.count || 0);
+    } catch (err) {
+      console.error("[Database] Drizzle getUserCount failed:", err.message);
+    }
+  }
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) return 0;
+  const { count, error } = await supabase.from("users").select("*", { count: "exact", head: true });
+  if (error) return 0;
+  return count || 0;
+}
+var _customFetch, _db, _client, _supabase, _dbInitialized, _supabaseInitializing, _supabaseInitialized, getUserByOpenId;
+var init_db = __esm({
+  "server/db.ts"() {
+    "use strict";
+    init_schema();
+    init_env();
+    dns.setDefaultResultOrder("ipv4first");
+    _customFetch = null;
+    _db = null;
+    _client = null;
+    _supabase = null;
+    _dbInitialized = false;
+    _supabaseInitializing = false;
+    _supabaseInitialized = false;
+    getUserByOpenId = findUserByOpenId;
+  }
+});
+
+// server/_core/trpc.ts
+import { initTRPC, TRPCError as TRPCError2 } from "@trpc/server";
+import superjson from "superjson";
+var t, router, publicProcedure, requireUser, protectedProcedure, adminProcedure;
+var init_trpc = __esm({
+  "server/_core/trpc.ts"() {
+    "use strict";
+    init_const();
+    t = initTRPC.context().create({
+      transformer: superjson
+    });
+    router = t.router;
+    publicProcedure = t.procedure;
+    requireUser = t.middleware(async (opts) => {
+      const { ctx, next } = opts;
+      if (!ctx.user) {
+        throw new TRPCError2({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+      }
+      return next({
+        ctx: {
+          ...ctx,
+          user: ctx.user
+        }
+      });
+    });
+    protectedProcedure = t.procedure.use(requireUser);
+    adminProcedure = t.procedure.use(
+      t.middleware(async (opts) => {
+        const { ctx, next } = opts;
+        if (!ctx.user || ctx.user.role !== "admin") {
+          throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
+        }
+        return next({
+          ctx: {
+            ...ctx,
+            user: ctx.user
+          }
+        });
+      })
+    );
+  }
+});
+
+// server/routers/notificacoes.ts
+var notificacoes_exports = {};
+__export(notificacoes_exports, {
+  TIPOS_NOTIFICACAO: () => TIPOS_NOTIFICACAO,
+  notificacoesRouter: () => notificacoesRouter,
+  substituirVariaveis: () => substituirVariaveis
+});
+import { z as z8 } from "zod";
+import { TRPCError as TRPCError8 } from "@trpc/server";
+function substituirVariaveis(template, vars) {
+  let msg = template;
+  if (vars.nome) msg = msg.replace(/{nome}/g, vars.nome);
+  if (vars.valor !== void 0) msg = msg.replace(/{valor}/g, vars.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  if (vars.data_vencimento) msg = msg.replace(/{data_vencimento}/g, vars.data_vencimento);
+  if (vars.dias_atraso !== void 0) msg = msg.replace(/{dias_atraso}/g, String(Math.abs(vars.dias_atraso)));
+  if (vars.empresa) msg = msg.replace(/{empresa}/g, vars.empresa);
+  if (vars.parcela !== void 0) msg = msg.replace(/{parcela}/g, String(vars.parcela));
+  if (vars.total_parcelas !== void 0) msg = msg.replace(/{total_parcelas}/g, String(vars.total_parcelas));
+  return msg;
+}
+async function enviarWhatsApp(userId, telefone, mensagem) {
+  const evolutionUrl = ENV.evolutionApiUrl.replace(/\/$/, "");
+  const evolutionApiKey = ENV.evolutionApiKey;
+  const instanceName = `user-${userId}`;
+  try {
+    const statusRes = await fetch(
+      `${evolutionUrl}/instance/connectionState/${instanceName}`,
+      { headers: { apikey: evolutionApiKey } }
+    );
+    const statusData = await statusRes.json();
+    if (statusData?.instance?.state !== "open") {
+      return { ok: false, erro: "WhatsApp desconectado" };
+    }
+  } catch {
+    return { ok: false, erro: "Erro ao verificar status do WhatsApp" };
+  }
+  let phone = telefone.replace(/\D/g, "");
+  if (!phone.startsWith("55")) phone = "55" + phone;
+  try {
+    const res = await fetch(
+      `${evolutionUrl}/message/sendText/${instanceName}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
+        body: JSON.stringify({ number: phone + "@s.whatsapp.net", textMessage: { text: mensagem } })
+      }
+    );
+    const data = await res.json();
+    if (data?.error) return { ok: false, erro: data.message || "Erro ao enviar" };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, erro: String(e) };
+  }
+}
+var TIPOS_NOTIFICACAO, MENSAGENS_PADRAO, notificacoesRouter;
+var init_notificacoes = __esm({
+  "server/routers/notificacoes.ts"() {
+    "use strict";
+    init_trpc();
+    init_db();
+    init_env();
+    TIPOS_NOTIFICACAO = [
+      { tipo: "antes_vencimento_3", label: "3 dias antes", descricao: "Lembrete 3 dias antes do vencimento", diasAntes: 3 },
+      { tipo: "antes_vencimento_2", label: "2 dias antes", descricao: "Lembrete 2 dias antes do vencimento", diasAntes: 2 },
+      { tipo: "antes_vencimento_1", label: "1 dia antes", descricao: "Lembrete 1 dia antes do vencimento", diasAntes: 1 },
+      { tipo: "no_vencimento", label: "No vencimento", descricao: "Aviso no dia do vencimento", diasAntes: 0 },
+      { tipo: "apos_vencimento_1", label: "1 dia em atraso", descricao: "Cobran\xE7a 1 dia ap\xF3s o vencimento", diasAntes: -1 },
+      { tipo: "apos_vencimento_3", label: "3 dias em atraso", descricao: "Cobran\xE7a 3 dias ap\xF3s o vencimento", diasAntes: -3 },
+      { tipo: "apos_vencimento_7", label: "7 dias em atraso", descricao: "Cobran\xE7a 7 dias ap\xF3s o vencimento", diasAntes: -7 },
+      { tipo: "confirmacao_pagamento", label: "Confirma\xE7\xE3o de pagamento", descricao: "Mensagem ao confirmar pagamento", diasAntes: 0 }
+    ];
+    MENSAGENS_PADRAO = {
+      antes_vencimento_3: "Ol\xE1 {nome}! \u{1F60A} Sua parcela de *R$ {valor}* vence em *3 dias* ({data_vencimento}). Qualquer d\xFAvida, estamos \xE0 disposi\xE7\xE3o! \u2014 {empresa}",
+      antes_vencimento_2: "Ol\xE1 {nome}! Sua parcela de *R$ {valor}* vence em *2 dias* ({data_vencimento}). N\xE3o esque\xE7a! \u{1F609} \u2014 {empresa}",
+      antes_vencimento_1: "Ol\xE1 {nome}! \u26A0\uFE0F Sua parcela de *R$ {valor}* vence *amanh\xE3* ({data_vencimento}). Por favor, efetue o pagamento para evitar juros. \u2014 {empresa}",
+      no_vencimento: "Ol\xE1 {nome}! \u{1F4C5} Sua parcela de *R$ {valor}* vence *hoje* ({data_vencimento}). Efetue o pagamento para evitar juros. \u2014 {empresa}",
+      apos_vencimento_1: "Ol\xE1 {nome}, sua parcela de *R$ {valor}* est\xE1 em atraso h\xE1 *1 dia*. Por favor, regularize o quanto antes. \u2014 {empresa}",
+      apos_vencimento_3: "Ol\xE1 {nome}, sua parcela de *R$ {valor}* est\xE1 em atraso h\xE1 *3 dias*. Entre em contato para evitar maiores problemas. \u2014 {empresa}",
+      apos_vencimento_7: "Ol\xE1 {nome}, sua parcela de *R$ {valor}* est\xE1 em atraso h\xE1 *7 dias*. Urgente: regularize sua situa\xE7\xE3o. \u2014 {empresa}",
+      confirmacao_pagamento: "Ol\xE1 {nome}! \u2705 Recebemos seu pagamento de *R$ {valor}* referente \xE0 parcela {parcela}/{total_parcelas}. Obrigado! \u2014 {empresa}"
+    };
+    notificacoesRouter = router({
+      // Listar todas as regras do usuário (com defaults para tipos não configurados)
+      listar: protectedProcedure.query(async ({ ctx }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) return TIPOS_NOTIFICACAO.map((t2) => ({ ...t2, id: null, ativo: false, mensagem_template: MENSAGENS_PADRAO[t2.tipo] }));
+        const { data } = await sb2.from("notificacoes_automaticas").select("*").eq("user_id", ctx.user.id);
+        const existentes = {};
+        (data ?? []).forEach((r) => {
+          existentes[r.tipo] = { id: r.id, ativo: r.ativo, mensagem_template: r.mensagem_template };
+        });
+        return TIPOS_NOTIFICACAO.map((t2) => ({
+          ...t2,
+          id: existentes[t2.tipo]?.id ?? null,
+          ativo: existentes[t2.tipo]?.ativo ?? false,
+          mensagem_template: existentes[t2.tipo]?.mensagem_template || MENSAGENS_PADRAO[t2.tipo]
+        }));
+      }),
+      // Verificar se as mensagens automáticas estão habilitadas globalmente
+      getGlobalAtivo: protectedProcedure.query(async ({ ctx }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) return false;
+        const { data } = await sb2.from("configuracoes").select("valor").eq("chave", "notificacoes_auto_ativo").eq("user_id", ctx.user.id).maybeSingle();
+        return data?.valor === "true";
+      }),
+      // Ligar/desligar o sistema globalmente
+      setGlobalAtivo: protectedProcedure.input(z8.object({ ativo: z8.boolean() })).mutation(async ({ ctx, input }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        await sb2.from("configuracoes").upsert(
+          { chave: "notificacoes_auto_ativo", valor: String(input.ativo), user_id: ctx.user.id },
+          { onConflict: "chave,user_id" }
+        );
+        return { success: true };
+      }),
+      // Salvar/atualizar uma regra (mensagem + ativo)
+      salvar: protectedProcedure.input(z8.object({
+        tipo: z8.string(),
+        ativo: z8.boolean(),
+        mensagem_template: z8.string().min(1)
+      })).mutation(async ({ ctx, input }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const tipoInfo = TIPOS_NOTIFICACAO.find((t2) => t2.tipo === input.tipo);
+        if (!tipoInfo) throw new TRPCError8({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
+        await sb2.from("notificacoes_automaticas").upsert(
+          {
+            user_id: ctx.user.id,
+            tipo: input.tipo,
+            ativo: input.ativo,
+            dias_antes: tipoInfo.diasAntes,
+            mensagem_template: input.mensagem_template,
+            updatedAt: (/* @__PURE__ */ new Date()).toISOString()
+          },
+          { onConflict: "user_id,tipo,dias_antes" }
+        );
+        return { success: true };
+      }),
+      // Toggle rápido de ativo/inativo para uma regra
+      toggle: protectedProcedure.input(z8.object({ tipo: z8.string(), ativo: z8.boolean() })).mutation(async ({ ctx, input }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const tipoInfo = TIPOS_NOTIFICACAO.find((t2) => t2.tipo === input.tipo);
+        if (!tipoInfo) throw new TRPCError8({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
+        const { data: existing } = await sb2.from("notificacoes_automaticas").select("id, mensagem_template").eq("user_id", ctx.user.id).eq("tipo", input.tipo).maybeSingle();
+        if (existing) {
+          await sb2.from("notificacoes_automaticas").update({ ativo: input.ativo, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }).eq("user_id", ctx.user.id).eq("tipo", input.tipo);
+        } else {
+          await sb2.from("notificacoes_automaticas").insert({
+            user_id: ctx.user.id,
+            tipo: input.tipo,
+            ativo: input.ativo,
+            dias_antes: tipoInfo.diasAntes,
+            mensagem_template: MENSAGENS_PADRAO[input.tipo] || ""
+          });
+        }
+        return { success: true };
+      }),
+      // Histórico de envios recentes
+      historico: protectedProcedure.input(z8.object({ limit: z8.number().default(50) }).optional()).query(async ({ ctx, input }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) return [];
+        const { data } = await sb2.from("notificacoes_log").select("*, clientes(nome)").eq("user_id", ctx.user.id).order("createdAt", { ascending: false }).limit(input?.limit ?? 50);
+        return data ?? [];
+      }),
+      // Testar envio (envia para o WhatsApp do próprio usuário)
+      testar: protectedProcedure.input(z8.object({
+        tipo: z8.string(),
+        mensagem_template: z8.string()
+      })).mutation(async ({ ctx, input }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { data: wppConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "whatsappEmpresa").eq("user_id", ctx.user.id).maybeSingle();
+        const { data: empresaConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "nomeEmpresa").eq("user_id", ctx.user.id).maybeSingle();
+        const telefone = wppConfig?.valor;
+        if (!telefone) throw new TRPCError8({ code: "BAD_REQUEST", message: "Configure o WhatsApp da empresa no Meu Perfil primeiro" });
+        const mensagem = substituirVariaveis(input.mensagem_template, {
+          nome: "Jo\xE3o Silva (teste)",
+          valor: 250,
+          data_vencimento: (/* @__PURE__ */ new Date()).toLocaleDateString("pt-BR"),
+          dias_atraso: 2,
+          empresa: empresaConfig?.valor || "Sua Empresa",
+          parcela: 3,
+          total_parcelas: 12
+        });
+        const resultado = await enviarWhatsApp(ctx.user.id, telefone, mensagem);
+        if (!resultado.ok) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: resultado.erro || "Erro ao enviar" });
+        return { success: true, mensagem };
+      }),
+      // Job: disparar notificações do dia para um usuário específico (chamado pelo cron)
+      dispararDoDia: protectedProcedure.mutation(async ({ ctx }) => {
+        const sb2 = await getSupabaseClientAsync();
+        if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+        const { data: globalConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "notificacoes_auto_ativo").eq("user_id", ctx.user.id).maybeSingle();
+        if (globalConfig?.valor !== "true") return { enviados: 0, mensagem: "Notifica\xE7\xF5es autom\xE1ticas desativadas" };
+        const { data: regras } = await sb2.from("notificacoes_automaticas").select("*").eq("user_id", ctx.user.id).eq("ativo", true);
+        if (!regras || regras.length === 0) return { enviados: 0, mensagem: "Nenhuma regra ativa" };
+        const { data: empresaConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "nomeEmpresa").eq("user_id", ctx.user.id).maybeSingle();
+        const nomeEmpresa = empresaConfig?.valor || "Empresa";
+        const hoje = /* @__PURE__ */ new Date();
+        hoje.setHours(0, 0, 0, 0);
+        let enviados = 0;
+        for (const regra of regras) {
+          const dataAlvo = new Date(hoje);
+          dataAlvo.setDate(dataAlvo.getDate() + regra.dias_antes);
+          const dataAlvoStr = dataAlvo.toISOString().split("T")[0];
+          const { data: parcelas2 } = await sb2.from("parcelas").select("id, valor, numero_parcela, contrato_id, contratos!inner(numero_parcelas, cliente_id, clientes!inner(id, nome, whatsapp, telefone))").eq("user_id", ctx.user.id).eq("data_vencimento", dataAlvoStr).in("status", ["pendente", "atrasada"]);
+          if (!parcelas2 || parcelas2.length === 0) continue;
+          for (const parcela of parcelas2) {
+            const cliente = parcela.contratos?.clientes;
+            if (!cliente) continue;
+            const telefone = cliente.whatsapp || cliente.telefone;
+            if (!telefone) continue;
+            const { data: logExistente } = await sb2.from("notificacoes_log").select("id").eq("user_id", ctx.user.id).eq("parcela_id", parcela.id).eq("tipo", regra.tipo).gte("createdAt", hoje.toISOString()).maybeSingle();
+            if (logExistente) continue;
+            const mensagem = substituirVariaveis(regra.mensagem_template, {
+              nome: cliente.nome,
+              valor: parcela.valor,
+              data_vencimento: dataAlvoStr.split("-").reverse().join("/"),
+              dias_atraso: regra.dias_antes < 0 ? Math.abs(regra.dias_antes) : 0,
+              empresa: nomeEmpresa,
+              parcela: parcela.numero_parcela,
+              total_parcelas: parcela.contratos?.numero_parcelas
+            });
+            const resultado = await enviarWhatsApp(ctx.user.id, telefone, mensagem);
+            await sb2.from("notificacoes_log").insert({
+              user_id: ctx.user.id,
+              parcela_id: parcela.id,
+              cliente_id: cliente.id,
+              tipo: regra.tipo,
+              telefone,
+              mensagem,
+              status: resultado.ok ? "enviado" : "erro",
+              erro: resultado.ok ? null : resultado.erro
+            });
+            if (resultado.ok) enviados++;
+          }
+        }
+        return { enviados, mensagem: `${enviados} mensagem(ns) enviada(s)` };
+      })
+    });
+  }
+});
+
+// server/_core/index.ts
+import "dotenv/config";
+import compression from "compression";
+import express2 from "express";
+import { createServer } from "http";
+import net from "net";
+import { createExpressMiddleware } from "@trpc/server/adapters/express";
+
+// server/_core/oauth.ts
+init_const();
+init_db();
 
 // server/_core/cookies.ts
 function isSecureRequest(req) {
@@ -650,6 +1060,9 @@ function getSessionCookieOptions(req) {
   };
 }
 
+// server/_core/sdk.ts
+init_const();
+
 // shared/_core/errors.ts
 var HttpError = class extends Error {
   constructor(statusCode, message) {
@@ -661,6 +1074,8 @@ var HttpError = class extends Error {
 var ForbiddenError = (msg) => new HttpError(403, msg);
 
 // server/_core/sdk.ts
+init_db();
+init_env();
 import axios from "axios";
 import { parse as parseCookieHeader } from "cookie";
 import { SignJWT, jwtVerify } from "jose";
@@ -919,11 +1334,15 @@ function registerOAuthRoutes(app) {
 }
 
 // server/authRoutes.ts
+init_schema();
+init_const();
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { and, eq as eq2, gt, sql as sql2 } from "drizzle-orm";
+init_db();
 
 // server/storage.ts
+init_env();
 function getStorageConfig() {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
@@ -975,7 +1394,7 @@ async function storagePut(relKey, data, contentType = "application/octet-stream"
 }
 
 // server/authRoutes.ts
-async function findUserByEmail(email) {
+async function findUserByEmail2(email) {
   const db = await getDb();
   if (db) {
     try {
@@ -1037,7 +1456,7 @@ function registerAuthRoutes(app) {
         res.status(400).json({ error: "Email e senha s\xE3o obrigat\xF3rios" });
         return;
       }
-      const user = await findUserByEmail(email);
+      const user = await findUserByEmail2(email);
       if (!user || !user.passwordHash) {
         res.status(401).json({ error: "Email ou senha incorretos" });
         return;
@@ -1080,7 +1499,7 @@ function registerAuthRoutes(app) {
         res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
         return;
       }
-      const existing = await findUserByEmail(email);
+      const existing = await findUserByEmail2(email);
       if (existing) {
         res.status(409).json({ error: "Este email j\xE1 est\xE1 cadastrado" });
         return;
@@ -1146,7 +1565,7 @@ function registerAuthRoutes(app) {
         res.status(400).json({ error: "Email \xE9 obrigat\xF3rio" });
         return;
       }
-      const user = await findUserByEmail(email);
+      const user = await findUserByEmail2(email);
       if (!user) {
         res.json({ success: true, message: "Se o email existir, voc\xEA receber\xE1 as instru\xE7\xF5es." });
         return;
@@ -1348,6 +1767,7 @@ function registerAuthRoutes(app) {
 }
 
 // server/webhookRoutes.ts
+init_db();
 function registerWebhookRoutes(app) {
   app.post("/api/webhook/evolution", async (req, res) => {
     try {
@@ -1442,6 +1862,8 @@ async function processWebhookEvent(payload) {
 }
 
 // server/kiwifyWebhook.ts
+init_schema();
+init_db();
 import bcrypt2 from "bcryptjs";
 import { eq as eq3 } from "drizzle-orm";
 
@@ -1737,10 +2159,14 @@ function registerKiwifyWebhookRoutes(app) {
   });
 }
 
+// server/routers.ts
+init_const();
+
 // server/_core/systemRouter.ts
 import { z } from "zod";
 
 // server/_core/notification.ts
+init_env();
 import { TRPCError } from "@trpc/server";
 var TITLE_MAX_LENGTH = 1200;
 var CONTENT_MAX_LENGTH = 2e4;
@@ -1822,43 +2248,8 @@ async function notifyOwner(payload) {
   }
 }
 
-// server/_core/trpc.ts
-import { initTRPC, TRPCError as TRPCError2 } from "@trpc/server";
-import superjson from "superjson";
-var t = initTRPC.context().create({
-  transformer: superjson
-});
-var router = t.router;
-var publicProcedure = t.procedure;
-var requireUser = t.middleware(async (opts) => {
-  const { ctx, next } = opts;
-  if (!ctx.user) {
-    throw new TRPCError2({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
-  }
-  return next({
-    ctx: {
-      ...ctx,
-      user: ctx.user
-    }
-  });
-});
-var protectedProcedure = t.procedure.use(requireUser);
-var adminProcedure = t.procedure.use(
-  t.middleware(async (opts) => {
-    const { ctx, next } = opts;
-    if (!ctx.user || ctx.user.role !== "admin") {
-      throw new TRPCError2({ code: "FORBIDDEN", message: NOT_ADMIN_ERR_MSG });
-    }
-    return next({
-      ctx: {
-        ...ctx,
-        user: ctx.user
-      }
-    });
-  })
-);
-
 // server/_core/systemRouter.ts
+init_trpc();
 var systemRouter = router({
   health: publicProcedure.input(
     z.object({
@@ -1881,6 +2272,9 @@ var systemRouter = router({
 });
 
 // server/routers/veiculos.ts
+init_trpc();
+init_db();
+init_schema();
 import { z as z2 } from "zod";
 import { TRPCError as TRPCError3 } from "@trpc/server";
 import { eq as eq4, desc, and as and2 } from "drizzle-orm";
@@ -1937,6 +2331,8 @@ var veiculosRouter = router({
 });
 
 // server/routers/assinaturas.ts
+init_trpc();
+init_db();
 import { z as z3 } from "zod";
 import { TRPCError as TRPCError4 } from "@trpc/server";
 var assinaturasRouter = router({
@@ -2097,6 +2493,8 @@ var assinaturasRouter = router({
 });
 
 // server/routers/backup.ts
+init_trpc();
+init_db();
 import { z as z4 } from "zod";
 async function sb() {
   const client = await getSupabaseClientAsync();
@@ -2161,6 +2559,8 @@ var backupRouter = router({
 });
 
 // server/routers/whatsappEvolution.ts
+init_trpc();
+init_env();
 import { z as z5 } from "zod";
 import { TRPCError as TRPCError5 } from "@trpc/server";
 function getGlobalConfig(userId) {
@@ -2307,6 +2707,8 @@ var whatsappEvolutionRouter = router({
 });
 
 // server/routers/perfil.ts
+init_trpc();
+init_db();
 import { z as z6 } from "zod";
 import { TRPCError as TRPCError6 } from "@trpc/server";
 import bcrypt3 from "bcryptjs";
@@ -2442,6 +2844,9 @@ var perfilRouter = router({
 });
 
 // server/routers/relatorioDiario.ts
+init_trpc();
+init_db();
+init_env();
 import { z as z7 } from "zod";
 import { TRPCError as TRPCError7 } from "@trpc/server";
 function getEvolutionConfig(userId) {
@@ -2630,236 +3035,11 @@ var relatorioDiarioRouter = router({
   })
 });
 
-// server/routers/notificacoes.ts
-import { z as z8 } from "zod";
-import { TRPCError as TRPCError8 } from "@trpc/server";
-var TIPOS_NOTIFICACAO = [
-  { tipo: "antes_vencimento_3", label: "3 dias antes", descricao: "Lembrete 3 dias antes do vencimento", diasAntes: 3 },
-  { tipo: "antes_vencimento_2", label: "2 dias antes", descricao: "Lembrete 2 dias antes do vencimento", diasAntes: 2 },
-  { tipo: "antes_vencimento_1", label: "1 dia antes", descricao: "Lembrete 1 dia antes do vencimento", diasAntes: 1 },
-  { tipo: "no_vencimento", label: "No vencimento", descricao: "Aviso no dia do vencimento", diasAntes: 0 },
-  { tipo: "apos_vencimento_1", label: "1 dia em atraso", descricao: "Cobran\xE7a 1 dia ap\xF3s o vencimento", diasAntes: -1 },
-  { tipo: "apos_vencimento_3", label: "3 dias em atraso", descricao: "Cobran\xE7a 3 dias ap\xF3s o vencimento", diasAntes: -3 },
-  { tipo: "apos_vencimento_7", label: "7 dias em atraso", descricao: "Cobran\xE7a 7 dias ap\xF3s o vencimento", diasAntes: -7 },
-  { tipo: "confirmacao_pagamento", label: "Confirma\xE7\xE3o de pagamento", descricao: "Mensagem ao confirmar pagamento", diasAntes: 0 }
-];
-var MENSAGENS_PADRAO = {
-  antes_vencimento_3: "Ol\xE1 {nome}! \u{1F60A} Sua parcela de *R$ {valor}* vence em *3 dias* ({data_vencimento}). Qualquer d\xFAvida, estamos \xE0 disposi\xE7\xE3o! \u2014 {empresa}",
-  antes_vencimento_2: "Ol\xE1 {nome}! Sua parcela de *R$ {valor}* vence em *2 dias* ({data_vencimento}). N\xE3o esque\xE7a! \u{1F609} \u2014 {empresa}",
-  antes_vencimento_1: "Ol\xE1 {nome}! \u26A0\uFE0F Sua parcela de *R$ {valor}* vence *amanh\xE3* ({data_vencimento}). Por favor, efetue o pagamento para evitar juros. \u2014 {empresa}",
-  no_vencimento: "Ol\xE1 {nome}! \u{1F4C5} Sua parcela de *R$ {valor}* vence *hoje* ({data_vencimento}). Efetue o pagamento para evitar juros. \u2014 {empresa}",
-  apos_vencimento_1: "Ol\xE1 {nome}, sua parcela de *R$ {valor}* est\xE1 em atraso h\xE1 *1 dia*. Por favor, regularize o quanto antes. \u2014 {empresa}",
-  apos_vencimento_3: "Ol\xE1 {nome}, sua parcela de *R$ {valor}* est\xE1 em atraso h\xE1 *3 dias*. Entre em contato para evitar maiores problemas. \u2014 {empresa}",
-  apos_vencimento_7: "Ol\xE1 {nome}, sua parcela de *R$ {valor}* est\xE1 em atraso h\xE1 *7 dias*. Urgente: regularize sua situa\xE7\xE3o. \u2014 {empresa}",
-  confirmacao_pagamento: "Ol\xE1 {nome}! \u2705 Recebemos seu pagamento de *R$ {valor}* referente \xE0 parcela {parcela}/{total_parcelas}. Obrigado! \u2014 {empresa}"
-};
-function substituirVariaveis(template, vars) {
-  let msg = template;
-  if (vars.nome) msg = msg.replace(/{nome}/g, vars.nome);
-  if (vars.valor !== void 0) msg = msg.replace(/{valor}/g, vars.valor.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
-  if (vars.data_vencimento) msg = msg.replace(/{data_vencimento}/g, vars.data_vencimento);
-  if (vars.dias_atraso !== void 0) msg = msg.replace(/{dias_atraso}/g, String(Math.abs(vars.dias_atraso)));
-  if (vars.empresa) msg = msg.replace(/{empresa}/g, vars.empresa);
-  if (vars.parcela !== void 0) msg = msg.replace(/{parcela}/g, String(vars.parcela));
-  if (vars.total_parcelas !== void 0) msg = msg.replace(/{total_parcelas}/g, String(vars.total_parcelas));
-  return msg;
-}
-async function enviarWhatsApp(userId, telefone, mensagem) {
-  const evolutionUrl = ENV.evolutionApiUrl.replace(/\/$/, "");
-  const evolutionApiKey = ENV.evolutionApiKey;
-  const instanceName = `user-${userId}`;
-  try {
-    const statusRes = await fetch(
-      `${evolutionUrl}/instance/connectionState/${instanceName}`,
-      { headers: { apikey: evolutionApiKey } }
-    );
-    const statusData = await statusRes.json();
-    if (statusData?.instance?.state !== "open") {
-      return { ok: false, erro: "WhatsApp desconectado" };
-    }
-  } catch {
-    return { ok: false, erro: "Erro ao verificar status do WhatsApp" };
-  }
-  let phone = telefone.replace(/\D/g, "");
-  if (!phone.startsWith("55")) phone = "55" + phone;
-  try {
-    const res = await fetch(
-      `${evolutionUrl}/message/sendText/${instanceName}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
-        body: JSON.stringify({ number: phone + "@s.whatsapp.net", textMessage: { text: mensagem } })
-      }
-    );
-    const data = await res.json();
-    if (data?.error) return { ok: false, erro: data.message || "Erro ao enviar" };
-    return { ok: true };
-  } catch (e) {
-    return { ok: false, erro: String(e) };
-  }
-}
-var notificacoesRouter = router({
-  // Listar todas as regras do usuário (com defaults para tipos não configurados)
-  listar: protectedProcedure.query(async ({ ctx }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) return TIPOS_NOTIFICACAO.map((t2) => ({ ...t2, id: null, ativo: false, mensagem_template: MENSAGENS_PADRAO[t2.tipo] }));
-    const { data } = await sb2.from("notificacoes_automaticas").select("*").eq("user_id", ctx.user.id);
-    const existentes = {};
-    (data ?? []).forEach((r) => {
-      existentes[r.tipo] = { id: r.id, ativo: r.ativo, mensagem_template: r.mensagem_template };
-    });
-    return TIPOS_NOTIFICACAO.map((t2) => ({
-      ...t2,
-      id: existentes[t2.tipo]?.id ?? null,
-      ativo: existentes[t2.tipo]?.ativo ?? false,
-      mensagem_template: existentes[t2.tipo]?.mensagem_template || MENSAGENS_PADRAO[t2.tipo]
-    }));
-  }),
-  // Verificar se as mensagens automáticas estão habilitadas globalmente
-  getGlobalAtivo: protectedProcedure.query(async ({ ctx }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) return false;
-    const { data } = await sb2.from("configuracoes").select("valor").eq("chave", "notificacoes_auto_ativo").eq("user_id", ctx.user.id).maybeSingle();
-    return data?.valor === "true";
-  }),
-  // Ligar/desligar o sistema globalmente
-  setGlobalAtivo: protectedProcedure.input(z8.object({ ativo: z8.boolean() })).mutation(async ({ ctx, input }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    await sb2.from("configuracoes").upsert(
-      { chave: "notificacoes_auto_ativo", valor: String(input.ativo), user_id: ctx.user.id },
-      { onConflict: "chave,user_id" }
-    );
-    return { success: true };
-  }),
-  // Salvar/atualizar uma regra (mensagem + ativo)
-  salvar: protectedProcedure.input(z8.object({
-    tipo: z8.string(),
-    ativo: z8.boolean(),
-    mensagem_template: z8.string().min(1)
-  })).mutation(async ({ ctx, input }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const tipoInfo = TIPOS_NOTIFICACAO.find((t2) => t2.tipo === input.tipo);
-    if (!tipoInfo) throw new TRPCError8({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
-    await sb2.from("notificacoes_automaticas").upsert(
-      {
-        user_id: ctx.user.id,
-        tipo: input.tipo,
-        ativo: input.ativo,
-        dias_antes: tipoInfo.diasAntes,
-        mensagem_template: input.mensagem_template,
-        updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-      },
-      { onConflict: "user_id,tipo,dias_antes" }
-    );
-    return { success: true };
-  }),
-  // Toggle rápido de ativo/inativo para uma regra
-  toggle: protectedProcedure.input(z8.object({ tipo: z8.string(), ativo: z8.boolean() })).mutation(async ({ ctx, input }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const tipoInfo = TIPOS_NOTIFICACAO.find((t2) => t2.tipo === input.tipo);
-    if (!tipoInfo) throw new TRPCError8({ code: "BAD_REQUEST", message: "Tipo inv\xE1lido" });
-    const { data: existing } = await sb2.from("notificacoes_automaticas").select("id, mensagem_template").eq("user_id", ctx.user.id).eq("tipo", input.tipo).maybeSingle();
-    if (existing) {
-      await sb2.from("notificacoes_automaticas").update({ ativo: input.ativo, updatedAt: (/* @__PURE__ */ new Date()).toISOString() }).eq("user_id", ctx.user.id).eq("tipo", input.tipo);
-    } else {
-      await sb2.from("notificacoes_automaticas").insert({
-        user_id: ctx.user.id,
-        tipo: input.tipo,
-        ativo: input.ativo,
-        dias_antes: tipoInfo.diasAntes,
-        mensagem_template: MENSAGENS_PADRAO[input.tipo] || ""
-      });
-    }
-    return { success: true };
-  }),
-  // Histórico de envios recentes
-  historico: protectedProcedure.input(z8.object({ limit: z8.number().default(50) }).optional()).query(async ({ ctx, input }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) return [];
-    const { data } = await sb2.from("notificacoes_log").select("*, clientes(nome)").eq("user_id", ctx.user.id).order("createdAt", { ascending: false }).limit(input?.limit ?? 50);
-    return data ?? [];
-  }),
-  // Testar envio (envia para o WhatsApp do próprio usuário)
-  testar: protectedProcedure.input(z8.object({
-    tipo: z8.string(),
-    mensagem_template: z8.string()
-  })).mutation(async ({ ctx, input }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const { data: wppConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "whatsappEmpresa").eq("user_id", ctx.user.id).maybeSingle();
-    const { data: empresaConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "nomeEmpresa").eq("user_id", ctx.user.id).maybeSingle();
-    const telefone = wppConfig?.valor;
-    if (!telefone) throw new TRPCError8({ code: "BAD_REQUEST", message: "Configure o WhatsApp da empresa no Meu Perfil primeiro" });
-    const mensagem = substituirVariaveis(input.mensagem_template, {
-      nome: "Jo\xE3o Silva (teste)",
-      valor: 250,
-      data_vencimento: (/* @__PURE__ */ new Date()).toLocaleDateString("pt-BR"),
-      dias_atraso: 2,
-      empresa: empresaConfig?.valor || "Sua Empresa",
-      parcela: 3,
-      total_parcelas: 12
-    });
-    const resultado = await enviarWhatsApp(ctx.user.id, telefone, mensagem);
-    if (!resultado.ok) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: resultado.erro || "Erro ao enviar" });
-    return { success: true, mensagem };
-  }),
-  // Job: disparar notificações do dia para um usuário específico (chamado pelo cron)
-  dispararDoDia: protectedProcedure.mutation(async ({ ctx }) => {
-    const sb2 = await getSupabaseClientAsync();
-    if (!sb2) throw new TRPCError8({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-    const { data: globalConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "notificacoes_auto_ativo").eq("user_id", ctx.user.id).maybeSingle();
-    if (globalConfig?.valor !== "true") return { enviados: 0, mensagem: "Notifica\xE7\xF5es autom\xE1ticas desativadas" };
-    const { data: regras } = await sb2.from("notificacoes_automaticas").select("*").eq("user_id", ctx.user.id).eq("ativo", true);
-    if (!regras || regras.length === 0) return { enviados: 0, mensagem: "Nenhuma regra ativa" };
-    const { data: empresaConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "nomeEmpresa").eq("user_id", ctx.user.id).maybeSingle();
-    const nomeEmpresa = empresaConfig?.valor || "Empresa";
-    const hoje = /* @__PURE__ */ new Date();
-    hoje.setHours(0, 0, 0, 0);
-    let enviados = 0;
-    for (const regra of regras) {
-      const dataAlvo = new Date(hoje);
-      dataAlvo.setDate(dataAlvo.getDate() + regra.dias_antes);
-      const dataAlvoStr = dataAlvo.toISOString().split("T")[0];
-      const { data: parcelas2 } = await sb2.from("parcelas").select("id, valor, numero_parcela, contrato_id, contratos!inner(numero_parcelas, cliente_id, clientes!inner(id, nome, whatsapp, telefone))").eq("user_id", ctx.user.id).eq("data_vencimento", dataAlvoStr).in("status", ["pendente", "atrasada"]);
-      if (!parcelas2 || parcelas2.length === 0) continue;
-      for (const parcela of parcelas2) {
-        const cliente = parcela.contratos?.clientes;
-        if (!cliente) continue;
-        const telefone = cliente.whatsapp || cliente.telefone;
-        if (!telefone) continue;
-        const { data: logExistente } = await sb2.from("notificacoes_log").select("id").eq("user_id", ctx.user.id).eq("parcela_id", parcela.id).eq("tipo", regra.tipo).gte("createdAt", hoje.toISOString()).maybeSingle();
-        if (logExistente) continue;
-        const mensagem = substituirVariaveis(regra.mensagem_template, {
-          nome: cliente.nome,
-          valor: parcela.valor,
-          data_vencimento: dataAlvoStr.split("-").reverse().join("/"),
-          dias_atraso: regra.dias_antes < 0 ? Math.abs(regra.dias_antes) : 0,
-          empresa: nomeEmpresa,
-          parcela: parcela.numero_parcela,
-          total_parcelas: parcela.contratos?.numero_parcelas
-        });
-        const resultado = await enviarWhatsApp(ctx.user.id, telefone, mensagem);
-        await sb2.from("notificacoes_log").insert({
-          user_id: ctx.user.id,
-          parcela_id: parcela.id,
-          cliente_id: cliente.id,
-          tipo: regra.tipo,
-          telefone,
-          mensagem,
-          status: resultado.ok ? "enviado" : "erro",
-          erro: resultado.ok ? null : resultado.erro
-        });
-        if (resultado.ok) enviados++;
-      }
-    }
-    return { enviados, mensagem: `${enviados} mensagem(ns) enviada(s)` };
-  })
-});
-
 // server/routers.ts
+init_notificacoes();
+init_trpc();
+init_db();
+init_schema();
 import { z as z9 } from "zod";
 import { TRPCError as TRPCError9 } from "@trpc/server";
 import { eq as eq5, and as and3, sql as sql3, desc as desc2, gte, lt, inArray, ne } from "drizzle-orm";
@@ -6478,6 +6658,91 @@ async function startServer() {
       results.evolutionSend = "FAILED: " + e.message;
     }
     res.json(results);
+  });
+  app.post("/api/scheduled/notificacoes", async (req, res) => {
+    try {
+      const { parse: parseCookieHeader2 } = await import("cookie");
+      const { jwtVerify: jwtVerify2 } = await import("jose");
+      const { getSupabaseClientAsync: getSupabaseClientAsync2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const { substituirVariaveis: substituirVariaveis2, TIPOS_NOTIFICACAO: TIPOS_NOTIFICACAO2 } = await Promise.resolve().then(() => (init_notificacoes(), notificacoes_exports));
+      const { ENV: ENV2 } = await Promise.resolve().then(() => (init_env(), env_exports));
+      const cookies = parseCookieHeader2(req.headers.cookie || "");
+      const sessionCookie = cookies["app_session_id"];
+      if (!sessionCookie) {
+        return res.status(401).json({ error: "N\xE3o autenticado" });
+      }
+      const sb2 = await getSupabaseClientAsync2();
+      if (!sb2) return res.status(500).json({ error: "DB indispon\xEDvel" });
+      const { data: configsAtivos } = await sb2.from("configuracoes").select("user_id").eq("chave", "notificacoes_auto_ativo").eq("valor", "true");
+      if (!configsAtivos || configsAtivos.length === 0) {
+        return res.json({ processados: 0, mensagem: "Nenhum usu\xE1rio com notifica\xE7\xF5es ativas" });
+      }
+      let totalEnviados = 0;
+      const hoje = /* @__PURE__ */ new Date();
+      hoje.setHours(0, 0, 0, 0);
+      for (const cfg of configsAtivos) {
+        const userId = cfg.user_id;
+        const { data: regras } = await sb2.from("notificacoes_automaticas").select("*").eq("user_id", userId).eq("ativo", true);
+        if (!regras || regras.length === 0) continue;
+        const { data: empresaConfig } = await sb2.from("configuracoes").select("valor").eq("chave", "nomeEmpresa").eq("user_id", userId).maybeSingle();
+        const nomeEmpresa = empresaConfig?.valor || "Empresa";
+        for (const regra of regras) {
+          const dataAlvo = new Date(hoje);
+          dataAlvo.setDate(dataAlvo.getDate() + regra.dias_antes);
+          const dataAlvoStr = dataAlvo.toISOString().split("T")[0];
+          const { data: parcelasData } = await sb2.from("parcelas").select("id, valor, numero_parcela, contrato_id, contratos!inner(numero_parcelas, cliente_id, clientes!inner(id, nome, whatsapp, telefone))").eq("user_id", userId).eq("data_vencimento", dataAlvoStr).in("status", ["pendente", "atrasada"]);
+          if (!parcelasData || parcelasData.length === 0) continue;
+          for (const parcela of parcelasData) {
+            const cliente = parcela.contratos?.clientes;
+            if (!cliente) continue;
+            const telefone = cliente.whatsapp || cliente.telefone;
+            if (!telefone) continue;
+            const { data: logExistente } = await sb2.from("notificacoes_log").select("id").eq("user_id", userId).eq("parcela_id", parcela.id).eq("tipo", regra.tipo).gte("createdAt", hoje.toISOString()).maybeSingle();
+            if (logExistente) continue;
+            const mensagem = substituirVariaveis2(regra.mensagem_template, {
+              nome: cliente.nome,
+              valor: parcela.valor,
+              data_vencimento: dataAlvoStr.split("-").reverse().join("/"),
+              dias_atraso: regra.dias_antes < 0 ? Math.abs(regra.dias_antes) : 0,
+              empresa: nomeEmpresa,
+              parcela: parcela.numero_parcela,
+              total_parcelas: parcela.contratos?.numero_parcelas
+            });
+            const evoUrl = ENV2.evolutionApiUrl.replace(/\/$/, "");
+            const evoKey = ENV2.evolutionApiKey;
+            const instanceName = `user-${userId}`;
+            let phone = telefone.replace(/\D/g, "");
+            if (!phone.startsWith("55")) phone = "55" + phone;
+            try {
+              const sendRes = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", apikey: evoKey },
+                body: JSON.stringify({ number: phone + "@s.whatsapp.net", textMessage: { text: mensagem } }),
+                signal: AbortSignal.timeout(1e4)
+              });
+              const ok = sendRes.ok;
+              await sb2.from("notificacoes_log").insert({
+                user_id: userId,
+                parcela_id: parcela.id,
+                cliente_id: cliente.id,
+                tipo: regra.tipo,
+                telefone,
+                mensagem,
+                status: ok ? "enviado" : "erro",
+                erro: ok ? null : "Falha no envio"
+              });
+              if (ok) totalEnviados++;
+            } catch (e) {
+              console.error("[scheduled/notificacoes] Erro ao enviar:", e);
+            }
+          }
+        }
+      }
+      res.json({ success: true, enviados: totalEnviados, processados: configsAtivos.length });
+    } catch (err) {
+      console.error("[scheduled/notificacoes] Erro:", err);
+      res.status(500).json({ error: String(err) });
+    }
   });
   app.use(
     "/api/trpc",

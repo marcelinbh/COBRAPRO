@@ -281,19 +281,7 @@ function PagamentoModal({
   const [contaCaixaId, setContaCaixaId] = useState(contas[0]?.id ? String(contas[0].id) : "");
   const [valorCustom, setValorCustom] = useState("");
 
-  const parcela = emprestimo.proximaParcela ?? emprestimo.parcelasComAtraso[0];
-  if (!parcela) return null;
-
-  const valorOriginal = parseFloat(String(parcela.valor_original ?? '0'));
-  const valorJuros = emprestimo.valorJurosParcela;
-  const valorTotal = valorOriginal;
-  const valorSoJuros = valorJuros > 0 ? valorJuros : valorOriginal * 0.5;
-
-  const parcelaComAtraso = emprestimo.parcelasComAtraso.find(p => p.id === parcela.id);
-  const diasAtraso = parcelaComAtraso?.diasAtraso ?? 0;
-  const jurosAtraso = parcelaComAtraso?.jurosAtraso ?? 0;
-  const totalComAtraso = parcelaComAtraso?.totalComAtraso ?? valorTotal;
-
+  // TODOS os hooks devem vir ANTES de qualquer early return (Regra dos Hooks do React)
   const utils = trpc.useUtils();
 
   const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
@@ -329,6 +317,19 @@ function PagamentoModal({
   });
 
   const isPending = pagarTotalMutation.isPending || pagarJurosMutation.isPending;
+
+  // Early return APÓS todos os hooks (regra dos hooks do React)
+  const parcela = emprestimo.proximaParcela ?? emprestimo.parcelasComAtraso[0];
+  const valorOriginal = parcela ? parseFloat(String(parcela.valor_original ?? '0')) : 0;
+  const valorJuros = emprestimo.valorJurosParcela;
+  const valorTotal = valorOriginal;
+  const valorSoJuros = valorJuros > 0 ? valorJuros : valorOriginal * 0.5;
+  const parcelaComAtraso = parcela ? emprestimo.parcelasComAtraso.find(p => p.id === parcela.id) : undefined;
+  const diasAtraso = parcelaComAtraso?.diasAtraso ?? 0;
+  const jurosAtraso = parcelaComAtraso?.jurosAtraso ?? 0;
+  const totalComAtraso = parcelaComAtraso?.totalComAtraso ?? valorTotal;
+
+  if (!parcela) return null;
 
   const handleConfirmar = () => {
     if (!contaCaixaId) { toast.error("Selecione uma conta"); return; }
