@@ -31,8 +31,8 @@ export default function NovoContrato() {
     contaCaixaId: "",
     descricao: urlParams.get('descricao') || "",
     observacoes: urlParams.get('observacoes') || "",
-    multaAtraso: "2",
-    jurosMoraDiario: "0.033",
+    multaAtraso: "",
+    jurosMoraDiario: "",
   });
 
   const [preview, setPreview] = useState<{
@@ -123,8 +123,8 @@ export default function NovoContrato() {
       contaCaixaId: form.contaCaixaId ? parseInt(form.contaCaixaId) : undefined,
       descricao: form.descricao || undefined,
       observacoes: form.observacoes || undefined,
-      multaAtraso: parseFloat(form.multaAtraso),
-      jurosMoraDiario: parseFloat(form.jurosMoraDiario),
+      multaAtraso: form.multaAtraso !== "" ? parseFloat(form.multaAtraso) : undefined,
+      jurosMoraDiario: form.jurosMoraDiario !== "" ? parseFloat(form.jurosMoraDiario) : undefined,
     });
   };
 
@@ -267,21 +267,25 @@ export default function NovoContrato() {
             {/* Multa e Juros Mora */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Multa por Atraso (%)</Label>
+                <Label>Multa por Atraso (%) <span className="text-muted-foreground text-xs">(opcional)</span></Label>
                 <Input
                   className="mt-1"
                   type="number"
                   step="0.01"
+                  min="0"
+                  placeholder="Ex: 2"
                   value={form.multaAtraso}
                   onChange={e => setForm(f => ({ ...f, multaAtraso: e.target.value }))}
                 />
               </div>
               <div>
-                <Label>Juros Mora Diário (%)</Label>
+                <Label>Juros Mora Diário (%) <span className="text-muted-foreground text-xs">(opcional)</span></Label>
                 <Input
                   className="mt-1"
                   type="number"
                   step="0.001"
+                  min="0"
+                  placeholder="Ex: 0.033"
                   value={form.jurosMoraDiario}
                   onChange={e => setForm(f => ({ ...f, jurosMoraDiario: e.target.value }))}
                 />

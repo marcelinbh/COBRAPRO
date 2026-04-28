@@ -16,7 +16,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import {
   Plus, Search, User, Star, Trash2, Eye, Camera, MapPin, FileText,
-  AlertCircle, Upload, Download, X, File, Image as ImageIcon
+  AlertCircle, Upload, Download, X, File, Image as ImageIcon, Pencil
 } from "lucide-react";
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -858,6 +858,9 @@ export default function Clientes() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-blue-500 hover:bg-blue-500/10" onClick={() => { setClienteEditar(cliente); setShowNovoModal(true); }}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
                       <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => setLocation(`/clientes/${cliente.id}`)}>
                         <Eye className="h-4 w-4" />
                       </Button>

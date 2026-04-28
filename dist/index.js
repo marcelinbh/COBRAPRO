@@ -4046,8 +4046,8 @@ var contratosRouter = router({
     descricao: z9.string().optional(),
     observacoes: z9.string().optional(),
     contaCaixaId: z9.number().optional(),
-    multaAtraso: z9.number().default(2),
-    jurosMoraDiario: z9.number().default(0.033)
+    multaAtraso: z9.number().optional(),
+    jurosMoraDiario: z9.number().optional()
   })).mutation(async ({ ctx, input }) => {
     let valorParcela;
     if (input.modalidade === "tabela_price") {
@@ -4080,8 +4080,8 @@ var contratosRouter = router({
           numeroParcelas: input.numeroParcelas,
           valorParcela: valorParcela.toFixed(2),
           totalContrato,
-          multaAtraso: input.multaAtraso.toFixed(4),
-          jurosMoraDiario: input.jurosMoraDiario.toFixed(4),
+          multaAtraso: (input.multaAtraso ?? 0).toFixed(4),
+          jurosMoraDiario: (input.jurosMoraDiario ?? 0).toFixed(4),
           dataInicio: input.dataInicio,
           dataVencimentoPrimeira: input.dataVencimentoPrimeira,
           diaVencimento: input.diaVencimento,
@@ -4159,8 +4159,8 @@ var contratosRouter = router({
       numero_parcelas: input.numeroParcelas,
       valor_parcela: parseFloat(valorParcela.toFixed(2)),
       total_contrato: totalContratoRest,
-      multa_atraso: parseFloat(input.multaAtraso.toFixed(4)),
-      juros_mora_diario: parseFloat(input.jurosMoraDiario.toFixed(4)),
+      multa_atraso: parseFloat((input.multaAtraso ?? 0).toFixed(4)),
+      juros_mora_diario: parseFloat((input.jurosMoraDiario ?? 0).toFixed(4)),
       data_inicio: input.dataInicio,
       data_vencimento_primeira: input.dataVencimentoPrimeira,
       data_vencimento: _dataVencFinal,

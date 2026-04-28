@@ -732,3 +732,26 @@
 - [x] Adicionar campos tipoCliente e isReferral no schema e migração
 - [x] Corrigir bug fluxoMensal [Max Depth] no Dashboard
 - [x] Corrigir filtro user_id no fluxoMensal Drizzle
+
+## Fase 45: Melhorias Modal Contrato + Bugs Clientes
+- [ ] Melhorar modal de novo contrato igual ao CobraFácil (campos completos)
+- [ ] Adicionar opção de parcelas fixas no modal (valor fixo por parcela)
+- [ ] Adicionar funcionalidade "Adicionar Parcela" em empréstimo existente (renegociação)
+- [ ] Corrigir bug de upload de arquivos na aba de clientes
+- [ ] Corrigir bug do botão "Editar Cliente" que não funciona
+- [ ] Corrigir bug NaN em multaAtraso e jurosMoradiario (campos opcionais com valor vazio causam erro)
+- [ ] Remover valor padrão 0.033% dos campos de juros mora diário
+- [ ] Tornar campos "Multa por Atraso" e "Juros Mora Diário" opcionais (não obrigatórios)
+- [ ] Adicionar botão de editar cliente na tabela de clientes
+- [ ] Corrigir bug de upload de arquivos na aba documentos do cliente
+- [ ] Adicionar funcionalidade de criar parcela com valor fixo em empréstimo existente
+- [ ] Melhorar modal de novo contrato igual ao CobraFácil (parcelas fixas, pular fins de semana, etc.)
+- [ ] Editar data de vencimento da parcela manualmente
+- [ ] Editar data de recebimento do pagamento manualmente
+- [ ] Editar valor de juros recebido manualmente
+- [ ] Aplicar multa em valor fixo (não apenas percentual)
+- [ ] Corrigir botões do modal de empréstimo (enviar cobrança, aplicar multa, editar não funcionam)
+- [ ] Corrigir upload de arquivos em produção (BUILT_IN_FORGE vars não configuradas no DO)
+- [ ] Corrigir NaN em campos multa/juros mora ao criar contrato
+- [ ] Remover valores padrão 2% e 0.033% dos campos multa/juros mora
+- [ ] Adicionar parcela com valor fixo em empréstimo existente

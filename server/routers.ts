@@ -1147,8 +1147,8 @@ const contratosRouter = router({
       descricao: z.string().optional(),
       observacoes: z.string().optional(),
       contaCaixaId: z.number().optional(),
-      multaAtraso: z.number().default(2),
-      jurosMoraDiario: z.number().default(0.033),
+      multaAtraso: z.number().optional(),
+      jurosMoraDiario: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       // Calcular valor da parcela
@@ -1190,8 +1190,8 @@ const contratosRouter = router({
             numeroParcelas: input.numeroParcelas,
             valorParcela: valorParcela.toFixed(2),
             totalContrato,
-            multaAtraso: input.multaAtraso.toFixed(4),
-            jurosMoraDiario: input.jurosMoraDiario.toFixed(4),
+            multaAtraso: (input.multaAtraso ?? 0).toFixed(4),
+            jurosMoraDiario: (input.jurosMoraDiario ?? 0).toFixed(4),
             dataInicio: input.dataInicio,
             dataVencimentoPrimeira: input.dataVencimentoPrimeira,
             diaVencimento: input.diaVencimento,
@@ -1277,8 +1277,8 @@ const contratosRouter = router({
           numero_parcelas: input.numeroParcelas,
           valor_parcela: parseFloat(valorParcela.toFixed(2)),
           total_contrato: totalContratoRest,
-          multa_atraso: parseFloat(input.multaAtraso.toFixed(4)),
-          juros_mora_diario: parseFloat(input.jurosMoraDiario.toFixed(4)),
+          multa_atraso: parseFloat((input.multaAtraso ?? 0).toFixed(4)),
+          juros_mora_diario: parseFloat((input.jurosMoraDiario ?? 0).toFixed(4)),
           data_inicio: input.dataInicio,
           data_vencimento_primeira: input.dataVencimentoPrimeira,
           data_vencimento: _dataVencFinal,
