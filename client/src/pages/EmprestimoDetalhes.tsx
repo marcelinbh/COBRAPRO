@@ -47,6 +47,13 @@ export default function EmprestimoDetalhes() {
   // Estado para editar parcela individualmente
   const [parcelaEditando, setParcelaEditando] = useState<{ id: number; valor: string; data: string } | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada'>('todas');
+  // Estado para criar nova parcela
+  const [showNovaParcela, setShowNovaParcela] = useState(false);
+  const [novaParcelaData, setNovaParcelaData] = useState('');
+  const [novaParcelaValor, setNovaParcelaValor] = useState('');
+  // Estado para pagamento com data/juros customizados
+  const [dataPagamentoCustom, setDataPagamentoCustom] = useState('');
+  const [jurosCustomDetalhes, setJurosCustomDetalhes] = useState('');
 
   const utils = trpc.useUtils();
   const { data: contas } = trpc.caixa.contas.useQuery();
@@ -88,6 +95,18 @@ export default function EmprestimoDetalhes() {
       utils.contratos.listComParcelas.invalidate();
     },
     onError: (e) => toast.error('Erro: ' + e.message),
+  });
+
+  const criarParcelaMutation = trpc.parcelas.criarParcela.useMutation({
+    onSuccess: () => {
+      toast.success('Parcela criada com sucesso!');
+      setShowNovaParcela(false);
+      setNovaParcelaData('');
+      setNovaParcelaValor('');
+      refetch();
+      utils.contratos.listComParcelas.invalidate();
+    },
+    onError: (e: any) => toast.error('Erro ao criar parcela: ' + e.message),
   });
 
   const editarParcelaMutation = trpc.parcelas.editarParcela.useMutation({
@@ -147,10 +166,25 @@ export default function EmprestimoDetalhes() {
     if (!contaCaixaId) { toast.error('Selecione uma conta'); return; }
     if (!parcela) { toast.error('Nenhuma parcela pendente'); return; }
     const valor = valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela);
+    const jurosVal = jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : undefined;
+    const dataManual = dataPagamentoCustom || undefined;
     pagarTotalMutation.mutate({
       parcelaId: parcela.id,
       valorPago: valor,
       contaCaixaId: parseInt(contaCaixaId),
+      valorJurosCustom: jurosVal,
+      dataPagamento: dataManual,
+    });
+  };
+
+  const handleCriarParcela = () => {
+    if (!novaParcelaData) { toast.error('Informe a data de vencimento'); return; }
+    const valor = novaParcelaValor ? parseFloat(novaParcelaValor) : (emprestimo?.valorPrincipal ?? 0);
+    if (valor <= 0) { toast.error('Informe um valor válido'); return; }
+    criarParcelaMutation.mutate({
+      contratoId: emprestimoId,
+      dataVencimento: novaParcelaData,
+      valorOriginal: valor,
     });
   };
 
@@ -454,6 +488,62 @@ export default function EmprestimoDetalhes() {
                   </tbody>
                 </table>
               </div>
+              {/* Botão e formulário para adicionar nova parcela */}
+              {!isQuitado && (
+                <div className="mt-3">
+                  {!showNovaParcela ? (
+                    <button
+                      onClick={() => setShowNovaParcela(true)}
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+                    >
+                      <span className="text-base leading-none">⊕</span>
+                      Adicionar Nova Parcela
+                    </button>
+                  ) : (
+                    <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-3">
+                      <p className="text-sm font-semibold text-foreground">Nova Parcela</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <Label className="text-xs">Data de Vencimento *</Label>
+                          <Input
+                            type="date"
+                            value={novaParcelaData}
+                            onChange={e => setNovaParcelaData(e.target.value)}
+                            className="mt-1 h-8 text-sm [color-scheme:dark]"
+                          />
+                        </div>
+                        <div>
+                          <Label className="text-xs">Valor (R$)</Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder={`Padrão: ${formatarMoeda(emprestimo.valorPrincipal)}`}
+                            value={novaParcelaValor}
+                            onChange={e => setNovaParcelaValor(e.target.value)}
+                            className="mt-1 h-8 text-sm"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCriarParcela}
+                          disabled={criarParcelaMutation.isPending || !novaParcelaData}
+                          className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+                        >
+                          {criarParcelaMutation.isPending ? 'Criando...' : 'Salvar Parcela'}
+                        </button>
+                        <button
+                          onClick={() => { setShowNovaParcela(false); setNovaParcelaData(''); setNovaParcelaValor(''); }}
+                          className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -552,29 +642,74 @@ export default function EmprestimoDetalhes() {
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Resumo Capital / Juros / Total */}
               <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span>Valor da Parcela</span>
-                  <span className="font-semibold">{formatarMoeda(valorOriginalParcela)}</span>
+                <div className="flex justify-between items-center">
+                  <span>Capital</span>
+                  <span>{formatarMoeda(emprestimo.valorPrincipal)}</span>
                 </div>
+                <div className="flex justify-between items-center">
+                  <span>Juros</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-amber-400">{formatarMoeda(jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : valorJurosParcela)}</span>
+                    <button
+                      type="button"
+                      className="text-[10px] text-muted-foreground underline hover:text-foreground"
+                      onClick={() => setJurosCustomDetalhes(jurosCustomDetalhes ? '' : valorJurosParcela.toFixed(2))}
+                    >
+                      {jurosCustomDetalhes ? 'usar padrão' : 'editar'}
+                    </button>
+                  </div>
+                </div>
+                {jurosCustomDetalhes !== '' && (
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="Valor dos juros (R$)"
+                    value={jurosCustomDetalhes}
+                    onChange={e => setJurosCustomDetalhes(e.target.value)}
+                    className="h-8 text-sm"
+                  />
+                )}
                 {isAtrasado && (
-                  <div className="flex justify-between text-red-400">
+                  <div className="flex justify-between text-red-400 border-t border-border pt-2">
                     <span>Total com Atraso ({diasAtraso} dias)</span>
                     <span className="font-semibold">{formatarMoeda(totalComAtraso)}</span>
                   </div>
                 )}
+                <div className="flex justify-between border-t border-border pt-2 font-semibold">
+                  <span>Total</span>
+                  <span className="text-emerald-400">{formatarMoeda(valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela))}</span>
+                </div>
               </div>
+              {/* Valor personalizado */}
               <div>
-                <Label className="text-xs">Valor a Pagar (deixe em branco para usar o valor padrão)</Label>
+                <Label className="text-xs">Valor a Pagar (R$)</Label>
                 <Input
                   type="number"
                   step="0.01"
-                  placeholder={isAtrasado ? String(totalComAtraso.toFixed(2)) : String(valorOriginalParcela.toFixed(2))}
+                  placeholder={`Padrão: ${formatarMoeda(isAtrasado ? totalComAtraso : valorOriginalParcela)}`}
                   value={valorCustomPagar}
                   onChange={e => setValorCustomPagar(e.target.value)}
-                  className="mt-1"
+                  className="mt-1 h-9 text-sm"
                 />
               </div>
+              {/* Data de pagamento manual */}
+              <div>
+                <Label className="text-xs">Data do Pagamento</Label>
+                <Input
+                  type="date"
+                  value={dataPagamentoCustom}
+                  onChange={e => setDataPagamentoCustom(e.target.value)}
+                  className="mt-1 h-9 text-sm [color-scheme:dark]"
+                  placeholder="Hoje (padrão)"
+                />
+                {!dataPagamentoCustom && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para usar a data de hoje</p>
+                )}
+              </div>
+              {/* Conta de Caixa */}
               <div>
                 <Label className="text-xs">Conta de Caixa</Label>
                 <Select value={contaCaixaId} onValueChange={setContaCaixaId}>

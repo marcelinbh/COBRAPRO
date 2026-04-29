@@ -799,3 +799,6 @@
 - [x] Tela /inadimplencia com lista de clientes em atraso e botão WhatsApp (CONCLUÍDO)
 - [x] Dashboard KPIs: corrigir totalReceber para incluir valor_multa (CONCLUÍDO)
 - [x] Invalidações do dashboard após aplicarMulta, editarJuros, deletar (CONCLUÍDO)
+- [x] Campo de data no modal de pagamento (date picker com color-scheme:dark)
+- [x] Botão Adicionar Nova Parcela na aba de detalhes do empréstimo
+- [x] Juros editável no modal de pagamento da página EmprestimoDetalhes

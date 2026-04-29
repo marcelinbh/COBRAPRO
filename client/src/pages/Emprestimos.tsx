@@ -653,7 +653,7 @@ function PagamentoModal({
                   type="date"
                   value={dataPagamentoCustom}
                   onChange={e => setDataPagamentoCustom(e.target.value)}
-                  className="mt-1 h-9 text-sm"
+                  className="mt-1 h-9 text-sm [color-scheme:dark]"
                   placeholder="Hoje (padrão)"
                 />
                 {!dataPagamentoCustom && (
