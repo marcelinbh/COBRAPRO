@@ -265,6 +265,56 @@ async function startServer() {
     }
   });
 
+  // ─── Endpoint temporário para migration saldo_residual ───
+  app.post('/api/admin/migration-saldo-residual', async (req, res) => {
+    try {
+      const { getSupabaseClientAsync } = await import('../db');
+      const sb = await getSupabaseClientAsync();
+      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
+      
+      // Check if columns already exist
+      const { data: checkData, error: checkError } = await sb
+        .from('parcelas')
+        .select('saldo_residual, multa_diaria_usada')
+        .limit(1);
+      
+      if (!checkError) {
+        return res.json({ success: true, message: 'Colunas já existem', columns: ['saldo_residual', 'multa_diaria_usada'] });
+      }
+      
+      // Columns don't exist — try Supabase Management API to execute DDL
+      const supabaseUrl = process.env.SUPABASE_URL || '';
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+      const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
+      
+      const ddlSql = `ALTER TABLE parcelas ADD COLUMN IF NOT EXISTS saldo_residual NUMERIC(15,2) DEFAULT 0.00 NOT NULL; ALTER TABLE parcelas ADD COLUMN IF NOT EXISTS multa_diaria_usada NUMERIC(15,2) DEFAULT 0.00;`;
+      
+      // Try Supabase Management API v1
+      const mgmtRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${serviceKey}`
+        },
+        body: JSON.stringify({ query: ddlSql }),
+        signal: AbortSignal.timeout(15000)
+      });
+      
+      const mgmtText = await mgmtRes.text();
+      
+      return res.json({ 
+        success: mgmtRes.ok,
+        status: mgmtRes.status,
+        message: mgmtRes.ok ? 'DDL executado via Management API' : 'Falha na Management API',
+        response: mgmtText,
+        originalError: checkError?.message,
+        projectRef
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

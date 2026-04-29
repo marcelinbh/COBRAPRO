@@ -1,13 +1,27 @@
 // Helpers financeiros compartilhados entre frontend e backend
 
+/**
+ * Calcula juros de mora e multa por atraso.
+ *
+ * MODELO CobraFácil (padrão do sistema):
+ * - multaDiariaReais: valor fixo em R$ por dia de atraso (ex: R$ 100/dia)
+ *   Configurável pelo usuário em Configurações > Multa Diária
+ * - multaAtrasoPercentual: % aplicado UMA VEZ sobre o valor original no 1º dia de atraso
+ *
+ * @param valorOriginal - Valor da parcela sem juros/multa
+ * @param dataVencimento - Data de vencimento da parcela
+ * @param dataPagamento - Data do pagamento (ou data atual para cálculo)
+ * @param multaDiariaReais - Valor em R$ por dia de atraso (padrão: 0 = sem multa diária)
+ * @param multaAtrasoPercentual - % de multa única no 1º dia (padrão: 0)
+ */
 export function calcularJurosMora(
   valorOriginal: number,
   dataVencimento: Date,
   dataPagamento: Date,
-  jurosMoraDiario: number = 0.033,
-  multaAtraso: number = 2.0
+  multaDiariaReais: number = 0,
+  multaAtrasoPercentual: number = 0
 ): { juros: number; multa: number; total: number; diasAtraso: number } {
-  const hoje = dataPagamento;
+  const hoje = new Date(dataPagamento);
   const venc = new Date(dataVencimento);
   venc.setHours(0, 0, 0, 0);
   hoje.setHours(0, 0, 0, 0);
@@ -18,16 +32,17 @@ export function calcularJurosMora(
     return { juros: 0, multa: 0, total: valorOriginal, diasAtraso: 0 };
   }
 
-  const multa = valorOriginal * (multaAtraso / 100);
-  const juros = valorOriginal * (jurosMoraDiario / 100) * diasAtraso;
-  const total = valorOriginal + multa + juros;
+  // Multa única (% sobre o valor original, aplicada no 1º dia)
+  const multa = multaAtrasoPercentual > 0
+    ? Math.round(valorOriginal * (multaAtrasoPercentual / 100) * 100) / 100
+    : 0;
 
-  return {
-    juros: Math.round(juros * 100) / 100,
-    multa: Math.round(multa * 100) / 100,
-    total: Math.round(total * 100) / 100,
-    diasAtraso,
-  };
+  // Juros diários = R$/dia × número de dias (valor absoluto configurado pelo usuário)
+  const juros = Math.round(multaDiariaReais * diasAtraso * 100) / 100;
+
+  const total = Math.round((valorOriginal + multa + juros) * 100) / 100;
+
+  return { juros, multa, total, diasAtraso };
 }
 
 export function calcularParcelasPrice(
@@ -43,7 +58,9 @@ export function calcularParcelasPrice(
 
 /**
  * Cálculo padrão amortizado (juros simples sobre o total)
- * Usado para parcelamentos mensais com múltiplas parcelas
+ * Modelo CobraFácil: capital × taxa × n_parcelas = juros total
+ * Valor por parcela = (capital + juros_total) / n_parcelas
+ * Exemplo: R$ 500, 50%, 3 parcelas → parcela = (500 + 750) / 3 = R$ 416,67
  */
 export function calcularParcelaPadrao(
   principal: number,
@@ -67,6 +84,26 @@ export function calcularParcelaBullet(
   const valorJuros = Math.round(principal * (taxa / 100) * 100) / 100;
   const valorParcela = Math.round((principal + valorJuros) * 100) / 100;
   return { valorParcela, valorJuros, valorTotal: valorParcela };
+}
+
+/**
+ * Calcula o saldo residual de um pagamento parcial.
+ * Quando o cliente paga menos do que o valor original, o saldo restante
+ * deve ser transferido para a próxima parcela.
+ *
+ * @param valorOriginal - Valor original da parcela
+ * @param valorPago - Valor efetivamente pago
+ * @param saldoResidualAnterior - Saldo residual que veio da parcela anterior (default: 0)
+ * @returns saldoRestante - Valor que ainda falta pagar (0 se pagou tudo)
+ */
+export function calcularSaldoResidual(
+  valorOriginal: number,
+  valorPago: number,
+  saldoResidualAnterior: number = 0
+): number {
+  const valorTotal = valorOriginal + saldoResidualAnterior;
+  const saldo = valorTotal - valorPago;
+  return saldo > 0 ? Math.round(saldo * 100) / 100 : 0;
 }
 
 export function formatarMoeda(valor: number | string | null | undefined): string {

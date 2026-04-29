@@ -197,6 +197,8 @@ export const parcelas = pgTable("parcelas", {
   valorMulta: decimal("valor_multa", { precision: 15, scale: 2 }).default("0.00"),
   valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).default("0.00"),
   multaManual: decimal("multa_manual", { precision: 15, scale: 2 }).default("0.00"),
+  saldoResidual: decimal("saldo_residual", { precision: 15, scale: 2 }).default("0.00").notNull(),
+  multaDiariaUsada: decimal("multa_diaria_usada", { precision: 15, scale: 2 }).default("0.00"),
   dataVencimento: date("data_vencimento").notNull(),
   dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
   status: statusParcelaEnum("status").default("pendente").notNull(),

@@ -802,3 +802,14 @@
 - [x] Campo de data no modal de pagamento (date picker com color-scheme:dark)
 - [x] Botão Adicionar Nova Parcela na aba de detalhes do empréstimo
 - [x] Juros editável no modal de pagamento da página EmprestimoDetalhes
+
+## Fase 40: Auditoria e Correção de Cálculos de Juros + Pagamento Parcial
+- [ ] Corrigir calcularJurosMora: usar multaDiaria (R$/dia) do contrato/configurações, não % do capital
+- [ ] Corrigir registrarPagamento: buscar multaDiaria do contrato antes de calcular juros de atraso
+- [ ] Adicionar campo saldo_residual na tabela parcelas (migration SQL)
+- [ ] Implementar saldo residual automático: ao pagar parcialmente, o saldo restante é adicionado à próxima parcela
+- [ ] Implementar saldo residual manual: opção no modal de pagamento para definir manualmente o valor a transferir
+- [ ] Atualizar modal de pagamento para mostrar saldo residual e opção de transferência
+- [ ] Corrigir cálculo de juros por atraso nos cards: usar multaDiaria do usuário (já está correto, confirmar)
+- [ ] Atualizar shared/finance.ts: função calcularJurosMoraAbsoluto (R$/dia) separada da % do capital
+- [ ] Testes: verificar cálculos com exemplos reais

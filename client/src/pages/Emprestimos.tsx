@@ -440,6 +440,7 @@ function PagamentoModal({
   const [valorCustom, setValorCustom] = useState("");
   const [jurosCustom, setJurosCustom] = useState(""); // juros editável manualmente
   const [dataPagamentoCustom, setDataPagamentoCustom] = useState(""); // data manual
+  const [transferirSaldo, setTransferirSaldo] = useState(true); // transferir saldo residual automaticamente
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
 
   // TODOS os hooks devem vir ANTES de qualquer early return (Regra dos Hooks do React)
@@ -507,6 +508,7 @@ function PagamentoModal({
         contaCaixaId: contaId,
         valorJurosCustom: jurosVal,
         dataPagamento: dataManual,
+        transferirSaldoResidual: transferirSaldo,
       });
     } else {
       const valor = valorCustom ? parseFloat(valorCustom) : (jurosCustom ? parseFloat(jurosCustom) : valorSoJuros);
@@ -524,6 +526,7 @@ function PagamentoModal({
     setValorCustom("");
     setJurosCustom("");
     setDataPagamentoCustom("");
+    setTransferirSaldo(true);
     setOpen(true);
   };
 
@@ -578,6 +581,24 @@ function PagamentoModal({
             </div>
           ) : (
             <div className="space-y-4">
+              {/* Saldo residual de parcela anterior */}
+              {(() => {
+                const saldoAnterior = parseFloat(String((parcela as any).saldo_residual ?? '0'));
+                return saldoAnterior > 0 ? (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-sm">
+                    <div className="flex items-center gap-2 text-amber-400 font-semibold mb-1">
+                      <AlertTriangle className="h-4 w-4" />
+                      Saldo Residual da Parcela Anterior
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Valor pendente anterior</span>
+                      <span className="text-amber-400 font-bold">{formatarMoeda(saldoAnterior)}</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-1">Este valor foi adicionado ao total desta parcela automaticamente.</p>
+                  </div>
+                ) : null;
+              })()}
+
               {/* Resumo Capital / Juros / Total */}
               <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
                 <div className="flex justify-between items-center">
@@ -660,6 +681,47 @@ function PagamentoModal({
                   <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para usar a data de hoje</p>
                 )}
               </div>
+
+              {/* Saldo residual automático - mostrar quando valor pago < total */}
+              {(() => {
+                const valorDigitado = valorCustom ? parseFloat(valorCustom) : 0;
+                const valorReferencia = diasAtraso > 0 ? totalComAtraso : valorTotal;
+                const saldoAnterior = parseFloat(String((parcela as any).saldo_residual ?? '0'));
+                const totalDevido = valorReferencia + saldoAnterior;
+                const temPagamentoParcial = valorDigitado > 0 && valorDigitado < totalDevido - 0.01;
+                return temPagamentoParcial ? (
+                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 text-sm space-y-2">
+                    <div className="flex items-center gap-2 text-blue-400 font-semibold">
+                      <AlertTriangle className="h-4 w-4" />
+                      Pagamento Parcial Detectado
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Saldo que faltará</span>
+                      <span className="text-blue-400 font-bold">{formatarMoeda(Math.max(0, totalDevido - valorDigitado))}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground text-xs">Transferir saldo para próxima parcela</span>
+                      <button
+                        type="button"
+                        onClick={() => setTransferirSaldo(!transferirSaldo)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                          transferirSaldo ? 'bg-blue-500' : 'bg-muted'
+                        }`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                          transferirSaldo ? 'translate-x-4' : 'translate-x-1'
+                        }`} />
+                      </button>
+                    </div>
+                    {transferirSaldo && (
+                      <p className="text-[10px] text-blue-300">✓ O saldo de {formatarMoeda(Math.max(0, totalDevido - valorDigitado))} será somado automaticamente à próxima parcela.</p>
+                    )}
+                    {!transferirSaldo && (
+                      <p className="text-[10px] text-muted-foreground">O saldo não será transferido. A parcela ficará como "parcial".</p>
+                    )}
+                  </div>
+                ) : null;
+              })()}
 
               {/* Conta de Caixa */}
               <div>

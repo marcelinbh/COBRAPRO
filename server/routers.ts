@@ -18,7 +18,7 @@ import {
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade } from "../shared/finance";
+import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -1911,11 +1911,11 @@ const parcelasRouter = router({
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
       desconto: z.number().default(0),
-      valorJurosCustom: z.number().optional(), // juros editado manualmente
-      dataPagamento: z.string().optional(),    // data manual no formato YYYY-MM-DD
+      valorJurosCustom: z.number().optional(),   // juros de atraso editado manualmente
+      dataPagamento: z.string().optional(),       // data manual no formato YYYY-MM-DD
+      transferirSaldoResidual: z.boolean().default(true), // transferir saldo para próxima parcela
     }))
-    .mutation(async ({ input }) => {
-      // Usar sempre Supabase REST API (PostgreSQL direto está indisponível neste ambiente)
+    .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
 
@@ -1923,44 +1923,82 @@ const parcelasRouter = router({
       const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).single();
       if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
 
-      const parcela = {
-        id: parcelaData.id,
-        contratoId: parcelaData.contrato_id,
-        clienteId: parcelaData.cliente_id,
-        numeroParcela: parcelaData.numero_parcela,
-        valorOriginal: parcelaData.valor_original,
-        dataVencimento: parcelaData.data_vencimento,
-      };
+      // Buscar configuração de multa diária do usuário
+      let multaDiariaReais = 0;
+      try {
+        const { data: configRows } = await sb.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
+        if (configRows) {
+          const configMap: Record<string, string> = {};
+          for (const r of configRows) configMap[r.chave] = r.valor ?? '';
+          if (configMap['multaDiaria']) multaDiariaReais = parseFloat(configMap['multaDiaria']) || 0;
+        }
+      } catch (_) { /* usa padrão 0 */ }
 
+      const valorOriginal = parseFloat(parcelaData.valor_original);
+      const saldoResidualAnterior = parseFloat(parcelaData.saldo_residual ?? '0');
+      // Valor total que o cliente deve nesta parcela (original + saldo residual de parcelas anteriores)
+      const valorTotalDevido = valorOriginal + saldoResidualAnterior;
+
+      // Calcular juros de atraso usando multaDiaria em R$/dia (modelo CobraFácil)
+      const dataPagamentoDate = input.dataPagamento
+        ? new Date(input.dataPagamento + 'T12:00:00')
+        : new Date();
       const { juros: jurosCalculado, multa } = calcularJurosMora(
-        parseFloat(parcela.valorOriginal),
-        new Date(parcela.dataVencimento + 'T00:00:00'),
-        new Date()
+        valorTotalDevido,
+        new Date(parcelaData.data_vencimento + 'T00:00:00'),
+        dataPagamentoDate,
+        multaDiariaReais,
+        0 // multa percentual não usada no modelo CobraFácil
       );
 
-      // Usar juros customizado se fornecido, senão usar o calculado
+      // Usar juros customizado se fornecido pelo usuário, senão usar o calculado
       const juros = input.valorJurosCustom !== undefined ? input.valorJurosCustom : jurosCalculado;
-      // Data de pagamento: usar a fornecida manualmente ou a data atual
+
+      // Data de pagamento
       const dataPagamentoISO = input.dataPagamento
         ? new Date(input.dataPagamento + 'T12:00:00').toISOString()
         : new Date().toISOString();
       const dataPagamentoStr = input.dataPagamento ?? new Date().toISOString().split('T')[0];
 
-      const valorOriginal = parseFloat(parcela.valorOriginal);
-      const novoStatus = input.valorPago >= valorOriginal ? 'paga' : 'parcial';
+      // Determinar status e saldo residual
+      const valorTotalComJuros = valorTotalDevido + juros + multa - input.desconto;
+      const isPago = input.valorPago >= valorTotalComJuros - 0.01; // tolerância de 1 centavo
+      const novoStatus = isPago ? 'paga' : 'parcial';
 
-      // Atualizar parcela
+      // Calcular saldo residual (quanto falta pagar)
+      const saldoRestante = isPago ? 0 : calcularSaldoResidual(valorTotalComJuros, input.valorPago);
+
+      // Atualizar parcela atual
       const { error: updateErr } = await sb.from('parcelas').update({
         valor_pago: input.valorPago.toFixed(2),
         valor_juros: juros.toFixed(2),
         valor_multa: multa.toFixed(2),
         valor_desconto: input.desconto.toFixed(2),
+        multa_diaria_usada: multaDiariaReais.toFixed(2),
         data_pagamento: dataPagamentoISO,
         status: novoStatus,
         conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
       }).eq('id', input.parcelaId);
       if (updateErr) console.error('[registrarPagamento] Update parcela error:', updateErr.message);
+
+      // ─── SALDO RESIDUAL AUTOMÁTICO ─────────────────────────────────────────
+      // Se pagamento parcial E transferirSaldoResidual=true, adicionar saldo à próxima parcela
+      if (novoStatus === 'parcial' && saldoRestante > 0 && input.transferirSaldoResidual) {
+        const { data: proximaParcela } = await sb.from('parcelas')
+          .select('id, saldo_residual, valor_original')
+          .eq('contrato_id', parcelaData.contrato_id)
+          .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
+          .order('numero_parcela', { ascending: true })
+          .limit(1)
+          .single();
+        if (proximaParcela) {
+          const saldoAtualProxima = parseFloat(proximaParcela.saldo_residual ?? '0');
+          const novoSaldo = Math.round((saldoAtualProxima + saldoRestante) * 100) / 100;
+          await sb.from('parcelas').update({ saldo_residual: novoSaldo.toFixed(2) }).eq('id', proximaParcela.id);
+          console.log(`[registrarPagamento] Saldo residual R$ ${saldoRestante.toFixed(2)} transferido para parcela #${proximaParcela.id}`);
+        }
+      }
 
       // Registrar entrada no caixa (apenas se conta informada)
       if (input.contaCaixaId) {
@@ -1969,9 +2007,9 @@ const parcelasRouter = router({
           tipo: 'entrada',
           categoria: 'pagamento_parcela',
           valor: input.valorPago.toFixed(2),
-          descricao: `Pagamento parcela #${parcela.numeroParcela} - Contrato #${parcela.contratoId}`,
+          descricao: `Pagamento parcela #${parcelaData.numero_parcela} - Contrato #${parcelaData.contrato_id}${saldoRestante > 0 ? ` (parcial, falta R$ ${saldoRestante.toFixed(2)})` : ''}`,
           parcela_id: input.parcelaId,
-          contrato_id: parcela.contratoId,
+          contrato_id: parcelaData.contrato_id,
           data_transacao: dataPagamentoStr,
         });
         if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
@@ -1980,22 +2018,25 @@ const parcelasRouter = router({
       // Verificar se contrato foi quitado
       const { data: pendentes } = await sb.from('parcelas')
         .select('id')
-        .eq('contrato_id', parcela.contratoId)
+        .eq('contrato_id', parcelaData.contrato_id)
         .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
       if ((pendentes?.length ?? 0) === 0) {
-        await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcela.contratoId);
+        await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcelaData.contrato_id);
       }
 
       // Registrar histórico
+      const descHistorico = novoStatus === 'paga'
+        ? `Parcela #${parcelaData.numero_parcela} quitada - R$ ${input.valorPago.toFixed(2)}`
+        : `Parcela #${parcelaData.numero_parcela} paga parcialmente - R$ ${input.valorPago.toFixed(2)} (falta R$ ${saldoRestante.toFixed(2)})${input.transferirSaldoResidual ? ' → transferido para próxima parcela' : ''}`;
       await registrarHistorico({
-        contratoId: parcela.contratoId,
+        contratoId: parcelaData.contrato_id,
         userId: String(parcelaData.user_id ?? parcelaData.koletor_id ?? ''),
         tipo: 'pagamento',
-        descricao: `Parcela #${parcela.numeroParcela} paga - R$ ${input.valorPago.toFixed(2)}`,
+        descricao: descHistorico,
         valorNovo: input.valorPago.toFixed(2),
       });
 
-      return { success: true, status: novoStatus };
+      return { success: true, status: novoStatus, saldoResidual: saldoRestante };
     }),
 
   // Pagar apenas os juros do período e renovar a parcela por mais um período

@@ -216,6 +216,8 @@ var init_schema = __esm({
       valorMulta: decimal("valor_multa", { precision: 15, scale: 2 }).default("0.00"),
       valorDesconto: decimal("valor_desconto", { precision: 15, scale: 2 }).default("0.00"),
       multaManual: decimal("multa_manual", { precision: 15, scale: 2 }).default("0.00"),
+      saldoResidual: decimal("saldo_residual", { precision: 15, scale: 2 }).default("0.00").notNull(),
+      multaDiariaUsada: decimal("multa_diaria_usada", { precision: 15, scale: 2 }).default("0.00"),
       dataVencimento: date("data_vencimento").notNull(),
       dataPagamento: timestamp("data_pagamento", { withTimezone: true }),
       status: statusParcelaEnum("status").default("pendente").notNull(),
@@ -3024,8 +3026,8 @@ import { eq as eq5, and as and3, sql as sql3, desc as desc2, gte, lt, inArray, n
 import { nanoid } from "nanoid";
 
 // shared/finance.ts
-function calcularJurosMora(valorOriginal, dataVencimento, dataPagamento, jurosMoraDiario = 0.033, multaAtraso = 2) {
-  const hoje = dataPagamento;
+function calcularJurosMora(valorOriginal, dataVencimento, dataPagamento, multaDiariaReais = 0, multaAtrasoPercentual = 0) {
+  const hoje = new Date(dataPagamento);
   const venc = new Date(dataVencimento);
   venc.setHours(0, 0, 0, 0);
   hoje.setHours(0, 0, 0, 0);
@@ -3033,15 +3035,10 @@ function calcularJurosMora(valorOriginal, dataVencimento, dataPagamento, jurosMo
   if (diasAtraso === 0) {
     return { juros: 0, multa: 0, total: valorOriginal, diasAtraso: 0 };
   }
-  const multa = valorOriginal * (multaAtraso / 100);
-  const juros = valorOriginal * (jurosMoraDiario / 100) * diasAtraso;
-  const total = valorOriginal + multa + juros;
-  return {
-    juros: Math.round(juros * 100) / 100,
-    multa: Math.round(multa * 100) / 100,
-    total: Math.round(total * 100) / 100,
-    diasAtraso
-  };
+  const multa = multaAtrasoPercentual > 0 ? Math.round(valorOriginal * (multaAtrasoPercentual / 100) * 100) / 100 : 0;
+  const juros = Math.round(multaDiariaReais * diasAtraso * 100) / 100;
+  const total = Math.round((valorOriginal + multa + juros) * 100) / 100;
+  return { juros, multa, total, diasAtraso };
 }
 function calcularParcelasPrice(principal, taxaMensal, numParcelas) {
   if (taxaMensal === 0) return principal / numParcelas;
@@ -3052,6 +3049,11 @@ function calcularParcelasPrice(principal, taxaMensal, numParcelas) {
 function calcularParcelaPadrao(principal, taxaMensal, numParcelas) {
   const jurosTotal = principal * (taxaMensal / 100) * numParcelas;
   return Math.round((principal + jurosTotal) / numParcelas * 100) / 100;
+}
+function calcularSaldoResidual(valorOriginal, valorPago, saldoResidualAnterior = 0) {
+  const valorTotal = valorOriginal + saldoResidualAnterior;
+  const saldo = valorTotal - valorPago;
+  return saldo > 0 ? Math.round(saldo * 100) / 100 : 0;
 }
 function getDiasModalidade(modalidade) {
   switch (modalidade) {
@@ -4716,68 +4718,92 @@ var parcelasRouter = router({
     observacoes: z9.string().optional(),
     desconto: z9.number().default(0),
     valorJurosCustom: z9.number().optional(),
-    // juros editado manualmente
-    dataPagamento: z9.string().optional()
+    // juros de atraso editado manualmente
+    dataPagamento: z9.string().optional(),
     // data manual no formato YYYY-MM-DD
-  })).mutation(async ({ input }) => {
+    transferirSaldoResidual: z9.boolean().default(true)
+    // transferir saldo para próxima parcela
+  })).mutation(async ({ ctx, input }) => {
     const sb2 = await getSupabaseClientAsync();
     if (!sb2) throw new TRPCError9({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indispon\xEDvel" });
     const { data: parcelaData, error: parcelaErr } = await sb2.from("parcelas").select("*").eq("id", input.parcelaId).single();
     if (parcelaErr || !parcelaData) throw new TRPCError9({ code: "NOT_FOUND", message: "Parcela n\xE3o encontrada" });
-    const parcela = {
-      id: parcelaData.id,
-      contratoId: parcelaData.contrato_id,
-      clienteId: parcelaData.cliente_id,
-      numeroParcela: parcelaData.numero_parcela,
-      valorOriginal: parcelaData.valor_original,
-      dataVencimento: parcelaData.data_vencimento
-    };
+    let multaDiariaReais = 0;
+    try {
+      const { data: configRows } = await sb2.from("configuracoes").select("chave, valor").eq("user_id", ctx.user.id);
+      if (configRows) {
+        const configMap = {};
+        for (const r of configRows) configMap[r.chave] = r.valor ?? "";
+        if (configMap["multaDiaria"]) multaDiariaReais = parseFloat(configMap["multaDiaria"]) || 0;
+      }
+    } catch (_) {
+    }
+    const valorOriginal = parseFloat(parcelaData.valor_original);
+    const saldoResidualAnterior = parseFloat(parcelaData.saldo_residual ?? "0");
+    const valorTotalDevido = valorOriginal + saldoResidualAnterior;
+    const dataPagamentoDate = input.dataPagamento ? /* @__PURE__ */ new Date(input.dataPagamento + "T12:00:00") : /* @__PURE__ */ new Date();
     const { juros: jurosCalculado, multa } = calcularJurosMora(
-      parseFloat(parcela.valorOriginal),
-      /* @__PURE__ */ new Date(parcela.dataVencimento + "T00:00:00"),
-      /* @__PURE__ */ new Date()
+      valorTotalDevido,
+      /* @__PURE__ */ new Date(parcelaData.data_vencimento + "T00:00:00"),
+      dataPagamentoDate,
+      multaDiariaReais,
+      0
+      // multa percentual não usada no modelo CobraFácil
     );
     const juros = input.valorJurosCustom !== void 0 ? input.valorJurosCustom : jurosCalculado;
     const dataPagamentoISO = input.dataPagamento ? (/* @__PURE__ */ new Date(input.dataPagamento + "T12:00:00")).toISOString() : (/* @__PURE__ */ new Date()).toISOString();
     const dataPagamentoStr = input.dataPagamento ?? (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-    const valorOriginal = parseFloat(parcela.valorOriginal);
-    const novoStatus = input.valorPago >= valorOriginal ? "paga" : "parcial";
+    const valorTotalComJuros = valorTotalDevido + juros + multa - input.desconto;
+    const isPago = input.valorPago >= valorTotalComJuros - 0.01;
+    const novoStatus = isPago ? "paga" : "parcial";
+    const saldoRestante = isPago ? 0 : calcularSaldoResidual(valorTotalComJuros, input.valorPago);
     const { error: updateErr } = await sb2.from("parcelas").update({
       valor_pago: input.valorPago.toFixed(2),
       valor_juros: juros.toFixed(2),
       valor_multa: multa.toFixed(2),
       valor_desconto: input.desconto.toFixed(2),
+      multa_diaria_usada: multaDiariaReais.toFixed(2),
       data_pagamento: dataPagamentoISO,
       status: novoStatus,
       conta_caixa_id: input.contaCaixaId ?? null,
       observacoes: input.observacoes ?? null
     }).eq("id", input.parcelaId);
     if (updateErr) console.error("[registrarPagamento] Update parcela error:", updateErr.message);
+    if (novoStatus === "parcial" && saldoRestante > 0 && input.transferirSaldoResidual) {
+      const { data: proximaParcela } = await sb2.from("parcelas").select("id, saldo_residual, valor_original").eq("contrato_id", parcelaData.contrato_id).in("status", ["pendente", "atrasada", "vencendo_hoje"]).order("numero_parcela", { ascending: true }).limit(1).single();
+      if (proximaParcela) {
+        const saldoAtualProxima = parseFloat(proximaParcela.saldo_residual ?? "0");
+        const novoSaldo = Math.round((saldoAtualProxima + saldoRestante) * 100) / 100;
+        await sb2.from("parcelas").update({ saldo_residual: novoSaldo.toFixed(2) }).eq("id", proximaParcela.id);
+        console.log(`[registrarPagamento] Saldo residual R$ ${saldoRestante.toFixed(2)} transferido para parcela #${proximaParcela.id}`);
+      }
+    }
     if (input.contaCaixaId) {
       const { error: txErr } = await sb2.from("transacoes_caixa").insert({
         conta_caixa_id: input.contaCaixaId,
         tipo: "entrada",
         categoria: "pagamento_parcela",
         valor: input.valorPago.toFixed(2),
-        descricao: `Pagamento parcela #${parcela.numeroParcela} - Contrato #${parcela.contratoId}`,
+        descricao: `Pagamento parcela #${parcelaData.numero_parcela} - Contrato #${parcelaData.contrato_id}${saldoRestante > 0 ? ` (parcial, falta R$ ${saldoRestante.toFixed(2)})` : ""}`,
         parcela_id: input.parcelaId,
-        contrato_id: parcela.contratoId,
+        contrato_id: parcelaData.contrato_id,
         data_transacao: dataPagamentoStr
       });
       if (txErr) console.error("[registrarPagamento] Insert transacao error:", txErr.message);
     }
-    const { data: pendentes } = await sb2.from("parcelas").select("id").eq("contrato_id", parcela.contratoId).in("status", ["pendente", "atrasada", "vencendo_hoje", "parcial"]);
+    const { data: pendentes } = await sb2.from("parcelas").select("id").eq("contrato_id", parcelaData.contrato_id).in("status", ["pendente", "atrasada", "vencendo_hoje", "parcial"]);
     if ((pendentes?.length ?? 0) === 0) {
-      await sb2.from("contratos").update({ status: "quitado" }).eq("id", parcela.contratoId);
+      await sb2.from("contratos").update({ status: "quitado" }).eq("id", parcelaData.contrato_id);
     }
+    const descHistorico = novoStatus === "paga" ? `Parcela #${parcelaData.numero_parcela} quitada - R$ ${input.valorPago.toFixed(2)}` : `Parcela #${parcelaData.numero_parcela} paga parcialmente - R$ ${input.valorPago.toFixed(2)} (falta R$ ${saldoRestante.toFixed(2)})${input.transferirSaldoResidual ? " \u2192 transferido para pr\xF3xima parcela" : ""}`;
     await registrarHistorico({
-      contratoId: parcela.contratoId,
+      contratoId: parcelaData.contrato_id,
       userId: String(parcelaData.user_id ?? parcelaData.koletor_id ?? ""),
       tipo: "pagamento",
-      descricao: `Parcela #${parcela.numeroParcela} paga - R$ ${input.valorPago.toFixed(2)}`,
+      descricao: descHistorico,
       valorNovo: input.valorPago.toFixed(2)
     });
-    return { success: true, status: novoStatus };
+    return { success: true, status: novoStatus, saldoResidual: saldoRestante };
   }),
   // Pagar apenas os juros do período e renovar a parcela por mais um período
   pagarJuros: protectedProcedure.input(z9.object({
@@ -7036,6 +7062,41 @@ async function startServer() {
       if (err?.message?.includes("relation") || err?.code === "42P01") {
         return res.json({ success: false, message: "Tabela n\xE3o existe", error: err.message });
       }
+      res.status(500).json({ error: String(err) });
+    }
+  });
+  app.post("/api/admin/migration-saldo-residual", async (req, res) => {
+    try {
+      const { getSupabaseClientAsync: getSupabaseClientAsync2 } = await Promise.resolve().then(() => (init_db(), db_exports));
+      const sb2 = await getSupabaseClientAsync2();
+      if (!sb2) return res.status(500).json({ error: "DB indispon\xEDvel" });
+      const { data: checkData, error: checkError } = await sb2.from("parcelas").select("saldo_residual, multa_diaria_usada").limit(1);
+      if (!checkError) {
+        return res.json({ success: true, message: "Colunas j\xE1 existem", columns: ["saldo_residual", "multa_diaria_usada"] });
+      }
+      const supabaseUrl = process.env.SUPABASE_URL || "";
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+      const projectRef = supabaseUrl.replace("https://", "").split(".")[0];
+      const ddlSql = `ALTER TABLE parcelas ADD COLUMN IF NOT EXISTS saldo_residual NUMERIC(15,2) DEFAULT 0.00 NOT NULL; ALTER TABLE parcelas ADD COLUMN IF NOT EXISTS multa_diaria_usada NUMERIC(15,2) DEFAULT 0.00;`;
+      const mgmtRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${serviceKey}`
+        },
+        body: JSON.stringify({ query: ddlSql }),
+        signal: AbortSignal.timeout(15e3)
+      });
+      const mgmtText = await mgmtRes.text();
+      return res.json({
+        success: mgmtRes.ok,
+        status: mgmtRes.status,
+        message: mgmtRes.ok ? "DDL executado via Management API" : "Falha na Management API",
+        response: mgmtText,
+        originalError: checkError?.message,
+        projectRef
+      });
+    } catch (err) {
       res.status(500).json({ error: String(err) });
     }
   });
