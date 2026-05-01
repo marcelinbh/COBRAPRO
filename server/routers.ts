@@ -73,7 +73,7 @@ const dashboardRouter = router({
         .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
       const capitalCirculacao = parseFloat(capitalResult[0]?.total ?? '0');
 
-      const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)` })
+      const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original + COALESCE(saldo_residual, 0) + COALESCE(valor_multa, 0)), 0)` })
         .from(parcelas).where(and(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']), eq(parcelas.userId, ctx.user.id)));
       const totalReceber = parseFloat(receberResult[0]?.total ?? '0');
 
@@ -144,7 +144,7 @@ const dashboardRouter = router({
     const capitalCirculacao = (contratosRes.data ?? []).reduce((s: number, c: any) => s + parseFloat(c.valor_principal ?? '0'), 0);
     
     const parcelasData = parcelasRes.data ?? [];
-    const totalReceber = parcelasData.filter((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0'), 0);
+    const totalReceber = parcelasData.filter((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
     
     const atrasadas = parcelasData.filter((p: any) => p.status === 'atrasada');
     const totalInadimplente = atrasadas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
@@ -686,8 +686,10 @@ const clientesRouter = router({
         
         for (const parcela of parcelas_data) {
           const valorOriginalParcela = parseFloat(parcela.valor_original ?? parcela.valorOriginal ?? '0');
+          const saldoResidualParcela = parseFloat(parcela.saldo_residual ?? parcela.saldoResidual ?? '0');
+          const valorMultaParcela = parseFloat(parcela.valor_multa ?? parcela.valorMulta ?? '0');
           capitalTotal += valorOriginalParcela;
-          if (parcela.status !== 'paga') totalReceber += valorOriginalParcela;
+          if (parcela.status !== 'paga') totalReceber += valorOriginalParcela + saldoResidualParcela + valorMultaParcela;
           if (parcela.status === 'paga') {
             parcelasQuitadas++;
             score += 10; // +10 por parcela paga
@@ -900,14 +902,14 @@ const contratosRouter = router({
           valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
         }
 
-        // Total a receber = soma das parcelas abertas (incluindo multas aplicadas)
-        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0'), 0);
+        // Total a receber = soma das parcelas abertas (incluindo multas e saldo residual)
+        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
         // Total pago = soma das parcelas pagas
         const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
         // Lucro previsto = juros × número de parcelas abertas
         const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
-        // Lucro realizado = total pago - capital (amortizações)
-        const lucroRealizado = Math.max(0, totalPago - (parcelasPagas.length > 0 ? 0 : 0));
+        // Lucro realizado = soma dos juros das parcelas já pagas
+        const lucroRealizado = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_juros ?? p.juros ?? '0'), 0);
 
         // Próxima parcela em aberto
         const proximaParcela = parcelasAbertas.length > 0 ? parcelasAbertas[0] : null;
@@ -1016,10 +1018,10 @@ const contratosRouter = router({
       const taxaJuros = parseFloat(contratoData.taxa_juros ?? '0');
       const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
 
-      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0'), 0);
+      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
       const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
       const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
-      const lucroRealizado = Math.max(0, totalPago - (parcelasPagas.length > 0 ? 0 : 0));
+      const lucroRealizado = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_juros ?? p.juros ?? '0'), 0);
 
       const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
         const venc = new Date(p.data_vencimento + 'T00:00:00');

@@ -813,3 +813,19 @@
 - [ ] Corrigir cálculo de juros por atraso nos cards: usar multaDiaria do usuário (já está correto, confirmar)
 - [ ] Atualizar shared/finance.ts: função calcularJurosMoraAbsoluto (R$/dia) separada da % do capital
 - [ ] Testes: verificar cálculos com exemplos reais
+
+## Fase 41: Correção de Cálculo de Total Devido
+
+- [ ] Auditar cálculo de valor total devido no dashboard
+- [ ] Corrigir: somar apenas parcelas não pagas (status != 'paga')
+- [ ] Testar pagamento de parcela e verificar se total diminui
+- [ ] Deploy em produção
+
+
+## Fase 66: Correção Crítica - Cálculos de Pagamentos Parciais (Maio 2026)
+- [x] Identificar problema: totalReceber não incluía saldo_residual e valor_multa
+- [x] Corrigir cálculo de totalReceber em 5 locais (dashboard, clientes, empréstimos, fallback Supabase)
+- [x] Corrigir cálculo de lucroRealizado para somar valor_juros das parcelas pagas
+- [x] Escrever 9 testes Vitest para validar cálculos (todos passando)
+- [x] Verificar que pagamentos parciais agora reduzem corretamente o KPI "Total a Receber"
+- [x] Deploy em produção e validação com usuário
