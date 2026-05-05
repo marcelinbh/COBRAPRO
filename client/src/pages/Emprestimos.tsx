@@ -315,6 +315,7 @@ function EditarEmprestimoModal({
                     <th className="text-left px-3 py-2 text-muted-foreground">Vencimento</th>
                     <th className="text-right px-3 py-2 text-muted-foreground">Valor</th>
                     <th className="text-right px-3 py-2 text-muted-foreground">Multa</th>
+                    <th className="text-center px-3 py-2 text-muted-foreground">Renovacoes</th>
                     <th className="text-center px-3 py-2 text-muted-foreground">Status</th>
                   </tr>
                 </thead>
@@ -331,14 +332,30 @@ function EditarEmprestimoModal({
                           {parseFloat(p.valor_multa ?? '0') > 0 ? formatarMoeda(parseFloat(p.valor_multa)) : '-'}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
-                            p.status === 'paga' ? 'bg-emerald-500/20 text-emerald-400' :
-                            p.status === 'atrasada' ? 'bg-red-500/20 text-red-400' :
-                            p.status === 'vencendo_hoje' ? 'bg-amber-500/20 text-amber-400' :
-                            'bg-muted text-muted-foreground'
-                          }`}>
-                            {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : p.status === 'vencendo_hoje' ? 'Hoje' : 'Pendente'}
-                          </span>
+                          {(p.contagem_renovacoes ?? 0) > 0 ? (
+                            <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/20 text-purple-400">
+                              {p.contagem_renovacoes}x
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          <div className="flex flex-col gap-1 items-center">
+                            <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                              p.status === 'paga' ? 'bg-emerald-500/20 text-emerald-400' :
+                              p.status === 'atrasada' ? 'bg-red-500/20 text-red-400' :
+                              p.status === 'vencendo_hoje' ? 'bg-amber-500/20 text-amber-400' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : p.status === 'vencendo_hoje' ? 'Hoje' : 'Pendente'}
+                            </span>
+                            {p.observacoes?.toLowerCase().includes('renovado') && (
+                              <span className="inline-block px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/20 text-blue-400">
+                                Renovada
+                              </span>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))

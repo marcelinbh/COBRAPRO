@@ -839,3 +839,9 @@
 - [x] Verificar que valor total mantém-se igual ao renovar (capital + juros)
 - [x] Verificar que número de parcelas incrementa corretamente
 - [x] Verificar que data de vencimento respeita a periodicidade
+
+
+## Fase 68: Implementar 3 Sugestões de Melhoria (Maio 2026)
+- [x] Sugestão 1: Testar fluxo completo em produção (criar empréstimo quinzenal, pagar juros, verificar renovação)
+- [x] Sugestão 2: Adicionar validação no frontend para mostrar "Parcela renovada" quando juros são pagos
+- [x] Sugestão 3: Implementar histórico de renovações para rastreabilidade (quantas vezes foi renovada)

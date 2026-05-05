@@ -2139,6 +2139,7 @@ const parcelasRouter = router({
           dataVencimento: novaDataVencStr,
           status: 'pendente' as const,
           contaCaixaId: input.contaCaixaId ?? null,
+          contagemRenovacoes: ((parcela as any).contagemRenovacoes as number) + 1 || 1,
         });
 
         // Atualizar numeroParcelas do contrato
@@ -2172,6 +2173,7 @@ const parcelasRouter = router({
 
         const novoNumero = (parcela.numeroParcela as number) + 1;
         const novoValor = parseFloat(String(parcela.valorOriginal));
+        const novaContagemRenovacoes = (((parcela as any).contagemRenovacoes as number) || 0) + 1;
         await supabase.from('parcelas').insert({
           user_id: ctx.user.id,
           cliente_id: parcela.clienteId,
@@ -2185,6 +2187,7 @@ const parcelasRouter = router({
           data_vencimento: novaDataVencStr,
           status: 'pendente',
           conta_caixa_id: input.contaCaixaId,
+          contagem_renovacoes: novaContagemRenovacoes,
         });
 
         await supabase.from('contratos')

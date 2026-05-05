@@ -204,6 +204,7 @@ export const parcelas = pgTable("parcelas", {
   status: statusParcelaEnum("status").default("pendente").notNull(),
   contaCaixaId: integer("conta_caixa_id"),
   observacoes: text("observacoes"),
+  contagemRenovacoes: integer("contagem_renovacoes").default(0).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -507,3 +508,22 @@ export const contratoHistorico = pgTable("contrato_historico", {
 });
 export type ContratoHistorico = typeof contratoHistorico.$inferSelect;
 export type InsertContratoHistorico = typeof contratoHistorico.$inferInsert;
+
+// ─── HISTÓRICO DE RENOVAÇÕES DE PARCELAS ─────────────────────────────────────
+export const parcelasRenovacoes = pgTable("parcelas_renovacoes", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  parcelaId: integer("parcela_id").notNull(),
+  contratoId: integer("contrato_id").notNull(),
+  clienteId: integer("cliente_id").notNull(),
+  numeroRenovacao: integer("numero_renovacao").notNull(), // 1ª renovação, 2ª renovação, etc
+  dataRenovacao: timestamp("data_renovacao", { withTimezone: true }).defaultNow().notNull(),
+  valorJurosPago: decimal("valor_juros_pago", { precision: 15, scale: 2 }).notNull(),
+  novaDataVencimento: date("nova_data_vencimento").notNull(),
+  novaParcelaId: integer("nova_parcela_id"), // ID da parcela criada após renovação
+  observacoes: text("observacoes"),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type ParcelaRenovacao = typeof parcelasRenovacoes.$inferSelect;
+export type InsertParcelaRenovacao = typeof parcelasRenovacoes.$inferInsert;
