@@ -829,3 +829,13 @@
 - [x] Escrever 9 testes Vitest para validar cálculos (todos passando)
 - [x] Verificar que pagamentos parciais agora reduzem corretamente o KPI "Total a Receber"
 - [x] Deploy em produção e validação com usuário
+
+
+## Fase 67: Correção de Renovação Automática de Parcelas ao Pagar Juros (Maio 2026)
+- [x] Identificar bug: userId e cliente_id faltando na nova parcela ao renovar
+- [x] Corrigir procedure pagarJuros para adicionar userId e cliente_id (Drizzle + Supabase REST)
+- [x] Escrever 23 testes Vitest para validar renovação automática (todos passando)
+- [x] Validar 5 cenários: Quinzenal 50% (R$ 1.000), Quinzenal 50% (R$ 500), Diário 10%, Semanal 20%, Mensal 5%
+- [x] Verificar que valor total mantém-se igual ao renovar (capital + juros)
+- [x] Verificar que número de parcelas incrementa corretamente
+- [x] Verificar que data de vencimento respeita a periodicidade

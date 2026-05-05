@@ -2129,6 +2129,7 @@ const parcelasRouter = router({
         const valorJurosNovaParcela = input.valorJurosPago.toFixed(2);
         // Criar nova parcela com o mesmo valor original e nova data
         await db.insert(parcelas).values({
+          userId: ctx.user.id,
           contratoId: parcela.contratoId as number,
           clienteId: parcela.clienteId as number,
           koletorId: parcela.koletorId ?? undefined,
@@ -2172,6 +2173,8 @@ const parcelasRouter = router({
         const novoNumero = (parcela.numeroParcela as number) + 1;
         const novoValor = parseFloat(String(parcela.valorOriginal));
         await supabase.from('parcelas').insert({
+          user_id: ctx.user.id,
+          cliente_id: parcela.clienteId,
           contrato_id: parcela.contratoId,
           koletor_id: parcela.koletorId ?? null,
           numero: novoNumero,
