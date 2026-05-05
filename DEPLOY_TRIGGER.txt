@@ -1,0 +1,6 @@
+Deploy Trigger - 2026-05-05 11:15:00 GMT-3
+Forçar deploy no Digital Ocean
+Commits inclusos:
+- d48f37d: Implementadas as 3 sugestões (Badge "Renovada", contador de renovações, exibição no frontend)
+- 306d390: Correção de renovação automática de parcelas ao pagar juros
+- 72a9558: Correção crítica de cálculos de totalReceber e lucroRealizado
