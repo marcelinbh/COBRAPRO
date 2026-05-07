@@ -5,10 +5,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+import i18n from './i18n/i18n';
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
-import './i18n/i18n';
 
 const queryClient = new QueryClient();
 
@@ -62,12 +62,28 @@ if (splash) {
   setTimeout(() => splash.remove(), 350);
 }
 
-createRoot(document.getElementById("root")!).render(
-  <trpc.Provider client={trpcClient} queryClient={queryClient}>
-    <QueryClientProvider client={queryClient}>
-      <Suspense fallback={<div>Loading...</div>}>
-        <App />
-      </Suspense>
-    </QueryClientProvider>
-  </trpc.Provider>
-);
+// Aguardar i18n estar pronto antes de renderizar
+i18n.on('initialized', () => {
+  createRoot(document.getElementById("root")!).render(
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <App />
+        </Suspense>
+      </QueryClientProvider>
+    </trpc.Provider>
+  );
+});
+
+// Fallback em caso de i18n já estar inicializado
+if (i18n.isInitialized) {
+  createRoot(document.getElementById("root")!).render(
+    <trpc.Provider client={trpcClient} queryClient={queryClient}>
+      <QueryClientProvider client={queryClient}>
+        <Suspense fallback={<div>Loading...</div>}>
+          <App />
+        </Suspense>
+      </QueryClientProvider>
+    </trpc.Provider>
+  );
+}

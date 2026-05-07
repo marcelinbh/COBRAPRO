@@ -31,6 +31,7 @@
   },
   "navigation": {
     "dashboard": "Panel de Control",
+    "meuPerfil": "Mi Perfil",
     "clients": "Clientes",
     "loans": "Préstamos",
     "contracts": "Contratos",

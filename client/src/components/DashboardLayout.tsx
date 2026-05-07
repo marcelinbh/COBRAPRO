@@ -59,6 +59,7 @@ import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 import { trpc } from "@/lib/trpc";
 import { BottomNav } from "./BottomNav";
+import { useTranslation } from 'react-i18next';
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
@@ -100,6 +101,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -187,6 +189,7 @@ function DashboardLayoutContent({
   children,
   setSidebarWidth,
 }: DashboardLayoutContentProps) {
+  const { t } = useTranslation();
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
@@ -286,18 +289,26 @@ function DashboardLayoutContent({
             <SidebarMenu className="px-2 py-1">
               {filteredMenuItems.map(item => {
                 const isActive = location === item.path;
+                const labelMap: Record<string, string> = {
+                  'Dashboard': 'navigation.dashboard',
+                  'Meu Perfil': 'navigation.meuPerfil',
+                  'Clientes': 'navigation.clients',
+                  'Emprestimos': 'navigation.loans',
+                };
+                const translationKey = labelMap[item.label] || item.label;
+                const translatedLabel = t(translationKey);
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
                       isActive={isActive}
                       onClick={() => setLocation(item.path)}
-                      tooltip={item.label}
+                      tooltip={translatedLabel}
                       className={`h-10 transition-all font-normal`}
                     >
                       <item.icon
                         className={`h-4 w-4 ${isActive ? "text-primary" : ""}`}
                       />
-                      <span>{item.label}</span>
+                      <span>{translatedLabel}</span>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 );

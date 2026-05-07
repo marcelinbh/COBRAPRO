@@ -31,6 +31,7 @@
   },
   "navigation": {
     "dashboard": "Dashboard",
+    "meuPerfil": "Meu Perfil",
     "clients": "Clientes",
     "loans": "Empréstimos",
     "contracts": "Contratos",
@@ -43,7 +44,7 @@
     "simulator": "Simulador",
     "backup": "Backup",
     "riskAnalysis": "Análise de Risco",
-    "collectors": "Koletores",
+    "collectors": "Cobradores",
     "reports": "Relatórios"
   },
   "dashboard": {
