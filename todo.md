@@ -854,3 +854,50 @@
 - [x] Validar cálculos de totalReceber com saldo_residual
 - [x] Validar incremento de contador de renovações
 - [x] Validar exibição de badge "Renovada" e contador no frontend
+
+
+## Fase 70: Implementação de Múltiplas Linguagens (Maio 2026)
+- [ ] Instalar dependências i18next e react-i18next
+- [ ] Criar estrutura de i18n com arquivos de tradução (PT-BR, ES)
+- [ ] Traduzir todo o conteúdo do dashboard para Espanhol
+- [ ] Traduzir página inicial (Home.tsx) para Espanhol
+- [ ] Criar componente LanguageSwitcher elegante (estilo imagem)
+- [ ] Integrar LanguageSwitcher no DashboardLayout
+- [ ] Integrar LanguageSwitcher na página Home
+- [ ] Salvar preferência de linguagem do usuário no localStorage
+- [ ] Testar fluxo completo de troca de linguagem
+- [ ] Deploy em produção
+
+
+## Fase 71: Implementação de Múltiplas Linguagens (PT-BR/Espanhol) - Maio 2026
+- [x] Instalar dependências i18next e react-i18next
+- [x] Criar estrutura de i18n com arquivo de inicialização
+- [x] Criar arquivo de tradução PT-BR (246 linhas, 8 seções)
+- [x] Criar arquivo de tradução Espanhol (246 linhas, 8 seções)
+- [x] Criar componente LanguageSwitcher elegante com dropdown
+- [x] Integrar i18n no main.tsx com Suspense
+- [x] Adicionar LanguageSwitcher ao DashboardLayout (sidebar footer)
+- [x] Adicionar LanguageSwitcher ao Home.tsx (header)
+- [x] Criar 15 testes de integração para validar i18n
+- [x] Todos os testes passando (15/15)
+
+**Traduções Implementadas:**
+- Common (30 termos): language, search, filter, add, edit, delete, save, cancel, etc.
+- Navigation (15 itens): dashboard, clientes, empréstimos, contratos, parcelas, caixa, etc.
+- Dashboard (15 campos): balance, capital, toReceive, delinquency, interest, etc.
+- Clients (18 campos): name, cpf, cnpj, phone, whatsapp, email, address, etc.
+- Loans (35 campos): amount, rate, modality, status, paid, interest, etc.
+- Parcels (8 campos): number, value, interest, dueDate, status, renewed, etc.
+- Cashbox (10 campos): account, balance, income, expense, transaction, etc.
+- Reports (10 campos): loans, delinquency, cashFlow, performance, etc.
+- Forms (20 campos): payment modal, methods, observations, receipt, etc.
+- Home (25 campos): features, pricing, contact, about, privacy, terms, etc.
+- Errors (12 campos): required, invalid, password, credentials, server, network, etc.
+- Success (6 campos): saved, deleted, updated, created, paymentProcessed, etc.
+
+**Seletor de Linguagem:**
+- Botão elegante com ícone Globe
+- Badge com código de idioma (PT, ES)
+- Dropdown com opções de idioma
+- Persistência em localStorage
+- Suporta PT-BR e Espanhol (ES)

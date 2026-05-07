@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Shield, Zap, TrendingUp, Users, Star, CheckCircle2, Plus, Minus, Smartphone, FileText, MessageCircle, BarChart3 } from "lucide-react";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 // ── Dados dos planos ────────────────────────────────────────────────────────
 const PLANOS = {
@@ -137,12 +138,15 @@ export default function Home() {
             alt="CobraPro"
             className="h-12 w-auto object-contain"
           />
-          <Button
-            onClick={goToLogin}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2 rounded-lg text-sm uppercase tracking-wide"
-          >
-            Acessar Sistema
-          </Button>
+          <div className="flex items-center gap-4">
+            <LanguageSwitcher />
+            <Button
+              onClick={goToLogin}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold px-6 py-2 rounded-lg text-sm uppercase tracking-wide"
+            >
+              Acessar Sistema
+            </Button>
+          </div>
         </div>
       </header>
 
