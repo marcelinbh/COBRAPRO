@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { Card } from '@/components/ui/card';
@@ -8,6 +9,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 
 export function Scores() {
+  const { t } = useTranslation();
   const [ordenarPor, setOrdenarPor] = useState<'score' | 'lucro' | 'nome'>('score');
   const { data, isLoading } = trpc.clientes.listarComScore.useQuery({ ordenarPor });
 

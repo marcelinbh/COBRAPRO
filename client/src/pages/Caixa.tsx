@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -259,6 +260,7 @@ function LancamentoRapido({
 
 // ── Página Principal ──────────────────────────────────────────────────────────
 export default function Caixa() {
+  const { t } = useTranslation();
   const [contaSelecionada, setContaSelecionada] = useState<number | undefined>();
   const utils = trpc.useUtils();
 

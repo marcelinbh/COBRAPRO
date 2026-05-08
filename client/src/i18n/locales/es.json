@@ -23,11 +23,35 @@
     "export": "Exportar",
     "import": "Importar",
     "download": "Descargar",
-    "upload": "Subir",
+    "upload": "Cargar",
     "settings": "Configuración",
     "logout": "Cerrar Sesión",
     "profile": "Perfil",
-    "help": "Ayuda"
+    "help": "Ayuda",
+    "newContract": "Nuevo Contrato",
+    "dailyReport": "Informe Diario",
+    "automaticNotifications": "Notificaciones Automáticas",
+    "configuration": "Configuración",
+    "myProfile": "Mi Perfil",
+    "users": "Usuarios",
+    "whatsappConfig": "Configuración WhatsApp",
+    "portalCliente": "Portal del Cliente",
+    "onboarding": "Incorporación",
+    "simulator": "Simulador",
+    "reparcelation": "Reprogramación",
+    "scores": "Puntuaciones",
+    "reports": "Informes",
+    "riskAnalysis": "Análisis de Riesgo",
+    "backup": "Copia de Seguridad",
+    "collectors": "Cobradores",
+    "vehicles": "Vehículos",
+    "phoneSales": "Venta por Teléfono",
+    "cashbox": "Caja",
+    "contracts": "Contratos",
+    "parcels": "Cuotas",
+    "loans": "Préstamos",
+    "clients": "Clientes",
+    "dashboard": "Panel de Control"
   },
   "navigation": {
     "dashboard": "Panel de Control",
@@ -45,7 +69,7 @@
     "backup": "Copia de Seguridad",
     "riskAnalysis": "Análisis de Riesgo",
     "collectors": "Cobradores",
-    "reports": "Reportes"
+    "reports": "Informes"
   },
   "dashboard": {
     "title": "Panel de Control",
@@ -61,8 +85,10 @@
     "cashFlow": "Flujo de Caja",
     "businessScore": "Puntuación del Negocio",
     "needsAttention": "Necesita Atención",
-    "dueThisWeek": "Vence Esta Semana",
-    "overdue30Days": "Atrasados +30 días"
+    "dueThisWeek": "Vence esta Semana",
+    "overdue30Days": "Atrasados +30 días",
+    "dailyReport": "Informe Diario",
+    "automaticNotifications": "Notificaciones Automáticas"
   },
   "clients": {
     "title": "Clientes",
@@ -88,7 +114,13 @@
     "photo": "Foto",
     "rg": "RG",
     "instagram": "Instagram",
-    "facebook": "Facebook"
+    "facebook": "Facebook",
+    "details": "Detalles del Cliente",
+    "edit": "Editar Cliente",
+    "delete": "Eliminar Cliente",
+    "addClient": "Agregar Cliente",
+    "clientList": "Lista de Clientes",
+    "searchClient": "Buscar Cliente"
   },
   "loans": {
     "title": "Préstamos",
@@ -103,7 +135,7 @@
     "biweekly": "Quincenal",
     "monthly": "Mensual",
     "standard": "Estándar",
-    "price": "Precio",
+    "price": "Price",
     "product": "Producto",
     "check": "Cheque",
     "startDate": "Fecha de Inicio",
@@ -129,7 +161,11 @@
     "whatsapp": "WhatsApp",
     "history": "Historial",
     "new": "Nuevo",
-    "renewals": "Renovaciones"
+    "renewals": "Renovaciones",
+    "loanList": "Lista de Préstamos",
+    "searchLoan": "Buscar Préstamo",
+    "editLoan": "Editar Préstamo",
+    "deleteLoan": "Eliminar Préstamo"
   },
   "parcels": {
     "title": "Cuotas",
@@ -143,7 +179,11 @@
     "pay": "Pagar",
     "details": "Detalles",
     "renewed": "Renovada",
-    "renewalCount": "Renovaciones"
+    "renewalCount": "Renovaciones",
+    "parcelList": "Lista de Cuotas",
+    "searchParcel": "Buscar Cuota",
+    "payParcel": "Pagar Cuota",
+    "parcelDetails": "Detalles de la Cuota"
   },
   "cashbox": {
     "title": "Caja",
@@ -159,18 +199,23 @@
     "type": "Tipo",
     "income": "Ingreso",
     "expense": "Gasto",
-    "dailyClose": "Cierre Diario"
+    "dailyClose": "Cierre Diario",
+    "transactionList": "Lista de Transacciones",
+    "searchTransaction": "Buscar Transacción"
   },
   "reports": {
-    "title": "Reportes",
-    "loans": "Reporte de Préstamos",
-    "delinquency": "Reporte de Morosidad",
-    "cashFlow": "Reporte de Flujo de Caja",
+    "title": "Informes",
+    "loans": "Informe de Préstamos",
+    "delinquency": "Informe de Morosidad",
+    "cashFlow": "Informe de Flujo de Caja",
     "collectorPerformance": "Desempeño del Cobrador",
     "month": "Mes",
     "year": "Año",
-    "generate": "Generar Reporte",
-    "export": "Exportar Reporte"
+    "generate": "Generar Informe",
+    "export": "Exportar Informe",
+    "dailyReport": "Informe Diario",
+    "monthlyReport": "Informe Mensual",
+    "yearlyReport": "Informe Anual"
   },
   "forms": {
     "paymentModal": "Modal de Pago",
@@ -189,30 +234,33 @@
     "payPartial": "Pagar Parcialmente",
     "discount": "Descuento",
     "residualBalance": "Saldo Residual",
-    "receipt": "Comprobante",
-    "downloadReceipt": "Descargar Comprobante"
+    "receipt": "Recibo",
+    "downloadReceipt": "Descargar Recibo",
+    "formTitle": "Formulario",
+    "formSubmit": "Enviar",
+    "formCancel": "Cancelar"
   },
   "home": {
     "title": "CobraPro - Sistema de Gestión de Cobros",
-    "subtitle": "Administra tus préstamos con eficiencia",
-    "description": "CobraPro es la solución completa para la gestión de cobros, préstamos y flujo de caja. Control total de tu cartera de clientes.",
+    "subtitle": "Gestiona tus préstamos con eficiencia",
+    "description": "CobraPro es la solución completa para gestión de cobros, préstamos y flujo de caja. Control total de tu cartera de clientes.",
     "features": "Características",
     "feature1Title": "Gestión de Préstamos",
     "feature1Desc": "Control completo de préstamos con múltiples modalidades: diario, semanal, quincenal y mensual.",
     "feature2Title": "Cálculo Automático de Intereses",
     "feature2Desc": "Cálculo automático de intereses, multas y atrasos en tiempo real.",
-    "feature3Title": "Cobro por WhatsApp",
-    "feature3Desc": "Envía mensajes de cobro automáticamente a través de WhatsApp Business.",
-    "feature4Title": "Reportes Detallados",
-    "feature4Desc": "Genera reportes completos de flujo de caja, morosidad y desempeño.",
+    "feature3Title": "Cobranza por WhatsApp",
+    "feature3Desc": "Envía mensajes de cobranza automáticamente a través de WhatsApp Business.",
+    "feature4Title": "Informes Detallados",
+    "feature4Desc": "Genera informes completos de flujo de caja, morosidad y desempeño.",
     "feature5Title": "Portal del Cliente",
     "feature5Desc": "Tus clientes pueden ver sus cuotas y copiar la clave PIX.",
     "feature6Title": "Análisis de Riesgo",
     "feature6Desc": "Puntuación de crédito interna y análisis de riesgo de cada cliente.",
-    "getStarted": "Comienza Ahora",
+    "getStarted": "Comenzar Ahora",
     "login": "Iniciar Sesión",
     "signup": "Registrarse",
-    "learnMore": "Aprende Más",
+    "learnMore": "Más Información",
     "pricing": "Precios",
     "contact": "Contacto",
     "about": "Acerca de",
@@ -229,16 +277,71 @@
     "passwordMismatch": "Las contraseñas no coinciden",
     "userNotFound": "Usuario no encontrado",
     "invalidCredentials": "Credenciales inválidas",
-    "serverError": "Error en el servidor",
+    "serverError": "Error del servidor",
     "networkError": "Error de conexión",
-    "tryAgain": "Intenta de nuevo"
+    "tryAgain": "Intentar de nuevo"
   },
   "success": {
-    "saved": "Guardado exitosamente",
-    "deleted": "Eliminado exitosamente",
-    "updated": "Actualizado exitosamente",
-    "created": "Creado exitosamente",
-    "paymentProcessed": "Pago procesado exitosamente",
-    "emailSent": "Correo electrónico enviado exitosamente"
+    "saved": "Guardado con éxito",
+    "deleted": "Eliminado con éxito",
+    "updated": "Actualizado con éxito",
+    "created": "Creado con éxito",
+    "paymentProcessed": "Pago procesado con éxito",
+    "emailSent": "Correo electrónico enviado con éxito"
+  },
+  "vehicles": {
+    "title": "Vehículos",
+    "newVehicle": "Nuevo Vehículo",
+    "plate": "Placa",
+    "model": "Modelo",
+    "brand": "Marca",
+    "year": "Año",
+    "color": "Color",
+    "vehicleList": "Lista de Vehículos",
+    "searchVehicle": "Buscar Vehículo"
+  },
+  "collectors": {
+    "title": "Cobradores",
+    "newCollector": "Nuevo Cobrador",
+    "name": "Nombre",
+    "email": "Correo Electrónico",
+    "phone": "Teléfono",
+    "performance": "Desempeño",
+    "collectorList": "Lista de Cobradores",
+    "searchCollector": "Buscar Cobrador"
+  },
+  "configuration": {
+    "title": "Configuración",
+    "general": "General",
+    "security": "Seguridad",
+    "notifications": "Notificaciones",
+    "whatsapp": "WhatsApp",
+    "backup": "Copia de Seguridad",
+    "save": "Guardar Configuración",
+    "cancel": "Cancelar"
+  },
+  "profile": {
+    "title": "Mi Perfil",
+    "personalData": "Datos Personales",
+    "changePassword": "Cambiar Contraseña",
+    "currentPassword": "Contraseña Actual",
+    "newPassword": "Nueva Contraseña",
+    "confirmPassword": "Confirmar Contraseña",
+    "save": "Guardar Cambios",
+    "cancel": "Cancelar"
+  },
+  "users": {
+    "title": "Usuarios",
+    "newUser": "Nuevo Usuario",
+    "name": "Nombre",
+    "email": "Correo Electrónico",
+    "role": "Rol",
+    "status": "Estado",
+    "active": "Activo",
+    "inactive": "Inactivo",
+    "userList": "Lista de Usuarios",
+    "searchUser": "Buscar Usuario",
+    "editUser": "Editar Usuario",
+    "deleteUser": "Eliminar Usuario"
   }
 }

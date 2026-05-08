@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -8,6 +9,7 @@ import { toast } from "sonner";
 import { Eye, EyeOff, Lock, Mail, Infinity, Clock, Zap, BarChart3 } from "lucide-react";
 
 export default function Login() {
+  const { t } = useTranslation();
   const { isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -27,6 +28,7 @@ const ETAPAS = [
 ];
 
 export default function Onboarding() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [etapa, setEtapa] = useState(1);
   const [nomeEmpresa, setNomeEmpresa] = useState("");

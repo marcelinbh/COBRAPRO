@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +24,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.
 };
 
 export default function Cheques() {
+  const { t } = useTranslation();
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [dialogAberto, setDialogAberto] = useState(false);
   const [dialogDevolverAberto, setDialogDevolverAberto] = useState(false);

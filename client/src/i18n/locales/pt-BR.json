@@ -27,7 +27,31 @@
     "settings": "Configurações",
     "logout": "Sair",
     "profile": "Perfil",
-    "help": "Ajuda"
+    "help": "Ajuda",
+    "newContract": "Novo Contrato",
+    "dailyReport": "Relatório Diário",
+    "automaticNotifications": "Notificações Automáticas",
+    "configuration": "Configuração",
+    "myProfile": "Meu Perfil",
+    "users": "Usuários",
+    "whatsappConfig": "Configuração WhatsApp",
+    "portalCliente": "Portal do Cliente",
+    "onboarding": "Onboarding",
+    "simulator": "Simulador",
+    "reparcelation": "Reparcelamento",
+    "scores": "Scores",
+    "reports": "Relatórios",
+    "riskAnalysis": "Análise de Risco",
+    "backup": "Backup",
+    "collectors": "Cobradores",
+    "vehicles": "Veículos",
+    "phoneSales": "Venda de Telefone",
+    "cashbox": "Caixa",
+    "contracts": "Contratos",
+    "parcels": "Parcelas",
+    "loans": "Empréstimos",
+    "clients": "Clientes",
+    "dashboard": "Dashboard"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -62,7 +86,9 @@
     "businessScore": "Score do Negócio",
     "needsAttention": "Precisa de Atenção",
     "dueThisWeek": "Vence esta Semana",
-    "overdue30Days": "Atrasados +30 dias"
+    "overdue30Days": "Atrasados +30 dias",
+    "dailyReport": "Relatório Diário",
+    "automaticNotifications": "Notificações Automáticas"
   },
   "clients": {
     "title": "Clientes",
@@ -85,11 +111,16 @@
     "history": "Histórico",
     "documents": "Documentos",
     "personalData": "Dados Pessoais",
-    "address": "Endereço",
     "photo": "Foto",
     "rg": "RG",
     "instagram": "Instagram",
-    "facebook": "Facebook"
+    "facebook": "Facebook",
+    "details": "Detalhes do Cliente",
+    "edit": "Editar Cliente",
+    "delete": "Deletar Cliente",
+    "addClient": "Adicionar Cliente",
+    "clientList": "Lista de Clientes",
+    "searchClient": "Pesquisar Cliente"
   },
   "loans": {
     "title": "Empréstimos",
@@ -119,7 +150,6 @@
     "totalToReceive": "Total a Receber",
     "projectedProfit": "Lucro Previsto",
     "realizedProfit": "Lucro Realizado",
-    "dueDate": "Vencimento",
     "paid": "Pago",
     "onlyInterest": "Só Juros (por parcela)",
     "overdueDays": "dias de atraso",
@@ -132,7 +162,11 @@
     "whatsapp": "WhatsApp",
     "history": "Histórico",
     "new": "Novo",
-    "renewals": "Renovações"
+    "renewals": "Renovações",
+    "loanList": "Lista de Empréstimos",
+    "searchLoan": "Pesquisar Empréstimo",
+    "editLoan": "Editar Empréstimo",
+    "deleteLoan": "Deletar Empréstimo"
   },
   "parcels": {
     "title": "Parcelas",
@@ -146,7 +180,11 @@
     "pay": "Pagar",
     "details": "Detalhes",
     "renewed": "Renovada",
-    "renewalCount": "Renovações"
+    "renewalCount": "Renovações",
+    "parcelList": "Lista de Parcelas",
+    "searchParcel": "Pesquisar Parcela",
+    "payParcel": "Pagar Parcela",
+    "parcelDetails": "Detalhes da Parcela"
   },
   "cashbox": {
     "title": "Caixa",
@@ -162,18 +200,23 @@
     "type": "Tipo",
     "income": "Entrada",
     "expense": "Saída",
-    "dailyClose": "Fechamento Diário"
+    "dailyClose": "Fechamento Diário",
+    "transactionList": "Lista de Transações",
+    "searchTransaction": "Pesquisar Transação"
   },
   "reports": {
     "title": "Relatórios",
     "loans": "Relatório de Empréstimos",
     "delinquency": "Relatório de Inadimplência",
     "cashFlow": "Relatório de Fluxo de Caixa",
-    "collectorPerformance": "Performance do Koletor",
+    "collectorPerformance": "Performance do Cobrador",
     "month": "Mês",
     "year": "Ano",
     "generate": "Gerar Relatório",
-    "export": "Exportar Relatório"
+    "export": "Exportar Relatório",
+    "dailyReport": "Relatório Diário",
+    "monthlyReport": "Relatório Mensal",
+    "yearlyReport": "Relatório Anual"
   },
   "forms": {
     "paymentModal": "Modal de Pagamento",
@@ -193,7 +236,10 @@
     "discount": "Desconto",
     "residualBalance": "Saldo Residual",
     "receipt": "Comprovante",
-    "downloadReceipt": "Baixar Comprovante"
+    "downloadReceipt": "Baixar Comprovante",
+    "formTitle": "Formulário",
+    "formSubmit": "Enviar",
+    "formCancel": "Cancelar"
   },
   "home": {
     "title": "CobraPro - Sistema de Gestão de Cobranças",
@@ -243,5 +289,60 @@
     "created": "Criado com sucesso",
     "paymentProcessed": "Pagamento processado com sucesso",
     "emailSent": "E-mail enviado com sucesso"
+  },
+  "vehicles": {
+    "title": "Veículos",
+    "newVehicle": "Novo Veículo",
+    "plate": "Placa",
+    "model": "Modelo",
+    "brand": "Marca",
+    "year": "Ano",
+    "color": "Cor",
+    "vehicleList": "Lista de Veículos",
+    "searchVehicle": "Pesquisar Veículo"
+  },
+  "collectors": {
+    "title": "Cobradores",
+    "newCollector": "Novo Cobrador",
+    "name": "Nome",
+    "email": "E-mail",
+    "phone": "Telefone",
+    "performance": "Performance",
+    "collectorList": "Lista de Cobradores",
+    "searchCollector": "Pesquisar Cobrador"
+  },
+  "configuration": {
+    "title": "Configuração",
+    "general": "Geral",
+    "security": "Segurança",
+    "notifications": "Notificações",
+    "whatsapp": "WhatsApp",
+    "backup": "Backup",
+    "save": "Salvar Configurações",
+    "cancel": "Cancelar"
+  },
+  "profile": {
+    "title": "Meu Perfil",
+    "personalData": "Dados Pessoais",
+    "changePassword": "Alterar Senha",
+    "currentPassword": "Senha Atual",
+    "newPassword": "Nova Senha",
+    "confirmPassword": "Confirmar Senha",
+    "save": "Salvar Alterações",
+    "cancel": "Cancelar"
+  },
+  "users": {
+    "title": "Usuários",
+    "newUser": "Novo Usuário",
+    "name": "Nome",
+    "email": "E-mail",
+    "role": "Função",
+    "status": "Status",
+    "active": "Ativo",
+    "inactive": "Inativo",
+    "userList": "Lista de Usuários",
+    "searchUser": "Pesquisar Usuário",
+    "editUser": "Editar Usuário",
+    "deleteUser": "Deletar Usuário"
   }
 }

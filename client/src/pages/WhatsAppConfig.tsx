@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -183,6 +184,7 @@ function TemplateCard({ template, onSave }: { template: any; onSave: (id: number
 }
 
 export default function WhatsAppConfig() {
+  const { t } = useTranslation();
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const { data: status, refetch: refetchStatus } = trpc.whatsappEvolution.getStatus.useQuery(undefined, { refetchInterval: 5000 });
   const { data: qrData, refetch: refetchQR, isLoading: qrLoading } = trpc.whatsappEvolution.getQRCode.useQuery(undefined, {

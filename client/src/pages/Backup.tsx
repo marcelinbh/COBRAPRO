@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,6 +61,7 @@ function downloadJson(data: any, filename: string) {
 const hoje = new Date().toISOString().split('T')[0];
 
 export default function Backup() {
+  const { t } = useTranslation();
   const [formato, setFormato] = useState<'csv' | 'json'>('csv');
   const [exportando, setExportando] = useState<string | null>(null);
   const [filtroModalidade, setFiltroModalidade] = useState('todos');

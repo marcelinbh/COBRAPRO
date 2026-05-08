@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -24,6 +25,7 @@ const MODALIDADE_LABELS: Record<string, string> = {
 };
 
 export default function Relatorios() {
+  const { t } = useTranslation();
   const hoje = new Date();
   const [dataInicio, setDataInicio] = useState(
     new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,6 +67,7 @@ const TEMPLATES_PADRAO = {
 };
 
 export default function Configuracoes() {
+  const { t } = useTranslation();
   const { data: config } = trpc.configuracoes.get.useQuery();
   const utils = trpc.useUtils();
   const saveConfigMutation = trpc.configuracoes.save.useMutation({

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -25,6 +26,7 @@ function getBadgeDias(dias: number) {
 }
 
 export default function Inadimplencia() {
+  const { t } = useTranslation();
   const [ordenarPor, setOrdenarPor] = useState<"dias" | "valor" | "nome">("dias");
   const [busca, setBusca] = useState("");
   const [expandidos, setExpandidos] = useState<Set<number>>(new Set());

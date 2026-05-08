@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -36,6 +37,7 @@ function getCategoria(tipo: string) {
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function NotificacoesAutomaticas() {
+  const { t } = useTranslation();
   const [editando, setEditando] = useState<{ tipo: string; mensagem: string } | null>(null);
   const [disparando, setDisparando] = useState(false);
 

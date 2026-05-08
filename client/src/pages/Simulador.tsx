@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,7 @@ function getTaxaLabelCurto(tipoTaxa: string): string {
 }
 
 export default function Simulador() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [modalidade, setModalidade] = useState<Modalidade>("emprestimo_padrao");
   const [valorPrincipal, setValorPrincipal] = useState("");

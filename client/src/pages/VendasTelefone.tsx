@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import jsPDF from "jspdf";
@@ -343,6 +344,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function VendasTelefone() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
 
   // Tela atual: "lista" | "simulador" | "formulario"

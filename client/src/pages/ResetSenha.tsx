@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, CheckCircle2, AlertCircle, Lock } from "lucide-react";
 
 export default function ResetSenha() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const search = useSearch();
   const token = new URLSearchParams(search).get("token") ?? "";

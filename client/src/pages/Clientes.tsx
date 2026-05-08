@@ -1,4 +1,5 @@
 'use client';
+import { useTranslation } from 'react-i18next';
 import { useState, useCallback, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
@@ -650,6 +651,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
 
 // ─── PÁGINA PRINCIPAL ─────────────────────────────────────────────────────────
 export default function Clientes() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [busca, setBusca] = useState("");
   const [filtroTipo, setFiltroTipo] = useState("todos");

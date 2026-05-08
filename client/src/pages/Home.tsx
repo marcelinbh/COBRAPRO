@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -112,6 +113,7 @@ const FAQ_ITEMS = [
 ];
 
 export default function Home() {
+  const { t } = useTranslation();
   const { isAuthenticated, loading } = useAuth();
   const [, setLocation] = useLocation();
   const [planoAtivo, setPlanoAtivo] = useState<PlanoKey>("anual");

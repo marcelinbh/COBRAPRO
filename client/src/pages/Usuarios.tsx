@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +32,7 @@ function formatMoeda(v: number | string | null | undefined) {
 }
 
 export default function Usuarios() {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<"lista" | "performance">("lista");
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<any>(null);

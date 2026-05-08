@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ function getMesAtual() {
 }
 
 export default function Assinaturas() {
+  const { t } = useTranslation();
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'inadimplente' | 'suspensa' | 'cancelada'>('todas');
   const [modalCriar, setModalCriar] = useState(false);

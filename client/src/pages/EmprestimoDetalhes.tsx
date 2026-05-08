@@ -1,4 +1,5 @@
 'use client';
+import { useTranslation } from 'react-i18next';
 import { useState, useMemo } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,7 @@ import { gerarComprovantePDF } from '@/lib/gerarComprovante';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 
 export default function EmprestimoDetalhes() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [aba, setAba] = useState<'etiqueta' | 'detalhes' | 'comprovante' | 'historico'>('etiqueta');
   const { id } = useParams<{ id: string }>();

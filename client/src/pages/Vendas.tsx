@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { formatarMoeda } from "../../../shared/finance";
 import { useLocation } from "wouter";
 
 export default function Vendas() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [dialogProdutoAberto, setDialogProdutoAberto] = useState(false);
   const [produtoForm, setProdutoForm] = useState({

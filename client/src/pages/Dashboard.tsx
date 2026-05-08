@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { trpc } from "@/lib/trpc";
 import { formatarMoeda } from "../../../shared/finance";
 import {
@@ -111,6 +112,7 @@ function ScoreCircle({ score }: { score: number }) {
 }
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const { data: meuKoletor } = trpc.cobradores.me.useQuery();
   const isKoletor = meuKoletor?.perfil === 'koletor';

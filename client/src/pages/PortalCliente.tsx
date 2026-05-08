@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useSearch } from "wouter";
@@ -15,6 +16,7 @@ function StatusIcon({ status }: { status: string }) {
 }
 
 export default function PortalCliente() {
+  const { t } = useTranslation();
   const search = useSearch();
   const params = new URLSearchParams(search);
   const token = params.get('token');

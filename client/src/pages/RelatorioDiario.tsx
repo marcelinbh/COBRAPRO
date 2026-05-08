@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 
 export default function RelatorioDiario() {
+  const { t } = useTranslation();
   const [ativo, setAtivo] = useState(false);
   const [horario, setHorario] = useState("08:00");
   const [telefone, setTelefone] = useState("");

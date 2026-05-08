@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ function formatMoeda(v: number | string | null | undefined) {
 }
 
 export default function Reparcelamento() {
+  const { t } = useTranslation();
   const [, navigate] = useLocation();
   const [contratoIdInput, setContratoIdInput] = useState("");
   const [contratoId, setContratoId] = useState<number | null>(null);

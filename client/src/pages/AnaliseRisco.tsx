@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,7 @@ interface ClienteComRisco {
 }
 
 export default function AnaliseRisco() {
+  const { t } = useTranslation();
   const [clientes, setClientes] = useState<ClienteComRisco[]>([]);
   const [filtroRisco, setFiltroRisco] = useState<"todos" | "baixo" | "medio" | "alto" | "critico">("todos");
 

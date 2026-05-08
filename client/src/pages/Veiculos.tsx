@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import React, { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, Car, TrendingUp, DollarSign, CheckCircle } from 'lucide-react';
 
 export default function Veiculos() {
+  const { t } = useTranslation();
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todos' | 'ativo' | 'quitado'>('todos');
   const [novoVeiculo, setNovoVeiculo] = useState({

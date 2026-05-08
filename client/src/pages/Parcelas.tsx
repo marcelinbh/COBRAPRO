@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -329,6 +330,7 @@ function PagamentoDialog({
 }
 
 export default function Parcelas() {
+  const { t } = useTranslation();
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroModalidade, setFiltroModalidade] = useState("todas");

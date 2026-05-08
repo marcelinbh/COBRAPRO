@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
@@ -82,6 +83,7 @@ function BotaoPDF({ contratoId }: { contratoId: number }) {
 }
 
 export default function Contratos() {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");

@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation, useParams } from "wouter";
@@ -49,6 +50,7 @@ const STATUS_PARCELA_LABELS: Record<string, string> = {
 
 // ─── component ───────────────────────────────────────────────────────────────
 export default function ClienteDetalhe() {
+  const { t } = useTranslation();
   const params = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const clienteId = parseInt(params.id ?? "0");
