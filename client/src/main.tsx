@@ -6,6 +6,7 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import i18n from './i18n/i18n';
+import { TranslationProvider } from './contexts/TranslationContext';
 import App from "./App";
 import { getLoginUrl } from "./const";
 import "./index.css";
@@ -67,9 +68,11 @@ i18n.on('initialized', () => {
   createRoot(document.getElementById("root")!).render(
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <App />
-        </Suspense>
+        <TranslationProvider>
+          <Suspense fallback={<div>Loading...</div>}>
+            <App />
+          </Suspense>
+        </TranslationProvider>
       </QueryClientProvider>
     </trpc.Provider>
   );
@@ -80,9 +83,11 @@ if (i18n.isInitialized) {
   createRoot(document.getElementById("root")!).render(
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>
-        <Suspense fallback={<div>Loading...</div>}>
-          <App />
-        </Suspense>
+        <TranslationProvider>
+          <Suspense fallback={<div>Loading...</div>}>
+            <App />
+          </Suspense>
+        </TranslationProvider>
       </QueryClientProvider>
     </trpc.Provider>
   );

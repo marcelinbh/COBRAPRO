@@ -62,15 +62,14 @@ function maskPhone(v: string) {
 }
 function maskCEP(v: string) {
   return v.replace(/\D/g, "").slice(0, 8).replace(/(\d{5})(\d{0,3})/, "$1-$2");
-}
-
-// ─── SCORE BADGE ──────────────────────────────────────────────────────────────
+}// ─── SCORE BADGE ──────────────────────────────────────────────────────────────────
 function ScoreBadge({ score }: { score: number }) {
+  const { t } = useTranslation();
   let color = "text-green-500 bg-green-500/15 border-green-500/30";
-  let label = "Excelente";
-  if (score < 300) { color = "text-red-500 bg-red-500/15 border-red-500/30"; label = "Ruim"; }
-  else if (score < 500) { color = "text-yellow-500 bg-yellow-500/15 border-yellow-500/30"; label = "Regular"; }
-  else if (score < 700) { color = "text-foreground bg-muted border-border"; label = "Bom"; }
+  let label = t('common.excellent');
+  if (score < 300) { color = "text-red-500 bg-red-500/15 border-red-500/30"; label = t('common.poor'); }
+  else if (score < 500) { color = "text-yellow-500 bg-yellow-500/15 border-yellow-500/30"; label = t('common.regular'); }
+  else if (score < 700) { color = "text-foreground bg-muted border-border"; label = t('common.good'); }
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${color}`}>
       <Star className="h-3 w-3" />{score}
@@ -79,14 +78,13 @@ function ScoreBadge({ score }: { score: number }) {
 }
 
 function StatusBadge({ status }: { status: boolean }) {
+  const { t } = useTranslation();
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${status ? "bg-green-500/15 text-green-500 border-green-500/30" : "bg-gray-500/15 text-gray-500 border-gray-500/30"}`}>
-      {status ? "✓ Ativo" : "Inativo"}
+      {status ? `✓ ${t('common.active')}` : t('common.inactiveStatus')}
     </span>
   );
-}
-
-// ─── UPLOAD HELPER ────────────────────────────────────────────────────────────
+}// ─── UPLOAD HELPER ────────────────────────────────────────────────────────────
 async function uploadFile(file: File, folder = "clientes"): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
