@@ -84,7 +84,7 @@ export default function MeuPerfil() {
     if (whatsappStatus?.connected && showQRModal) {
       setShowQRModal(false);
       if (qrTimerRef.current) clearInterval(qrTimerRef.current);
-      toast.success("WhatsApp conectado com sucesso!");
+      toast.success(t('toast_success.whatsapp_conectado_com_sucesso'));
     }
   }, [whatsappStatus?.connected, showQRModal]);
 
@@ -110,28 +110,28 @@ export default function MeuPerfil() {
 
   // Mutations
   const updatePerfil = trpc.perfil.update.useMutation({
-    onSuccess: () => { toast.success("Perfil atualizado!"); setEditando(false); refetchPerfil(); },
+    onSuccess: () => { toast.success(t('toast_success.perfil_atualizado')); setEditando(false); refetchPerfil(); },
     onError: (e) => toast.error(e.message),
   });
 
   const salvarPix = trpc.perfil.salvarPix.useMutation({
-    onSuccess: () => { toast.success("Chave PIX salva!"); refetchPerfil(); },
+    onSuccess: () => { toast.success(t('toast_success.chave_pix_salva')); refetchPerfil(); },
     onError: (e) => toast.error(e.message),
   });
 
   const uploadLogo = trpc.perfil.uploadLogo.useMutation({
-    onSuccess: () => { toast.success("Logo enviada com sucesso!"); refetchPerfil(); },
+    onSuccess: () => { toast.success(t('toast_success.logo_enviada_com_sucesso')); refetchPerfil(); },
     onError: (e) => toast.error("Erro ao enviar logo: " + e.message),
   });
 
   const removerLogo = trpc.perfil.removerLogo.useMutation({
-    onSuccess: () => { toast.success("Logo removida!"); refetchPerfil(); },
+    onSuccess: () => { toast.success(t('toast_success.logo_removida')); refetchPerfil(); },
     onError: (e) => toast.error(e.message),
   });
 
   const alterarSenha = trpc.perfil.alterarSenha.useMutation({
     onSuccess: () => {
-      toast.success("Senha alterada com sucesso!");
+      toast.success(t('toast_success.senha_alterada_com_sucesso'));
       setNovaSenha("");
       setConfirmarSenha("");
     },
@@ -150,7 +150,7 @@ export default function MeuPerfil() {
   }, [connectWpp, refetchQR, refetchWpp]);
 
   const disconnectWpp = trpc.whatsappEvolution.disconnect.useMutation({
-    onSuccess: () => { toast.success("WhatsApp desconectado"); refetchWpp(); refetchQR(); },
+    onSuccess: () => { toast.success(t('toast_success.whatsapp_desconectado')); refetchWpp(); refetchQR(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -162,7 +162,7 @@ export default function MeuPerfil() {
   const handleUploadLogo = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error("Arquivo muito grande. Máximo 2MB."); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error(t('toast_error.arquivo_muito_grande_máximo_2mb')); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target?.result as string;
@@ -172,8 +172,8 @@ export default function MeuPerfil() {
   };
 
   const handleAlterarSenha = () => {
-    if (novaSenha.length < 6) { toast.error("A senha deve ter pelo menos 6 caracteres"); return; }
-    if (novaSenha !== confirmarSenha) { toast.error("As senhas não coincidem"); return; }
+    if (novaSenha.length < 6) { toast.error(t('toast_error.a_senha_deve_ter_pelo_menos_6_caracteres')); return; }
+    if (novaSenha !== confirmarSenha) { toast.error(t('toast_error.as_senhas_não_coincidem')); return; }
     alterarSenha.mutate({ novaSenha, confirmarSenha });
   };
 

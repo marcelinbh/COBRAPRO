@@ -142,6 +142,7 @@ function PagamentoDialog({
   contas: { id: number; nome: string; saldoAtual: number }[];
   onSuccess: () => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [valorPago, setValorPago] = useState("");
   const [contaCaixaId, setContaCaixaId] = useState("");
@@ -168,7 +169,7 @@ function PagamentoDialog({
   const utils = trpc.useUtils();
   const pagarMutation = trpc.parcelas.registrarPagamento.useMutation({
     onSuccess: () => {
-      toast.success("Pagamento registrado com sucesso!");
+      toast.success(t('toast_success.pagamento_registrado_com_sucesso'));
       setOpen(false);
       onSuccess();
       utils.dashboard.kpis.invalidate();
@@ -369,7 +370,7 @@ export default function Parcelas() {
 
   // Funções de exportação (lazy loading para reduzir bundle inicial em ~1.1MB)
   const exportarExcel = async () => {
-    if (!filtradas || filtradas.length === 0) { toast.error('Nenhuma parcela para exportar'); return; }
+    if (!filtradas || filtradas.length === 0) { toast.error(t('toast_error.nenhuma_parcela_para_exportar')); return; }
     const XLSX = await import('xlsx');
     const dados = filtradas.map(p => ({
       'Cliente': p.clienteNome,
@@ -385,11 +386,11 @@ export default function Parcelas() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Parcelas');
     XLSX.writeFile(wb, `parcelas_${new Date().toISOString().split('T')[0]}.xlsx`);
-    toast.success('Excel exportado com sucesso!');
+    toast.success(t('toast_success.excel_exportado_com_sucesso'));
   };
 
   const exportarPDF = async () => {
-    if (!filtradas || filtradas.length === 0) { toast.error('Nenhuma parcela para exportar'); return; }
+    if (!filtradas || filtradas.length === 0) { toast.error(t('toast_error.nenhuma_parcela_para_exportar')); return; }
     const { default: jsPDF } = await import('jspdf');
     const { default: autoTable } = await import('jspdf-autotable');
     const doc = new jsPDF({ orientation: 'landscape' });
@@ -419,7 +420,7 @@ export default function Parcelas() {
       alternateRowStyles: { fillColor: [245, 245, 245] },
     });
     doc.save(`parcelas_${new Date().toISOString().split('T')[0]}.pdf`);
-    toast.success('PDF exportado com sucesso!');
+    toast.success(t('toast_success.pdf_exportado_com_sucesso'));
   };
 
   return (

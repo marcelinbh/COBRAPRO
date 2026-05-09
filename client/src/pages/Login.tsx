@@ -39,10 +39,10 @@ export default function Login() {
         return;
       }
 
-      toast.success("Bem-vindo de volta!");
+      toast.success(t('toast_success.bemvindo_de_volta'));
       window.location.href = "/dashboard";
     } catch {
-      toast.error("Erro de conexão. Tente novamente.");
+      toast.error(t('toast_error.erro_de_conexão_tente_novamente'));
     } finally {
       setSubmitting(false);
     }

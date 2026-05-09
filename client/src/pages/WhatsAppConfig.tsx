@@ -199,11 +199,11 @@ export default function WhatsAppConfig() {
     onError: (e) => toast.error("Erro ao conectar: " + e.message),
   });
   const disconnect = trpc.whatsappEvolution.disconnect.useMutation({
-    onSuccess: () => { toast.success("WhatsApp desconectado"); refetchStatus(); setQrModalOpen(false); },
+    onSuccess: () => { toast.success(t('toast_success.whatsapp_desconectado')); refetchStatus(); setQrModalOpen(false); },
     onError: (e) => toast.error(e.message),
   });
   const updateTemplate = trpc.configuracoes.updateTemplate.useMutation({
-    onSuccess: () => { toast.success("Template salvo!"); refetchTemplates(); },
+    onSuccess: () => { toast.success(t('toast_success.template_salvo')); refetchTemplates(); },
     onError: (e) => toast.error("Erro ao salvar: " + e.message),
   });
   const connected = status?.connected ?? false;

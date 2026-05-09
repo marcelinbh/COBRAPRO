@@ -28,7 +28,7 @@ export default function PortalCliente() {
 
   const copiarPix = (chave: string) => {
     navigator.clipboard.writeText(chave);
-    toast.success("Chave PIX copiada!");
+    toast.success(t('toast_success.chave_pix_copiada'));
   };
 
   if (!token) {

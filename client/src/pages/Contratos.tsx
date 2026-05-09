@@ -14,6 +14,7 @@ import { formatarMoeda, formatarData, MODALIDADE_LABELS, STATUS_CONTRATO_LABELS 
 import { gerarPdfContrato } from "@/lib/gerarPdfContrato";
 
 function BotaoPDF({ contratoId }: { contratoId: number }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
   const utils = trpc.useUtils();
 
@@ -23,7 +24,7 @@ function BotaoPDF({ contratoId }: { contratoId: number }) {
     try {
       // Buscar dados completos do contrato
       const contrato = await utils.contratos.byId.fetch({ id: contratoId });
-      if (!contrato) { toast.error("Contrato não encontrado"); return; }
+      if (!contrato) { toast.error(t('toast_error.contrato_não_encontrado')); return; }
       // Buscar parcelas do contrato
       const parcelasData = await utils.parcelas.list.fetch({ contratoId });
       // Montar objeto para o PDF
@@ -57,7 +58,7 @@ function BotaoPDF({ contratoId }: { contratoId: number }) {
           dataPagamento: p.dataPagamento,
         })),
       });
-      toast.success("PDF gerado com sucesso!");
+      toast.success(t('toast_success.pdf_gerado_com_sucesso'));
     } catch (err: any) {
       toast.error("Erro ao gerar PDF: " + (err?.message ?? "erro desconhecido"));
     } finally {

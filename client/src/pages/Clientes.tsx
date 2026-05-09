@@ -172,7 +172,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
   });
   const updateMutation = trpc.clientes.update.useMutation({
     onSuccess: () => {
-      toast.success("Cliente atualizado!");
+      toast.success(t('toast_success.cliente_atualizado'));
       onSuccess();
       onClose();
     },
@@ -240,15 +240,15 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
 
   // Upload de foto
   const handleFotoChange = async (file: File) => {
-    if (!file.type.startsWith("image/")) { toast.error("Selecione uma imagem"); return; }
+    if (!file.type.startsWith("image/")) { toast.error(t('toast_error.selecione_uma_imagem')); return; }
     setUploadingFoto(true);
     try {
       const preview = URL.createObjectURL(file);
       setFotoPreview(preview);
       const url = await uploadFile(file, "clientes/fotos");
       setFotoUrl(url);
-      toast.success("Foto carregada!");
-    } catch { toast.error("Erro ao fazer upload da foto"); }
+      toast.success(t('toast_success.foto_carregada'));
+    } catch { toast.error(t('toast_error.erro_ao_fazer_upload_da_foto')); }
     setUploadingFoto(false);
   };
 
@@ -272,7 +272,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
       setDocumentos(prev => [...prev, ...novos]);
       setDocDescricao("");
       toast.success(`${novos.length} documento(s) enviado(s)!`);
-    } catch { toast.error("Erro ao fazer upload dos documentos"); }
+    } catch { toast.error(t('toast_error.erro_ao_fazer_upload_dos_documentos')); }
     setUploadingDoc(false);
   };
 
@@ -287,7 +287,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
   };
 
   const handleSalvar = () => {
-    if (!nome.trim()) { toast.error("Nome é obrigatório"); setAba("dados"); return; }
+    if (!nome.trim()) { toast.error(t('toast_error.nome_é_obrigatório')); setAba("dados"); return; }
     const payload = {
       nome,
       cpfCnpj: cpf || undefined,
@@ -673,7 +673,7 @@ export default function Clientes() {
 
   const deleteClienteMutation = trpc.clientes.deletar.useMutation({
     onSuccess: () => {
-      toast.success("Cliente deletado com sucesso!");
+      toast.success(t('toast_success.cliente_deletado_com_sucesso'));
       setDeleteClienteId(null);
       utils.clientes.list.invalidate();
     },
@@ -1001,7 +1001,7 @@ export default function Clientes() {
     try {
       const text = await file.text();
       const linhas = text.split(/\r?\n/).filter(l => l.trim());
-      if (linhas.length < 2) { toast.error('CSV vazio ou sem dados'); setImportando(false); return; }
+      if (linhas.length < 2) { toast.error(t('toast_error.csv_vazio_ou_sem_dados')); setImportando(false); return; }
       const sep = linhas[0].includes(';') ? ';' : ',';
       const headers = linhas[0].split(sep).map(h => h.trim().toLowerCase().replace(/["']/g, ''));
       const idxNome = headers.findIndex(h => h.includes('nome'));

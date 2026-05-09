@@ -401,7 +401,7 @@ export default function VendasTelefone() {
 
   const criarMutation = trpc.vendasTelefone.criar.useMutation({
     onSuccess: () => {
-      toast.success("Contrato criado com sucesso!");
+      toast.success(t('toast_success.contrato_criado_com_sucesso'));
       refetch();
       setTela("lista");
       resetForm();
@@ -410,12 +410,12 @@ export default function VendasTelefone() {
   });
 
   const deletarMutation = trpc.vendasTelefone.deletar.useMutation({
-    onSuccess: () => { toast.success("Excluído com sucesso!"); refetch(); },
+    onSuccess: () => { toast.success(t('toast_success.excluído_com_sucesso')); refetch(); },
     onError: (err) => toast.error("Erro: " + err.message),
   });
 
   const pagarMutation = trpc.vendasTelefone.pagarParcela.useMutation({
-    onSuccess: () => { toast.success("Parcela paga!"); refetch(); },
+    onSuccess: () => { toast.success(t('toast_success.parcela_paga')); refetch(); },
     onError: (err) => toast.error("Erro: " + err.message),
   });
 
@@ -435,11 +435,11 @@ export default function VendasTelefone() {
 
   function handleCriarContrato() {
     if (!compradorNome.trim()) {
-      toast.error("Nome obrigatório: informe o nome do comprador.");
+      toast.error(t('toast_error.nome_obrigatório_informe_o_nome_do_compr'));
       return;
     }
     if (!marca.trim() || !modelo.trim()) {
-      toast.error("Produto obrigatório: informe marca e modelo.");
+      toast.error(t('toast_error.produto_obrigatório_informe_marca_e_mode'));
       return;
     }
     criarMutation.mutate({
@@ -658,7 +658,7 @@ export default function VendasTelefone() {
                         // Buscar parcelas via query para o PDF
                         const parcelasDoCard = parcelasVenda.length > 0 && vendaSelecionada?.id === v.id ? parcelasVenda : [];
                         gerarPDFContrato(v, parcelasDoCard);
-                        toast.success("PDF gerado com sucesso!");
+                        toast.success(t('toast_success.pdf_gerado_com_sucesso'));
                       }}
                     >
                       <FileText className="w-3 h-3" /> PDF
@@ -695,7 +695,7 @@ export default function VendasTelefone() {
                 className="gap-1.5 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200"
                 onClick={() => {
                   gerarPDFContrato(vendaSelecionada, parcelasVenda);
-                  toast.success("PDF do contrato gerado!");
+                  toast.success(t('toast_success.pdf_do_contrato_gerado'));
                 }}
               >
                 <FileText className="w-3.5 h-3.5" /> Baixar Contrato PDF

@@ -30,8 +30,8 @@ export default function Calendario() {
   const { data: parcelasRaw } = trpc.parcelas.list.useQuery({});
   const { data: koletores } = (trpc as any).koletores?.list?.useQuery?.() ?? { data: [] };
   const pagarMutation = (trpc.parcelas as any).pagar?.useMutation ? (trpc.parcelas as any).pagar.useMutation({
-    onSuccess: () => { toast.success("Parcela paga com sucesso!"); },
-    onError: () => toast.error("Erro ao pagar parcela"),
+    onSuccess: () => { toast.success(t('toast_success.parcela_paga_com_sucesso')); },
+    onError: () => toast.error(t('toast_error.erro_ao_pagar_parcela')),
   }) : { mutate: () => {}, isPending: false };
 
   // Filtrar por cobrador

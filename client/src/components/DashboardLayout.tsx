@@ -61,36 +61,6 @@ import { trpc } from "@/lib/trpc";
 import { BottomNav } from "./BottomNav";
 import { useTranslation } from 'react-i18next';
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
-  { icon: User, label: "Meu Perfil", path: "/perfil" },
-  { icon: Users, label: "Clientes", path: "/clientes" },
-  { icon: DollarSign, label: "Empréstimos", path: "/emprestimos" },
-  { icon: Star, label: "Score de Clientes", path: "/scores" },
-  { icon: Car, label: "Veículos", path: "/veiculos" },
-  { icon: Smartphone, label: "Venda de Telefone", path: "/vendas-telefone" },
-  { icon: Database, label: "Backup", path: "/backup" },
-  { icon: AlertTriangle, label: "Análise de Risco", path: "/analise-risco" },
-  { icon: FileText, label: "Contratos", path: "/contratos" },
-  { icon: CreditCard, label: "Parcelas", path: "/parcelas" },
-  { icon: RefreshCw, label: "Reparcelamento", path: "/reparcelamento" },
-  { icon: Calculator, label: "Simulador", path: "/simulador" },
-  { icon: Receipt, label: "Contas a Pagar", path: "/contas-pagar" },
-  { icon: ShoppingBag, label: "Vendas", path: "/vendas" },
-  { icon: FileCheck, label: "Cheques", path: "/cheques" },
-  { icon: Wallet, label: "Caixa", path: "/caixa" },
-  { icon: CalendarDays, label: "Calendário", path: "/calendario" },
-  { icon: BarChart3, label: "Relatórios", path: "/relatorios" },
-  { icon: UserCog, label: "Cobradores", path: "/cobradores" },
-  { icon: Settings, label: "Configurações", path: "/configuracoes" },
-  { icon: Tv2, label: "Assinaturas", path: "/assinaturas" },
-  { icon: MessageCircle, label: "WhatsApp QR", path: "/whatsapp" },
-  { icon: ClipboardList, label: "Relatório Diário", path: "/relatorio-diario" },
-  { icon: TrendingDown, label: "Inadimplência", path: "/inadimplencia" },
-  { icon: Bell, label: "Mensagens Auto", path: "/notificacoes-automaticas" },
-  { icon: Smartphone, label: "Instalar App", path: "/install" },
-];
-
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
 const DEFAULT_WIDTH = 280;
 const MIN_WIDTH = 200;
@@ -102,6 +72,35 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { t } = useTranslation();
+  const menuItems = [
+    { icon: LayoutDashboard, label: t("menu.dashboard"), path: "/dashboard" },
+    { icon: User, label: t("menu.my_profile"), path: "/perfil" },
+    { icon: Users, label: t("menu.clients"), path: "/clientes" },
+    { icon: DollarSign, label: t("menu.loans"), path: "/emprestimos" },
+    { icon: Star, label: t("menu.client_score"), path: "/scores" },
+    { icon: Car, label: t("menu.vehicles"), path: "/veiculos" },
+    { icon: Smartphone, label: t("menu.phone_sales"), path: "/vendas-telefone" },
+    { icon: Database, label: t("menu.backup"), path: "/backup" },
+    { icon: AlertTriangle, label: t("menu.risk_analysis"), path: "/analise-risco" },
+    { icon: FileText, label: t("menu.contracts"), path: "/contratos" },
+    { icon: CreditCard, label: t("menu.installments"), path: "/parcelas" },
+    { icon: RefreshCw, label: t("menu.rescheduling"), path: "/reparcelamento" },
+    { icon: Calculator, label: t("menu.simulator"), path: "/simulador" },
+    { icon: Receipt, label: t("menu.accounts_payable"), path: "/contas-pagar" },
+    { icon: ShoppingBag, label: t("menu.sales"), path: "/vendas" },
+    { icon: FileCheck, label: t("menu.checks"), path: "/cheques" },
+    { icon: Wallet, label: t("menu.cash"), path: "/caixa" },
+    { icon: CalendarDays, label: t("menu.calendar"), path: "/calendario" },
+    { icon: BarChart3, label: t("menu.reports"), path: "/relatorios" },
+    { icon: UserCog, label: t("menu.collectors"), path: "/cobradores" },
+    { icon: Settings, label: t("menu.settings"), path: "/configuracoes" },
+    { icon: Tv2, label: t("menu.subscriptions"), path: "/assinaturas" },
+    { icon: MessageCircle, label: t("menu.whatsapp_qr"), path: "/whatsapp" },
+    { icon: ClipboardList, label: t("menu.daily_report"), path: "/relatorio-diario" },
+    { icon: TrendingDown, label: t("menu.default"), path: "/inadimplencia" },
+    { icon: Bell, label: t("menu.auto_messages"), path: "/notificacoes-automaticas" },
+    { icon: Smartphone, label: t("menu.install_app"), path: "/install" },
+  ];
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
@@ -130,7 +129,7 @@ export default function DashboardLayout({
   if (isMobile) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
-        <MobileHeader />
+        <MobileHeader menuItems={menuItems} />
         <main
           className="flex-1 overflow-y-auto"
           style={{ paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }}
@@ -139,7 +138,7 @@ export default function DashboardLayout({
             {children}
           </div>
         </main>
-        <BottomNav />
+        <BottomNav menuItems={menuItems} />
       </div>
     );
   }
@@ -152,16 +151,16 @@ export default function DashboardLayout({
         } as CSSProperties
       }
     >
-      <DashboardLayoutContent setSidebarWidth={setSidebarWidth}>
+      <DashboardLayoutContent setSidebarWidth={setSidebarWidth} menuItems={menuItems}>
         {children}
       </DashboardLayoutContent>
     </SidebarProvider>
   );
 }
 
-function MobileHeader() {
+function MobileHeader({ menuItems }: { menuItems: any[] }) {
   const [location] = useLocation();
-  const activeItem = menuItems.find(item => item.path === location);
+  const activeItem = menuItems.find((item: any) => item.path === location);
 
   return (
     <header
@@ -183,11 +182,13 @@ function MobileHeader() {
 type DashboardLayoutContentProps = {
   children: React.ReactNode;
   setSidebarWidth: (width: number) => void;
+  menuItems: any[];
 };
 
 function DashboardLayoutContent({
   children,
   setSidebarWidth,
+  menuItems,
 }: DashboardLayoutContentProps) {
   const { t } = useTranslation();
   const { user, logout } = useAuth();

@@ -914,3 +914,18 @@
 - [x] Corrigir t() em constantes de nível de módulo (STATUS_CONFIG, MODALIDADE_LABELS)
 - [x] Zero erros TypeScript após todas as correções
 - [x] Tradução testada e funcionando: Dashboard → Panel de Control, KPIs, Sidebar
+
+
+## Fase 46: Tradução 100% Completa PT-BR / Espanhol
+- [ ] Auditar todos os textos hardcoded (toasts, erros, labels, placeholders, menu)
+- [ ] Expandir arquivos de tradução com mensagens de sucesso/erro
+- [ ] Aplicar t() em todos os toasts (success, error, info)
+- [ ] Aplicar t() em todos os labels de formulários
+- [ ] Aplicar t() em todos os placeholders de input
+- [ ] Traduzir menu lateral (itens de navegação)
+- [ ] Traduzir botões e ações (Editar, Deletar, Salvar, Cancelar, etc)
+- [ ] Traduzir diálogos de confirmação
+- [ ] Traduzir textos de validação de formulários
+- [ ] Testar experiência 100% em PT-BR
+- [ ] Testar experiência 100% em Espanhol
+- [ ] Zero textos em português quando em modo Espanhol

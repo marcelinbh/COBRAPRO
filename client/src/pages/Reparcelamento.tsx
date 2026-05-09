@@ -50,7 +50,7 @@ export default function Reparcelamento() {
 
   function buscarContrato() {
     const id = parseInt(contratoIdInput);
-    if (!id || isNaN(id)) return toast.error("Digite um número de contrato válido");
+    if (!id || isNaN(id)) return toast.error(t('toast_error.digite_um_número_de_contrato_válido'));
     setContratoId(id);
   }
 

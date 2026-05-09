@@ -239,7 +239,7 @@ export default function Relatorios() {
   const utils = trpc.useUtils();
   const caixaExtraMutation = trpc.caixa.registrarTransacao.useMutation({
     onSuccess: () => {
-      toast.success('Lançamento registrado no caixa!');
+      toast.success(t('toast_success.lançamento_registrado_no_caixa'));
       setCaixaExtraValor('');
       setCaixaExtraDesc('');
       utils.caixa.transacoes.invalidate();
@@ -249,10 +249,10 @@ export default function Relatorios() {
 
   function handleCaixaExtra() {
     const valor = parseFloat(caixaExtraValor.replace(',', '.'));
-    if (!valor || valor <= 0) { toast.error('Informe um valor válido'); return; }
-    if (!caixaExtraDesc.trim()) { toast.error('Informe uma descrição'); return; }
+    if (!valor || valor <= 0) { toast.error(t('toast_error.informe_um_valor_válido')); return; }
+    if (!caixaExtraDesc.trim()) { toast.error(t('toast_error.informe_uma_descrição')); return; }
     const contaId = contasCaixa?.[0]?.id;
-    if (!contaId) { toast.error('Nenhuma conta caixa encontrada. Crie uma conta no módulo Caixa.'); return; }
+    if (!contaId) { toast.error(t('toast_error.nenhuma_conta_caixa_encontrada_crie_uma_')); return; }
     caixaExtraMutation.mutate({
       contaCaixaId: contaId,
       tipo: caixaExtraTipo,

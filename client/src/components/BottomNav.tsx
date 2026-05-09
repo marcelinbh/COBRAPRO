@@ -70,7 +70,7 @@ const allMenuItems = [
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
 ];
 
-export function BottomNav() {
+export function BottomNav({ menuItems }: { menuItems: any[] }) {
   const [location, setLocation] = useLocation();
   const [open, setOpen] = useState(false);
   const { user, logout } = useAuth();

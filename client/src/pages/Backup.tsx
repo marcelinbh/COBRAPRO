@@ -173,7 +173,7 @@ export default function Backup() {
           transacoes: tRes.dados,
         };
         downloadJson(backup, `backup_completo_cobrapro_${date}.json`);
-        toast.success('Backup completo exportado!');
+        toast.success(t('toast_success.backup_completo_exportado'));
       }
     } catch (e: any) {
       toast.error('Erro ao exportar: ' + (e?.message || 'Tente novamente'));

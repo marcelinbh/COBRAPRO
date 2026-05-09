@@ -72,7 +72,7 @@ export default function Configuracoes() {
   const utils = trpc.useUtils();
   const saveConfigMutation = trpc.configuracoes.save.useMutation({
     onSuccess: () => {
-      toast.success("Configurações salvas com sucesso!");
+      toast.success(t('toast_success.configurações_salvas_com_sucesso'));
       utils.configuracoes.get.invalidate();
     },
     onError: (e: { message: string }) => toast.error("Erro: " + e.message),
@@ -166,14 +166,14 @@ export default function Configuracoes() {
     if (abaAtiva === "atraso") setTemplateAtraso(TEMPLATES_PADRAO.atraso);
     if (abaAtiva === "venceHoje") setTemplateVenceHoje(TEMPLATES_PADRAO.venceHoje);
     if (abaAtiva === "antecipada") setTemplateAntecipada(TEMPLATES_PADRAO.antecipada);
-    toast.success("Template restaurado para o padrão!");
+    toast.success(t('toast_success.template_restaurado_para_o_padrão'));
   };
 
   const resetarTodos = () => {
     setTemplateAtraso(TEMPLATES_PADRAO.atraso);
     setTemplateVenceHoje(TEMPLATES_PADRAO.venceHoje);
     setTemplateAntecipada(TEMPLATES_PADRAO.antecipada);
-    toast.success("Todos os templates restaurados!");
+    toast.success(t('toast_success.todos_os_templates_restaurados'));
   };
 
   const salvarTemplates = () => {
@@ -200,7 +200,7 @@ export default function Configuracoes() {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) { toast.error('Logo deve ter no máximo 2MB'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error(t('toast_error.logo_deve_ter_no_máximo_2mb')); return; }
     setUploadingLogo(true);
     try {
       const formData = new FormData();
@@ -210,7 +210,7 @@ export default function Configuracoes() {
       const { url } = await res.json();
       setLogoUrl(url);
       await saveConfigMutation.mutateAsync({ logoUrl: url } as any);
-      toast.success('Logo salva com sucesso!');
+      toast.success(t('toast_success.logo_salva_com_sucesso'));
     } catch {
       // Fallback: usar base64 local
       const reader = new FileReader();
@@ -218,7 +218,7 @@ export default function Configuracoes() {
         const b64 = ev.target?.result as string;
         setLogoUrl(b64);
         await saveConfigMutation.mutateAsync({ logoUrl: b64 } as any);
-        toast.success('Logo salva com sucesso!');
+        toast.success(t('toast_success.logo_salva_com_sucesso'));
       };
       reader.readAsDataURL(file);
     } finally {
@@ -469,7 +469,7 @@ export default function Configuracoes() {
             <Label>Dias de Antecedência para Lembrete</Label>
             <Input className="mt-1 w-24" type="number" min="1" max="30" value={diasLembrete} onChange={e => setDiasLembrete(e.target.value)} />
           </div>
-          <Button size="sm" className="gap-2" onClick={() => toast.success("Configurações do BREVO salvas!")}>
+          <Button size="sm" className="gap-2" onClick={() => toast.success(t('toast_success.configurações_do_brevo_salvas'))}>
             <Save className="h-3 w-3" /> Salvar
           </Button>
         </CardContent>
@@ -510,7 +510,7 @@ export default function Configuracoes() {
               Promise.all(Object.entries(saveData).map(([k, v]) =>
                 (trpc as any).configuracoes?.salvar?.mutate?.({ chave: k, valor: v })
               ));
-              toast.success("Configurações do relatório diário salvas!");
+              toast.success(t('toast_success.configurações_do_relatório_diário_salvas'));
             }}>
               <Save className="h-3 w-3" /> Salvar
             </Button>
@@ -519,10 +519,10 @@ export default function Configuracoes() {
                 onSuccess: (data) => {
                   if (data?.whatsappUrl) {
                     window.open(data.whatsappUrl, '_blank');
-                    toast.success("Relatório gerado! WhatsApp aberto.");
+                    toast.success(t('toast_success.relatório_gerado_whatsapp_aberto'));
                   }
                 },
-                onError: () => toast.error("Erro ao gerar relatório")
+                onError: () => toast.error(t('toast_error.erro_ao_gerar_relatório'))
               });
             }} disabled={relatorioDiarioMutation.isPending}>
               <Send className="h-3 w-3" /> Enviar Agora

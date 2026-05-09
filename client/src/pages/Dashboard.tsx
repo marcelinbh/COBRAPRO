@@ -129,7 +129,7 @@ export default function Dashboard() {
       window.open(data.whatsappUrl, '_blank');
       toast.success(`Relatório gerado! Recebido hoje: R$ ${data.totalRecebidoHoje.toFixed(2).replace('.', ',')}`);
     },
-    onError: () => toast.error('Erro ao gerar relatório diário'),
+    onError: () => toast.error(t('toast_error.erro_ao_gerar_relatório_diário')),
   });
 
   const chartData = fluxoMensal ?? [];

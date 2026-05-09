@@ -46,7 +46,7 @@ export default function Onboarding() {
 
   const handleProximo = () => {
     if (etapa === 2 && !nomeEmpresa.trim()) {
-      toast.error("Informe o nome da sua empresa");
+      toast.error(t('toast_error.informe_o_nome_da_sua_empresa'));
       return;
     }
     if (etapa === 3) {

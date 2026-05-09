@@ -83,7 +83,7 @@ export default function Assinaturas() {
   // Mutations
   const criarMutation = trpc.assinaturas.criar.useMutation({
     onSuccess: () => {
-      toast.success('Assinatura criada com sucesso!');
+      toast.success(t('toast_success.assinatura_criada_com_sucesso'));
       utils.assinaturas.list.invalidate();
       utils.assinaturas.kpis.invalidate();
       setModalCriar(false);
@@ -94,7 +94,7 @@ export default function Assinaturas() {
 
   const pagarMutation = trpc.assinaturas.registrarPagamento.useMutation({
     onSuccess: () => {
-      toast.success('Pagamento registrado!');
+      toast.success(t('toast_success.pagamento_registrado'));
       utils.assinaturas.list.invalidate();
       utils.assinaturas.kpis.invalidate();
       if (expandedId) utils.assinaturas.pagamentos.invalidate({ assinaturaId: expandedId });
@@ -106,7 +106,7 @@ export default function Assinaturas() {
 
   const atualizarMutation = trpc.assinaturas.atualizar.useMutation({
     onSuccess: () => {
-      toast.success('Assinatura atualizada!');
+      toast.success(t('toast_success.assinatura_atualizada'));
       utils.assinaturas.list.invalidate();
       utils.assinaturas.kpis.invalidate();
       setModalEditar(null);
@@ -116,7 +116,7 @@ export default function Assinaturas() {
 
   const deletarMutation = trpc.assinaturas.deletar.useMutation({
     onSuccess: () => {
-      toast.success('Assinatura removida!');
+      toast.success(t('toast_success.assinatura_removida'));
       utils.assinaturas.list.invalidate();
       utils.assinaturas.kpis.invalidate();
     },
@@ -125,7 +125,7 @@ export default function Assinaturas() {
 
   const handleCriar = () => {
     if (!form.clienteId || !form.servico || !form.valorMensal) {
-      toast.error('Preencha cliente, serviço e valor mensal');
+      toast.error(t('toast_error.preencha_cliente_serviço_e_valor_mensal'));
       return;
     }
     criarMutation.mutate({
@@ -141,7 +141,7 @@ export default function Assinaturas() {
 
   const handlePagar = (assinatura: any) => {
     if (!formPagamento.valorPago) {
-      toast.error('Informe o valor pago');
+      toast.error(t('toast_error.informe_o_valor_pago'));
       return;
     }
     pagarMutation.mutate({

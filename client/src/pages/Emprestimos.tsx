@@ -76,6 +76,7 @@ function EditarEmprestimoModal({
   onClose: () => void;
   onSuccess: () => void;
 }) {
+  const { t } = useTranslation();
   const [valor, setValor] = useState(parseFloat(emprestimo.valorPrincipal));
   const [juros, setJuros] = useState(parseFloat(emprestimo.taxaJuros));
   const [tipo, setTipo] = useState(emprestimo.tipoTaxa);
@@ -97,7 +98,7 @@ function EditarEmprestimoModal({
   const utils = trpc.useUtils();
   const editarMutation = trpc.contratos.editar.useMutation({
     onSuccess: () => {
-      toast.success('Empréstimo atualizado com sucesso!');
+      toast.success(t('toast_success.empréstimo_atualizado_com_sucesso'));
       utils.contratos.list.invalidate();
       utils.contratos.listComParcelas.invalidate();
       utils.dashboard.kpis.invalidate();
@@ -125,8 +126,8 @@ function EditarEmprestimoModal({
   });
 
   const handleCriarParcela = () => {
-    if (!novaParcelaData) { toast.error('Informe a data de vencimento'); return; }
-    if (!novaParcelaValor || parseFloat(novaParcelaValor) <= 0) { toast.error('Informe o valor da parcela'); return; }
+    if (!novaParcelaData) { toast.error(t('toast_error.informe_a_data_de_vencimento')); return; }
+    if (!novaParcelaValor || parseFloat(novaParcelaValor) <= 0) { toast.error(t('toast_error.informe_o_valor_da_parcela')); return; }
     criarParcelaMutation.mutate({
       contratoId: emprestimo.id,
       dataVencimento: novaParcelaData,
@@ -452,6 +453,7 @@ function PagamentoModal({
   triggerClassName?: string;
   triggerIcon?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [tipo, setTipo] = useState<'total' | 'juros'>(modoInicial);
   const [contaCaixaId, setContaCaixaId] = useState(contas[0]?.id ? String(contas[0].id) : "");
@@ -469,7 +471,7 @@ function PagamentoModal({
       const valorPago = variables.valorPago;
       const parcelaNum = parcela?.numero_parcela ?? 1;
       setPagamentoRealizado({ valorPago, parcelaNum });
-      toast.success("Pagamento registrado!");
+      toast.success(t('toast_success.pagamento_registrado'));
       setTimeout(() => {
         onSuccess();
         utils.contratos.listComParcelas.invalidate();
@@ -483,7 +485,7 @@ function PagamentoModal({
 
   const pagarJurosMutation = trpc.parcelas.pagarJuros.useMutation({
     onSuccess: () => {
-      toast.success("Juros pagos! Empréstimo renovado.");
+      toast.success(t('toast_success.juros_pagos_empréstimo_renovado'));
       setOpen(false);
       setTimeout(() => {
         onSuccess();
@@ -513,7 +515,7 @@ function PagamentoModal({
   if (!parcela) return null;
 
   const handleConfirmar = () => {
-    if (!contaCaixaId) { toast.error("Selecione uma conta"); return; }
+    if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
     const contaId = parseInt(contaCaixaId);
     const dataManual = dataPagamentoCustom || undefined;
 
@@ -786,6 +788,7 @@ function EmprestimoCardCobra({
   contas: { id: number; nome: string; saldoAtual: number }[];
   onRefresh: () => void;
 }) {
+  const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [showEditarModal, setShowEditarModal] = useState(false);
   const [showEditarJurosModal, setShowEditarJurosModal] = useState<number | null>(null);
@@ -806,20 +809,20 @@ function EmprestimoCardCobra({
   const [etiquetasSelecionadas, setEtiquetasSelecionadas] = useState<string[]>(emp.etiquetas ?? []);
 
   const criarEtiquetaMutation = trpc.etiquetas.criar.useMutation({
-    onSuccess: () => { toast.success("Etiqueta criada!"); setNovaEtiquetaNome(""); utils.etiquetas.listar.invalidate(); },
+    onSuccess: () => { toast.success(t('toast_success.etiqueta_criada')); setNovaEtiquetaNome(""); utils.etiquetas.listar.invalidate(); },
     onError: (e) => toast.error("Erro: " + e.message),
   });
   const removerEtiquetaMutation = trpc.etiquetas.remover.useMutation({
     onSuccess: () => { utils.etiquetas.listar.invalidate(); },
   });
   const aplicarEtiquetasMutation = trpc.etiquetas.aplicarContrato.useMutation({
-    onSuccess: () => { toast.success("Etiquetas salvas!"); setShowEtiquetasModal(false); onRefresh(); utils.contratos.listComParcelas.invalidate(); },
+    onSuccess: () => { toast.success(t('toast_success.etiquetas_salvas')); setShowEtiquetasModal(false); onRefresh(); utils.contratos.listComParcelas.invalidate(); },
     onError: (e) => toast.error("Erro: " + e.message),
   });
 
   const editarJurosMutation = trpc.contratos.editarJuros.useMutation({
     onSuccess: () => {
-      toast.success("Taxa de juros atualizada!");
+      toast.success(t('toast_success.taxa_de_juros_atualizada'));
       setShowEditarJurosModal(null);
       setNovasTaxaJuros("");
       onRefresh();
@@ -830,7 +833,7 @@ function EmprestimoCardCobra({
   });
   const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation({
     onSuccess: () => {
-      toast.success("Multa aplicada com sucesso!");
+      toast.success(t('toast_success.multa_aplicada_com_sucesso'));
       setShowAplicarMultaModal(null);
       setValorMulta("");
       setMotivoMulta("");
@@ -842,7 +845,7 @@ function EmprestimoCardCobra({
   });
   const deletarMutation = trpc.contratos.deletar.useMutation({
     onSuccess: () => {
-      toast.success("Empréstimo deletado");
+      toast.success(t('toast_success.empréstimo_deletado'));
       onRefresh();
       utils.contratos.listComParcelas.invalidate();
       utils.dashboard.kpis.invalidate();
@@ -864,7 +867,7 @@ function EmprestimoCardCobra({
 
   const handleWhatsApp = async (tipo: 'atraso' | 'preventivo' = 'atraso') => {
     if (!emp.clienteWhatsapp) {
-      toast.error("Telefone WhatsApp não cadastrado");
+      toast.error(t('toast_error.telefone_whatsapp_não_cadastrado'));
       return;
     }
     setLoadingWpp(true);
@@ -876,7 +879,7 @@ function EmprestimoCardCobra({
       if (result.whatsappUrl) {
         window.open(result.whatsappUrl, '_blank');
       } else {
-        toast.error("Não foi possível gerar o link do WhatsApp");
+        toast.error(t('toast_error.não_foi_possível_gerar_o_link_do_whatsap'));
       }
     } catch {
       // Fallback para mensagem simples
@@ -904,9 +907,9 @@ function EmprestimoCardCobra({
         dataPagamento: parcelaPaga?.data_pagamento ?? new Date().toISOString(),
         modalidade: emp.modalidade,
       });
-      toast.success('Comprovante gerado!');
+      toast.success(t('toast_success.comprovante_gerado'));
     } catch {
-      toast.error('Erro ao gerar comprovante');
+      toast.error(t('toast_error.erro_ao_gerar_comprovante'));
     } finally {
       setGerandoPDF(false);
     }
@@ -1285,7 +1288,7 @@ function EmprestimoCardCobra({
                   className="flex-1 bg-blue-600 hover:bg-blue-700" 
                   onClick={() => {
                     if (!novasTaxaJuros.trim()) {
-                      toast.error("Digite a nova taxa de juros");
+                      toast.error(t('toast_error.digite_a_nova_taxa_de_juros'));
                       return;
                     }
                     editarJurosMutation.mutate({
@@ -1335,7 +1338,7 @@ function EmprestimoCardCobra({
                   className="flex-1 bg-red-600 hover:bg-red-700" 
                   onClick={() => {
                     if (!valorMulta.trim()) {
-                      toast.error("Digite o valor da multa");
+                      toast.error(t('toast_error.digite_o_valor_da_multa'));
                       return;
                     }
                     aplicarMultaMutation.mutate({
@@ -1444,7 +1447,7 @@ export default function Emprestimos() {
     onSuccess: (data) => {
       const urls = data.resultados.filter(r => r.whatsappUrl && r.sucesso);
       if (urls.length === 0) {
-        toast.error('Nenhum cliente tem WhatsApp cadastrado');
+        toast.error(t('toast_error.nenhum_cliente_tem_whatsapp_cadastrado'));
         return;
       }
       toast.success(`Abrindo ${urls.length} cobranças...`);

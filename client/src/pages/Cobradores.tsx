@@ -46,17 +46,17 @@ export default function Cobradores() {
   });
 
   const createMutation = trpc.cobradores.create.useMutation({
-    onSuccess: () => { toast.success("Cobrador criado com sucesso!"); refetch(); setModalOpen(false); setEditando(null); },
+    onSuccess: () => { toast.success(t('toast_success.cobrador_criado_com_sucesso')); refetch(); setModalOpen(false); setEditando(null); },
     onError: (e) => toast.error(e.message),
   });
 
   const updateMutation = trpc.cobradores.update.useMutation({
-    onSuccess: () => { toast.success("Cobrador atualizado!"); refetch(); setModalOpen(false); setEditando(null); },
+    onSuccess: () => { toast.success(t('toast_success.cobrador_atualizado')); refetch(); setModalOpen(false); setEditando(null); },
     onError: (e) => toast.error(e.message),
   });
 
   const deleteMutation = trpc.cobradores.delete.useMutation({
-    onSuccess: () => { toast.success("Cobrador desativado!"); refetch(); },
+    onSuccess: () => { toast.success(t('toast_success.cobrador_desativado')); refetch(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -83,7 +83,7 @@ export default function Cobradores() {
   }
 
   function salvar() {
-    if (!form.nome.trim()) return toast.error("Nome é obrigatório");
+    if (!form.nome.trim()) return toast.error(t('toast_error.nome_é_obrigatório'));
     if (editando) {
       updateMutation.mutate({ id: editando.id, ...form });
     } else {

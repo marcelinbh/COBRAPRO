@@ -59,7 +59,7 @@ export default function NotificacoesAutomaticas() {
     onSuccess: () => {
       utils.notificacoes.listar.invalidate();
       setEditando(null);
-      toast.success("Mensagem salva com sucesso!");
+      toast.success(t('toast_success.mensagem_salva_com_sucesso'));
     },
     onError: (e) => toast.error(e.message),
   });

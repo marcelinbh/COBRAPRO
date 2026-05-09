@@ -154,11 +154,11 @@ export default function NovoContrato() {
 
   const handleSubmit = () => {
     if (!form.clienteId || !form.valorPrincipal || !form.dataVencimentoPrimeira) {
-      toast.error("Preencha todos os campos obrigatórios");
+      toast.error(t('toast_error.preencha_todos_os_campos_obrigatórios'));
       return;
     }
     if (modoDataManual && datasManual.some(d => !d)) {
-      toast.error("Preencha todas as datas de vencimento");
+      toast.error(t('toast_error.preencha_todas_as_datas_de_vencimento'));
       return;
     }
 

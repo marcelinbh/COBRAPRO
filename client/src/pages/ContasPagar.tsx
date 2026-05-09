@@ -78,7 +78,7 @@ export default function ContasPagar() {
       utils.contasPagar.resumo.invalidate();
       setDialogAberto(false);
       setForm({ descricao: "", categoria: "outros", valor: "", dataVencimento: new Date().toISOString().split("T")[0], recorrente: false, periodicidade: "unica", observacoes: "" });
-      toast.success("Conta a pagar registrada com sucesso.");
+      toast.success(t('toast_success.conta_a_pagar_registrada_com_sucesso'));
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });
@@ -88,7 +88,7 @@ export default function ContasPagar() {
       utils.contasPagar.listar.invalidate();
       utils.contasPagar.resumo.invalidate();
       setDialogPagarId(null);
-      toast.success("Conta marcada como paga!");
+      toast.success(t('toast_success.conta_marcada_como_paga'));
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });
@@ -97,7 +97,7 @@ export default function ContasPagar() {
     onSuccess: () => {
       utils.contasPagar.listar.invalidate();
       utils.contasPagar.resumo.invalidate();
-      toast.success("Conta cancelada.");
+      toast.success(t('toast_success.conta_cancelada'));
     },
   });
 
@@ -105,14 +105,14 @@ export default function ContasPagar() {
     onSuccess: () => {
       utils.contasPagar.listar.invalidate();
       utils.contasPagar.resumo.invalidate();
-      toast.success("Conta excluída.");
+      toast.success(t('toast_success.conta_excluída'));
     },
   });
 
   function handleCriar() {
     const valor = parseFloat(form.valor.replace(",", "."));
     if (!form.descricao || !valor || !form.dataVencimento) {
-      toast.error("Preencha todos os campos obrigatórios");
+      toast.error(t('toast_error.preencha_todos_os_campos_obrigatórios'));
       return;
     }
     criarMutation.mutate({

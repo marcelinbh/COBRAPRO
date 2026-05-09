@@ -90,7 +90,7 @@ export default function Cheques() {
     onSuccess: () => {
       utils.cheques.listar.invalidate();
       utils.cheques.resumo.invalidate();
-      toast.success("Cheque marcado como compensado!");
+      toast.success(t('toast_success.cheque_marcado_como_compensado'));
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });
@@ -101,7 +101,7 @@ export default function Cheques() {
       utils.cheques.resumo.invalidate();
       setDialogDevolverAberto(false);
       setMotivoDevolucao("");
-      toast.success("Cheque marcado como devolvido.");
+      toast.success(t('toast_success.cheque_marcado_como_devolvido'));
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });
@@ -110,7 +110,7 @@ export default function Cheques() {
     onSuccess: () => {
       utils.cheques.listar.invalidate();
       utils.cheques.resumo.invalidate();
-      toast.success("Cheque cancelado.");
+      toast.success(t('toast_success.cheque_cancelado'));
     },
   });
 
@@ -118,7 +118,7 @@ export default function Cheques() {
     const valor = parseFloat(form.valorNominal.replace(",", "."));
     const taxa = parseFloat(form.taxaDesconto);
     if (!form.clienteId || !form.emitente || !valor || !taxa || !form.dataVencimento) {
-      toast.error("Preencha todos os campos obrigatórios");
+      toast.error(t('toast_error.preencha_todos_os_campos_obrigatórios'));
       return;
     }
     criarMutation.mutate({
@@ -464,7 +464,7 @@ export default function Cheques() {
             <Button
               className="w-full bg-red-600 hover:bg-red-700 text-white"
               onClick={() => {
-                if (!motivoDevolucao.trim()) { toast.error("Informe o motivo da devolução"); return; }
+                if (!motivoDevolucao.trim()) { toast.error(t('toast_error.informe_o_motivo_da_devolução')); return; }
                 devolverMutation.mutate({ id: chequeIdDevolver!, motivo: motivoDevolucao });
               }}
               disabled={devolverMutation.isPending}

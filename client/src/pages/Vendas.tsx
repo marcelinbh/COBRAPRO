@@ -33,7 +33,7 @@ export default function Vendas() {
       utils.vendas.listarProdutos.invalidate();
       setDialogProdutoAberto(false);
       setProdutoForm({ nome: "", descricao: "", preco: "", estoque: "0" });
-      toast.success("Produto cadastrado com sucesso!");
+      toast.success(t('toast_success.produto_cadastrado_com_sucesso'));
     },
     onError: (e) => toast.error("Erro: " + e.message),
   });
@@ -41,7 +41,7 @@ export default function Vendas() {
   function handleCriarProduto() {
     const preco = parseFloat(produtoForm.preco.replace(",", "."));
     if (!produtoForm.nome || !preco) {
-      toast.error("Preencha nome e preço do produto");
+      toast.error(t('toast_error.preencha_nome_e_preço_do_produto'));
       return;
     }
     criarProdutoMutation.mutate({

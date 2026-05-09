@@ -70,7 +70,7 @@ export default function EmprestimoDetalhes() {
     onSuccess: (_data, variables) => {
       const parcelaNum = emprestimo?.todasParcelas?.find((p: any) => p.id === variables.parcelaId)?.numero_parcela ?? 1;
       setPagamentoRealizado({ valorPago: variables.valorPago, parcelaNum });
-      toast.success('Pagamento registrado!');
+      toast.success(t('toast_success.pagamento_registrado'));
       refetch();
       utils.contratos.listComParcelas.invalidate();
       utils.dashboard.kpis.invalidate();
@@ -80,7 +80,7 @@ export default function EmprestimoDetalhes() {
 
   const pagarJurosMutation = trpc.parcelas.pagarJuros.useMutation({
     onSuccess: () => {
-      toast.success('Juros pagos! Empréstimo renovado.');
+      toast.success(t('toast_success.juros_pagos_empréstimo_renovado'));
       setModalPagarJuros(false);
       refetch();
       utils.contratos.listComParcelas.invalidate();
@@ -90,7 +90,7 @@ export default function EmprestimoDetalhes() {
 
   const editarJurosMutation = trpc.contratos.editarJuros.useMutation({
     onSuccess: () => {
-      toast.success('Taxa de juros atualizada!');
+      toast.success(t('toast_success.taxa_de_juros_atualizada'));
       setModalEditarJuros(false);
       setNovaTaxa('');
       refetch();
@@ -101,7 +101,7 @@ export default function EmprestimoDetalhes() {
 
   const criarParcelaMutation = trpc.parcelas.criarParcela.useMutation({
     onSuccess: () => {
-      toast.success('Parcela criada com sucesso!');
+      toast.success(t('toast_success.parcela_criada_com_sucesso'));
       setShowNovaParcela(false);
       setNovaParcelaData('');
       setNovaParcelaValor('');
@@ -113,7 +113,7 @@ export default function EmprestimoDetalhes() {
 
   const editarParcelaMutation = trpc.parcelas.editarParcela.useMutation({
     onSuccess: () => {
-      toast.success('Parcela atualizada!');
+      toast.success(t('toast_success.parcela_atualizada'));
       setParcelaEditando(null);
       refetch();
       utils.contratos.listComParcelas.invalidate();
@@ -123,7 +123,7 @@ export default function EmprestimoDetalhes() {
 
   const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation({
     onSuccess: () => {
-      toast.success('Multa aplicada com sucesso!');
+      toast.success(t('toast_success.multa_aplicada_com_sucesso'));
       setModalMulta(false);
       setValorMulta('');
       refetch();
@@ -165,8 +165,8 @@ export default function EmprestimoDetalhes() {
   const valorJurosParcela = emprestimo.valorJurosParcela;
 
   const handlePagar = () => {
-    if (!contaCaixaId) { toast.error('Selecione uma conta'); return; }
-    if (!parcela) { toast.error('Nenhuma parcela pendente'); return; }
+    if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
+    if (!parcela) { toast.error(t('toast_error.nenhuma_parcela_pendente')); return; }
     const valor = valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela);
     const jurosVal = jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : undefined;
     const dataManual = dataPagamentoCustom || undefined;
@@ -180,9 +180,9 @@ export default function EmprestimoDetalhes() {
   };
 
   const handleCriarParcela = () => {
-    if (!novaParcelaData) { toast.error('Informe a data de vencimento'); return; }
+    if (!novaParcelaData) { toast.error(t('toast_error.informe_a_data_de_vencimento')); return; }
     const valor = novaParcelaValor ? parseFloat(novaParcelaValor) : (emprestimo?.valorPrincipal ?? 0);
-    if (valor <= 0) { toast.error('Informe um valor válido'); return; }
+    if (valor <= 0) { toast.error(t('toast_error.informe_um_valor_válido')); return; }
     criarParcelaMutation.mutate({
       contratoId: emprestimoId,
       dataVencimento: novaParcelaData,
@@ -191,8 +191,8 @@ export default function EmprestimoDetalhes() {
   };
 
   const handlePagarJuros = () => {
-    if (!contaCaixaId) { toast.error('Selecione uma conta'); return; }
-    if (!parcela) { toast.error('Nenhuma parcela pendente'); return; }
+    if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
+    if (!parcela) { toast.error(t('toast_error.nenhuma_parcela_pendente')); return; }
     const valor = valorCustomJuros ? parseFloat(valorCustomJuros) : valorJurosParcela;
     pagarJurosMutation.mutate({
       parcelaId: parcela.id,
@@ -202,7 +202,7 @@ export default function EmprestimoDetalhes() {
   };
 
   const handleWhatsApp = async (tipo: 'atraso' | 'preventivo' = 'atraso') => {
-    if (!emprestimo.clienteWhatsapp) { toast.error('Telefone WhatsApp não cadastrado'); return; }
+    if (!emprestimo.clienteWhatsapp) { toast.error(t('toast_error.telefone_whatsapp_não_cadastrado')); return; }
     setLoadingWpp(true);
     try {
       const result = await utils.client.whatsapp.gerarMensagemContrato.query({
@@ -212,7 +212,7 @@ export default function EmprestimoDetalhes() {
       if (result.whatsappUrl) {
         window.open(result.whatsappUrl, '_blank');
       } else {
-        toast.error('Não foi possível gerar o link do WhatsApp');
+        toast.error(t('toast_error.não_foi_possível_gerar_o_link_do_whatsap'));
       }
     } catch {
       const msg = tipo === 'atraso'
@@ -243,9 +243,9 @@ export default function EmprestimoDetalhes() {
         enderecoEmpresa: config?.enderecoEmpresa || undefined,
         telefoneEmpresa: config?.telefoneEmpresa || undefined,
       });
-      toast.success('Comprovante gerado!');
+      toast.success(t('toast_success.comprovante_gerado'));
     } catch {
-      toast.error('Erro ao gerar comprovante');
+      toast.error(t('toast_error.erro_ao_gerar_comprovante'));
     } finally {
       setGerandoPDF(false);
     }

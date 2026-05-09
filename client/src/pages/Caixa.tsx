@@ -22,7 +22,7 @@ function NovaConta({ onSuccess }: { onSuccess: () => void }) {
   const [form, setForm] = useState({ nome: "", tipo: "caixa", banco: "", saldoInicial: "0" });
 
   const mutation = trpc.caixa.criarConta.useMutation({
-    onSuccess: () => { toast.success("Conta criada!"); setOpen(false); onSuccess(); },
+    onSuccess: () => { toast.success(t('toast_success.conta_criada')); setOpen(false); onSuccess(); },
     onError: (e) => toast.error(e.message),
   });
 
@@ -81,7 +81,7 @@ function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: stri
   const [form, setForm] = useState({ contaCaixaId: "", tipo: "entrada", categoria: "outros", valor: "", descricao: "" });
 
   const mutation = trpc.caixa.registrarTransacao.useMutation({
-    onSuccess: () => { toast.success("Transação registrada!"); setOpen(false); onSuccess(); },
+    onSuccess: () => { toast.success(t('toast_success.transação_registrada')); setOpen(false); onSuccess(); },
     onError: (e) => toast.error(e.message),
   });
 

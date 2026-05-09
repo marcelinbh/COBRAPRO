@@ -27,12 +27,12 @@ export default function RelatorioDiario() {
   );
 
   const saveConfig = trpc.relatorioDiario.saveConfig.useMutation({
-    onSuccess: () => toast.success("Configurações salvas com sucesso!"),
+    onSuccess: () => toast.success(t('toast_success.configurações_salvas_com_sucesso')),
     onError: (e) => toast.error(e.message),
   });
 
   const enviarAgora = trpc.relatorioDiario.enviarAgora.useMutation({
-    onSuccess: () => toast.success("Relatório enviado com sucesso! Verifique seu WhatsApp."),
+    onSuccess: () => toast.success(t('toast_success.relatório_enviado_com_sucesso_verifique_')),
     onError: (e) => toast.error(e.message),
   });
 
@@ -52,11 +52,11 @@ export default function RelatorioDiario() {
 
   const handleEnviarAgora = () => {
     if (!telefone) {
-      toast.error("Configure o número de telefone primeiro");
+      toast.error(t('toast_error.configure_o_número_de_telefone_primeiro'));
       return;
     }
     if (!wppStatus?.connected) {
-      toast.error("WhatsApp não está conectado. Vá em Meu Perfil para conectar.");
+      toast.error(t('toast_error.whatsapp_não_está_conectado_vá_em_meu_pe'));
       return;
     }
     enviarAgora.mutate({ telefone });
