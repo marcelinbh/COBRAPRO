@@ -1644,6 +1644,7 @@
     "toggle_italic": "Toggle italic"
   },
   "menu": {
+    "dashboard": "Dashboard",
     "title": "Dashboard",
     "my_profile": "Meu Perfil",
     "clients": "Clientes",

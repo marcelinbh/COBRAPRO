@@ -1644,6 +1644,7 @@
     "toggle_italic": "[TRADUZIR] Toggle italic"
   },
   "menu": {
+    "dashboard": "Panel de Control",
     "title": "Panel de Control",
     "my_profile": "Mi Perfil",
     "clients": "Clientes",
