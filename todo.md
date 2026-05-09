@@ -1021,3 +1021,10 @@
 - [x] Corrigir cabeçalhos das tabelas PDF (Parcela, Vencimento, Valor, Periodicidade, etc.)
 - [x] Adicionar 30+ novas chaves em pt-BR.json e es.json (simulator.taxaLabel.*, simulator.taxaLabelCurto.*, etc.)
 - [x] Zero erros TypeScript após todas as mudanças
+
+## Fase 58: Auditoria Completa PT-BR e Espanhol (09/05/2026)
+- [x] Botão LANGUAGE movido para o SidebarHeader (sempre visível, ao lado do logo)
+- [x] LanguageSwitcher atualizado com prop compact (modo colapsado) e localStorage.setItem para persistência
+- [ ] Testar fluxo completo PT-BR: Empréstimos, Clientes, Parcelas, Simulador, Caixa
+- [ ] Testar fluxo completo ES: todas as páginas com tradução
+- [ ] Corrigir bugs encontrados na auditoria

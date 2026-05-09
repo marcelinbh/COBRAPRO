@@ -8,7 +8,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Globe } from 'lucide-react';
 
-export function LanguageSwitcher() {
+interface LanguageSwitcherProps {
+  compact?: boolean;
+}
+
+export function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
   const { i18n } = useTranslation();
 
   const languages = [
@@ -20,6 +24,7 @@ export function LanguageSwitcher() {
 
   const handleLanguageChange = (langCode: string) => {
     i18n.changeLanguage(langCode);
+    localStorage.setItem('i18nextLng', langCode);
   };
 
   return (
@@ -28,11 +33,14 @@ export function LanguageSwitcher() {
         <Button
           variant="outline"
           size="sm"
-          className="gap-2 bg-slate-900 border-slate-700 hover:bg-slate-800"
+          className={compact
+            ? "gap-1 bg-slate-900 border-slate-700 hover:bg-slate-800 px-2"
+            : "gap-2 bg-slate-900 border-slate-700 hover:bg-slate-800"
+          }
         >
           <Globe className="w-4 h-4" />
-          <span className="text-xs font-semibold">LANGUAGE</span>
-          <span className="px-2 py-1 text-xs font-bold bg-amber-500 text-slate-900 rounded">
+          {!compact && <span className="text-xs font-semibold">LANGUAGE</span>}
+          <span className="px-1.5 py-0.5 text-xs font-bold bg-amber-500 text-slate-900 rounded">
             {currentLanguage.label}
           </span>
         </Button>

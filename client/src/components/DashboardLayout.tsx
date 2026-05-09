@@ -259,8 +259,8 @@ function DashboardLayoutContent({
           className="border-r-0"
           disableTransition={isResizing}
         >
-          <SidebarHeader className="h-16 justify-center border-b border-sidebar-border">
-            <div className="flex items-center gap-3 px-2 transition-all w-full">
+          <SidebarHeader className="border-b border-sidebar-border">
+            <div className="flex items-center gap-2 px-2 py-2 transition-all w-full">
               <button
                 onClick={toggleSidebar}
                 className="h-8 w-8 flex items-center justify-center hover:bg-accent rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring shrink-0"
@@ -269,21 +269,29 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
-                <div className="flex items-center min-w-0">
+                <div className="flex items-center justify-between flex-1 min-w-0">
                   <img
                     src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
                     alt="CobraPro"
-                    className="h-10 w-auto object-contain"
+                    className="h-9 w-auto object-contain"
                   />
+                  <LanguageSwitcher compact={false} />
                 </div>
               ) : (
-                <img
-                  src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
-                  alt="CobraPro"
-                  className="h-7 w-7 object-contain rounded"
-                />
+                <div className="flex flex-col items-center gap-1">
+                  <img
+                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663380431118/BkqW4WQ4ndZHJQHLtTMfxv/cobrapro-logo_ca1f0d34.webp"
+                    alt="CobraPro"
+                    className="h-7 w-7 object-contain rounded"
+                  />
+                </div>
               )}
             </div>
+            {isCollapsed && (
+              <div className="flex justify-center pb-2">
+                <LanguageSwitcher compact={true} />
+              </div>
+            )}
           </SidebarHeader>
 
           <SidebarContent className="gap-0">
@@ -312,7 +320,6 @@ function DashboardLayoutContent({
           </SidebarContent>
 
           <SidebarFooter className="p-3 space-y-2">
-            <LanguageSwitcher />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-accent/50 transition-colors w-full text-left group-data-[collapsible=icon]:justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">
