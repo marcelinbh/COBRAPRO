@@ -430,11 +430,11 @@ function EditarEmprestimoModal({
                     <thead>
                       <tr className="border-b border-border bg-muted/20">
                         <th className="text-left px-3 py-2 text-muted-foreground">#</th>
-                        <th className="text-left px-3 py-2 text-muted-foreground">Vencimento</th>
-                        <th className="text-right px-3 py-2 text-muted-foreground">Valor</th>
+                        <th className="text-left px-3 py-2 text-muted-foreground">{t('common.dueDate')}</th>
+                        <th className="text-right px-3 py-2 text-muted-foreground">{t('common.value')}</th>
                         <th className="text-right px-3 py-2 text-muted-foreground">Multa</th>
                         <th className="text-center px-3 py-2 text-muted-foreground">Renov.</th>
-                        <th className="text-center px-3 py-2 text-muted-foreground">Status</th>
+                        <th className="text-center px-3 py-2 text-muted-foreground">{t('common.status')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -466,10 +466,10 @@ function EditarEmprestimoModal({
                 </div>
                 {showNovaParcela && (
                   <div className="px-4 py-3 border-t border-border bg-emerald-500/5 space-y-3">
-                    <div className="text-xs font-semibold text-emerald-400">Nova Parcela</div>
+                    <div className="text-xs font-semibold text-emerald-400">{t('emprestimos.newInstallment')}</div>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <Label className="text-xs">Data de Vencimento *</Label>
+                        <Label className="text-xs">{t('emprestimos.dueDateRequired')}</Label>
                         <Input type="date" value={novaParcelaData} onChange={e => setNovaParcelaData(e.target.value)} className="mt-1 h-8 text-xs" />
                       </div>
                       <div>
@@ -478,7 +478,7 @@ function EditarEmprestimoModal({
                       </div>
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => { setShowNovaParcela(false); setNovaParcelaData(""); setNovaParcelaValor(""); }}>Cancelar</Button>
+                      <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => { setShowNovaParcela(false); setNovaParcelaData(""); setNovaParcelaValor(""); }}>{t('common.cancel')}</Button>
                       <Button size="sm" className="flex-1 h-8 text-xs bg-emerald-600 hover:bg-emerald-700" onClick={() => handleCriarParcela(novaParcelaData, novaParcelaValor)} disabled={criarParcelaMutation.isPending}>
                         {criarParcelaMutation.isPending ? 'Criando...' : 'Confirmar Parcela'}
                       </Button>
@@ -538,7 +538,7 @@ function EditarEmprestimoModal({
               {/* Tabela de parcelas editáveis */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-foreground">Todas as Parcelas</p>
+                  <p className="text-sm font-semibold text-foreground">{t('emprestimos.allInstallments')}</p>
                   <div className="flex gap-1">
                     {(['todas', 'pendente', 'paga', 'atrasada'] as const).map(f => (
                       <button key={f} onClick={() => setFiltroStatus(f)}
@@ -555,10 +555,10 @@ function EditarEmprestimoModal({
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-left px-3 py-2 text-muted-foreground font-medium">#</th>
-                        <th className="text-left px-3 py-2 text-muted-foreground font-medium">Vencimento</th>
-                        <th className="text-right px-3 py-2 text-muted-foreground font-medium">Valor</th>
-                        <th className="text-center px-3 py-2 text-muted-foreground font-medium">Status</th>
-                        <th className="text-center px-3 py-2 text-muted-foreground font-medium">Editar</th>
+                        <th className="text-left px-3 py-2 text-muted-foreground font-medium">{t('common.dueDate')}</th>
+                        <th className="text-right px-3 py-2 text-muted-foreground font-medium">{t('common.value')}</th>
+                        <th className="text-center px-3 py-2 text-muted-foreground font-medium">{t('common.status')}</th>
+                        <th className="text-center px-3 py-2 text-muted-foreground font-medium">{t('common.edit')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -622,10 +622,10 @@ function EditarEmprestimoModal({
                       </button>
                     ) : (
                       <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-3">
-                        <p className="text-sm font-semibold text-foreground">Nova Parcela</p>
+                        <p className="text-sm font-semibold text-foreground">{t('emprestimos.newInstallment')}</p>
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <Label className="text-xs">Data de Vencimento *</Label>
+                            <Label className="text-xs">{t('emprestimos.dueDateRequired')}</Label>
                             <Input type="date" value={novaParcelaDataDetalhes} onChange={e => setNovaParcelaDataDetalhes(e.target.value)} className="mt-1 h-8 text-sm [color-scheme:dark]" />
                           </div>
                           <div>
@@ -637,7 +637,7 @@ function EditarEmprestimoModal({
                           <button onClick={() => handleCriarParcela(novaParcelaDataDetalhes, novaParcelaValorDetalhes || String(emprestimo.valorPrincipal))} disabled={criarParcelaMutation.isPending || !novaParcelaDataDetalhes} className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium transition-colors">
                             {criarParcelaMutation.isPending ? 'Criando...' : 'Salvar Parcela'}
                           </button>
-                          <button onClick={() => { setShowNovaParcelaDetalhes(false); setNovaParcelaDataDetalhes(''); setNovaParcelaValorDetalhes(''); }} className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors">Cancelar</button>
+                          <button onClick={() => { setShowNovaParcelaDetalhes(false); setNovaParcelaDataDetalhes(''); setNovaParcelaValorDetalhes(''); }} className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors">{t('common.cancel')}</button>
                         </div>
                       </div>
                     )}
@@ -673,12 +673,12 @@ function EditarEmprestimoModal({
               ) : !historico || historico.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <History className="h-12 w-12 text-muted-foreground/30 mb-3" />
-                  <p className="text-muted-foreground text-sm">Nenhum histórico registrado ainda.</p>
-                  <p className="text-muted-foreground/60 text-xs mt-1">As ações futuras aparecerão aqui.</p>
+                  <p className="text-muted-foreground text-sm">{t('emprestimos.noHistory')}</p>
+                  <p className="text-muted-foreground/60 text-xs mt-1">{t('emprestimos.historyWillAppear')}</p>
                 </div>
               ) : (
                 <>
-                  <p className="text-sm font-semibold text-foreground mb-3">Histórico de Alterações ({historico.length})</p>
+                  <p className="text-sm font-semibold text-foreground mb-3">{t('emprestimos.changeHistory')} ({historico.length})</p>
                   {historico.map((h) => (
                     <div key={h.id} className="flex gap-3 p-3 rounded-lg bg-muted/30 border border-border/50 hover:bg-muted/50 transition-colors">
                       <Clock className="h-4 w-4 text-muted-foreground mt-0.5" />
@@ -690,8 +690,8 @@ function EditarEmprestimoModal({
                         <p className="text-sm text-foreground mt-0.5">{h.descricao}</p>
                         {(h.valorAnterior || h.valorNovo) && (
                           <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
-                            {h.valorAnterior && <span>Antes: <span className="text-foreground">{h.valorAnterior}</span></span>}
-                            {h.valorNovo && <span>Depois: <span className="text-foreground">{h.valorNovo}</span></span>}
+                            {h.valorAnterior && <span>{t('common.before')}: <span className="text-foreground">{h.valorAnterior}</span></span>}
+                            {h.valorNovo && <span>{t('common.after')}: <span className="text-foreground">{h.valorNovo}</span></span>}
                           </div>
                         )}
                       </div>
@@ -705,7 +705,7 @@ function EditarEmprestimoModal({
           {/* ─── ABA COMPROVANTE ─── */}
           {aba === 'comprovante' && (
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Gera o comprovante de pagamento com os dados da empresa configurados em Configurações.</p>
+              <p className="text-sm text-muted-foreground">{t('emprestimos.receiptInfo')}</p>
               {config?.nomeEmpresa && (
                 <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm">
                   <p className="font-medium text-foreground">{config.nomeEmpresa}</p>
@@ -725,7 +725,7 @@ function EditarEmprestimoModal({
         {/* Rodapé fixo — só mostra Salvar na aba Editar */}
         {aba === 'editar' && (
           <div className="px-6 py-4 border-t border-border shrink-0 flex gap-3">
-            <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
+            <Button variant="outline" className="flex-1" onClick={onClose}>{t('common.cancel')}</Button>
             <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" onClick={handleSalvar} disabled={editarMutation.isPending}>
               {editarMutation.isPending ? 'Salvando...' : 'Salvar Alterações'}
             </Button>
@@ -747,7 +747,7 @@ function EditarEmprestimoModal({
             <div className="flex flex-col items-center gap-3 py-4">
               <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center"><CheckCircle className="h-8 w-8 text-emerald-500" /></div>
               <div className="text-center">
-                <div className="text-lg font-bold text-emerald-500">Pagamento Registrado!</div>
+                <div className="text-lg font-bold text-emerald-500">{t('emprestimos.paymentRegistered')}</div>
                 <div className="text-sm text-muted-foreground">{emprestimo.clienteNome}</div>
                 <div className="text-2xl font-bold text-foreground mt-1">{formatarMoeda(pagamentoRealizado.valorPago)}</div>
                 <div className="text-xs text-muted-foreground">Parcela {pagamentoRealizado.parcelaNum}</div>
@@ -763,29 +763,29 @@ function EditarEmprestimoModal({
         ) : (
           <div className="space-y-4">
             <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
-              <div className="flex justify-between"><span>Capital</span><span>{formatarMoeda(emprestimo.valorPrincipal)}</span></div>
+              <div className="flex justify-between"><span>{t('common.capital')}</span><span>{formatarMoeda(emprestimo.valorPrincipal)}</span></div>
               <div className="flex justify-between">
-                <span>Juros</span>
+                <span>{t('common.interest')}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-amber-400">{formatarMoeda(jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : valorJurosParcela)}</span>
                   <button type="button" className="text-[10px] text-muted-foreground underline hover:text-foreground" onClick={() => setJurosCustomDetalhes(jurosCustomDetalhes ? '' : valorJurosParcela.toFixed(2))}>{jurosCustomDetalhes ? 'usar padrão' : 'editar'}</button>
                 </div>
               </div>
               {jurosCustomDetalhes !== '' && <Input type="number" step="0.01" min="0" placeholder="Valor dos juros (R$)" value={jurosCustomDetalhes} onChange={e => setJurosCustomDetalhes(e.target.value)} className="h-8 text-sm" />}
-              {diasAtraso > 0 && <div className="flex justify-between text-red-400 border-t border-border pt-2"><span>Total com Atraso ({diasAtraso} dias)</span><span className="font-semibold">{formatarMoeda(totalComAtraso)}</span></div>}
-              <div className="flex justify-between border-t border-border pt-2 font-semibold"><span>Total</span><span className="text-emerald-400">{formatarMoeda(valorCustomPagar ? parseFloat(valorCustomPagar) : (diasAtraso > 0 ? totalComAtraso : valorOriginalParcela))}</span></div>
+              {diasAtraso > 0 && <div className="flex justify-between text-red-400 border-t border-border pt-2"><span>{t('emprestimos.totalWithDelay')} ({diasAtraso} dias)</span><span className="font-semibold">{formatarMoeda(totalComAtraso)}</span></div>}
+              <div className="flex justify-between border-t border-border pt-2 font-semibold"><span>{t('common.total')}</span><span className="text-emerald-400">{formatarMoeda(valorCustomPagar ? parseFloat(valorCustomPagar) : (diasAtraso > 0 ? totalComAtraso : valorOriginalParcela))}</span></div>
             </div>
-            <div><Label className="text-xs">Valor a Pagar (R$)</Label><Input type="number" step="0.01" placeholder={`Padrão: ${formatarMoeda(diasAtraso > 0 ? totalComAtraso : valorOriginalParcela)}`} value={valorCustomPagar} onChange={e => setValorCustomPagar(e.target.value)} className="mt-1 h-9 text-sm" /></div>
-            <div><Label className="text-xs">Data do Pagamento</Label><Input type="date" value={dataPagamentoCustom} onChange={e => setDataPagamentoCustom(e.target.value)} className="mt-1 h-9 text-sm [color-scheme:dark]" /></div>
+            <div><Label className="text-xs">{t('emprestimos.valueToPay')}</Label><Input type="number" step="0.01" placeholder={`Padrão: ${formatarMoeda(diasAtraso > 0 ? totalComAtraso : valorOriginalParcela)}`} value={valorCustomPagar} onChange={e => setValorCustomPagar(e.target.value)} className="mt-1 h-9 text-sm" /></div>
+            <div><Label className="text-xs">{t('emprestimos.paymentDate')}</Label><Input type="date" value={dataPagamentoCustom} onChange={e => setDataPagamentoCustom(e.target.value)} className="mt-1 h-9 text-sm [color-scheme:dark]" /></div>
             <div>
-              <Label className="text-xs">Conta de Caixa</Label>
+              <Label className="text-xs">{t('emprestimos.cashAccount')}</Label>
               <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
                 <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
                 <SelectContent>{(contas ?? []).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setModalPagar(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setModalPagar(false)}>{t('common.cancel')}</Button>
               <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={!contaCaixaId || pagarTotalMutation.isPending} onClick={handlePagar}>{pagarTotalMutation.isPending ? 'Processando...' : 'Confirmar'}</Button>
             </div>
           </div>
@@ -800,32 +800,32 @@ function EditarEmprestimoModal({
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
             <p className="text-amber-400 font-semibold">Juros por parcela: {formatarMoeda(valorJurosParcela)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Pagando apenas os juros, o contrato é renovado sem abater o principal.</p>
+            <p className="text-xs text-muted-foreground mt-1">{t('emprestimos.interestOnlyInfo')}</p>
           </div>
           <div><Label className="text-xs">Valor dos Juros (deixe em branco para usar o valor padrão)</Label><Input type="number" step="0.01" placeholder={String(valorJurosParcela.toFixed(2))} value={valorCustomJuros} onChange={e => setValorCustomJuros(e.target.value)} className="mt-1" /></div>
           {/* Próximo vencimento */}
           <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 space-y-3">
-            <p className="text-xs font-semibold text-blue-400">Opções do Próximo Vencimento (opcional)</p>
+            <p className="text-xs font-semibold text-blue-400">{t('emprestimos.nextDueDateOptions')}</p>
             <div>
-              <Label className="text-xs">Data do Próximo Vencimento</Label>
+              <Label className="text-xs">{t('emprestimos.nextDueDate')}</Label>
               <Input type="date" value={novaDataVencJuros} onChange={e => setNovaDataVencJuros(e.target.value)} className="mt-1 h-8 text-sm [color-scheme:dark]" />
-              <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para calcular automaticamente</p>
+              <p className="text-[10px] text-muted-foreground mt-1">{t('emprestimos.leaveBlankAutoCalc')}</p>
             </div>
             <div>
-              <Label className="text-xs">Valor do Próximo Vencimento (R$)</Label>
+              <Label className="text-xs">{t('emprestimos.nextDueDateValue')}</Label>
               <Input type="number" step="0.01" min="0" placeholder={`Padrão: ${formatarMoeda(valorOriginalParcela)}`} value={novoValorParcelaJuros} onChange={e => setNovoValorParcelaJuros(e.target.value)} className="mt-1 h-8 text-sm" />
               <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para manter o valor atual</p>
             </div>
           </div>
           <div>
-            <Label className="text-xs">Conta de Caixa</Label>
+            <Label className="text-xs">{t('emprestimos.cashAccount')}</Label>
             <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
               <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
               <SelectContent>{(contas ?? []).map((c: any) => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setModalPagarJuros(false)}>Cancelar</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setModalPagarJuros(false)}>{t('common.cancel')}</Button>
             <Button className="flex-1 bg-amber-600 hover:bg-amber-700" disabled={!contaCaixaId || pagarJurosMutation.isPending} onClick={handlePagarJuros}>{pagarJurosMutation.isPending ? 'Processando...' : 'Confirmar'}</Button>
           </div>
         </div>
@@ -840,7 +840,7 @@ function EditarEmprestimoModal({
           <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm"><p className="text-muted-foreground">Taxa atual: <span className="font-bold text-foreground">{emprestimo.taxaJuros}% {emprestimo.tipoTaxa}</span></p></div>
           <div><Label>Nova Taxa de Juros (%)</Label><Input type="number" step="0.01" min="0" placeholder="Ex: 5" value={novaTaxa} onChange={e => setNovaTaxa(e.target.value)} className="mt-1" /></div>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setModalEditarJuros(false)}>Cancelar</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setModalEditarJuros(false)}>{t('common.cancel')}</Button>
             <Button className="flex-1 bg-blue-600 hover:bg-blue-700" disabled={!novaTaxa.trim() || editarJurosMutation.isPending} onClick={() => editarJurosMutation.mutate({ id: emprestimo.id, novaTaxa })}>{editarJurosMutation.isPending ? 'Salvando...' : 'Salvar'}</Button>
           </div>
         </div>
@@ -855,7 +855,7 @@ function EditarEmprestimoModal({
           {diasAtraso > 0 && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm"><p className="text-red-400 font-semibold">{diasAtraso} dias de atraso</p><p className="text-xs text-muted-foreground mt-1">A multa será adicionada ao valor das parcelas em atraso.</p></div>}
           <div><Label>Valor da Multa (R$)</Label><Input type="number" step="0.01" min="0" placeholder="Ex: 50.00" value={valorMulta} onChange={e => setValorMulta(e.target.value)} className="mt-1" /></div>
           <div className="flex gap-2">
-            <Button variant="outline" className="flex-1" onClick={() => setModalMulta(false)}>Cancelar</Button>
+            <Button variant="outline" className="flex-1" onClick={() => setModalMulta(false)}>{t('common.cancel')}</Button>
             <Button className="flex-1 bg-red-600 hover:bg-red-700" disabled={!valorMulta.trim() || aplicarMultaMutation.isPending} onClick={() => aplicarMultaMutation.mutate({ id: emprestimo.id, multa: valorMulta })}>{aplicarMultaMutation.isPending ? 'Aplicando...' : 'Aplicar Multa'}</Button>
           </div>
         </div>
@@ -1020,7 +1020,7 @@ function PagamentoModal({
                   <CheckCircle className="h-8 w-8 text-success" />
                 </div>
                 <div className="text-center">
-                  <div className="text-lg font-bold text-success">Pagamento Registrado!</div>
+                  <div className="text-lg font-bold text-success">{t('emprestimos.paymentRegistered')}</div>
                   <div className="text-sm text-muted-foreground">{emprestimo.clienteNome}</div>
                   <div className="text-2xl font-bold text-foreground mt-1">{formatarMoeda(pagamentoRealizado.valorPago)}</div>
                   <div className="text-xs text-muted-foreground">Parcela {pagamentoRealizado.parcelaNum}</div>
@@ -1067,7 +1067,7 @@ function PagamentoModal({
               {/* Resumo Capital / Juros / Total */}
               <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
                 <div className="flex justify-between items-center">
-                  <span>Capital</span>
+                  <span>{t('common.capital')}</span>
                   <span className="font-medium">{formatarMoeda(emprestimo.valorPrincipal)}</span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -1097,7 +1097,7 @@ function PagamentoModal({
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                  <span>Total</span>
+                  <span>{t('common.total')}</span>
                   <span className="text-emerald-400">
                     {formatarMoeda(
                       valorCustom ? parseFloat(valorCustom) :
@@ -1124,7 +1124,7 @@ function PagamentoModal({
 
               {/* Valor personalizado */}
               <div>
-                <Label className="text-xs">Valor a Pagar (R$)</Label>
+                <Label className="text-xs">{t('emprestimos.valueToPay')}</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -1138,7 +1138,7 @@ function PagamentoModal({
 
               {/* Data de pagamento manual */}
               <div>
-                <Label className="text-xs">Data do Pagamento</Label>
+                <Label className="text-xs">{t('emprestimos.paymentDate')}</Label>
                 <Input
                   type="date"
                   value={dataPagamentoCustom}
@@ -1147,7 +1147,7 @@ function PagamentoModal({
                   placeholder="Hoje (padrão)"
                 />
                 {!dataPagamentoCustom && (
-                  <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para usar a data de hoje</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{t('emprestimos.leaveBlankToday')}</p>
                 )}
               </div>
 
@@ -1159,7 +1159,7 @@ function PagamentoModal({
                     Próxima Renovação
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">Data do Próximo Vencimento</Label>
+                    <Label className="text-xs text-muted-foreground">{t('emprestimos.nextDueDate')}</Label>
                     <Input
                       type="date"
                       value={novaDataVencJuros}
@@ -1167,11 +1167,11 @@ function PagamentoModal({
                       className="mt-1 h-9 text-sm [color-scheme:dark]"
                     />
                     {!novaDataVencJuros && (
-                      <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para calcular automaticamente</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{t('emprestimos.leaveBlankAutoCalc')}</p>
                     )}
                   </div>
                   <div>
-                    <Label className="text-xs text-muted-foreground">Valor do Próximo Vencimento (R$)</Label>
+                    <Label className="text-xs text-muted-foreground">{t('emprestimos.nextDueDateValue')}</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -1229,9 +1229,9 @@ function PagamentoModal({
                 ) : null;
               })()}
 
-              {/* Conta de Caixa */}
+              {/* {t('emprestimos.cashAccount')} */}
               <div>
-                <Label className="text-xs">Conta de Caixa</Label>
+                <Label className="text-xs">{t('emprestimos.cashAccount')}</Label>
                 <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
@@ -1247,7 +1247,7 @@ function PagamentoModal({
               </div>
 
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
                 <Button
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                   disabled={!contaCaixaId || isPending}
@@ -1710,7 +1710,7 @@ function EmprestimoCardCobra({
             size="sm"
             variant="outline"
             className="h-8 text-xs"
-            title="Histórico"
+            title={t('common.history')}
           >
             <Clock className="h-3.5 w-3.5" />
           </Button>
@@ -1718,7 +1718,7 @@ function EmprestimoCardCobra({
             size="sm"
             variant="outline"
             className="h-8 text-xs"
-            title="Detalhes"
+            title={t('common.details')}
             onClick={() => { setAbaModalInicial('detalhes'); setShowEditarModal(true); }}
           >
             <Eye className="h-3.5 w-3.5" />
@@ -1727,7 +1727,7 @@ function EmprestimoCardCobra({
             size="sm"
             variant="outline"
             className="h-8 text-xs"
-            title="Editar"
+            title={t('common.edit')}
             onClick={() => { setAbaModalInicial('editar'); setShowEditarModal(true); }}
           >
             <Edit className="h-3.5 w-3.5" />
@@ -1771,7 +1771,7 @@ function EmprestimoCardCobra({
                 />
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setShowEditarJurosModal(null)}>Cancelar</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowEditarJurosModal(null)}>{t('common.cancel')}</Button>
                 <Button 
                   className="flex-1 bg-blue-600 hover:bg-blue-700" 
                   onClick={() => {
@@ -1821,7 +1821,7 @@ function EmprestimoCardCobra({
                 />
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setShowAplicarMultaModal(null)}>Cancelar</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowAplicarMultaModal(null)}>{t('common.cancel')}</Button>
                 <Button 
                   className="flex-1 bg-red-600 hover:bg-red-700" 
                   onClick={() => {
@@ -1895,7 +1895,7 @@ function EmprestimoCardCobra({
                 {todasEtiquetas.length === 0 && <p className="text-xs text-muted-foreground text-center py-4">Nenhuma etiqueta criada ainda</p>}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setShowEtiquetasModal(false)}>Cancelar</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setShowEtiquetasModal(false)}>{t('common.cancel')}</Button>
                 <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={() => aplicarEtiquetasMutation.mutate({ contratoId: emp.id, etiquetas: etiquetasSelecionadas })} disabled={aplicarEtiquetasMutation.isPending}>
                   {aplicarEtiquetasMutation.isPending ? "Salvando..." : "Salvar Etiquetas"}
                 </Button>

@@ -161,8 +161,8 @@ export default function Dashboard() {
             className="gap-1.5 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 text-xs px-2.5"
           >
             <Send className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{relatorioDiarioMutation.isPending ? 'Gerando...' : 'Relatório Diário'}</span>
-            <span className="sm:hidden">{relatorioDiarioMutation.isPending ? '...' : 'Relatório'}</span>
+            <span className="hidden sm:inline">{relatorioDiarioMutation.isPending ? t('common.generating') : t('dashboard.dailyReportButton')}</span>
+            <span className="sm:hidden">{relatorioDiarioMutation.isPending ? '...' : t('dashboard.dailyReport')}</span>
           </Button>
           <Button size="sm" onClick={() => setLocation('/contratos/novo')} className="gap-1.5 text-xs px-2.5">
             <Plus className="h-3.5 w-3.5" />
@@ -176,14 +176,14 @@ export default function Dashboard() {
       {isKoletor && (
         <div className="rounded-lg border border-warning/30 bg-warning/5 p-3 flex items-center gap-3">
           <AlertTriangle className="h-4 w-4 text-warning shrink-0" />
-          <p className="text-sm text-warning">Você está visualizando apenas seus próprios empréstimos e parcelas.</p>
+          <p className="text-sm text-warning">{t('dashboard.koletorBanner')}</p>
         </div>
       )}
 
       {/* KPI Cards - ocultos para koletores */}
       {!isKoletor && <div className="grid grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
         <KPICard title={t('dashboard.balance')} value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)} icon={Wallet} variant="default" subtitle={t('dashboard.allAccounts')} />
-        <KPICard title={t('dashboard.capital')} value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)} icon={TrendingUp} variant="primary" subtitle={`${kpis?.contratosAtivos ?? 0} contratos ativos`} />
+        <KPICard title={t('dashboard.capital')} value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)} icon={TrendingUp} variant="primary" subtitle={`${kpis?.contratosAtivos ?? 0} ${t('dashboard.activeContracts')}`} />
         <KPICard title={t('dashboard.toReceive2')} value={kpisLoading ? "..." : formatarMoeda(kpis?.totalReceber ?? 0)} icon={DollarSign} variant="success" subtitle={t('dashboard.pendingInstallments')} />
         <KPICard title={t('dashboard.delinquency')} value={kpisLoading ? "..." : formatarMoeda(kpis?.totalInadimplente ?? 0)} icon={AlertTriangle} variant="danger" subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes · ${taxaInadimplencia}%`} />
         <KPICard title={t('dashboard.interest')} value={kpisLoading ? "..." : formatarMoeda(kpis?.jurosPendentes ?? 0)} icon={TrendingDown} variant="warning" subtitle={t('dashboard.accumulated')} />
@@ -196,7 +196,7 @@ export default function Dashboard() {
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('dashboard.portfolioHealth')}</span>
-              <span className="text-xs text-muted-foreground">Taxa de inadimplência: <span className={`font-bold ${parseFloat(taxaInadimplencia) > 15 ? 'text-primary' : parseFloat(taxaInadimplencia) > 8 ? 'text-warning' : 'text-success'}`}>{taxaInadimplencia}%</span></span>
+              <span className="text-xs text-muted-foreground">{t('dashboard.delinquencyRate')}: <span className={`font-bold ${parseFloat(taxaInadimplencia) > 15 ? 'text-primary' : parseFloat(taxaInadimplencia) > 8 ? 'text-warning' : 'text-success'}`}>{taxaInadimplencia}%</span></span>
             </div>
             <div className="flex gap-1 h-3 rounded-full overflow-hidden">
               <div className="bg-success rounded-l-full transition-all" style={{ width: `${Math.max(0, 100 - parseFloat(taxaInadimplencia))}%` }} />
@@ -204,10 +204,10 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between mt-1.5">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <div className="w-2 h-2 rounded-full bg-success" /> Em dia: {formatarMoeda((kpis.capitalCirculacao - kpis.totalInadimplente))}
+                <div className="w-2 h-2 rounded-full bg-success" /> {t('dashboard.onTime')}: {formatarMoeda((kpis.capitalCirculacao - kpis.totalInadimplente))}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <div className="w-2 h-2 rounded-full bg-primary" /> Inadimplente: {formatarMoeda(kpis.totalInadimplente)}
+                <div className="w-2 h-2 rounded-full bg-primary" /> {t('dashboard.delinquent')}: {formatarMoeda(kpis.totalInadimplente)}
               </div>
             </div>
           </CardContent>
@@ -221,7 +221,7 @@ export default function Dashboard() {
           <Card className="border-border">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                <Target className="h-3.5 w-3.5" /> Score do Negócio
+                <Target className="h-3.5 w-3.5" /> {t('dashboard.businessScore')}
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-3">
@@ -247,7 +247,7 @@ export default function Dashboard() {
           <Card className="border-warning/20 md:col-span-2">
             <CardHeader className="pb-2">
               <CardTitle className="text-xs font-medium text-warning uppercase tracking-wide flex items-center gap-2">
-                <ShieldAlert className="h-3.5 w-3.5" /> Precisa de Atenção
+                <ShieldAlert className="h-3.5 w-3.5" /> {t('dashboard.needsAttention')}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -262,7 +262,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="text-sm font-medium text-foreground">{t('dashboard.dueThisWeek')}</div>
-                    <div className="text-xs text-muted-foreground">{atencao?.venceSemana.qtd ?? 0} parcelas nos próximos 7 dias</div>
+                    <div className="text-xs text-muted-foreground">{atencao?.venceSemana.qtd ?? 0} {t('dashboard.installmentsNext7Days')}</div>
                   </div>
                 </div>
                 <div className="text-right">
@@ -282,7 +282,7 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="text-sm font-medium text-foreground">{t('dashboard.overdueMore30Days')}</div>
-                    <div className="text-xs text-muted-foreground">{atencao?.atrasados30.qtd ?? 0} clientes com atraso grave</div>
+                    <div className="text-xs text-muted-foreground">{atencao?.atrasados30.qtd ?? 0} {t('dashboard.clientsWithSeriousDelay')}</div>
                   </div>
                 </div>
                 <div className="text-right">
@@ -294,13 +294,13 @@ export default function Dashboard() {
               {/* Atalhos rápidos */}
               <div className="grid grid-cols-3 gap-2 pt-1">
                 <Button variant="outline" size="sm" className="text-xs h-8 gap-1" onClick={() => setLocation('/emprestimos')}>
-                  <Zap className="h-3 w-3" /> Empréstimos
+                  <Zap className="h-3 w-3" /> {t('dashboard.loans')}
                 </Button>
                 <Button variant="outline" size="sm" className="text-xs h-8 gap-1" onClick={() => setLocation('/clientes')}>
-                  <Users className="h-3 w-3" /> Clientes
+                  <Users className="h-3 w-3" /> {t('dashboard.clients2')}
                 </Button>
                 <Button variant="outline" size="sm" className="text-xs h-8 gap-1" onClick={() => setLocation('/caixa')}>
-                  <Wallet className="h-3 w-3" /> Caixa
+                  <Wallet className="h-3 w-3" /> {t('dashboard.cashbox')}
                 </Button>
               </div>
             </CardContent>
@@ -314,7 +314,7 @@ export default function Dashboard() {
         <Card className="xl:col-span-2 border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Fluxo de Recebimentos - Últimos 7 Dias
+              {t('dashboard.cashFlowWeek')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -332,7 +332,7 @@ export default function Dashboard() {
                 <Tooltip
                   contentStyle={{ background: 'oklch(0.14 0.008 240)', border: '1px solid oklch(0.22 0.01 240)', borderRadius: '8px' }}
                   labelStyle={{ color: 'oklch(0.95 0.005 240)' }}
-                  formatter={(v: number) => [formatarMoeda(v), 'Recebido']}
+                  formatter={(v: number) => [formatarMoeda(v), t('dashboard.received')]}
                 />
                 <Area type="monotone" dataKey="valor" stroke="oklch(0.55 0.18 145)" strokeWidth={2} fill="url(#colorEntrada)" />
               </AreaChart>
@@ -344,7 +344,7 @@ export default function Dashboard() {
         <Card className="border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
-              Resumo do Dia
+              {t('dashboard.dailySummary')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
@@ -378,7 +378,7 @@ export default function Dashboard() {
         <Card className="border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <BarChart2 className="h-3.5 w-3.5" /> Tendência de Recebimentos - Últimos 6 Meses
+              <BarChart2 className="h-3.5 w-3.5" /> {t('dashboard.receivingTrend')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -390,7 +390,7 @@ export default function Dashboard() {
                 <Tooltip
                   contentStyle={{ background: 'oklch(0.14 0.008 240)', border: '1px solid oklch(0.22 0.01 240)', borderRadius: '8px' }}
                   labelStyle={{ color: 'oklch(0.95 0.005 240)' }}
-                  formatter={(v: number) => [formatarMoeda(v), 'Recebido']}
+                  formatter={(v: number) => [formatarMoeda(v), t('dashboard.received')]}
                 />
                 <Bar dataKey="valor" fill="oklch(0.55 0.22 25)" radius={[4, 4, 0, 0]} />
               </BarChart>
@@ -407,10 +407,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-warning uppercase tracking-wide flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                Vencendo Hoje ({parcelasHoje?.length ?? 0})
+                {t('dashboard.dueTodayTitle')} ({parcelasHoje?.length ?? 0})
               </CardTitle>
               <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => setLocation('/parcelas')}>
-                Ver todas <ChevronRight className="h-3 w-3" />
+                {t('dashboard.viewAll')} <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </CardHeader>
@@ -422,7 +422,7 @@ export default function Dashboard() {
               <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border hover:border-warning/30 transition-colors">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">{p.clienteNome}</div>
-                  <div className="text-xs text-muted-foreground">Parcela {p.numeroParcela}/{p.totalParcelas}</div>
+                  <div className="text-xs text-muted-foreground">{t('common.installment')} {p.numeroParcela}/{p.totalParcelas}</div>
                 </div>
                 <div className="text-right shrink-0 ml-3">
                   <div className="text-sm font-semibold text-warning">{formatarMoeda(p.valorOriginal)}</div>
@@ -439,10 +439,10 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-primary uppercase tracking-wide flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
-                Em Atraso ({atrasadas?.length ?? 0})
+                {t('dashboard.overdueTitle')} ({atrasadas?.length ?? 0})
               </CardTitle>
               <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => setLocation('/parcelas?status=atrasada')}>
-                Ver todas <ChevronRight className="h-3 w-3" />
+                {t('dashboard.viewAll')} <ChevronRight className="h-3 w-3" />
               </Button>
             </div>
           </CardHeader>
@@ -454,7 +454,7 @@ export default function Dashboard() {
               <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-colors">
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-foreground truncate">{p.clienteNome}</div>
-                  <div className="text-xs text-muted-foreground">{p.diasAtraso} dias em atraso</div>
+                  <div className="text-xs text-muted-foreground">{p.diasAtraso} {t('dashboard.daysOverdue')}</div>
                 </div>
                 <div className="text-right shrink-0 ml-3">
                   <div className="text-sm font-semibold text-primary">{formatarMoeda(p.valorAtualizado)}</div>

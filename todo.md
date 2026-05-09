@@ -989,3 +989,13 @@
 - [x] Melhorar preview de cálculo no formulário de novo contrato: adicionado Juros por Parcela (taxa%) e Total em verde
 - [x] Corrigir modal de pagamento: Juros mostra taxa%, Total = capital + juros corretamente
 - [ ] Auditoria completa PT-BR e Espanhol de todas as funcionalidades
+
+## Fase 54: Auditoria Completa PT-BR e Espanhol (09/05/2026)
+- [x] Dashboard: 15 textos hardcoded corrigidos + 7 novas chaves (cashFlowWeek, receivingTrend, dueTodayTitle, overdueTitle, viewAll, daysOverdue, koletorBanner)
+- [x] Emprestimos: 31 textos hardcoded corrigidos + 18 novas chaves emprestimos.* em pt-BR.json e es.json
+- [x] Chaves comuns: 67 novas chaves common.* adicionadas (before, after, receipt, history, details, capital, interest, total, etc.)
+- [x] Chaves clientes.*: 41 novas chaves adicionadas em pt-BR.json e es.json
+- [x] Chaves parcelas.*: 29 novas chaves adicionadas em pt-BR.json e es.json
+- [x] Chaves analiseRisco.*, calendario.*, cheques.*, cobradores.*, contratos.*, reparcelamento.*, relatorios.*: 187 novas chaves adicionadas
+- [x] Zero erros TypeScript após todas as correções
+- [ ] Pendente: aplicar t() nas páginas Clientes.tsx, Parcelas.tsx, EmprestimoDetalhes.tsx, MeuPerfil.tsx, Relatorios.tsx (chaves já adicionadas, falta substituir textos hardcoded)
