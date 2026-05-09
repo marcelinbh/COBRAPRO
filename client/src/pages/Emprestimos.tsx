@@ -1068,12 +1068,12 @@ function PagamentoModal({
               <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
                 <div className="flex justify-between items-center">
                   <span>Capital</span>
-                  <span>{formatarMoeda(emprestimo.valorPrincipal)}</span>
+                  <span className="font-medium">{formatarMoeda(emprestimo.valorPrincipal)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>Juros</span>
+                  <span>Juros ({emprestimo.taxaJuros}%)</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-amber-400">{formatarMoeda(jurosCustom ? parseFloat(jurosCustom) : valorSoJuros)}</span>
+                    <span className="text-amber-400 font-medium">{formatarMoeda(jurosCustom ? parseFloat(jurosCustom) : valorSoJuros)}</span>
                     <button
                       type="button"
                       className="text-[10px] text-muted-foreground underline hover:text-foreground"
@@ -1099,7 +1099,11 @@ function PagamentoModal({
                 <div className="flex justify-between border-t border-border pt-2 font-semibold">
                   <span>Total</span>
                   <span className="text-emerald-400">
-                    {formatarMoeda(valorCustom ? parseFloat(valorCustom) : (diasAtraso > 0 ? totalComAtraso : valorTotal))}
+                    {formatarMoeda(
+                      valorCustom ? parseFloat(valorCustom) :
+                      diasAtraso > 0 ? totalComAtraso :
+                      emprestimo.valorPrincipal + (jurosCustom ? parseFloat(jurosCustom) : valorSoJuros)
+                    )}
                   </span>
                 </div>
               </div>

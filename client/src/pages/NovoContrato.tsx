@@ -511,20 +511,29 @@ export default function NovoContrato() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Principal</span>
-                      <span className="text-foreground">{formatarMoeda(parseFloat(form.valorPrincipal) || 0)}</span>
+                      <span className="text-muted-foreground">Capital</span>
+                      <span className="text-foreground font-medium">{formatarMoeda(parseFloat(form.valorPrincipal) || 0)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total Juros</span>
-                      <span className="text-warning">{formatarMoeda(preview.totalJuros)}</span>
+                      <span className="text-muted-foreground">Juros por Parcela ({form.taxaJuros}%)</span>
+                      <span className="text-amber-400 font-medium">{formatarMoeda((parseFloat(form.valorPrincipal) || 0) * (parseFloat(form.taxaJuros) || 0) / 100)}</span>
                     </div>
-                    <div className="flex justify-between text-sm font-medium border-t border-border pt-2">
+                    {parseInt(form.numeroParcelas) > 1 && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Total Juros ({form.numeroParcelas}x)</span>
+                        <span className="text-warning">{formatarMoeda(preview.totalJuros)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
                       <span className="text-foreground">Total a Pagar</span>
-                      <span className="text-foreground">{formatarMoeda(preview.totalPagar)}</span>
+                      <span className="text-emerald-400">{formatarMoeda(preview.totalPagar)}</span>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground text-center">
-                    {form.numeroParcelas}x de {formatarMoeda(preview.valorParcela)}
+                  <div className="text-xs text-center mt-1 p-2 rounded bg-muted/40 text-muted-foreground">
+                    {parseInt(form.numeroParcelas) > 1
+                      ? `${form.numeroParcelas}x de ${formatarMoeda(preview.valorParcela)}`
+                      : `Pagamento único: ${formatarMoeda(preview.totalPagar)}`
+                    }
                   </div>
                 </>
               )}

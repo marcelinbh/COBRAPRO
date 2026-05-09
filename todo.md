@@ -984,3 +984,8 @@
 - [x] Corrigir badge de modalidade no card: usar tipoTaxa (quinzenal/mensal/diario/semanal) em vez de modalidade
 - [x] Auditar cálculo de valorJurosParcela: R$500 × 50% = R$250 (corrigido - era amortização errada)
 - [x] Corrigir procedure listComParcelas: valorJurosParcela = capital × taxa / 100 (juros simples)
+
+## Fase 53: Preview de Cálculo + Correção Modal Pagamento
+- [x] Melhorar preview de cálculo no formulário de novo contrato: adicionado Juros por Parcela (taxa%) e Total em verde
+- [x] Corrigir modal de pagamento: Juros mostra taxa%, Total = capital + juros corretamente
+- [ ] Auditoria completa PT-BR e Espanhol de todas as funcionalidades
