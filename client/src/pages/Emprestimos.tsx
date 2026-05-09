@@ -507,7 +507,7 @@ function EditarEmprestimoModal({
                     <DollarSign className="h-3.5 w-3.5" /> Pagar
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setValorCustomJuros(''); setContaCaixaId(''); setModalPagarJuros(true); }}>
-                    <TrendingUp className="h-3.5 w-3.5" /> Pagar Juros
+                    <TrendingUp className="h-3.5 w-3.5" /> {t('loans.payInterest')}
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
                     <Edit2 className="h-3.5 w-3.5" /> Editar Juros
@@ -665,7 +665,7 @@ function EditarEmprestimoModal({
                     <DollarSign className="h-3.5 w-3.5" /> Pagar
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setValorCustomJuros(''); setContaCaixaId(''); setModalPagarJuros(true); }}>
-                    <TrendingUp className="h-3.5 w-3.5" /> Pagar Juros
+                    <TrendingUp className="h-3.5 w-3.5" /> {t('loans.payInterest')}
                   </Button>
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
                     <Edit2 className="h-3.5 w-3.5" /> Editar Juros
@@ -878,7 +878,7 @@ function EditarEmprestimoModal({
         <DialogHeader><DialogTitle>PAGAR SÓ JUROS</DialogTitle><DialogDescription>{emprestimo.clienteNome}</DialogDescription></DialogHeader>
         <div className="space-y-4">
           <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
-            <p className="text-amber-400 font-semibold">Juros por parcela: {formatarMoeda(valorJurosParcela)}</p>
+            <p className="text-amber-400 font-semibold">{t('loans.interestPerInstallment')}: {formatarMoeda(valorJurosParcela)}</p>
             <p className="text-xs text-muted-foreground mt-1">{t('emprestimos.interestOnlyInfo')}</p>
           </div>
           <div><Label className="text-xs">Valor dos Juros (deixe em branco para usar o valor padrão)</Label><Input type="number" step="0.01" placeholder={String(valorJurosParcela.toFixed(2))} value={valorCustomJuros} onChange={e => setValorCustomJuros(e.target.value)} className="mt-1" /></div>
@@ -892,7 +892,7 @@ function EditarEmprestimoModal({
             </div>
             <div>
               <Label className="text-xs">{t('emprestimos.nextDueDateValue')}</Label>
-              <Input type="number" step="0.01" min="0" placeholder={`Padrão: ${formatarMoeda(valorOriginalParcela)}`} value={novoValorParcelaJuros} onChange={e => setNovoValorParcelaJuros(e.target.value)} className="mt-1 h-8 text-sm" />
+              <Input type="number" step="0.01" min="0" placeholder={`${t('common.default')}: ${formatarMoeda(valorOriginalParcela)}`} value={novoValorParcelaJuros} onChange={e => setNovoValorParcelaJuros(e.target.value)} className="mt-1 h-8 text-sm" />
               <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para manter o valor atual</p>
             </div>
           </div>
@@ -1563,7 +1563,7 @@ function EmprestimoCardCobra({
         {/* ── VALOR PRINCIPAL ── */}
         <div className="px-4 py-4 text-center border-b border-border/40">
           <div className="text-3xl font-bold text-emerald-400">{formatarMoeda(emp.totalReceber)}</div>
-          <div className="text-xs text-muted-foreground mt-0.5">restante a receber</div>
+          <div className="text-xs text-muted-foreground mt-0.5">{t('loans.remainingToReceive')}</div>
           {diasAtraso > 0 && (
             <div className="text-xs text-red-400 mt-1 font-medium">
               contém {formatarMoeda(jurosAtraso)} de juros por atraso
@@ -1575,19 +1575,19 @@ function EmprestimoCardCobra({
         <div className="px-4 py-3 border-b border-border/40">
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
             <div>
-              <div className="text-muted-foreground">Emprestado</div>
+              <div className="text-muted-foreground">{t('loans.borrowed')}</div>
               <div className="font-bold text-white">{formatarMoeda(emp.valorPrincipal)}</div>
             </div>
             <div>
-              <div className="text-muted-foreground">Total a Receber</div>
+              <div className="text-muted-foreground">{t('loans.totalToReceive')}</div>
               <div className="font-bold text-white">{formatarMoeda(emp.totalReceber)}</div>
             </div>
             <div>
-              <div className="text-muted-foreground">💰 Lucro Previsto</div>
+              <div className="text-muted-foreground">💰 {t('loans.projectedProfit')}</div>
               <div className="font-bold text-emerald-400">{formatarMoeda(emp.lucroPrevisto)}</div>
             </div>
             <div>
-              <div className="text-muted-foreground">✅ Lucro Realizado</div>
+              <div className="text-muted-foreground">✅ {t('loans.realizedProfit')}</div>
               <div className="font-bold text-emerald-400">
                 {formatarMoeda(emp.lucroRealizado)}{' '}
                 <span className="text-muted-foreground font-normal">
@@ -1615,7 +1615,7 @@ function EmprestimoCardCobra({
 
         {/* ── SÓ JUROS ── */}
         <div className="mx-4 my-3 px-4 py-2.5 rounded-lg bg-purple-900/30 border border-purple-500/30 flex items-center justify-between">
-          <span className="text-sm text-purple-200">Só Juros (por parcela):</span>
+          <span className="text-sm text-purple-200">{t('loans.onlyInterest')}:</span>
           <span className="text-sm font-bold text-purple-300">{formatarMoeda(emp.valorJurosParcela)}</span>
         </div>
 
@@ -1689,7 +1689,7 @@ function EmprestimoCardCobra({
             contas={contas}
             onSuccess={onRefresh}
             triggerClassName="flex-1 h-9 text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1"
-            triggerLabel="Pagar"
+            triggerLabel={t('loans.pay')}
             triggerIcon={<CheckCircle className="h-3.5 w-3.5" />}
           />
 
@@ -1700,7 +1700,7 @@ function EmprestimoCardCobra({
             onSuccess={onRefresh}
             modoInicial="juros"
             triggerClassName="flex-1 h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1"
-            triggerLabel="Pagar Juros"
+            triggerLabel={t('loans.payInterest')}
             triggerIcon={<DollarSign className="h-3.5 w-3.5" />}
           />
 
@@ -2113,24 +2113,24 @@ export default function Emprestimos() {
   const capitalNaRua = emprestimos?.reduce((s, e) => s + parseFloat(e.valorPrincipal), 0) ?? 0;
   const totalReceber = emprestimos?.reduce((s, e) => s + e.totalReceber, 0) ?? 0;
 
-  if (isLoading) return <div className="p-8 text-center">Carregando...</div>;
+  if (isLoading) return <div className="p-8 text-center">{t('common.loading')}</div>;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Empréstimos</h1>
-          <p className="text-sm text-muted-foreground hidden sm:block">Gerencie seus empréstimos</p>
+          <h1 className="text-2xl sm:text-3xl font-bold">{t('loans.title')}</h1>
+          <p className="text-sm text-muted-foreground hidden sm:block">{t('loans.manageLoans')}</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" className="gap-1 hidden sm:flex">
             <Eye className="h-4 w-4" />
-            Tutorial
+            {t('common.tutorial')}
           </Button>
           <Button size="sm" variant="outline" className="gap-1 hidden sm:flex">
             <FileText className="h-4 w-4" />
-            Baixar Relatório
+            {t('common.downloadReport')}
           </Button>
           <Button
             size="sm"
@@ -2138,7 +2138,7 @@ export default function Emprestimos() {
             className="gap-1 bg-emerald-600 hover:bg-emerald-700 sm:hidden"
           >
             <Plus className="h-4 w-4" />
-            Novo
+            {t('loans.new')}
           </Button>
         </div>
       </div>
@@ -2146,10 +2146,10 @@ export default function Emprestimos() {
       {/* Abas */}
       <div className="flex gap-1 sm:gap-4 border-b border-border overflow-x-auto">
         {[
-          { id: 'emprestimos', label: 'Empréstimos', count: emprestimos?.length ?? 0 },
-          { id: 'diario', label: 'Diário', count: 0 },
-          { id: 'price', label: 'Parcela Fixa', count: 0 },
-          { id: 'recebimentos', label: 'Recebimentos', count: recebimentosData?.total ?? 0 },
+          { id: 'emprestimos', label: t('loans.title'), count: emprestimos?.length ?? 0 },
+          { id: 'diario', label: t('loans.daily'), count: 0 },
+          { id: 'price', label: t('loans.fixedInstallment'), count: 0 },
+          { id: 'recebimentos', label: t('loans.receipts'), count: recebimentosData?.total ?? 0 },
         ].map(aba => (
           <button
             key={aba.id}
@@ -2171,7 +2171,7 @@ export default function Emprestimos() {
           {modoSelecao && (
             <div className="flex items-center gap-3 p-3 bg-blue-900/30 border border-blue-500/40 rounded-lg">
               <span className="text-sm font-medium text-blue-300">
-                {selecionados.length} selecionado(s)
+                {selecionados.length} {t('loans.selected')}
               </span>
               <Button
                 size="sm"
@@ -2179,7 +2179,7 @@ export default function Emprestimos() {
                 className="text-xs gap-1"
                 onClick={selecionarTodosAtrasados}
               >
-                Selecionar Atrasados
+                {t('loans.selectOverdue')}
               </Button>
               <Button
                 size="sm"
@@ -2188,7 +2188,7 @@ export default function Emprestimos() {
                 onClick={() => cobrarLoteMutation.mutate({ contratoIds: selecionados, tipo: 'atraso' })}
               >
                 {cobrarLoteMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                Cobrar Selecionados
+                {t('loans.collectSelected')}
               </Button>
               <Button
                 size="sm"
@@ -2197,7 +2197,7 @@ export default function Emprestimos() {
                 onClick={() => cobrarLoteMutation.mutate({ contratoIds: selecionados, tipo: 'preventivo' })}
               >
                 <MessageCircle className="h-3.5 w-3.5" />
-                Preventivo em Lote
+                {t('loans.preventiveBatch')}
               </Button>
               <Button
                 size="sm"
@@ -2205,7 +2205,7 @@ export default function Emprestimos() {
                 className="ml-auto text-xs"
                 onClick={() => { setModoSelecao(false); setSelecionados([]); }}
               >
-                Cancelar
+                {t('common.cancel')}
               </Button>
             </div>
           )}
@@ -2215,7 +2215,7 @@ export default function Emprestimos() {
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por cliente..."
+                placeholder={t('loans.searchByClient')}
                 value={busca}
                 onChange={e => setBusca(e.target.value)}
                 className="pl-10"
@@ -2226,18 +2226,18 @@ export default function Emprestimos() {
                 <SelectValue placeholder={t('loans.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="todos">Todos</SelectItem>
-                <SelectItem value="atrasados">Atrasados</SelectItem>
-                <SelectItem value="emdia">Em Dia</SelectItem>
+                <SelectItem value="todos">{t('common.all')}</SelectItem>
+                <SelectItem value="atrasados">{t('loans.overdue')}</SelectItem>
+                <SelectItem value="emdia">{t('loans.onTime')}</SelectItem>
               </SelectContent>
             </Select>
             {koletores && koletores.length > 0 && (
               <Select value={filtroKoletor} onValueChange={setFiltroKoletor}>
                 <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Cobrador" />
+                  <SelectValue placeholder={t('loans.collector')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todos">Todos Cobradores</SelectItem>
+                  <SelectItem value="todos">{t('loans.allCollectors')}</SelectItem>
                   {koletores.map((k: any) => (
                     <SelectItem key={k.id} value={String(k.id)}>{k.nome}</SelectItem>
                   ))}
@@ -2251,17 +2251,17 @@ export default function Emprestimos() {
               onClick={() => { setModoSelecao(!modoSelecao); setSelecionados([]); }}
             >
               <Users className="h-4 w-4" />
-              Lote
+              {t('loans.batch')}
             </Button>
             <Button
               size="sm"
               variant={modoVisualizacao === 'pasta' ? 'default' : 'outline'}
               className="gap-1"
-              title={modoVisualizacao === 'pasta' ? 'Ver como cards' : 'Ver por cliente (pasta)'}
+              title={modoVisualizacao === 'pasta' ? t('loans.viewAsCards') : t('loans.viewByClient')}
               onClick={() => setModoVisualizacao(v => v === 'cards' ? 'pasta' : 'cards')}
             >
               {modoVisualizacao === 'pasta' ? <LayoutGrid className="h-4 w-4" /> : <FolderOpen className="h-4 w-4" />}
-              {modoVisualizacao === 'pasta' ? 'Cards' : 'Pasta'}
+              {modoVisualizacao === 'pasta' ? t('loans.cards') : t('loans.folder')}
             </Button>
             <Button
               onClick={() => setLocation('/contratos/novo')}

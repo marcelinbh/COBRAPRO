@@ -209,7 +209,10 @@
     "contract": "Contrato",
     "rate": "Taxa",
     "finish": "Finalizar",
-    "partial": "Parcial"
+    "partial": "Parcial",
+    "tutorial": "Tutorial",
+    "downloadReport": "Baixar Relatório",
+    "default": "Padrão"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -302,7 +305,11 @@
     "overdueTitle": "Em Atraso",
     "daysOverdue": "dias em atraso",
     "koletorBanner": "Você está visualizando apenas seus próprios empréstimos e parcelas.",
-    "dailySummary": "Resumo do Dia"
+    "dailySummary": "Resumo do Dia",
+    "scoreExcellent": "Excelente",
+    "scoreGood": "Bom",
+    "scoreRegular": "Regular",
+    "scorePoor": "Ruim"
   },
   "clients": {
     "title": "Clientes",
@@ -376,7 +383,15 @@
     "exportClients": "Exportar Clientes",
     "totalClients": "Total de Clientes",
     "activeClients": "Clientes Ativos",
-    "inactiveClients": "Clientes Inativos"
+    "inactiveClients": "Clientes Inativos",
+    "exportCSV": "Exportar CSV",
+    "importCSV": "Importar CSV",
+    "searchPlaceholder": "Buscar clientes por nome, CPF ou telefone...",
+    "type": "Tipo",
+    "registeredAt": "Cadastrado em",
+    "loadingClients": "Carregando clientes...",
+    "noClientsFound": "Nenhum cliente encontrado",
+    "registerFirstClient": "Cadastrar primeiro cliente"
   },
   "loans": {
     "title": "Empréstimos",
@@ -464,7 +479,25 @@
     "totalLoans": "Total de Empréstimos",
     "activeLoans": "Empréstimos Ativos",
     "paidLoans": "Empréstimos Pagos",
-    "overdueLoans": "Empréstimos Atrasados"
+    "overdueLoans": "Empréstimos Atrasados",
+    "manageLoans": "Gerencie seus empréstimos",
+    "searchByClient": "Buscar por cliente...",
+    "onTime": "Em Dia",
+    "batch": "Lote",
+    "selectOverdue": "Selecionar Atrasados",
+    "collectSelected": "Cobrar Selecionados",
+    "preventiveBatch": "Preventivo em Lote",
+    "remainingToReceive": "restante a receber",
+    "interestPerInstallment": "Juros por parcela",
+    "collector": "Cobrador",
+    "allCollectors": "Todos Cobradores",
+    "viewAsCards": "Ver como cards",
+    "viewByClient": "Ver por cliente (pasta)",
+    "cards": "Cards",
+    "folder": "Pasta",
+    "selected": "selecionado(s)",
+    "fixedInstallment": "Parcela Fixa",
+    "receipts": "Recebimentos"
   },
   "contracts": {
     "title": "Contratos",
@@ -2085,5 +2118,13 @@
     "discount": "Desconto (R$)",
     "allModalities": "Todas as Modalidades",
     "priceTable": "Tabela Price"
+  },
+  "installments": {
+    "title": "PARCELAS",
+    "installments": "parcelas",
+    "overdue": "Atrasadas",
+    "dueToday": "Vence Hoje",
+    "pending": "Pendentes",
+    "paid": "Pagas"
   }
 }

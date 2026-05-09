@@ -69,17 +69,18 @@ function KPICard({
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; className: string }> = {
-    paga: { label: "Paga", className: "bg-success/15 text-success border-success/30" },
-    pendente: { label: "Pendente", className: "bg-muted text-muted-foreground border-border" },
-    atrasada: { label: "Atrasada", className: "bg-primary/15 text-primary border-primary/30" },
-    vencendo_hoje: { label: "Vence Hoje", className: "bg-warning/15 text-warning border-warning/30" },
-    parcial: { label: "Parcial", className: "bg-warning/15 text-warning border-warning/30" },
+  const { t } = useTranslation();
+  const map: Record<string, { labelKey: string; className: string }> = {
+    paga: { labelKey: 'loans.paid', className: "bg-success/15 text-success border-success/30" },
+    pendente: { labelKey: 'loans.pending', className: "bg-muted text-muted-foreground border-border" },
+    atrasada: { labelKey: 'loans.overdue', className: "bg-primary/15 text-primary border-primary/30" },
+    vencendo_hoje: { labelKey: 'loans.dueToday', className: "bg-warning/15 text-warning border-warning/30" },
+    parcial: { labelKey: 'loans.partial', className: "bg-warning/15 text-warning border-warning/30" },
   };
   const s = map[status] ?? map.pendente;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${s.className}`}>
-      {s.label}
+      {t(s.labelKey)}
     </span>
   );
 }
@@ -87,7 +88,7 @@ function StatusBadge({ status }: { status: string }) {
 function ScoreCircle({ score }: { score: number }) {
   const { t } = useTranslation();
   const cor = score >= 75 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-primary';
-  const label = score >= 75 ? 'Excelente' : score >= 50 ? 'Bom' : score >= 25 ? 'Regular' : 'Ruim';
+  const label = score >= 75 ? t('dashboard.scoreExcellent') : score >= 50 ? t('dashboard.scoreGood') : score >= 25 ? t('dashboard.scoreRegular') : t('dashboard.scorePoor');
   const corBg = score >= 75 ? 'bg-success/10 border-success/30' : score >= 50 ? 'bg-warning/10 border-warning/30' : 'bg-primary/10 border-primary/30';
   const circumference = 2 * Math.PI * 40;
   const offset = circumference - (score / 100) * circumference;
@@ -113,7 +114,7 @@ function ScoreCircle({ score }: { score: number }) {
 }
 
 export default function Dashboard() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
   const { data: meuKoletor } = trpc.cobradores.me.useQuery();
   const isKoletor = meuKoletor?.perfil === 'koletor';
@@ -146,10 +147,10 @@ export default function Dashboard() {
         <div className="min-w-0">
           <h1 className="font-display text-xl sm:text-3xl text-foreground tracking-wide">{t('dashboard.title')}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 hidden sm:block">
-            {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
-            {new Date().toLocaleDateString('pt-BR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+            {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
         <div className="flex gap-1.5 shrink-0">

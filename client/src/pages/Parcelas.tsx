@@ -98,7 +98,7 @@ function StatusBadge({ status }: { status: string }) {
     paga: { label: "Paga", className: "bg-success/15 text-success border-success/30", icon: CheckCircle },
     pendente: { label: t('parcels.pending'), className: "bg-muted text-muted-foreground border-border", icon: Clock },
     atrasada: { label: "Atrasada", className: "bg-primary/15 text-primary border-primary/30", icon: AlertTriangle },
-    vencendo_hoje: { label: "Vence Hoje", className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
+    vencendo_hoje: { label: t('installments.dueToday'), className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
     parcial: { label: "Parcial", className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
   };
   const s = map[status] ?? map.pendente;
@@ -357,10 +357,10 @@ export default function Parcelas() {
 
   // Contadores por modalidade (apenas pendentes/atrasadas)
   const MODALIDADES = [
-    { key: 'diario', label: 'Diário', color: 'border-orange-500/30 bg-orange-500/5', textColor: 'text-orange-400' },
-    { key: 'semanal', label: 'Semanal', color: 'border-blue-500/30 bg-blue-500/5', textColor: 'text-blue-400' },
-    { key: 'quinzenal', label: 'Quinzenal', color: 'border-purple-500/30 bg-purple-500/5', textColor: 'text-purple-400' },
-    { key: 'mensal', label: 'Mensal', color: 'border-teal-500/30 bg-teal-500/5', textColor: 'text-teal-400' },
+    { key: 'diario', label: t('loans.daily'), color: 'border-orange-500/30 bg-orange-500/5', textColor: 'text-orange-400' },
+    { key: 'semanal', label: t('loans.weekly'), color: 'border-blue-500/30 bg-blue-500/5', textColor: 'text-blue-400' },
+    { key: 'quinzenal', label: t('loans.biweekly'), color: 'border-purple-500/30 bg-purple-500/5', textColor: 'text-purple-400' },
+    { key: 'mensal', label: t('loans.monthly'), color: 'border-teal-500/30 bg-teal-500/5', textColor: 'text-teal-400' },
   ];
   const modalidadeCount = MODALIDADES.map(m => ({
     ...m,
@@ -427,8 +427,8 @@ export default function Parcelas() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl text-foreground tracking-wide">PARCELAS</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtradas?.length ?? 0} parcelas</p>
+          <h1 className="font-display text-3xl text-foreground tracking-wide">{t('installments.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{filtradas?.length ?? 0} {t('installments.installments')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={exportarExcel} className="gap-1.5 text-xs">
@@ -460,10 +460,10 @@ export default function Parcelas() {
       {/* Status Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { key: "atrasada", label: "Atrasadas", color: "border-primary/30 bg-primary/5", textColor: "text-primary" },
-          { key: "vencendo_hoje", label: "Vence Hoje", color: "border-warning/30 bg-warning/5", textColor: "text-warning" },
-          { key: "pendente", label: "Pendentes", color: "border-border bg-muted/30", textColor: "text-foreground" },
-          { key: "paga", label: "Pagas", color: "border-success/30 bg-success/5", textColor: "text-success" },
+          { key: "atrasada", label: t('installments.overdue'), color: "border-primary/30 bg-primary/5", textColor: "text-primary" },
+          { key: "vencendo_hoje", label: t('installments.dueToday'), color: "border-warning/30 bg-warning/5", textColor: "text-warning" },
+          { key: "pendente", label: t('installments.pending'), color: "border-border bg-muted/30", textColor: "text-foreground" },
+          { key: "paga", label: t('installments.paid'), color: "border-success/30 bg-success/5", textColor: "text-success" },
         ].map(s => (
           <button
             key={s.key}
@@ -480,7 +480,7 @@ export default function Parcelas() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar por cliente..." value={busca} onChange={e => setBusca(e.target.value)} />
+          <Input className="pl-9" placeholder={t('loans.searchByClient')} value={busca} onChange={e => setBusca(e.target.value)} />
         </div>
         <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
           <SelectTrigger className="w-full sm:w-48">

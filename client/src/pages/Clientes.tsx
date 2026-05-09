@@ -739,15 +739,15 @@ export default function Clientes() {
         <div className="flex gap-2">
           <Button variant="outline" className="gap-2" onClick={exportarCSV}>
             <Download className="h-4 w-4" />
-            Exportar CSV
+            {t('clients.exportCSV')}
           </Button>
           <Button variant="outline" className="gap-2" onClick={() => setShowImportModal(true)}>
             <Upload className="h-4 w-4" />
-            Importar CSV
+            {t('clients.importCSV')}
           </Button>
           <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }}>
             <Plus className="h-4 w-4" />
-            Novo Cliente
+            {t('clients.newClient')}
           </Button>
         </div>
       </div>
@@ -758,7 +758,7 @@ export default function Clientes() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             className="pl-9"
-            placeholder="Buscar clientes por nome, CPF ou telefone..."
+            placeholder={t('clients.searchPlaceholder')}
             value={busca}
             onChange={e => setBusca(e.target.value)}
           />
@@ -796,27 +796,27 @@ export default function Clientes() {
             <thead>
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('common.client')}</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Telefone</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Tipo</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Score</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Cadastrado em</th>
-                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Ações</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('clients.phone')}</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('clients.type')}</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('clients.status')}</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('clients.score')}</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('clients.registeredAt')}</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-muted-foreground">Carregando clientes...</td>
+                  <td colSpan={7} className="px-6 py-4 text-center text-muted-foreground">{t('clients.loadingClients')}</td>
                 </tr>
               )}
               {!isLoading && filteredClientes.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center">
                     <User className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-muted-foreground">Nenhum cliente encontrado</p>
+                    <p className="text-muted-foreground">{t('clients.noClientsFound')}</p>
                     <Button className="mt-4 gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }}>
-                      <Plus className="h-4 w-4" /> Cadastrar primeiro cliente
+                      <Plus className="h-4 w-4" /> {t('clients.registerFirstClient')}
                     </Button>
                   </td>
                 </tr>

@@ -209,7 +209,10 @@
     "contract": "Contrato",
     "rate": "Tasa",
     "finish": "Finalizar",
-    "partial": "Parcial"
+    "partial": "Parcial",
+    "tutorial": "Tutorial",
+    "downloadReport": "Descargar Informe",
+    "default": "Predeterminado"
   },
   "navigation": {
     "dashboard": "Panel",
@@ -263,7 +266,7 @@
     "needsAttention": "Necesita Atención",
     "dueThisWeek": "Vence esta semana",
     "installmentsNext7Days": "cuotas en los próximos 7 días",
-    "overdueMore30Days": "Morosos +30 días",
+    "overdueMore30Days": "Deudores +30 días",
     "clientsWithSeriousDelay": "clientes con atraso grave",
     "recentActivity": "Actividad Reciente",
     "monthlyFlow": "Flujo Mensual",
@@ -302,7 +305,11 @@
     "overdueTitle": "En Atraso",
     "daysOverdue": "días en atraso",
     "koletorBanner": "Estás visualizando solo tus propios préstamos y cuotas.",
-    "dailySummary": "Resumen del Día"
+    "dailySummary": "Resumen del Día",
+    "scoreExcellent": "Excelente",
+    "scoreGood": "Bueno",
+    "scoreRegular": "Regular",
+    "scorePoor": "Malo"
   },
   "clients": {
     "title": "Clientes",
@@ -376,7 +383,15 @@
     "exportClients": "Exportar Clientes",
     "totalClients": "Total de Clientes",
     "activeClients": "Clientes Activos",
-    "inactiveClients": "Clientes Inactivos"
+    "inactiveClients": "Clientes Inactivos",
+    "exportCSV": "Exportar CSV",
+    "importCSV": "Importar CSV",
+    "searchPlaceholder": "Buscar clientes por nombre, CPF o teléfono...",
+    "type": "Tipo",
+    "registeredAt": "Registrado el",
+    "loadingClients": "Cargando clientes...",
+    "noClientsFound": "No se encontraron clientes",
+    "registerFirstClient": "Registrar primer cliente"
   },
   "loans": {
     "title": "Préstamos",
@@ -464,7 +479,25 @@
     "totalLoans": "Total de Préstamos",
     "activeLoans": "Préstamos Activos",
     "paidLoans": "Préstamos Pagados",
-    "overdueLoans": "Préstamos Atrasados"
+    "overdueLoans": "Préstamos Atrasados",
+    "manageLoans": "Gestiona tus préstamos",
+    "searchByClient": "Buscar por cliente...",
+    "onTime": "Al Día",
+    "batch": "Lote",
+    "selectOverdue": "Seleccionar Atrasados",
+    "collectSelected": "Cobrar Seleccionados",
+    "preventiveBatch": "Preventivo en Lote",
+    "remainingToReceive": "restante por cobrar",
+    "interestPerInstallment": "Intereses por cuota",
+    "collector": "Cobrador",
+    "allCollectors": "Todos los Cobradores",
+    "viewAsCards": "Ver como tarjetas",
+    "viewByClient": "Ver por cliente (carpeta)",
+    "cards": "Tarjetas",
+    "folder": "Carpeta",
+    "selected": "seleccionado(s)",
+    "fixedInstallment": "Cuota Fija",
+    "receipts": "Cobros"
   },
   "contracts": {
     "title": "Contratos",
@@ -2085,5 +2118,13 @@
     "discount": "Descuento (R$)",
     "allModalities": "Todas las Modalidades",
     "priceTable": "Tabla Price"
+  },
+  "installments": {
+    "title": "CUOTAS",
+    "installments": "cuotas",
+    "overdue": "Atrasadas",
+    "dueToday": "Vence Hoy",
+    "pending": "Pendientes",
+    "paid": "Pagadas"
   }
 }
