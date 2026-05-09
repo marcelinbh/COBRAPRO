@@ -35,7 +35,7 @@ export default function Relatorios() {
 
   const { data: kpis } = trpc.dashboard.kpis.useQuery();
   const { data: parcelas } = trpc.parcelas.list.useQuery({});
-  const { data: transacoes } = trpc.caixa.transacoes.useQuery({});
+  const { data: transacoes } = trpc.caixa.transacoes.useQuery({ limit: 1000 });
   const { data: contasCaixa } = trpc.caixa.contas.useQuery();
   const { data: contasPagarData } = trpc.contasPagar.listar.useQuery({ status: 'paga' });
 
@@ -46,10 +46,11 @@ export default function Relatorios() {
     const modalidadeOk = filtroModalidade === 'todas' || p.modalidade === filtroModalidade;
     if (!modalidadeOk) return false;
     if (p.status === 'paga' && p.dataPagamento) {
-      const d = new Date(p.dataPagamento).toISOString().split('T')[0];
+      // Usar slice para evitar problemas de timezone (data_pagamento pode ser string YYYY-MM-DD ou ISO)
+      const d = String(p.dataPagamento).slice(0, 10);
       return d >= dataInicio && d <= dataFim;
     }
-    const d = new Date(p.dataVencimento).toISOString().split('T')[0];
+    const d = String(p.dataVencimento).slice(0, 10);
     return d >= dataInicio && d <= dataFim;
   });
 
@@ -94,10 +95,10 @@ export default function Relatorios() {
   const fluxoData = ultimos7Dias.map(d => {
     const dayKey = d.toISOString().split('T')[0];
     const entradas = (transacoes ?? [])
-      .filter(t => t.tipo === 'entrada' && new Date(t.dataTransacao).toISOString().split('T')[0] === dayKey)
+      .filter(t => t.tipo === 'entrada' && String(t.dataTransacao).slice(0, 10) === dayKey)
       .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
     const saidas = (transacoes ?? [])
-      .filter(t => t.tipo === 'saida' && new Date(t.dataTransacao).toISOString().split('T')[0] === dayKey)
+      .filter(t => t.tipo === 'saida' && String(t.dataTransacao).slice(0, 10) === dayKey)
       .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
     return {
       dia: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
@@ -112,7 +113,7 @@ export default function Relatorios() {
   // Saídas no período (empréstimos concedidos + contas a pagar pagas)
   const saidasCaixaPeriodo = (transacoes ?? [])
     .filter(t => {
-      const d = new Date(t.dataTransacao).toISOString().split('T')[0];
+      const d = String(t.dataTransacao).slice(0, 10);
       return t.tipo === 'saida' && d >= dataInicio && d <= dataFim;
     })
     .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
@@ -121,7 +122,7 @@ export default function Relatorios() {
   const contasPagarPagas = (contasPagarData ?? []).filter((c: any) => {
     const dataPag = c.dataPagamento || c.data_pagamento;
     if (!dataPag) return false;
-    const d = new Date(dataPag).toISOString().split('T')[0];
+    const d = String(dataPag).slice(0, 10);
     return d >= dataInicio && d <= dataFim;
   });
   const totalContasPagarPeriodo = contasPagarPagas.reduce((sum: number, c: any) =>
@@ -130,7 +131,7 @@ export default function Relatorios() {
 
   const entradasPeriodo = (transacoes ?? [])
     .filter(t => {
-      const d = new Date(t.dataTransacao).toISOString().split('T')[0];
+      const d = String(t.dataTransacao).slice(0, 10);
       return t.tipo === 'entrada' && d >= dataInicio && d <= dataFim;
     })
     .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);

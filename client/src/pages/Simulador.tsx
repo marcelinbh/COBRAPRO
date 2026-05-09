@@ -370,14 +370,14 @@ export default function Simulador() {
             <Calculator className="h-6 w-6 text-emerald-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Simulador de Emprestimo</h1>
-            <p className="text-sm text-muted-foreground">Calcule parcelas antes de criar o contrato</p>
+            <h1 className="text-2xl font-bold text-foreground">{t('simulator.pageTitle')}</h1>
+            <p className="text-sm text-muted-foreground">{t('simulator.pageSubtitle')}</p>
           </div>
         </div>
         {/* Modo Comparacao */}
         <div className="flex items-center gap-2 bg-card border border-border rounded-lg px-3 py-2">
           <GitCompare className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">Comparar Modos</span>
+          <span className="text-sm text-muted-foreground">{t('simulator.compareModes')}</span>
           <Switch checked={modoComparacao} onCheckedChange={setModoComparacao} />
         </div>
       </div>
@@ -388,25 +388,25 @@ export default function Simulador() {
           <CardHeader className="pb-4">
             <CardTitle className="text-base flex items-center gap-2">
               <TrendingUp className="h-4 w-4 text-emerald-400" />
-              Parametros da Simulacao
+              {t('simulator.parameters')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Modalidade - so mostra se nao estiver em modo comparacao */}
             {!modoComparacao && (
               <div className="space-y-1.5">
-                <Label className="text-sm text-muted-foreground">Modalidade</Label>
+                <Label className="text-sm text-muted-foreground">{t('simulator.modality')}</Label>
                 <Select value={modalidade} onValueChange={(v) => setModalidade(v as Modalidade)}>
                   <SelectTrigger className="bg-background border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="emprestimo_padrao">Emprestimo Padrao (Juros Simples)</SelectItem>
-                    <SelectItem value="emprestimo_diario">Emprestimo Diario</SelectItem>
-                    <SelectItem value="emprestimo_semanal">Emprestimo Semanal</SelectItem>
-                    <SelectItem value="emprestimo_quinzenal">Emprestimo Quinzenal</SelectItem>
-                    <SelectItem value="tabela_price">Parcela Fixa / Price</SelectItem>
-                    <SelectItem value="desconto_cheque">Desconto de Cheque</SelectItem>
+                    <SelectItem value="emprestimo_padrao">{t('simulator.loanSimple')}</SelectItem>
+                    <SelectItem value="emprestimo_diario">{t('simulator.loanDaily')}</SelectItem>
+                    <SelectItem value="emprestimo_semanal">{t('simulator.loanWeekly')}</SelectItem>
+                    <SelectItem value="emprestimo_quinzenal">{t('simulator.loanBiweekly')}</SelectItem>
+                    <SelectItem value="tabela_price">{t('simulator.loanFixed')}</SelectItem>
+                    <SelectItem value="desconto_cheque">{t('simulator.checkDiscount')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -430,7 +430,7 @@ export default function Simulador() {
             {/* Valor Principal */}
             <div className="space-y-1.5">
               <Label className="text-sm text-muted-foreground">
-                {modalidade === "desconto_cheque" ? "Valor Nominal do Cheque (R$)" : "Valor do Emprestimo (R$)"}
+                {modalidade === "desconto_cheque" ? t('simulator.checkNominalValue') : t('simulator.loanAmountLabel')}
               </Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
@@ -442,13 +442,13 @@ export default function Simulador() {
             {/* Parcela Desejada (opcional) */}
             {modalidade !== "desconto_cheque" && !modoComparacao && (
               <div className="space-y-1.5">
-                <Label className="text-sm text-muted-foreground">Parcela Desejada (R$) <span className="text-xs text-emerald-400">(opcional)</span></Label>
+                <Label className="text-sm text-muted-foreground">{t('simulator.desiredInstallment')} <span className="text-xs text-emerald-400">({t('common.optional')})</span></Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
                   <Input className="pl-8 bg-background border-border" placeholder="Ex: 300,00"
                     value={parcelaDesejada} onChange={(e) => { setParcelaDesejada(e.target.value); if (e.target.value) setTaxaJuros(""); }} />
                 </div>
-                {parcelaDesejada && <p className="text-xs text-emerald-400">Taxa calculada automaticamente</p>}
+                {parcelaDesejada && <p className="text-xs text-emerald-400">{t('simulator.rateAutoCalculated')}</p>}
               </div>
             )}
             {/* Taxa */}
@@ -473,7 +473,7 @@ export default function Simulador() {
 
             {/* Data de Inicio */}
             <div className="space-y-1.5">
-              <Label className="text-sm text-muted-foreground">Data de Inicio</Label>
+              <Label className="text-sm text-muted-foreground">{t('simulator.startDate')}</Label>
               <Input type="date" className="bg-background border-border"
                 value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
             </div>
@@ -481,15 +481,15 @@ export default function Simulador() {
             {/* Periodicidade - apenas para modalidades sem periodicidade fixa */}
             {mostrarPeriodicidade && (
               <div className="space-y-1.5">
-                <Label className="text-sm text-muted-foreground">Periodicidade</Label>
+                <Label className="text-sm text-muted-foreground">{t('simulator.periodicity')}</Label>
                 <Select value={tipoTaxaManual} onValueChange={setTipoTaxaManual}>
                   <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="diaria">Diaria</SelectItem>
-                    <SelectItem value="semanal">Semanal</SelectItem>
-                    <SelectItem value="quinzenal">Quinzenal</SelectItem>
-                    <SelectItem value="mensal">Mensal</SelectItem>
-                    <SelectItem value="anual">Anual</SelectItem>
+                    <SelectItem value="diaria">{t('common.daily')}</SelectItem>
+                    <SelectItem value="semanal">{t('common.weekly')}</SelectItem>
+                    <SelectItem value="quinzenal">{t('common.biweekly')}</SelectItem>
+                    <SelectItem value="mensal">{t('common.monthly')}</SelectItem>
+                    <SelectItem value="anual">{t('common.annual')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -498,7 +498,7 @@ export default function Simulador() {
             {/* Dia de Vencimento */}
             {tipoTaxa === "mensal" && !modoComparacao && modalidade !== "desconto_cheque" && (
               <div className="space-y-1.5">
-                <Label className="text-sm text-muted-foreground">Dia de Vencimento</Label>
+                <Label className="text-sm text-muted-foreground">{t('simulator.dueDay')}</Label>
                 <Select value={diaVencimento} onValueChange={setDiaVencimento}>
                   <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -512,7 +512,7 @@ export default function Simulador() {
 
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold" onClick={calcular}>
               <Calculator className="h-4 w-4 mr-2" />
-              {modoComparacao ? "Comparar Modalidades" : "Calcular Simulacao"}
+              {modoComparacao ? t('simulator.compareModalities') : t('simulator.calculate')}
             </Button>
           </CardContent>
         </Card>
@@ -524,7 +524,7 @@ export default function Simulador() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-emerald-400" />
-                  Resultado da Simulacao
+                  {t('simulator.simulationResult')}
                 </CardTitle>
                 <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => exportarPDF()}>
                   <Download className="h-3.5 w-3.5" /> Exportar PDF
@@ -534,11 +534,11 @@ export default function Simulador() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20">
-                  <p className="text-xs text-muted-foreground mb-1">Valor da Parcela</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('simulator.installmentValue')}</p>
                   <p className="text-xl font-bold text-emerald-400">{formatarMoeda(resultado.valorParcela)}</p>
                 </div>
                 <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
-                  <p className="text-xs text-muted-foreground mb-1">Total a Pagar</p>
+                  <p className="text-xs text-muted-foreground mb-1">{t('simulator.totalToPay')}</p>
                   <p className="text-xl font-bold text-blue-400">{formatarMoeda(resultado.totalPagar)}</p>
                 </div>
               </div>
@@ -547,23 +547,23 @@ export default function Simulador() {
 
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Capital emprestado</span>
+                  <span className="text-muted-foreground">{t('simulator.loanedCapital')}</span>
                   <span className="font-medium">{formatarMoeda(resultado.valorPrincipal)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Total de juros</span>
+                  <span className="text-muted-foreground">{t('simulator.totalInterest')}</span>
                   <span className="font-medium text-amber-400">{formatarMoeda(resultado.totalJuros)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Numero de parcelas</span>
+                  <span className="text-muted-foreground">{t('simulator.installments')}</span>
                   <span className="font-medium">{resultado.numeroParcelas}x</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Taxa de juros</span>
+                  <span className="text-muted-foreground">{t('simulator.interestRate')}</span>
                   <span className="font-medium">{parseFloat(resultado.taxaJuros.toFixed(4))}% {getTaxaLabelCurto(resultado.tipoTaxa)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Custo efetivo total</span>
+                  <span className="text-muted-foreground">{t('simulator.effectiveCost')}</span>
                   <span className="font-medium text-red-400">
                     {resultado.valorPrincipal > 0 ? ((resultado.totalJuros / resultado.valorPrincipal) * 100).toFixed(2) : "0.00"}%
                   </span>
@@ -574,7 +574,7 @@ export default function Simulador() {
 
               <Button variant="outline" className="w-full border-border" onClick={() => setMostrarTabela(!mostrarTabela)}>
                 <Calendar className="h-4 w-4 mr-2" />
-                {mostrarTabela ? "Ocultar" : "Ver"} Plano de Parcelas
+                {mostrarTabela ? t('common.hide') : t('common.view')} {t('simulator.installmentPlan')}
                 {mostrarTabela ? <ChevronUp className="h-4 w-4 ml-2" /> : <ChevronDown className="h-4 w-4 ml-2" />}
               </Button>
 
@@ -583,9 +583,9 @@ export default function Simulador() {
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50 sticky top-0">
                       <tr>
-                        <th className="px-3 py-2 text-left text-xs text-muted-foreground">Parcela</th>
-                        <th className="px-3 py-2 text-left text-xs text-muted-foreground">Vencimento</th>
-                        <th className="px-3 py-2 text-right text-xs text-muted-foreground">Valor</th>
+                        <th className="px-3 py-2 text-left text-xs text-muted-foreground">{t('common.installment')}</th>
+                        <th className="px-3 py-2 text-left text-xs text-muted-foreground">{t('common.dueDate')}</th>
+                        <th className="px-3 py-2 text-right text-xs text-muted-foreground">{t('common.value')}</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -603,7 +603,7 @@ export default function Simulador() {
 
               <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold" onClick={irParaNovoContrato}>
                 <FileText className="h-4 w-4 mr-2" />
-                Criar Contrato com estes Dados
+                {t('simulator.createContractWithData')}
               </Button>
             </CardContent>
           </Card>
@@ -614,8 +614,8 @@ export default function Simulador() {
                 <Calculator className="h-8 w-8 text-muted-foreground" />
               </div>
               <p className="text-muted-foreground text-sm">
-                Preencha os parametros ao lado e clique em<br />
-                <strong className="text-foreground">Calcular Simulacao</strong> para ver o resultado
+                {t('simulator.fillParamsAndClick')}<br />
+                <strong className="text-foreground">{t('simulator.calculate')}</strong> {t('simulator.toSeeResult')}
               </p>
             </div>
           </Card>
@@ -629,8 +629,8 @@ export default function Simulador() {
                 <GitCompare className="h-8 w-8 text-blue-400" />
               </div>
               <p className="text-muted-foreground text-sm">
-                Preencha os parametros e clique em<br />
-                <strong className="text-foreground">Comparar Modalidades</strong>
+                {t('simulator.fillParamsAndClick')}<br />
+                <strong className="text-foreground">{t('simulator.compareModalities')}</strong>
               </p>
             </div>
           </Card>
@@ -644,7 +644,7 @@ export default function Simulador() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-base flex items-center gap-2">
                 <GitCompare className="h-4 w-4 text-blue-400" />
-                Comparacao de Modalidades
+                {t('simulator.modalityComparison')}
               </CardTitle>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={exportarComparacaoPDF}>
                 <Download className="h-3.5 w-3.5" /> Exportar PDF
@@ -656,13 +656,13 @@ export default function Simulador() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Modalidade</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Periodicidade</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Parcela</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Total Juros</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Total a Pagar</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">CET (%)</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">Acoes</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('simulator.modality')}</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">{t('simulator.periodicity')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">{t('common.installment')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">{t('simulator.totalInterest')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">{t('simulator.totalToPay')}</th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">{t('simulator.cet')}</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-muted-foreground uppercase">{t('common.actions')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -676,7 +676,7 @@ export default function Simulador() {
                             <Badge variant={isMelhor ? "default" : "outline"} className={`text-xs ${isMelhor ? "bg-emerald-600" : ""}`}>
                               {MODALIDADE_LABELS[r.modalidade]}
                             </Badge>
-                            {isMelhor && <span className="text-xs text-emerald-400">Menor custo</span>}
+                            {isMelhor && <span className="text-xs text-emerald-400">{t('simulator.lowestCost')}</span>}
                           </div>
                         </td>
                         <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{getTaxaLabelCurto(r.tipoTaxa)}</td>
@@ -726,32 +726,32 @@ export default function Simulador() {
       {/* Info sobre modalidades */}
       <Card className="bg-card border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm text-muted-foreground">Como funciona cada modalidade</CardTitle>
+          <CardTitle className="text-sm text-muted-foreground">{t('simulator.howEachModalityWorks')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
             <div className="p-3 rounded-lg bg-muted/20">
-              <Badge variant="outline" className="mb-2 text-xs">Emprestimo Padrao</Badge>
+              <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanSimpleShort')}</Badge>
               <p className="text-muted-foreground text-xs">Juros simples mensais. Total = Capital x (1 + Taxa% x Parcelas). Parcelas iguais.</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
-              <Badge variant="outline" className="mb-2 text-xs">Emprestimo Diario</Badge>
+              <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanDailyShort')}</Badge>
               <p className="text-muted-foreground text-xs">Cobranca diaria. Taxa aplicada por dia. Ideal para prazos curtos de 15 a 60 dias.</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
-              <Badge variant="outline" className="mb-2 text-xs">Emprestimo Semanal</Badge>
+              <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanWeeklyShort')}</Badge>
               <p className="text-muted-foreground text-xs">Parcelas semanais. Taxa aplicada por semana. Ideal para prazos de 4 a 16 semanas.</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
-              <Badge variant="outline" className="mb-2 text-xs">Emprestimo Quinzenal</Badge>
+              <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanBiweeklyShort')}</Badge>
               <p className="text-muted-foreground text-xs">Parcelas a cada 15 dias. Taxa aplicada por quinzena. Ideal para prazos de 2 a 6 meses.</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
-              <Badge variant="outline" className="mb-2 text-xs">Parcela Fixa</Badge>
+              <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanFixedShort')}</Badge>
               <p className="text-muted-foreground text-xs">Juros compostos (SAC). Parcelas iguais com amortizacao crescente e juros decrescentes.</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
-              <Badge variant="outline" className="mb-2 text-xs">Desconto de Cheque</Badge>
+              <Badge variant="outline" className="mb-2 text-xs">{t('simulator.checkDiscountShort')}</Badge>
               <p className="text-muted-foreground text-xs">Antecipacao de cheque. O cliente recebe o valor nominal menos o desconto calculado.</p>
             </div>
           </div>

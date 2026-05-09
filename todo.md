@@ -929,3 +929,25 @@
 - [ ] Testar experiência 100% em PT-BR
 - [ ] Testar experiência 100% em Espanhol
 - [ ] Zero textos em português quando em modo Espanhol
+
+## Revisão Crítica - 09/05/2026
+
+- [x] VERIFICAR/CORRIGIR: Lógica de pagamento de juros com renovação automática de prazo:
+  - Regra: cliente pegou R$1.000 a 50% quinzenal → total R$1.500 em 15 dias
+  - Se no vencimento pagar SOMENTE os juros (R$500):
+    1. Registrar pagamento dos juros (R$500)
+    2. Renovar automaticamente o prazo (+15 dias ou conforme modalidade: diário/semanal/quinzenal/mensal)
+    3. Manter o valor total (R$1.500) para a próxima data
+  - Regra: pagou só juros = renova o prazo, mantém o total
+  - Regra: pagou o total = quita a parcela normalmente
+  - Outro exemplo: R$500 a 50% quinzenal → total R$750 em 15 dias
+    - Paga só juros (R$250) → ganha mais 15 dias, total continua R$750
+- [x] CORRIGIDO: Exclusão de contratos com cascade delete (parcelas deletadas antes do contrato)
+- [ ] Testar fluxo completo na conta koletor3 após deploy das correções
+
+## Fase 47: Correções Simulador + Relatórios
+- [x] Corrigir todos os textos hardcoded sem acentos no Simulador.tsx (53 substituições com t())
+- [x] Adicionar chaves de tradução simulator.* ao pt-BR.json e es.json
+- [x] Adicionar chaves common.daily/weekly/biweekly/monthly/annual/installment ao pt-BR.json e es.json
+- [x] Corrigir bug Relatórios R$ 0.00: aumentar limit de transações para 1000
+- [x] Corrigir parsing de datas no Relatorios.tsx (usar slice(0,10) para evitar timezone issues)
