@@ -296,7 +296,7 @@ export default function ContasPagar() {
             <CardContent className="py-12 text-center">
               <Receipt className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">Nenhuma conta encontrada</p>
-              <p className="text-sm text-muted-foreground mt-1">Clique em "Nova Conta" para adicionar</p>
+              <p className="text-sm text-muted-foreground mt-1">Clique em {t('accountsPayable.newAccount')} para adicionar</p>
             </CardContent>
           </Card>
         ) : (

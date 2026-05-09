@@ -124,7 +124,7 @@ export default function Contratos() {
           <Input className="pl-9" placeholder="Buscar por cliente..." value={busca} onChange={e => setBusca(e.target.value)} />
         </div>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
-          <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder={t('contracts.status')} /></SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">Todos os status</SelectItem>
             <SelectItem value="ativo">Ativo</SelectItem>

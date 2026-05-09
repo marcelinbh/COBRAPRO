@@ -1,0 +1,18 @@
+{
+  "query": "\n-- Create vendas table\nCREATE TABLE IF NOT EXISTS \"vendas\" (\n  \"id\" serial PRIMARY KEY NOT NULL,\n  \"user_id\" integer NOT NULL,\n  \"cliente_id\" integer,\n  \"produto_id\" integer,\n  \"produto\" varchar(255) NOT NULL,\n  \"quantidade\" integer DEFAULT 1 NOT NULL,\n  \"valor_unitario\" numeric(15, 2) NOT NULL,\n  \"valor_total\" numeric(15, 2) NOT NULL,\n  \"status\" varchar(50) DEFAULT 'concluida' NOT NULL,\n  \"forma_pagamento\" varchar(50) DEFAULT 'dinheiro',\n  \"data_venda\" timestamp with time zone DEFAULT now() NOT NULL,\n  \"createdAt\" timestamp with time zone DEFAULT now() NOT NULL,\n  \"updatedAt\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute \n-- Create vendas table\nCREATE TABLE IF NOT EXISTS \"vendas\" (\n  \"id\" serial PRIMARY KEY NOT NULL,\n  \"user_id\" integer NOT NULL,\n  \"cliente_id\" integer,\n  \"produto_id\" integer,\n  \"produto\" varchar(255) NOT NULL,\n  \"quantidade\" integer DEFAULT 1 NOT NULL,\n  \"valor_unitario\" numeric(15, 2) NOT NULL,\n  \"valor_total\" numeric(15, 2) NOT NULL,\n  \"status\" varchar(50) DEFAULT 'concluida' NOT NULL,\n  \"forma_pagamento\" varchar(50) DEFAULT 'dinheiro',\n  \"data_venda\" timestamp with time zone DEFAULT now() NOT NULL,\n  \"createdAt\" timestamp with time zone DEFAULT now() NOT NULL,\n  \"updatedAt\" timestamp with time zone DEFAULT now() NOT NULL\n);\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1064 (42000) at line 3: You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 1 column 35 near \"\"vendas\" (",
+    "  \"id\" serial PRIMARY KEY NOT NULL,",
+    "  \"user_id\" integer NOT NULL,",
+    "  \"cliente_id\" integer,",
+    "  \"produto_id\" integer,",
+    "  \"produto\" varchar(255) NOT NULL,",
+    "  \"quantidade\" integer DEFAULT 1 NOT NULL,",
+    "  \"valor_unitario\" numeric(15, 2) NOT NULL,",
+    "  \"valor_total\" numeric(15, 2) NOT NULL,",
+    "  \"status\" varchar(50) DEFAULT 'concluida' NOT NULL,",
+    "  \"forma_pagamento\" varcha"
+  ]
+}

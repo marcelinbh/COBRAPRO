@@ -72,7 +72,7 @@ export default function Veiculos() {
               <TabsContent value="dados" className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Marca</Label>
+                    <Label>{t('vehicles.brand')}</Label>
                     <Input
                       placeholder="Ex: Toyota"
                       value={novoVeiculo.marca}
@@ -80,7 +80,7 @@ export default function Veiculos() {
                     />
                   </div>
                   <div>
-                    <Label>Modelo</Label>
+                    <Label>{t('vehicles.model')}</Label>
                     <Input
                       placeholder="Ex: Corolla"
                       value={novoVeiculo.modelo}
@@ -88,7 +88,7 @@ export default function Veiculos() {
                     />
                   </div>
                   <div>
-                    <Label>Placa</Label>
+                    <Label>{t('vehicles.plate')}</Label>
                     <Input
                       placeholder="ABC-1234"
                       value={novoVeiculo.placa}
@@ -104,7 +104,7 @@ export default function Veiculos() {
                     />
                   </div>
                   <div className="col-span-2">
-                    <Label>Chassi</Label>
+                    <Label>{t('vehicles.chassis')}</Label>
                     <Input
                       placeholder="Número do chassi"
                       value={novoVeiculo.chassi}
@@ -207,7 +207,7 @@ export default function Veiculos() {
         <Card className="bg-slate-800/50 border-slate-700 p-4">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-slate-400 text-sm">Total de Veículos</div>
+              <div className="text-slate-400 text-sm">{t('vehicles.totalVehicles')}</div>
               <div className="text-2xl font-bold text-white mt-2">{kpis.total}</div>
             </div>
             <Car className="w-8 h-8 text-slate-600" />

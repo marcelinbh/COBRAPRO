@@ -63,15 +63,18 @@ export const backupRouter = router({
 
   exportarVendas: protectedProcedure.query(async ({ ctx }) => {
     const client = await sb();
+    // Usar vendas_telefone como "produtos vendidos" já que a tabela vendas genérica não existe
     const { data: produtos, error: errProd } = await client
-      .from('vendas')
-      .select('id, produto, quantidade, valor_unitario, valor_total, status, forma_pagamento, data_venda, cliente_id, clientes(nome, cpf_cnpj, telefone)')
+      .from('vendas_telefone')
+      .select('*')
+      .eq('user_id', ctx.user.id)
       .order('data_venda', { ascending: false });
     if (errProd) throw errProd;
 
     const { data: veiculos, error: errVeic } = await client
       .from('veiculos')
-      .select('id, marca, modelo, ano, placa, valor_venda, valor_entrada, status, data_venda, cliente_id, clientes(nome, cpf_cnpj, telefone)')
+      .select('*')
+      .eq('user_id', ctx.user.id)
       .order('created_at', { ascending: false });
     if (errVeic) throw errVeic;
 

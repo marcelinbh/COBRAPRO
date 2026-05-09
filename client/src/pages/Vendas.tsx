@@ -70,7 +70,7 @@ export default function Vendas() {
             <ShoppingBag className="h-6 w-6 text-purple-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Vendas de Produtos</h1>
+            <h1 className="text-2xl font-bold text-foreground">{t('sales.productSales')}</h1>
             <p className="text-sm text-muted-foreground">Venda produtos a prazo e controle seu estoque</p>
           </div>
         </div>

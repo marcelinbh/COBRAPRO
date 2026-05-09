@@ -70,7 +70,7 @@ export default function Inadimplencia() {
               <TrendingDown className="h-6 w-6 text-red-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold">Inadimplência</h1>
+              <h1 className="text-2xl font-bold">{t('inadimplencia.title')}</h1>
               <p className="text-sm text-muted-foreground">Clientes com parcelas em atraso</p>
             </div>
           </div>

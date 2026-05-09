@@ -93,9 +93,10 @@ function gerarMensagemCobranca(
 }
 
 function StatusBadge({ status }: { status: string }) {
+  const { t } = useTranslation();
   const map: Record<string, { label: string; className: string; icon: React.ElementType }> = {
     paga: { label: "Paga", className: "bg-success/15 text-success border-success/30", icon: CheckCircle },
-    pendente: { label: "Pendente", className: "bg-muted text-muted-foreground border-border", icon: Clock },
+    pendente: { label: t('parcels.pending'), className: "bg-muted text-muted-foreground border-border", icon: Clock },
     atrasada: { label: "Atrasada", className: "bg-primary/15 text-primary border-primary/30", icon: AlertTriangle },
     vencendo_hoje: { label: "Vence Hoje", className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
     parcial: { label: "Parcial", className: "bg-warning/15 text-warning border-warning/30", icon: Clock },

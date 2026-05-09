@@ -213,7 +213,7 @@ export default function NovoContrato() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="font-display text-3xl text-foreground tracking-wide">NOVO CONTRATO</h1>
+          <h1 className="font-display text-3xl text-foreground tracking-wide">{t('novoContrato.title').toUpperCase()}</h1>
           <p className="text-sm text-muted-foreground">Preencha os dados do contrato</p>
         </div>
       </div>
@@ -286,9 +286,9 @@ export default function NovoContrato() {
                     <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="diaria">Diária</SelectItem>
-                      <SelectItem value="semanal">Semanal</SelectItem>
-                      <SelectItem value="quinzenal">Quinzenal</SelectItem>
-                      <SelectItem value="mensal">Mensal</SelectItem>
+                      <SelectItem value="semanal">{t('novoContrato.weekly')}</SelectItem>
+                      <SelectItem value="quinzenal">{t('novoContrato.biweekly')}</SelectItem>
+                      <SelectItem value="mensal">{t('novoContrato.monthly')}</SelectItem>
                       <SelectItem value="anual">Anual</SelectItem>
                     </SelectContent>
                   </Select>

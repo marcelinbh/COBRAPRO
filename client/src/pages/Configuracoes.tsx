@@ -266,7 +266,7 @@ export default function Configuracoes() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label>Nome da Empresa</Label>
+              <Label>{t('configuration.companyName')}</Label>
               <Input className="mt-1" value={nomeEmpresa} onChange={e => setNomeEmpresa(e.target.value)} placeholder="CobraPro Financeira" />
             </div>
             <div>

@@ -80,9 +80,14 @@ export default function Backup() {
     setExportando(tipo);
     try {
       const date = new Date().toISOString().split('T')[0];
+      
+      // Timeout de 30 segundos para prevenir estado {t('backup.exporting')} infinito
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Exportação expirou após 30 segundos')), 30000)
+      );
 
       if (tipo === 'clientes') {
-        const res = await utils.backup.exportarClientes.fetch();
+        const res = await Promise.race([utils.backup.exportarClientes.fetch(), timeoutPromise]) as any;
         if (formato === 'csv') {
           downloadCsv(jsonToCsv(res.dados), `clientes_${date}.csv`);
         } else {
@@ -92,7 +97,7 @@ export default function Backup() {
       }
 
       else if (tipo === 'contratos') {
-        const res = await utils.backup.exportarContratos.fetch({ modalidade: 'todos' });
+        const res = await Promise.race([utils.backup.exportarContratos.fetch({ modalidade: 'todos' }), timeoutPromise]) as any;
         if (formato === 'csv') {
           downloadCsv(jsonToCsv(res.dados), `contratos_${date}.csv`);
         } else {
@@ -102,7 +107,7 @@ export default function Backup() {
       }
 
       else if (tipo === 'contratos_diarios') {
-        const res = await utils.backup.exportarContratos.fetch({ modalidade: 'diario' });
+        const res = await Promise.race([utils.backup.exportarContratos.fetch({ modalidade: 'diario' }), timeoutPromise]) as any;
         if (formato === 'csv') {
           downloadCsv(jsonToCsv(res.dados), `emprestimos_diarios_${date}.csv`);
         } else {
@@ -112,11 +117,11 @@ export default function Backup() {
       }
 
       else if (tipo === 'parcelas') {
-        const res = await utils.backup.exportarParcelas.fetch({
+        const res = await Promise.race([utils.backup.exportarParcelas.fetch({
           status: filtroStatus,
           dataInicio: dataInicio || undefined,
           dataFim: dataFim || undefined,
-        });
+        }), timeoutPromise]) as any;
         if (formato === 'csv') {
           downloadCsv(jsonToCsv(res.dados), `parcelas_${date}.csv`);
         } else {
@@ -126,7 +131,7 @@ export default function Backup() {
       }
 
       else if (tipo === 'vendas') {
-        const res = await utils.backup.exportarVendas.fetch();
+        const res = await Promise.race([utils.backup.exportarVendas.fetch(), timeoutPromise]) as any;
         const todos = [
           ...res.produtos.map((p: any) => ({ tipo: 'produto', ...p })),
           ...res.veiculos.map((v: any) => ({ tipo: 'veiculo', ...v })),
@@ -140,10 +145,10 @@ export default function Backup() {
       }
 
       else if (tipo === 'transacoes') {
-        const res = await utils.backup.exportarTransacoes.fetch({
+        const res = await Promise.race([utils.backup.exportarTransacoes.fetch({
           dataInicio: dataInicio || undefined,
           dataFim: dataFim || undefined,
-        });
+        }), timeoutPromise]) as any;
         if (formato === 'csv') {
           downloadCsv(jsonToCsv(res.dados), `transacoes_${date}.csv`);
         } else {
@@ -183,8 +188,8 @@ export default function Backup() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-white">Backup de Dados</h1>
-        <p className="text-slate-400 mt-1">Exporte seus dados em CSV ou JSON para backup seguro</p>
+        <h1 className="text-3xl font-bold text-white">{t('backup.title')}</h1>
+        <p className="text-slate-400 mt-1">{t('backup.subtitle')}</p>
       </div>
 
       {/* KPIs */}

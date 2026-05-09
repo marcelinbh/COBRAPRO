@@ -17,6 +17,7 @@ import { formatarMoeda } from "../../../shared/finance";
 
 // ── Modal: Nova Conta ─────────────────────────────────────────────────────────
 function NovaConta({ onSuccess }: { onSuccess: () => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ nome: "", tipo: "caixa", banco: "", saldoInicial: "0" });
 
@@ -28,36 +29,36 @@ function NovaConta({ onSuccess }: { onSuccess: () => void }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2"><Plus className="h-4 w-4" />Nova Conta</Button>
+        <Button variant="outline" size="sm" className="gap-2"><Plus className="h-4 w-4" />{t('cashbox.newTransaction')}</Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl tracking-wide">NOVA CONTA</DialogTitle>
+          <DialogTitle className="font-display text-xl tracking-wide">{t('cashbox.title').toUpperCase()}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <div>
-            <Label>Nome da Conta *</Label>
+            <Label>{t('cashbox.account')} *</Label>
             <Input className="mt-1" placeholder="Ex: Caixa Principal" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
           </div>
           <div>
-            <Label>Tipo</Label>
+            <Label>{t('cashbox.type')}</Label>
             <Select value={form.tipo} onValueChange={v => setForm(f => ({ ...f, tipo: v }))}>
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="caixa">Caixa Físico</SelectItem>
-                <SelectItem value="banco">Banco</SelectItem>
-                <SelectItem value="digital">Conta Digital</SelectItem>
+                <SelectItem value="caixa">{t('cashbox.other')}</SelectItem>
+                <SelectItem value="banco">{t('cashbox.account')}</SelectItem>
+                <SelectItem value="digital">{t('cashbox.account')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           {form.tipo === 'banco' && (
             <div>
-              <Label>Banco</Label>
+              <Label>{t('cashbox.account')}</Label>
               <Input className="mt-1" placeholder="Ex: Nubank, Itaú..." value={form.banco} onChange={e => setForm(f => ({ ...f, banco: e.target.value }))} />
             </div>
           )}
           <div>
-            <Label>Saldo Inicial (R$)</Label>
+            <Label>{t('cashbox.balance')} (R$)</Label>
             <Input className="mt-1" type="number" step="0.01" value={form.saldoInicial} onChange={e => setForm(f => ({ ...f, saldoInicial: e.target.value }))} />
           </div>
           <Button
@@ -75,6 +76,7 @@ function NovaConta({ onSuccess }: { onSuccess: () => void }) {
 
 // ── Modal: Nova Transação (completo) ─────────────────────────────────────────
 function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: string }[]; onSuccess: () => void }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ contaCaixaId: "", tipo: "entrada", categoria: "outros", valor: "", descricao: "" });
 
@@ -86,15 +88,15 @@ function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: stri
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-2"><Plus className="h-4 w-4" />Nova Transação</Button>
+        <Button size="sm" className="gap-2"><Plus className="h-4 w-4" />{t('cashbox.newTransaction')}</Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl tracking-wide">NOVA TRANSAÇÃO</DialogTitle>
+          <DialogTitle className="font-display text-xl tracking-wide">{t('cashbox.newTransaction').toUpperCase()}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <div>
-            <Label>Conta *</Label>
+            <Label>{t('cashbox.account')} *</Label>
             <Select value={form.contaCaixaId} onValueChange={v => setForm(f => ({ ...f, contaCaixaId: v }))}>
               <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
               <SelectContent>
@@ -103,7 +105,7 @@ function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: stri
             </Select>
           </div>
           <div>
-            <Label>Tipo</Label>
+            <Label>{t('cashbox.type')}</Label>
             <div className="grid grid-cols-2 gap-2 mt-1">
               {['entrada', 'saida'].map(t => (
                 <button
@@ -121,25 +123,25 @@ function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: stri
             </div>
           </div>
           <div>
-            <Label>Categoria</Label>
+            <Label>{t('cashbox.type')}</Label>
             <Select value={form.categoria} onValueChange={v => setForm(f => ({ ...f, categoria: v }))}>
               <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="pagamento_parcela">Pagamento de Parcela</SelectItem>
-                <SelectItem value="emprestimo_liberado">Empréstimo Liberado</SelectItem>
-                <SelectItem value="despesa_operacional">Despesa Operacional</SelectItem>
-                <SelectItem value="transferencia_conta">Transferência entre Contas</SelectItem>
-                <SelectItem value="ajuste_manual">Ajuste Manual</SelectItem>
-                <SelectItem value="outros">Outros</SelectItem>
+                <SelectItem value="pagamento_parcela">{t('cashbox.paymentReceived')}</SelectItem>
+                <SelectItem value="emprestimo_liberado">{t('cashbox.loanDisbursement')}</SelectItem>
+                <SelectItem value="despesa_operacional">{t('cashbox.operationalExpense')}</SelectItem>
+                <SelectItem value="transferencia_conta">{t('cashbox.other')}</SelectItem>
+                <SelectItem value="ajuste_manual">{t('cashbox.other')}</SelectItem>
+                <SelectItem value="outros">{t('cashbox.other')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div>
-            <Label>Valor (R$) *</Label>
+            <Label>{t('cashbox.amount')} (R$) *</Label>
             <Input className="mt-1" type="number" step="0.01" min="0" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} />
           </div>
           <div>
-            <Label>Descrição</Label>
+            <Label>{t('cashbox.description')}</Label>
             <Input className="mt-1" placeholder="Descrição da transação" value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
           </div>
           <Button
@@ -171,6 +173,7 @@ function LancamentoRapido({
   tipo: "entrada" | "saida";
   onSuccess: () => void;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [valor, setValor] = useState("");
   const [descricao, setDescricao] = useState("");
@@ -214,7 +217,7 @@ function LancamentoRapido({
             Conta: <span className="font-medium text-foreground">{conta.nome}</span>
           </div>
           <div>
-            <Label>Valor (R$) *</Label>
+            <Label>{t('cashbox.amount')} (R$) *</Label>
             <Input
               className="mt-1 text-lg font-semibold"
               type="number"
@@ -227,7 +230,7 @@ function LancamentoRapido({
             />
           </div>
           <div>
-            <Label>Descrição (opcional)</Label>
+            <Label>{t('cashbox.description')} ({t('common.optional')})</Label>
             <Input
               className="mt-1"
               placeholder={isEntrada ? "Ex: Depósito em dinheiro" : "Ex: Retirada para despesa"}
@@ -236,7 +239,7 @@ function LancamentoRapido({
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
+            <Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
             <Button
               className={isEntrada ? "bg-success hover:bg-success/90 text-white" : ""}
               variant={isEntrada ? "default" : "destructive"}
@@ -288,8 +291,8 @@ export default function Caixa() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-3xl text-foreground tracking-wide">CAIXA</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gestão de contas e transações</p>
+          <h1 className="font-display text-3xl text-foreground tracking-wide">{t('cashbox.title').toUpperCase()}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('cashbox.transactions')}</p>
         </div>
         <div className="flex gap-2">
           <NovaConta onSuccess={invalidarTudo} />
@@ -305,7 +308,7 @@ export default function Caixa() {
               <Wallet className="h-6 w-6 text-success" />
             </div>
             <div>
-              <div className="text-sm text-muted-foreground">Saldo Total em Todas as Contas</div>
+              <div className="text-sm text-muted-foreground">{t('cashbox.totalIncome')}</div>
               <div className={`font-display text-3xl ${saldoTotal >= 0 ? 'text-success' : 'text-primary'}`}>
                 {formatarMoeda(saldoTotal)}
               </div>
@@ -319,7 +322,7 @@ export default function Caixa() {
 
       {/* Contas */}
       <div>
-        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">Contas</h2>
+        <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">{t('cashbox.account')}</h2>
         {contasLoading && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[...Array(3)].map((_, i) => <Card key={i} className="border-border animate-pulse"><CardContent className="p-5 h-24" /></Card>)}
@@ -350,7 +353,7 @@ export default function Caixa() {
                 <div className="text-sm text-muted-foreground mt-1">{conta.nome}</div>
                 {conta.banco && <div className="text-xs text-muted-foreground">{conta.banco}</div>}
                 {conta.saldoAtual < 0 && (
-                  <div className="text-xs text-primary mt-1">Saldo negativo</div>
+                  <div className="text-xs text-primary mt-1">{t('cashbox.balance')}</div>
                 )}
               </CardContent>
             </Card>
@@ -358,7 +361,7 @@ export default function Caixa() {
           {!contasLoading && contas?.length === 0 && (
             <div className="col-span-3 text-center py-8 text-muted-foreground">
               <Wallet className="h-8 w-8 mx-auto mb-2" />
-              <p className="text-sm">Nenhuma conta cadastrada</p>
+              <p className="text-sm">{t('common.noData')}</p>
             </div>
           )}
         </div>
@@ -373,7 +376,7 @@ export default function Caixa() {
           <CardContent className="p-0">
             {transacoes?.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
-                <p className="text-sm">Nenhuma transação registrada</p>
+                <p className="text-sm">{t('common.noData')}</p>
               </div>
             )}
             <div className="divide-y divide-border">

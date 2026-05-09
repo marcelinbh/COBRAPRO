@@ -901,3 +901,16 @@
 - Dropdown com opções de idioma
 - Persistência em localStorage
 - Suporta PT-BR e Espanhol (ES)
+
+## Fase 45: Internacionalização PT-BR / Espanhol (i18n)
+- [x] Instalar e configurar react-i18next com LanguageDetector
+- [x] Criar arquivos de tradução pt-BR.json e es.json (1272 linhas cada)
+- [x] Criar componente LanguageSwitcher com dropdown PT/ES
+- [x] Integrar LanguageSwitcher na sidebar (DashboardLayout) e na Home
+- [x] Aplicar t() em todas as páginas: Dashboard, Clientes, Contratos, Parcelas, Empréstimos
+- [x] Aplicar t() em: Caixa, Veículos, Cheques, ContasPagar, MeuPerfil, Simulador
+- [x] Aplicar t() em: Cobradores, Usuários, Backup, Relatorios, Configuracoes, NovoContrato
+- [x] Corrigir t() em sub-componentes (NovaConta, NovaTransacao, LancamentoRapido, StatusBadge, ScoreCircle)
+- [x] Corrigir t() em constantes de nível de módulo (STATUS_CONFIG, MODALIDADE_LABELS)
+- [x] Zero erros TypeScript após todas as correções
+- [x] Tradução testada e funcionando: Dashboard → Panel de Control, KPIs, Sidebar

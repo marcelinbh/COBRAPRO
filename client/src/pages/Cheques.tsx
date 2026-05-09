@@ -358,7 +358,7 @@ export default function Cheques() {
             <CardContent className="py-12 text-center">
               <FileCheck className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">Nenhum cheque encontrado</p>
-              <p className="text-sm text-muted-foreground mt-1">Clique em "Novo Cheque" para registrar</p>
+              <p className="text-sm text-muted-foreground mt-1">Clique em {t('checks.newCheck')} para registrar</p>
             </CardContent>
           </Card>
         ) : (

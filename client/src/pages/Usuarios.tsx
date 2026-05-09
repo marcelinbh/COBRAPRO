@@ -162,7 +162,7 @@ export default function Usuarios() {
                   <div>
                     <p className="text-muted-foreground text-xs">Status</p>
                     <Badge variant={k.ativo ? "default" : "secondary"} className="text-xs">
-                      {k.ativo ? "Ativo" : "Inativo"}
+                      {k.ativo ? t('users.active') : t('users.inactive')}
                     </Badge>
                   </div>
                 </div>
@@ -265,7 +265,7 @@ export default function Usuarios() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editando ? "Editar Usuário" : "Novo Usuário"}</DialogTitle>
+            <DialogTitle>{editando ? t('users.editUser') : t('users.newUser')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

@@ -85,6 +85,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function ScoreCircle({ score }: { score: number }) {
+  const { t } = useTranslation();
   const cor = score >= 75 ? 'text-success' : score >= 50 ? 'text-warning' : 'text-primary';
   const label = score >= 75 ? 'Excelente' : score >= 50 ? 'Bom' : score >= 25 ? 'Regular' : 'Ruim';
   const corBg = score >= 75 ? 'bg-success/10 border-success/30' : score >= 50 ? 'bg-warning/10 border-warning/30' : 'bg-primary/10 border-primary/30';
@@ -106,7 +107,7 @@ function ScoreCircle({ score }: { score: number }) {
         </div>
       </div>
       <div className={`text-xs font-semibold mt-1 ${cor}`}>{label}</div>
-      <div className="text-[10px] text-muted-foreground mt-0.5">Score do Negócio</div>
+      <div className="text-[10px] text-muted-foreground mt-0.5">{t('dashboard.businessScore')}</div>
     </div>
   );
 }
@@ -143,7 +144,7 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h1 className="font-display text-xl sm:text-3xl text-foreground tracking-wide">DASHBOARD</h1>
+          <h1 className="font-display text-xl sm:text-3xl text-foreground tracking-wide">{t('dashboard.title')}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 hidden sm:block">
             {new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
@@ -165,8 +166,8 @@ export default function Dashboard() {
           </Button>
           <Button size="sm" onClick={() => setLocation('/contratos/novo')} className="gap-1.5 text-xs px-2.5">
             <Plus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Novo Contrato</span>
-            <span className="sm:hidden">Novo</span>
+            <span className="hidden sm:inline">{t('common.newContract')}</span>
+            <span className="sm:hidden">{t('common.new')}</span>
           </Button>
         </div>
       </div>
@@ -181,12 +182,12 @@ export default function Dashboard() {
 
       {/* KPI Cards - ocultos para koletores */}
       {!isKoletor && <div className="grid grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
-        <KPICard title="Saldo em Contas" value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)} icon={Wallet} variant="default" subtitle="Todas as contas" />
-        <KPICard title="Capital em Circulação" value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)} icon={TrendingUp} variant="primary" subtitle={`${kpis?.contratosAtivos ?? 0} contratos ativos`} />
-        <KPICard title="Total a Receber" value={kpisLoading ? "..." : formatarMoeda(kpis?.totalReceber ?? 0)} icon={DollarSign} variant="success" subtitle="Parcelas pendentes" />
-        <KPICard title="Inadimplência" value={kpisLoading ? "..." : formatarMoeda(kpis?.totalInadimplente ?? 0)} icon={AlertTriangle} variant="danger" subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes · ${taxaInadimplencia}%`} />
-        <KPICard title="Juros Pendentes" value={kpisLoading ? "..." : formatarMoeda(kpis?.jurosPendentes ?? 0)} icon={TrendingDown} variant="warning" subtitle="Acumulados" />
-        <KPICard title="Vence Hoje" value={kpisLoading ? "..." : `${kpis?.qtdVenceHoje ?? 0}`} icon={CalendarClock} variant={kpis?.qtdVenceHoje ? "warning" : "default"} subtitle={formatarMoeda(kpis?.valorVenceHoje ?? 0)} />
+        <KPICard title={t('dashboard.balance')} value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)} icon={Wallet} variant="default" subtitle={t('dashboard.allAccounts')} />
+        <KPICard title={t('dashboard.capital')} value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)} icon={TrendingUp} variant="primary" subtitle={`${kpis?.contratosAtivos ?? 0} contratos ativos`} />
+        <KPICard title={t('dashboard.toReceive2')} value={kpisLoading ? "..." : formatarMoeda(kpis?.totalReceber ?? 0)} icon={DollarSign} variant="success" subtitle={t('dashboard.pendingInstallments')} />
+        <KPICard title={t('dashboard.delinquency')} value={kpisLoading ? "..." : formatarMoeda(kpis?.totalInadimplente ?? 0)} icon={AlertTriangle} variant="danger" subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes · ${taxaInadimplencia}%`} />
+        <KPICard title={t('dashboard.interest')} value={kpisLoading ? "..." : formatarMoeda(kpis?.jurosPendentes ?? 0)} icon={TrendingDown} variant="warning" subtitle={t('dashboard.accumulated')} />
+        <KPICard title={t('dashboard.dueToday')} value={kpisLoading ? "..." : `${kpis?.qtdVenceHoje ?? 0}`} icon={CalendarClock} variant={kpis?.qtdVenceHoje ? "warning" : "default"} subtitle={formatarMoeda(kpis?.valorVenceHoje ?? 0)} />
       </div>}
 
       {/* Barra de saúde financeira */}
@@ -194,7 +195,7 @@ export default function Dashboard() {
         <Card className="border-border">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Saúde da Carteira</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{t('dashboard.portfolioHealth')}</span>
               <span className="text-xs text-muted-foreground">Taxa de inadimplência: <span className={`font-bold ${parseFloat(taxaInadimplencia) > 15 ? 'text-primary' : parseFloat(taxaInadimplencia) > 8 ? 'text-warning' : 'text-success'}`}>{taxaInadimplencia}%</span></span>
             </div>
             <div className="flex gap-1 h-3 rounded-full overflow-hidden">
@@ -227,15 +228,15 @@ export default function Dashboard() {
               <ScoreCircle score={scoreData?.score ?? 0} />
               <div className="w-full space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Taxa de recebimento</span>
+                  <span className="text-muted-foreground">{t('dashboard.received')}</span>
                   <span className="text-success font-medium">{(scoreData?.taxaRecebimento ?? 0).toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Inadimplência</span>
+                  <span className="text-muted-foreground">{t('dashboard.delinquency')}</span>
                   <span className="text-primary font-medium">{(scoreData?.inadimplencia ?? 0).toFixed(1)}%</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Total recebido</span>
+                  <span className="text-muted-foreground">{t('dashboard.received')}</span>
                   <span className="text-foreground font-medium">{formatarMoeda(scoreData?.totalRecebido ?? 0)}</span>
                 </div>
               </div>
@@ -260,7 +261,7 @@ export default function Dashboard() {
                     <Clock className="h-4 w-4 text-warning" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-foreground">Vence esta semana</div>
+                    <div className="text-sm font-medium text-foreground">{t('dashboard.dueThisWeek')}</div>
                     <div className="text-xs text-muted-foreground">{atencao?.venceSemana.qtd ?? 0} parcelas nos próximos 7 dias</div>
                   </div>
                 </div>
@@ -280,7 +281,7 @@ export default function Dashboard() {
                     <AlertTriangle className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-foreground">Inadimplentes +30 dias</div>
+                    <div className="text-sm font-medium text-foreground">{t('dashboard.overdueMore30Days')}</div>
                     <div className="text-xs text-muted-foreground">{atencao?.atrasados30.qtd ?? 0} clientes com atraso grave</div>
                   </div>
                 </div>
@@ -349,21 +350,21 @@ export default function Dashboard() {
           <CardContent className="space-y-3">
             <div className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20">
               <div>
-                <div className="text-xs text-muted-foreground">Recebido Hoje</div>
+                <div className="text-xs text-muted-foreground">{t('dashboard.received')}</div>
                 <div className="font-display text-lg text-success">{formatarMoeda(kpis?.recebidoHoje ?? 0)}</div>
               </div>
               <ArrowUpRight className="h-5 w-5 text-success" />
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
               <div>
-                <div className="text-xs text-muted-foreground">Vence Hoje</div>
+                <div className="text-xs text-muted-foreground">{t('dashboard.dueToday')}</div>
                 <div className="font-display text-lg text-primary">{formatarMoeda(kpis?.valorVenceHoje ?? 0)}</div>
               </div>
               <Clock className="h-5 w-5 text-primary" />
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border">
               <div>
-                <div className="text-xs text-muted-foreground">Contratos Ativos</div>
+                <div className="text-xs text-muted-foreground">{t('dashboard.activeContracts2')}</div>
                 <div className="font-display text-lg text-foreground">{kpis?.contratosAtivos ?? 0}</div>
               </div>
               <Users className="h-5 w-5 text-muted-foreground" />
@@ -415,7 +416,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-2">
             {parcelasHoje?.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma parcela vence hoje</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('common.noData')}</p>
             )}
             {parcelasHoje?.slice(0, 5).map((p) => (
               <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border border-border hover:border-warning/30 transition-colors">
@@ -447,7 +448,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="space-y-2">
             {atrasadas?.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">Nenhuma parcela em atraso</p>
+              <p className="text-sm text-muted-foreground text-center py-4">{t('common.noData')}</p>
             )}
             {atrasadas?.slice(0, 5).map((p) => (
               <div key={p.id} className="flex items-center justify-between p-3 rounded-lg bg-primary/5 border border-primary/20 hover:border-primary/40 transition-colors">

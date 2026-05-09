@@ -162,7 +162,7 @@ export default function Cobradores() {
                   <div>
                     <p className="text-muted-foreground text-xs">Status</p>
                     <Badge variant={k.ativo ? "default" : "secondary"} className="text-xs">
-                      {k.ativo ? "Ativo" : "Inativo"}
+                      {k.ativo ? t('collectors.active') : t('collectors.inactive')}
                     </Badge>
                   </div>
                 </div>
@@ -265,7 +265,7 @@ export default function Cobradores() {
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
         <DialogContent className="bg-card border-border max-w-lg">
           <DialogHeader>
-            <DialogTitle>{editando ? "Editar Cobrador" : "Novo Cobrador"}</DialogTitle>
+            <DialogTitle>{editando ? t('collectors.editCollector') : t('collectors.newCollector')}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">

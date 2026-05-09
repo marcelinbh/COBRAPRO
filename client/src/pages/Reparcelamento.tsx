@@ -105,15 +105,15 @@ export default function Reparcelamento() {
                   <p className="font-bold text-foreground">#{contrato.id}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Cliente</p>
+                  <p className="text-muted-foreground text-xs">{t('reparcelamento.client')}</p>
                   <p className="font-medium text-foreground">{contrato.clienteNome}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Valor Original</p>
+                  <p className="text-muted-foreground text-xs">{t('reparcelamento.originalValue')}</p>
                   <p className="font-medium text-foreground">{formatMoeda(contrato.valorPrincipal)}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground text-xs">Status</p>
+                  <p className="text-muted-foreground text-xs">{t('reparcelamento.status')}</p>
                   <Badge variant={contrato.status === "inadimplente" ? "destructive" : "secondary"}>
                     {contrato.status}
                   </Badge>
@@ -221,7 +221,7 @@ export default function Reparcelamento() {
                       <thead className="bg-background/70 sticky top-0">
                         <tr>
                           <th className="text-left p-2 text-muted-foreground font-medium">Nº</th>
-                          <th className="text-left p-2 text-muted-foreground font-medium">Vencimento</th>
+                          <th className="text-left p-2 text-muted-foreground font-medium">{t('reparcelamento.dueDate')}</th>
                           <th className="text-right p-2 text-muted-foreground font-medium">Valor</th>
                         </tr>
                       </thead>

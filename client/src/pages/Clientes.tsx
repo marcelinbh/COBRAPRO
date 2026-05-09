@@ -122,6 +122,7 @@ interface NovoClienteModalProps {
 }
 
 function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClienteModalProps) {
+  const { t } = useTranslation();
   const isEdit = !!clienteEditar;
   const [aba, setAba] = useState<"dados" | "endereco" | "documentos">("dados");
 
@@ -339,7 +340,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col p-0">
         <DialogHeader className="px-6 pt-6 pb-0">
-          <DialogTitle>{isEdit ? "Editar Cliente" : "Novo Cliente"}</DialogTitle>
+          <DialogTitle>{isEdit ? t('clients.editClient') : t('clients.newClient')}</DialogTitle>
         </DialogHeader>
 
         {/* Abas */}
@@ -353,7 +354,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
               {a === "dados" && <User className="h-3.5 w-3.5" />}
               {a === "endereco" && <MapPin className="h-3.5 w-3.5" />}
               {a === "documentos" && <FileText className="h-3.5 w-3.5" />}
-              {a === "dados" ? "Dados Pessoais" : a === "endereco" ? "Endereço" : "Documentos"}
+              {a === "dados" ? "Dados Pessoais" : a === "endereco" ? t('clients.address') : "Documentos"}
             </button>
           ))}
         </div>
@@ -523,7 +524,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
                 </div>
                 <div>
                   <Label className="text-xs">Cidade</Label>
-                  <Input placeholder="Cidade" value={cidade} onChange={e => setCidade(e.target.value)} className="mt-1" />
+                  <Input placeholder={t('clients.city')} value={cidade} onChange={e => setCidade(e.target.value)} className="mt-1" />
                 </div>
                 <div>
                   <Label className="text-xs">Estado</Label>

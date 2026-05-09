@@ -1,0 +1,22 @@
+{
+  "query": "\n-- Verificar colunas na tabela clientes\nSELECT column_name, data_type FROM information_schema.columns \nWHERE table_name = 'clientes' AND column_name LIKE '%created%';\n\n-- Verificar colunas na tabela contratos\nSELECT column_name, data_type FROM information_schema.columns \nWHERE table_name = 'contratos' AND column_name LIKE '%created%';\n\n-- Verificar se a tabela vendas existe\nSELECT table_name FROM information_schema.tables \nWHERE table_name = 'vendas';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway05.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 4Ve39mJgttRTexu.root --database BkqW4WQ4ndZHJQHLtTMfxv --execute \n-- Verificar colunas na tabela clientes\nSELECT column_name, data_type FROM information_schema.columns \nWHERE table_name = 'clientes' AND column_name LIKE '%created%';\n\n-- Verificar colunas na tabela contratos\nSELECT column_name, data_type FROM information_schema.columns \nWHERE table_name = 'contratos' AND column_name LIKE '%created%';\n\n-- Verificar se a tabela vendas existe\nSELECT table_name FROM information_schema.tables \nWHERE table_name = 'vendas';\n",
+  "rows": [
+    {
+      "column_name": "createdAt",
+      "data_type": "timestamp"
+    },
+    {
+      "column_name": "column_name",
+      "data_type": "data_type"
+    },
+    {
+      "column_name": "createdAt",
+      "data_type": "timestamp"
+    }
+  ],
+  "messages": [],
+  "stdout": "column_name\tdata_type\ncreatedAt\ttimestamp\ncolumn_name\tdata_type\ncreatedAt\ttimestamp\n",
+  "stderr": "",
+  "execution_time_ms": 1400
+}

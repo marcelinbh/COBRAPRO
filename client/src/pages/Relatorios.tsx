@@ -265,7 +265,7 @@ export default function Relatorios() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="font-display text-3xl text-foreground tracking-wide">RELATÓRIOS</h1>
+        <h1 className="font-display text-3xl text-foreground tracking-wide">{t('reports.title').toUpperCase()}</h1>
         <p className="text-sm text-muted-foreground mt-1">Análise financeira e desempenho</p>
       </div>
 
@@ -366,7 +366,7 @@ export default function Relatorios() {
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-destructive/15"><AlertTriangle className="h-4 w-4 text-destructive" /></div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wide">Taxa de Inadimplência</span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">{t('reports.delinquencyRate')}</span>
             </div>
             <div className="font-display text-2xl text-destructive">
               {totalPeriodo > 0 ? ((inadimplentePeriodo / totalPeriodo) * 100).toFixed(1) : 0}%

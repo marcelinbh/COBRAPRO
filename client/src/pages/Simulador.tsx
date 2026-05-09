@@ -264,9 +264,9 @@ export default function Simulador() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     const params = [
-      ["Modalidade", MODALIDADE_LABELS[r.modalidade]],
+      [t('simulator.modality'), MODALIDADE_LABELS[r.modalidade]],
       ["Capital Emprestado", formatarMoeda(r.valorPrincipal)],
-      ["Taxa de Juros", `${parseFloat(r.taxaJuros.toFixed(4))}% ${getTaxaLabelCurto(r.tipoTaxa)}`],
+      [t('simulator.interestRate'), `${parseFloat(r.taxaJuros.toFixed(4))}% ${getTaxaLabelCurto(r.tipoTaxa)}`],
       ["Numero de Parcelas", `${r.numeroParcelas}x`],
     ];
     params.forEach(([k, v]) => {
@@ -278,14 +278,14 @@ export default function Simulador() {
     // Resultado
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("Resultado", 14, yPos);
+    doc.text(t('simulator.result'), 14, yPos);
     yPos += 6;
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     const resultados = [
-      ["Valor da Parcela", formatarMoeda(r.valorParcela)],
+      [t('simulator.installmentValue'), formatarMoeda(r.valorParcela)],
       ["Total a Pagar", formatarMoeda(r.totalPagar)],
-      ["Total de Juros", formatarMoeda(r.totalJuros)],
+      [t('simulator.totalInterest'), formatarMoeda(r.totalJuros)],
       ["Custo Efetivo Total", `${r.valorPrincipal > 0 ? ((r.totalJuros / r.valorPrincipal) * 100).toFixed(2) : "0.00"}%`],
     ];
     resultados.forEach(([k, v]) => {
@@ -337,7 +337,7 @@ export default function Simulador() {
     // Tabela comparativa
     autoTable(doc, {
       startY: yPos,
-      head: [["Modalidade", "Periodicidade", "Parcela", "Total Juros", "Total a Pagar", "CET (%)"]],
+      head: [[t('simulator.modality'), "Periodicidade", "Parcela", "Total Juros", "Total a Pagar", "CET (%)"]],
       body: comparacoes.map(r => [
         MODALIDADE_LABELS[r.modalidade],
         getTaxaLabelCurto(r.tipoTaxa),

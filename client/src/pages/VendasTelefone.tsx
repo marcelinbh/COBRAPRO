@@ -513,8 +513,8 @@ export default function VendasTelefone() {
           {/* KPIs */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { label: "Total de Vendas", value: kpis?.totalVendas ?? 0, icon: Package, fmt: (v: number) => String(v) },
-              { label: "Vendas Ativas", value: kpis?.vendasAtivas ?? 0, icon: CheckCircle2, fmt: (v: number) => String(v) },
+              { label: t('phoneSales.totalSales'), value: kpis?.totalVendas ?? 0, icon: Package, fmt: (v: number) => String(v) },
+              { label: t('phoneSales.activeSales'), value: kpis?.vendasAtivas ?? 0, icon: CheckCircle2, fmt: (v: number) => String(v) },
               { label: "Vendas Quitadas", value: kpis?.vendasQuitadas ?? 0, icon: TrendingUp, fmt: (v: number) => String(v) },
               { label: "Capital Investido", value: kpis?.capitalInvestido ?? 0, icon: Banknote, fmt: fmt },
               { label: "A Receber", value: kpis?.totalAReceber ?? 0, icon: DollarSign, fmt: fmt },
@@ -545,7 +545,7 @@ export default function VendasTelefone() {
                 </div>
                 <Select value={filtroStatus} onValueChange={setFiltroStatus}>
                   <SelectTrigger className="w-full sm:w-44 bg-gray-50 border-gray-200">
-                    <SelectValue placeholder="Status" />
+                    <SelectValue placeholder={t('phoneSales.status')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="todos">Todos os status</SelectItem>
@@ -579,7 +579,7 @@ export default function VendasTelefone() {
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
               <Smartphone className="w-12 h-12 text-gray-300 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma venda registrada</h3>
-              <p className="text-gray-400 mb-6">Clique em "Nova Venda" para simular e criar seu primeiro contrato</p>
+              <p className="text-gray-400 mb-6">Clique em {t('phoneSales.newSale')} para simular e criar seu primeiro contrato</p>
               <Button onClick={() => setTela("simulador")} className="bg-emerald-500 hover:bg-emerald-600 text-white">
                 <Plus className="w-4 h-4 mr-2" /> Criar primeira venda
               </Button>

@@ -527,3 +527,23 @@ export const parcelasRenovacoes = pgTable("parcelas_renovacoes", {
 
 export type ParcelaRenovacao = typeof parcelasRenovacoes.$inferSelect;
 export type InsertParcelaRenovacao = typeof parcelasRenovacoes.$inferInsert;
+
+// ─── VENDAS ──────────────────────────────────────────────────────────────────
+export const vendas = pgTable("vendas", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").notNull(),
+  clienteId: integer("cliente_id"),
+  produtoId: integer("produto_id"),
+  produto: varchar("produto", { length: 255 }).notNull(),
+  quantidade: integer("quantidade").default(1).notNull(),
+  valorUnitario: decimal("valor_unitario", { precision: 15, scale: 2 }).notNull(),
+  valorTotal: decimal("valor_total", { precision: 15, scale: 2 }).notNull(),
+  status: varchar("status", { length: 50 }).default("concluida").notNull(),
+  formaPagamento: varchar("forma_pagamento", { length: 50 }).default("dinheiro"),
+  datavenda: timestamp("data_venda", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Venda = typeof vendas.$inferSelect;
+export type InsertVenda = typeof vendas.$inferInsert;

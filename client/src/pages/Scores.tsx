@@ -53,7 +53,7 @@ export function Scores() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-white">Score de Clientes</h1>
+          <h1 className="text-3xl font-bold text-white">{t('scores.title')}</h1>
           <p className="text-slate-400 mt-1">Ranking de confiabilidade e desempenho</p>
         </div>
         <Select value={ordenarPor} onValueChange={(value: any) => setOrdenarPor(value)}>
