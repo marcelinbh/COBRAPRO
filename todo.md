@@ -1011,3 +1011,13 @@
 - [x] Adicionar botão Etiquetas (roxo) na barra de ações do card - abre modal na aba Etiquetas
 - [x] Validar lógica pagarJuros: CORRETA - cria nova parcela com mesmo valor e data+intervalo
 - [ ] Testes completos no cobrapro.online (fluxo PT-BR e Espanhol) - aguardando deploy
+
+## Fase 57: Simulador.tsx - i18n Completo (09/05/2026)
+- [x] Substituir 6 descrições hardcoded das modalidades por t() (loanSimpleDesc, loanDailyDesc, loanWeeklyDesc, loanBiweeklyDesc, loanFixedDesc, checkDiscountDesc)
+- [x] Converter getTaxaLabel() e getTaxaLabelCurto() para aceitar t como parâmetro (i18n completo)
+- [x] Corrigir parcelasLabel: "Prazo (dias)", "Número de Semanas", "Número de Quinzenas", "Número de Parcelas"
+- [x] Corrigir texto de periodicidade automática e modo comparação
+- [x] Corrigir textos hardcoded no PDF: "Simulação de Empréstimo", "Parâmetros da Simulação", "Exportar PDF", etc.
+- [x] Corrigir cabeçalhos das tabelas PDF (Parcela, Vencimento, Valor, Periodicidade, etc.)
+- [x] Adicionar 30+ novas chaves em pt-BR.json e es.json (simulator.taxaLabel.*, simulator.taxaLabelCurto.*, etc.)
+- [x] Zero erros TypeScript após todas as mudanças

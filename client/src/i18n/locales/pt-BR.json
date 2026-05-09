@@ -301,7 +301,8 @@
     "dueTodayTitle": "Vencendo Hoje",
     "overdueTitle": "Em Atraso",
     "daysOverdue": "dias em atraso",
-    "koletorBanner": "Você está visualizando apenas seus próprios empréstimos e parcelas."
+    "koletorBanner": "Você está visualizando apenas seus próprios empréstimos e parcelas.",
+    "dailySummary": "Resumo do Dia"
   },
   "clients": {
     "title": "Clientes",
@@ -989,7 +990,44 @@
     "loanBiweeklyShort": "Empréstimo Quinzenal",
     "loanFixedShort": "Parcela Fixa",
     "checkDiscountShort": "Desconto de Cheque",
-    "cet": "CET (%)"
+    "cet": "CET (%)",
+    "fixedInstallment": "Parcela Fixa",
+    "simpleInterest": "Juros Simples",
+    "loanSimpleDesc": "Juros simples mensais. Total = Capital x (1 + Taxa% x Parcelas). Parcelas iguais.",
+    "loanDailyDesc": "Cobrança diária. Taxa aplicada por dia. Ideal para prazos curtos de 15 a 60 dias.",
+    "loanWeeklyDesc": "Parcelas semanais. Taxa aplicada por semana. Ideal para prazos de 4 a 16 semanas.",
+    "loanBiweeklyDesc": "Parcelas a cada 15 dias. Taxa aplicada por quinzena. Ideal para prazos de 2 a 6 meses.",
+    "loanFixedDesc": "Juros compostos (SAC). Parcelas iguais com amortização crescente e juros decrescentes.",
+    "checkDiscountDesc": "Antecipação de cheque. O cliente recebe o valor nominal menos o desconto calculado.",
+    "taxaLabel": {
+      "diaria": "Taxa Diária (%)",
+      "semanal": "Taxa Semanal (%)",
+      "quinzenal": "Taxa Quinzenal (%)",
+      "anual": "Taxa Anual (%)",
+      "mensal": "Taxa Mensal (%)"
+    },
+    "taxaLabelCurto": {
+      "diaria": "ao dia",
+      "semanal": "por semana",
+      "quinzenal": "por quinzena",
+      "anual": "ao ano",
+      "mensal": "ao mês"
+    },
+    "autoPeriodicidade": "Periodicidade automática: parcelas {{tipo}}. A taxa informada é aplicada {{periodo}}.",
+    "modoComparacaoAtivo": "Modo comparação ativo - calculará Juros Simples, Semanal, Quinzenal, Diário e Parcela Fixa simultaneamente.",
+    "diarias": "diárias",
+    "semanais": "semanais",
+    "quinzenais": "quinzenais",
+    "prazoEmDias": "Prazo (dias)",
+    "numeroSemanas": "Número de Semanas",
+    "numeroQuinzenas": "Número de Quinzenas",
+    "numeroParcelas": "Número de Parcelas",
+    "simulacaoEmprestimo": "Simulação de Empréstimo",
+    "geradoEm": "Gerado em",
+    "parametrosSimulacao": "Parâmetros da Simulação",
+    "exportarPDF": "Exportar PDF",
+    "usar": "Usar",
+    "diaVencimento": "Dia {{dia}}"
   },
   "scores": {
     "title": "Score de Clientes",
@@ -1933,7 +1971,8 @@
     "pay": "Pagar",
     "payInterest": "Pagar Juros",
     "editInterest": "Editar Juros",
-    "applyFine": "Aplicar Multa"
+    "applyFine": "Aplicar Multa",
+    "labelsDesc": "Gerenciar etiquetas do contrato"
   },
   "clientes": {
     "title": "Clientes",

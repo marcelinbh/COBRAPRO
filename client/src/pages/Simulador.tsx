@@ -69,24 +69,24 @@ function getTipoTaxaAuto(mod: Modalidade): string | null {
 }
 
 // Retorna o label da taxa conforme o tipo
-function getTaxaLabel(tipoTaxa: string): string {
+function getTaxaLabel(tipoTaxa: string, t: (key: string) => string): string {
   switch (tipoTaxa) {
-    case "diaria": return "Taxa Diaria (%)";
-    case "semanal": return "Taxa Semanal (%)";
-    case "quinzenal": return "Taxa Quinzenal (%)";
-    case "anual": return "Taxa Anual (%)";
-    default: return "Taxa Mensal (%)";
+    case "diaria": return t('simulator.taxaLabel.diaria');
+    case "semanal": return t('simulator.taxaLabel.semanal');
+    case "quinzenal": return t('simulator.taxaLabel.quinzenal');
+    case "anual": return t('simulator.taxaLabel.anual');
+    default: return t('simulator.taxaLabel.mensal');
   }
 }
 
 // Retorna o label da taxa para exibicao no resultado
-function getTaxaLabelCurto(tipoTaxa: string): string {
+function getTaxaLabelCurto(tipoTaxa: string, t: (key: string) => string): string {
   switch (tipoTaxa) {
-    case "diaria": return "ao dia";
-    case "semanal": return "por semana";
-    case "quinzenal": return "por quinzena";
-    case "anual": return "ao ano";
-    default: return "ao mes";
+    case "diaria": return t('simulator.taxaLabelCurto.diaria');
+    case "semanal": return t('simulator.taxaLabelCurto.semanal');
+    case "quinzenal": return t('simulator.taxaLabelCurto.quinzenal');
+    case "anual": return t('simulator.taxaLabelCurto.anual');
+    default: return t('simulator.taxaLabelCurto.mensal');
   }
 }
 
@@ -252,26 +252,26 @@ export default function Simulador() {
 
     doc.setFontSize(16);
     doc.setFont("helvetica", "bold");
-    doc.text("Simulacao de Emprestimo", 14, yPos + 5);
+    doc.text(t('simulator.simulacaoEmprestimo'), 14, yPos + 5);
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
-    doc.text(`${nomeEmpresa} - Gerado em ${new Date().toLocaleDateString("pt-BR")}`, 14, yPos + 12);
+    doc.text(`${nomeEmpresa} - ${t('simulator.geradoEm')} ${new Date().toLocaleDateString("pt-BR")}`, 14, yPos + 12);
     doc.setTextColor(0, 0, 0);
     yPos += 20;
 
     // Parametros
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text("Parametros da Simulacao", 14, yPos);
+    doc.text(t('simulator.parametrosSimulacao'), 14, yPos);
     yPos += 6;
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     const params = [
       [t('simulator.modality'), getModalidadeLabel(r.modalidade, t)],
-      ["Capital Emprestado", formatarMoeda(r.valorPrincipal)],
-      [t('simulator.interestRate'), `${parseFloat(r.taxaJuros.toFixed(4))}% ${getTaxaLabelCurto(r.tipoTaxa)}`],
-      ["Numero de Parcelas", `${r.numeroParcelas}x`],
+      [t('simulator.loanedCapital'), formatarMoeda(r.valorPrincipal)],
+      [t('simulator.interestRate'), `${parseFloat(r.taxaJuros.toFixed(4))}% ${getTaxaLabelCurto(r.tipoTaxa, t)}`],
+      [t('simulator.installments'), `${r.numeroParcelas}x`],
     ];
     params.forEach(([k, v]) => {
       doc.text(`${k}: ${v}`, 14, yPos);
@@ -288,9 +288,9 @@ export default function Simulador() {
     doc.setFont("helvetica", "normal");
     const resultados = [
       [t('simulator.installmentValue'), formatarMoeda(r.valorParcela)],
-      ["Total a Pagar", formatarMoeda(r.totalPagar)],
+      [t('simulator.totalToPay'), formatarMoeda(r.totalPagar)],
       [t('simulator.totalInterest'), formatarMoeda(r.totalJuros)],
-      ["Custo Efetivo Total", `${r.valorPrincipal > 0 ? ((r.totalJuros / r.valorPrincipal) * 100).toFixed(2) : "0.00"}%`],
+      [t('simulator.effectiveCost'), `${r.valorPrincipal > 0 ? ((r.totalJuros / r.valorPrincipal) * 100).toFixed(2) : "0.00"}%`],
     ];
     resultados.forEach(([k, v]) => {
       doc.text(`${k}: ${v}`, 14, yPos);
@@ -302,7 +302,7 @@ export default function Simulador() {
     if (r.parcelas.length > 0) {
       autoTable(doc, {
         startY: yPos,
-        head: [["Parcela", "Vencimento", "Valor"]],
+        head: [[t('common.installment'), t('common.dueDate'), t('common.value')]],
         body: r.parcelas.map(p => [`${p.numero}a`, p.vencimento, formatarMoeda(p.valor)]),
         styles: { fontSize: 8 },
         headStyles: { fillColor: [16, 185, 129] },
@@ -334,17 +334,17 @@ export default function Simulador() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
-    doc.text(`${nomeEmpresa} - Gerado em ${new Date().toLocaleDateString("pt-BR")}`, 14, yPos + 12);
+    doc.text(`${nomeEmpresa} - ${t('simulator.geradoEm')} ${new Date().toLocaleDateString("pt-BR")}`, 14, yPos + 12);
     doc.setTextColor(0, 0, 0);
     yPos += 22;
 
     // Tabela comparativa
     autoTable(doc, {
       startY: yPos,
-      head: [[t('simulator.modality'), "Periodicidade", "Parcela", "Total Juros", "Total a Pagar", "CET (%)"]],
+      head: [[t('simulator.modality'), t('simulator.periodicity'), t('common.installment'), t('simulator.totalInterest'), t('simulator.totalToPay'), t('simulator.cet')]],
       body: comparacoes.map(r => [
         getModalidadeLabel(r.modalidade, t),
-        getTaxaLabelCurto(r.tipoTaxa),
+        getTaxaLabelCurto(r.tipoTaxa, t),
         formatarMoeda(r.valorParcela),
         formatarMoeda(r.totalJuros),
         formatarMoeda(r.totalPagar),
@@ -358,12 +358,12 @@ export default function Simulador() {
     doc.save(`comparacao-modalidades-${new Date().toISOString().split("T")[0]}.pdf`);
   }
 
-  const taxaLabel = getTaxaLabel(tipoTaxa);
-  const parcelasLabel = modalidade === "emprestimo_diario" ? "Prazo (dias)"
-    : modalidade === "emprestimo_semanal" ? "Numero de Semanas"
-    : modalidade === "emprestimo_quinzenal" ? "Numero de Quinzenas"
-    : modalidade === "desconto_cheque" ? "Prazo (dias)"
-    : "Numero de Parcelas";
+  const taxaLabel = getTaxaLabel(tipoTaxa, t);
+  const parcelasLabel = modalidade === "emprestimo_diario" ? t('simulator.prazoEmDias')
+    : modalidade === "emprestimo_semanal" ? t('simulator.numeroSemanas')
+    : modalidade === "emprestimo_quinzenal" ? t('simulator.numeroQuinzenas')
+    : modalidade === "desconto_cheque" ? t('simulator.prazoEmDias')
+    : t('simulator.numeroParcelas');
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
@@ -419,15 +419,17 @@ export default function Simulador() {
             {/* Badge informativo para modalidades com periodicidade fixa */}
             {!modoComparacao && tipoTaxaAuto && (
               <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400">
-                Periodicidade automatica: parcelas {tipoTaxaAuto === "diaria" ? "diarias" : tipoTaxaAuto === "semanal" ? "semanais" : "quinzenais"}.
-                A taxa informada e aplicada {getTaxaLabelCurto(tipoTaxaAuto)}.
+                {t('simulator.autoPeriodicidade', {
+                  tipo: tipoTaxaAuto === "diaria" ? t('simulator.diarias') : tipoTaxaAuto === "semanal" ? t('simulator.semanais') : t('simulator.quinzenais'),
+                  periodo: getTaxaLabelCurto(tipoTaxaAuto, t)
+                })}
               </div>
             )}
 
             {modoComparacao && (
               <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400">
                 <GitCompare className="h-3.5 w-3.5 inline mr-1.5" />
-                Modo comparacao ativo - calculara Juros Simples, Semanal, Quinzenal, Diario e Parcela Fixa simultaneamente.
+                {t('simulator.modoComparacaoAtivo')}
               </div>
             )}
 
@@ -507,7 +509,7 @@ export default function Simulador() {
                   <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {[1, 5, 10, 15, 20, 25, 28, 30].map((d) => (
-                      <SelectItem key={d} value={String(d)}>Dia {d}</SelectItem>
+                      <SelectItem key={d} value={String(d)}>{t('simulator.diaVencimento', { dia: d })}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -531,7 +533,7 @@ export default function Simulador() {
                   {t('simulator.simulationResult')}
                 </CardTitle>
                 <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={() => exportarPDF()}>
-                  <Download className="h-3.5 w-3.5" /> Exportar PDF
+                  <Download className="h-3.5 w-3.5" /> {t('simulator.exportarPDF')}
                 </Button>
               </div>
             </CardHeader>
@@ -564,7 +566,7 @@ export default function Simulador() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t('simulator.interestRate')}</span>
-                  <span className="font-medium">{parseFloat(resultado.taxaJuros.toFixed(4))}% {getTaxaLabelCurto(resultado.tipoTaxa)}</span>
+                  <span className="font-medium">{parseFloat(resultado.taxaJuros.toFixed(4))}% {getTaxaLabelCurto(resultado.tipoTaxa, t)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">{t('simulator.effectiveCost')}</span>
@@ -651,7 +653,7 @@ export default function Simulador() {
                 {t('simulator.modalityComparison')}
               </CardTitle>
               <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={exportarComparacaoPDF}>
-                <Download className="h-3.5 w-3.5" /> Exportar PDF
+                <Download className="h-3.5 w-3.5" /> {t('simulator.exportarPDF')}
               </Button>
             </div>
           </CardHeader>
@@ -683,7 +685,7 @@ export default function Simulador() {
                             {isMelhor && <span className="text-xs text-emerald-400">{t('simulator.lowestCost')}</span>}
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{getTaxaLabelCurto(r.tipoTaxa)}</td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground capitalize">{getTaxaLabelCurto(r.tipoTaxa, t)}</td>
                         <td className="px-4 py-3 text-right font-semibold text-emerald-400">{formatarMoeda(r.valorParcela)}</td>
                         <td className="px-4 py-3 text-right text-amber-400">{formatarMoeda(r.totalJuros)}</td>
                         <td className="px-4 py-3 text-right font-semibold">{formatarMoeda(r.totalPagar)}</td>
@@ -697,7 +699,7 @@ export default function Simulador() {
                             </Button>
                             <Button size="sm" className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white"
                               onClick={() => { setResultado(r); setModoComparacao(false); }}>
-                              <FileText className="h-3 w-3" /> Usar
+                              <FileText className="h-3 w-3" /> {t('simulator.usar')}
                             </Button>
                           </div>
                         </td>
@@ -716,7 +718,7 @@ export default function Simulador() {
                 return (
                   <div key={r.modalidade} className={`p-3 rounded-lg border ${isMelhor ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-muted/20"}`}>
                     <p className="text-xs font-medium text-muted-foreground mb-1">{getModalidadeLabel(r.modalidade, t)}</p>
-                    <p className="text-xs text-muted-foreground/70 mb-2">{getTaxaLabelCurto(r.tipoTaxa)}</p>
+                    <p className="text-xs text-muted-foreground/70 mb-2">{getTaxaLabelCurto(r.tipoTaxa, t)}</p>
                     <p className="text-lg font-bold text-foreground">{formatarMoeda(r.valorParcela)}</p>
                     <p className="text-xs text-muted-foreground">{r.numeroParcelas}x - {formatarMoeda(r.totalPagar)} total</p>
                   </div>
@@ -736,27 +738,27 @@ export default function Simulador() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
             <div className="p-3 rounded-lg bg-muted/20">
               <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanSimpleShort')}</Badge>
-              <p className="text-muted-foreground text-xs">Juros simples mensais. Total = Capital x (1 + Taxa% x Parcelas). Parcelas iguais.</p>
+              <p className="text-muted-foreground text-xs">{t('simulator.loanSimpleDesc')}</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
               <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanDailyShort')}</Badge>
-              <p className="text-muted-foreground text-xs">Cobranca diaria. Taxa aplicada por dia. Ideal para prazos curtos de 15 a 60 dias.</p>
+              <p className="text-muted-foreground text-xs">{t('simulator.loanDailyDesc')}</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
               <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanWeeklyShort')}</Badge>
-              <p className="text-muted-foreground text-xs">Parcelas semanais. Taxa aplicada por semana. Ideal para prazos de 4 a 16 semanas.</p>
+              <p className="text-muted-foreground text-xs">{t('simulator.loanWeeklyDesc')}</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
               <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanBiweeklyShort')}</Badge>
-              <p className="text-muted-foreground text-xs">Parcelas a cada 15 dias. Taxa aplicada por quinzena. Ideal para prazos de 2 a 6 meses.</p>
+              <p className="text-muted-foreground text-xs">{t('simulator.loanBiweeklyDesc')}</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
               <Badge variant="outline" className="mb-2 text-xs">{t('simulator.loanFixedShort')}</Badge>
-              <p className="text-muted-foreground text-xs">Juros compostos (SAC). Parcelas iguais com amortizacao crescente e juros decrescentes.</p>
+              <p className="text-muted-foreground text-xs">{t('simulator.loanFixedDesc')}</p>
             </div>
             <div className="p-3 rounded-lg bg-muted/20">
               <Badge variant="outline" className="mb-2 text-xs">{t('simulator.checkDiscountShort')}</Badge>
-              <p className="text-muted-foreground text-xs">Antecipacao de cheque. O cliente recebe o valor nominal menos o desconto calculado.</p>
+              <p className="text-muted-foreground text-xs">{t('simulator.checkDiscountDesc')}</p>
             </div>
           </div>
         </CardContent>
