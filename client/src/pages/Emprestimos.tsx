@@ -1426,8 +1426,8 @@ function EmprestimoCardCobra({
                 <span className={`text-xs font-semibold ${diasAtraso > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
                   {diasAtraso > 0 ? 'Atrasado' : 'Em Dia'}
                 </span>
-                <Badge className={`text-[10px] px-1.5 py-0 h-4 ${emp.modalidade === 'quinzenal' ? 'bg-cyan-700' : emp.modalidade === 'semanal' ? 'bg-purple-700' : emp.modalidade === 'diario' ? 'bg-orange-700' : 'bg-blue-700'} text-white border-0`}>
-                  {emp.modalidade?.toUpperCase()}
+                <Badge className={`text-[10px] px-1.5 py-0 h-4 ${emp.tipoTaxa === 'quinzenal' ? 'bg-cyan-700' : emp.tipoTaxa === 'semanal' ? 'bg-purple-700' : emp.tipoTaxa === 'diaria' ? 'bg-orange-700' : emp.tipoTaxa === 'diario' ? 'bg-orange-700' : 'bg-blue-700'} text-white border-0`}>
+                  {emp.tipoTaxa?.toUpperCase()}
                 </Badge>
               </div>
             </div>

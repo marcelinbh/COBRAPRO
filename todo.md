@@ -979,3 +979,8 @@
 - [x] Nome do cliente clicando abre o modal unificado na aba Detalhes
 - [x] Botão "Editar" no card abre o modal unificado na aba Editar
 - [x] Zero erros TypeScript após todas as mudanças
+
+## Fase 52: Correção Badge Modalidade + Cálculo de Juros
+- [x] Corrigir badge de modalidade no card: usar tipoTaxa (quinzenal/mensal/diario/semanal) em vez de modalidade
+- [x] Auditar cálculo de valorJurosParcela: R$500 × 50% = R$250 (corrigido - era amortização errada)
+- [x] Corrigir procedure listComParcelas: valorJurosParcela = capital × taxa / 100 (juros simples)

@@ -888,19 +888,10 @@ const contratosRouter = router({
         const valorParcela = parseFloat(c.valor_parcela ?? '0');
         const taxaJuros = parseFloat(c.taxa_juros ?? '0');
         const numeroParcelas = parseInt(c.numero_parcelas ?? '1') || 1;
-        // Para contratos com parcela fixa, os juros por parcela = valorParcela - amortização do principal
-        // Para contratos normais, juros = principal × taxa
-        let valorJurosParcela: number;
-        if (valorParcela > 0 && valorPrincipal > 0) {
-          // Amortização por parcela = principal / número de parcelas
-          const amortizacaoPorParcela = valorPrincipal / numeroParcelas;
-          const jurosCalculado = valorParcela - amortizacaoPorParcela;
-          // Usar o maior entre o cálculo pela taxa e o cálculo pela parcela
-          const jurosPelaTaxa = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
-          valorJurosParcela = jurosCalculado > 0 ? Math.round(jurosCalculado * 100) / 100 : jurosPelaTaxa;
-        } else {
-          valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
-        }
+        // Juros por parcela = capital × taxa%
+        // Para contratos de juros simples (quinzenal, mensal, etc.): juros = principal × taxa / 100
+        // Isso é sempre correto: R$500 × 50% = R$250 de juros por parcela
+        const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
 
         // Total a receber = soma das parcelas abertas (incluindo multas e saldo residual)
         const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
