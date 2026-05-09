@@ -1563,8 +1563,9 @@ const contratosRouter = router({
           if (parcelasNaoPagas.length > 0) {
             throw new TRPCError({ code: 'CONFLICT', message: `Nao eh possivel deletar contrato com ${parcelasNaoPagas.length} parcela(s) nao paga(s).` });
           }
-          await db.delete(contratos).where(eq(contratos.id, input.id));
+          // IMPORTANTE: deletar parcelas ANTES do contrato (foreign key constraint)
           await db.delete(parcelas).where(eq(parcelas.contratoId, input.id));
+          await db.delete(contratos).where(eq(contratos.id, input.id));
           return { success: true };
         } catch (err: any) {
           if (err?.code === 'CONFLICT') throw err;
