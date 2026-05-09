@@ -494,8 +494,8 @@ export default function VendasTelefone() {
                 <Smartphone className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Venda de Telefone</h1>
-                <p className="text-sm text-gray-500">Gerencie contratos de venda parcelada</p>
+                <h1 className="text-xl font-bold text-gray-900">{t('vendaTelefone.title')}</h1>
+                <p className="text-sm text-gray-500">{t('vendaTelefone.subtitle')}</p>
               </div>
             </div>
             <Button
@@ -503,7 +503,7 @@ export default function VendasTelefone() {
               className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
             >
               <Plus className="w-4 h-4" />
-              <span className="hidden sm:inline">Nova Venda</span>
+              <span className="hidden sm:inline">{t('vendaTelefone.newSale')}</span>
               <span className="sm:hidden">Nova</span>
             </Button>
           </div>
@@ -548,11 +548,11 @@ export default function VendasTelefone() {
                     <SelectValue placeholder={t('phoneSales.status')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="todos">Todos os status</SelectItem>
-                    <SelectItem value="ativo">Ativo</SelectItem>
-                    <SelectItem value="quitado">Quitado</SelectItem>
-                    <SelectItem value="inadimplente">Inadimplente</SelectItem>
-                    <SelectItem value="cancelado">Cancelado</SelectItem>
+                    <SelectItem value="todos">{t('common.allStatus')}</SelectItem>
+                    <SelectItem value="ativo">{t('common.active')}</SelectItem>
+                    <SelectItem value="quitado">{t('common.settled')}</SelectItem>
+                    <SelectItem value="inadimplente">{t('common.defaulter')}</SelectItem>
+                    <SelectItem value="cancelado">{t('common.cancelled')}</SelectItem>
                   </SelectContent>
                 </Select>
                 {(busca || filtroStatus !== "todos") && (
@@ -578,7 +578,7 @@ export default function VendasTelefone() {
           {vendas.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-16 text-center">
               <Smartphone className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">Nenhuma venda registrada</h3>
+              <h3 className="text-lg font-semibold text-gray-600 mb-2">{t('vendaTelefone.noSales')}</h3>
               <p className="text-gray-400 mb-6">Clique em {t('phoneSales.newSale')} para simular e criar seu primeiro contrato</p>
               <Button onClick={() => setTela("simulador")} className="bg-emerald-500 hover:bg-emerald-600 text-white">
                 <Plus className="w-4 h-4 mr-2" /> Criar primeira venda
@@ -587,8 +587,8 @@ export default function VendasTelefone() {
           ) : vendasFiltradas.length === 0 ? (
             <div className="bg-white rounded-2xl border border-dashed border-gray-200 p-12 text-center">
               <Smartphone className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-base font-semibold text-gray-600 mb-1">Nenhum resultado encontrado</h3>
-              <p className="text-gray-400 text-sm">Tente ajustar os filtros ou limpar a busca.</p>
+              <h3 className="text-base font-semibold text-gray-600 mb-1">{t('common.noResults')}</h3>
+              <p className="text-gray-400 text-sm">{t('common.adjustFilters')}</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -619,15 +619,15 @@ export default function VendasTelefone() {
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="bg-gray-50 rounded-lg p-2 text-center">
-                        <p className="text-xs text-gray-500">Preço de Venda</p>
+                        <p className="text-xs text-gray-500">{t('vendaTelefone.salePrice')}</p>
                         <p className="text-sm font-bold text-gray-900">{fmt(parseFloat(v.preco_venda))}</p>
                       </div>
                       <div className="bg-gray-50 rounded-lg p-2 text-center">
-                        <p className="text-xs text-gray-500">Parcelas</p>
+                        <p className="text-xs text-gray-500">{t('common.installments')}</p>
                         <p className="text-sm font-bold text-gray-900">{v.num_parcelas}x {fmt(parseFloat(v.valor_parcela))}</p>
                       </div>
                       <div className="bg-emerald-50 rounded-lg p-2 text-center">
-                        <p className="text-xs text-emerald-600">Lucro Bruto</p>
+                        <p className="text-xs text-emerald-600">{t('vendaTelefone.grossProfit')}</p>
                         <p className="text-sm font-bold text-emerald-700">{fmt(parseFloat(v.lucro_bruto))}</p>
                       </div>
                       <div className="bg-blue-50 rounded-lg p-2 text-center">
@@ -711,7 +711,7 @@ export default function VendasTelefone() {
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-sm">{fmt(parseFloat(p.valor))}</span>
                     {p.status === 'paga' ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 text-xs">Paga</Badge>
+                      <Badge className="bg-emerald-100 text-emerald-700 text-xs">{t('common.paid')}</Badge>
                     ) : (
                       <Button
                         size="sm"
@@ -747,8 +747,8 @@ export default function VendasTelefone() {
               </Button>
               <div className="w-px h-6 bg-gray-200" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Simulador de Venda</h1>
-                <p className="text-sm text-gray-500">Configure os parâmetros e veja o retorno em tempo real</p>
+                <h1 className="text-xl font-bold text-gray-900">{t('vendaTelefone.simulator')}</h1>
+                <p className="text-sm text-gray-500">{t('vendaTelefone.simulatorSubtitle')}</p>
               </div>
             </div>
             <Button
@@ -772,7 +772,7 @@ export default function VendasTelefone() {
               {/* Custo e Preço de Venda */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-600">Custo do Aparelho</Label>
+                  <Label className="text-sm font-medium text-gray-600">{t('vendaTelefone.deviceCost')}</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
                     <Input
@@ -788,7 +788,7 @@ export default function VendasTelefone() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium text-gray-600">Preço de Venda</Label>
+                  <Label className="text-sm font-medium text-gray-600">{t('vendaTelefone.salePrice')}</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">R$</span>
                     <Input
@@ -837,15 +837,15 @@ export default function VendasTelefone() {
               <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl p-4 text-white">
                 <div className="grid grid-cols-3 gap-3 text-center">
                   <div>
-                    <p className="text-emerald-100 text-xs">Entrada</p>
+                    <p className="text-emerald-100 text-xs">{t('common.downPayment')}</p>
                     <p className="font-bold text-sm">{fmt(sim.entradaValor)}</p>
                   </div>
                   <div>
-                    <p className="text-emerald-100 text-xs">Parcela</p>
+                    <p className="text-emerald-100 text-xs">{t('common.installment')}</p>
                     <p className="font-bold text-sm">{fmt(sim.valorParcela)}</p>
                   </div>
                   <div>
-                    <p className="text-emerald-100 text-xs">Total</p>
+                    <p className="text-emerald-100 text-xs">{t('common.total')}</p>
                     <p className="font-bold text-sm">{fmt(sim.totalAReceber)}</p>
                   </div>
                 </div>
@@ -892,9 +892,9 @@ export default function VendasTelefone() {
                   </BarChart>
                 </ResponsiveContainer>
                 <div className="flex items-center gap-4 mt-2 justify-center">
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-xs text-gray-500">Investido</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-amber-400" /><span className="text-xs text-gray-500">Payback</span></div>
-                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-500" /><span className="text-xs text-gray-500">Lucro</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-red-400" /><span className="text-xs text-gray-500">{t('vendaTelefone.invested')}</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-amber-400" /><span className="text-xs text-gray-500">{t('vendaTelefone.payback')}</span></div>
+                  <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-sm bg-emerald-500" /><span className="text-xs text-gray-500">{t('vendaTelefone.profit')}</span></div>
                 </div>
               </div>
             </div>
@@ -918,7 +918,7 @@ export default function VendasTelefone() {
             </Button>
             <div className="w-px h-6 bg-gray-200" />
             <div>
-              <h1 className="text-xl font-bold text-gray-900">Dados do Comprador</h1>
+              <h1 className="text-xl font-bold text-gray-900">{t('vendaTelefone.buyerData')}</h1>
               <p className="text-sm text-gray-500">{marca || "Aparelho"} {modelo} · {fmt(precoVenda)} · {parcelas}x {fmt(sim.valorParcela)}</p>
             </div>
           </div>
@@ -936,7 +936,7 @@ export default function VendasTelefone() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Resumo da venda */}
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-5 text-white">
-          <h3 className="text-sm font-medium text-gray-400 mb-3">Resumo da Operação</h3>
+          <h3 className="text-sm font-medium text-gray-400 mb-3">{t('vendaTelefone.operationSummary')}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div><p className="text-gray-400 text-xs">Preço de Venda</p><p className="font-bold">{fmt(precoVenda)}</p></div>
             <div><p className="text-gray-400 text-xs">Entrada</p><p className="font-bold">{fmt(sim.entradaValor)}</p></div>
@@ -952,19 +952,19 @@ export default function VendasTelefone() {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1.5">
-              <Label className="text-sm">Marca *</Label>
+              <Label className="text-sm">{t('vendaTelefone.brand')} *</Label>
               <Input placeholder="Samsung, Apple, Xiaomi..." value={marca} onChange={e => setMarca(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Modelo *</Label>
+              <Label className="text-sm">{t('vendaTelefone.model')} *</Label>
               <Input placeholder="Galaxy S24, iPhone 15..." value={modelo} onChange={e => setModelo(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Armazenamento</Label>
+              <Label className="text-sm">{t('vendaTelefone.storage')}</Label>
               <Input placeholder="128GB, 256GB..." value={armazenamento} onChange={e => setArmazenamento(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Cor</Label>
+              <Label className="text-sm">{t('vendaTelefone.color')}</Label>
               <Input placeholder="Preto, Branco, Azul..." value={cor} onChange={e => setCor(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -972,7 +972,7 @@ export default function VendasTelefone() {
               <Input placeholder="000000000000000" value={imei} onChange={e => setImei(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Data 1ª Parcela</Label>
+              <Label className="text-sm">{t('vendaTelefone.firstInstallmentDate')}</Label>
               <Input type="date" value={dataPrimeiraParcela} onChange={e => setDataPrimeiraParcela(e.target.value)} />
             </div>
           </div>
@@ -985,7 +985,7 @@ export default function VendasTelefone() {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="space-y-1.5 sm:col-span-2">
-              <Label className="text-sm">Nome Completo *</Label>
+              <Label className="text-sm">{t('common.fullName')} *</Label>
               <Input placeholder="Nome do comprador" value={compradorNome} onChange={e => setCompradorNome(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -997,20 +997,20 @@ export default function VendasTelefone() {
               <Input placeholder="00.000.000-0" value={compradorRg} onChange={e => setCompradorRg(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Estado Civil</Label>
+              <Label className="text-sm">{t('vendaTelefone.maritalStatus')}</Label>
               <Select value={compradorEstadoCivil} onValueChange={setCompradorEstadoCivil}>
                 <SelectTrigger><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="solteiro">Solteiro(a)</SelectItem>
-                  <SelectItem value="casado">Casado(a)</SelectItem>
-                  <SelectItem value="divorciado">Divorciado(a)</SelectItem>
-                  <SelectItem value="viuvo">Viúvo(a)</SelectItem>
-                  <SelectItem value="outro">Outro</SelectItem>
+                  <SelectItem value="solteiro">{t('vendaTelefone.single')}</SelectItem>
+                  <SelectItem value="casado">{t('vendaTelefone.married')}</SelectItem>
+                  <SelectItem value="divorciado">{t('vendaTelefone.divorced')}</SelectItem>
+                  <SelectItem value="viuvo">{t('vendaTelefone.widowed')}</SelectItem>
+                  <SelectItem value="outro">{t('common.other')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Profissão</Label>
+              <Label className="text-sm">{t('vendaTelefone.profession')}</Label>
               <Input placeholder="Ex: Comerciante" value={compradorProfissao} onChange={e => setCompradorProfissao(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -1043,11 +1043,11 @@ export default function VendasTelefone() {
               <Input placeholder="00000-000" value={compradorCep} onChange={e => setCompradorCep(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Cidade</Label>
+              <Label className="text-sm">{t('common.city')}</Label>
               <Input placeholder="São Paulo" value={compradorCidade} onChange={e => setCompradorCidade(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-sm">Estado</Label>
+              <Label className="text-sm">{t('common.state')}</Label>
               <Select value={compradorEstado} onValueChange={setCompradorEstado}>
                 <SelectTrigger><SelectValue placeholder="UF" /></SelectTrigger>
                 <SelectContent>
@@ -1058,7 +1058,7 @@ export default function VendasTelefone() {
               </Select>
             </div>
             <div className="space-y-1.5 sm:col-span-2 lg:col-span-3">
-              <Label className="text-sm">Rua, número, complemento</Label>
+              <Label className="text-sm">{t('vendaTelefone.address')}</Label>
               <Input placeholder="Rua das Flores, 123, Apto 4" value={compradorEndereco} onChange={e => setCompradorEndereco(e.target.value)} />
             </div>
           </div>

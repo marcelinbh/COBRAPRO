@@ -2049,6 +2049,8 @@ const parcelasRouter = router({
       valorJurosPago: z.number().positive(),
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
+      novaDataVencimento: z.string().optional(), // YYYY-MM-DD — sobrescreve o cálculo automático
+      novoValorParcela: z.number().positive().optional(), // sobrescreve o valor original da nova parcela
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
@@ -2095,11 +2097,21 @@ const parcelasRouter = router({
       if (!contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
 
       // Calcular nova data de vencimento (vencimento atual + intervalo da modalidade)
-      const diasIntervalo = getDiasModalidade(contrato.tipoTaxa ?? contrato.modalidade);
-      const dataVencAtual = new Date(String(parcela.dataVencimento) + 'T00:00:00');
-      const novaDataVenc = new Date(dataVencAtual);
-      novaDataVenc.setDate(novaDataVenc.getDate() + diasIntervalo);
-      const novaDataVencStr = novaDataVenc.toISOString().split('T')[0];
+      // Se o usuário informou uma data manual, usar ela; caso contrário calcular automaticamente
+      let novaDataVencStr: string;
+      if (input.novaDataVencimento) {
+        novaDataVencStr = input.novaDataVencimento;
+      } else {
+        const diasIntervalo = getDiasModalidade(contrato.tipoTaxa ?? contrato.modalidade);
+        const dataVencAtual = new Date(String(parcela.dataVencimento) + 'T00:00:00');
+        const novaDataVenc = new Date(dataVencAtual);
+        novaDataVenc.setDate(novaDataVenc.getDate() + diasIntervalo);
+        novaDataVencStr = novaDataVenc.toISOString().split('T')[0];
+      }
+      // Valor da nova parcela: usar o valor informado pelo usuário ou manter o original
+      const valorNovaParcela = input.novoValorParcela
+        ? String(input.novoValorParcela.toFixed(2))
+        : String(parcela.valorOriginal);
 
       // Marcar parcela atual como "paga" (juros pagos = renovação)
       const hoje = new Date();
@@ -2128,14 +2140,14 @@ const parcelasRouter = router({
 
         // Calcular valorJuros para a nova parcela (juros = valor pago, pois é só juros)
         const valorJurosNovaParcela = input.valorJurosPago.toFixed(2);
-        // Criar nova parcela com o mesmo valor original e nova data
+        // Criar nova parcela com o valor (possivelmente customizado) e nova data
         await db.insert(parcelas).values({
           userId: ctx.user.id,
           contratoId: parcela.contratoId as number,
           clienteId: parcela.clienteId as number,
           koletorId: parcela.koletorId ?? undefined,
           numeroParcela: (parcela.numeroParcela as number) + 1,
-          valorOriginal: String(parcela.valorOriginal),
+          valorOriginal: valorNovaParcela,
           valorJuros: valorJurosNovaParcela,
           dataVencimento: novaDataVencStr,
           status: 'pendente' as const,
@@ -2173,7 +2185,7 @@ const parcelasRouter = router({
         });
 
         const novoNumero = (parcela.numeroParcela as number) + 1;
-        const novoValor = parseFloat(String(parcela.valorOriginal));
+        const novoValorRest = parseFloat(valorNovaParcela);
         const novaContagemRenovacoes = (((parcela as any).contagemRenovacoes as number) || 0) + 1;
         await supabase.from('parcelas').insert({
           user_id: ctx.user.id,
@@ -2182,8 +2194,8 @@ const parcelasRouter = router({
           koletor_id: parcela.koletorId ?? null,
           numero: novoNumero,
           numero_parcela: novoNumero,
-          valor: novoValor,
-          valor_original: novoValor,
+          valor: novoValorRest,
+          valor_original: novoValorRest,
           valor_juros: parseFloat(input.valorJurosPago.toFixed(2)),
           data_vencimento: novaDataVencStr,
           status: 'pendente',

@@ -959,3 +959,23 @@
 - [x] Auditar e corrigir textos hardcoded em Mensagens Automáticas (NotificacoesAutomaticas.tsx) - 22 substituições
 - [x] Adicionar 43 chaves de tradução faltantes em pt-BR.json e es.json (common, inadimplencia, scores, notifications)
 - [x] Verificar e corrigir Relatórios: limit de transações=1000 e parsing de datas com slice(0,10)
+
+## Fase 49: 3 Melhorias (i18n Veículos/Venda, Juros, Simulador ES)
+- [x] Auditar e corrigir textos hardcoded em Veículos (Veiculos.tsx) - reescrito com t()
+- [x] Auditar e corrigir textos hardcoded em Venda de Telefone (VendaTelefone.tsx) - 48 substituições
+- [x] Adicionar chaves de tradução faltantes para veiculos.* e vendaTelefone.* em pt-BR.json e es.json
+- [x] Corrigir lógica de pagamento de juros: pagarJuros aceita novaDataVencimento e novoValorParcela opcionais
+- [x] Verificar Simulador em Espanhol: MODALIDADE_LABELS convertido para função getModalidadeLabel(mod, t)
+
+## Fase 50: Modal Só Juros - Campos de Próximo Vencimento
+- [x] Adicionar campo "Data do Próximo Vencimento" no modal de pagamento Só Juros
+- [x] Adicionar campo "Valor do Próximo Vencimento" no modal de pagamento Só Juros
+- [x] Salvar esses valores no backend ao confirmar pagamento de juros (procedure pagarJuros atualizada)
+
+## Fase 51: Mover Detalhes para dentro de Editar Empréstimo
+- [x] Modal unificado EditarEmprestimoModal com 4 abas: Editar, Detalhes, Histórico, Comprovante
+- [x] Botóes de ação (Pagar, Pagar Juros, Editar Juros, Multa, WhatsApp, Deletar) em ambas as abas
+- [x] Botão "Detalhes" no card agora abre o modal unificado na aba Detalhes
+- [x] Nome do cliente clicando abre o modal unificado na aba Detalhes
+- [x] Botão "Editar" no card abre o modal unificado na aba Editar
+- [x] Zero erros TypeScript após todas as mudanças
