@@ -1005,3 +1005,9 @@
 - [x] Adicionar aba "Etiquetas" ao modal unificado EditarEmprestimoModal (5ª aba com CRUD completo)
 - [x] Corrigir menu lateral (DashboardLayout): "Meu Perfil" e "Sair" agora usam t() - traduzidos em ES
 - [x] Adicionar chave common.logout em pt-BR.json (Sair) e es.json (Salir)
+
+## Fase 56: 3 Sugestões + Testes Completos
+- [x] Corrigir chave menu.dashboard: removido labelMap redundante, item.label já é t("menu.*") traduzido
+- [x] Adicionar botão Etiquetas (roxo) na barra de ações do card - abre modal na aba Etiquetas
+- [x] Validar lógica pagarJuros: CORRETA - cria nova parcela com mesmo valor e data+intervalo
+- [ ] Testes completos no cobrapro.online (fluxo PT-BR e Espanhol) - aguardando deploy

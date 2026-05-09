@@ -290,14 +290,8 @@ function DashboardLayoutContent({
             <SidebarMenu className="px-2 py-1">
               {filteredMenuItems.map(item => {
                 const isActive = location === item.path;
-                const labelMap: Record<string, string> = {
-                  'Dashboard': 'navigation.dashboard',
-                  'Meu Perfil': 'navigation.meuPerfil',
-                  'Clientes': 'navigation.clients',
-                  'Emprestimos': 'navigation.loans',
-                };
-                const translationKey = labelMap[item.label] || item.label;
-                const translatedLabel = t(translationKey);
+                // item.label já é o resultado de t("menu.*") — usar diretamente
+                const translatedLabel = item.label;
                 return (
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton

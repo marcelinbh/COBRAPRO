@@ -1356,7 +1356,7 @@ function EmprestimoCardCobra({
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [showEditarModal, setShowEditarModal] = useState(false);
-  const [abaModalInicial, setAbaModalInicial] = useState<'editar' | 'detalhes' | 'historico' | 'comprovante'>('editar');
+  const [abaModalInicial, setAbaModalInicial] = useState<'editar' | 'detalhes' | 'historico' | 'comprovante' | 'etiquetas'>('editar');
   const [showEditarJurosModal, setShowEditarJurosModal] = useState<number | null>(null);
   const [showAplicarMultaModal, setShowAplicarMultaModal] = useState<number | null>(null);
   const [showEtiquetasModal, setShowEtiquetasModal] = useState(false);
@@ -1728,12 +1728,22 @@ function EmprestimoCardCobra({
               <Edit className="h-4 w-4" />
             </Button>
 
+            {/* Etiquetas */}
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20 text-violet-400 hover:text-violet-300"
+              title="Etiquetas"
+              onClick={() => { setAbaModalInicial('etiquetas'); setShowEditarModal(true); }}
+            >
+              <Tag className="h-4 w-4" />
+            </Button>
             {/* Renegociar / Cobrar WhatsApp */}
             <Button
               size="sm"
               variant="outline"
               className={`h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20 ${diasAtraso > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300'}`}
-              title={diasAtraso > 0 ? 'Cobrar via WhatsApp' : 'Cobrança preventiva'}
+              title={diasAtraso > 0 ? 'Cobrar via WhatsApp' : 'Cobça preventiva'}
               onClick={() => handleWhatsApp(diasAtraso > 0 ? 'atraso' : 'preventivo')}
               disabled={loadingWpp}
             >
