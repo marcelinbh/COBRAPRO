@@ -71,11 +71,11 @@ export default function Inadimplencia() {
             </div>
             <div>
               <h1 className="text-2xl font-bold">{t('inadimplencia.title')}</h1>
-              <p className="text-sm text-muted-foreground">Clientes com parcelas em atraso</p>
+              <p className="text-sm text-muted-foreground">{t('inadimplencia.subtitle')}</p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={() => refetch()}>
-            Atualizar
+            {t('common.refresh')}
           </Button>
         </div>
 
@@ -85,7 +85,7 @@ export default function Inadimplencia() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Users className="h-4 w-4 text-red-400" />
-                <span className="text-xs text-muted-foreground">Clientes</span>
+                <span className="text-xs text-muted-foreground">{t('common.clients')}</span>
               </div>
               <p className="text-2xl font-bold text-red-400">{totalClientes}</p>
             </CardContent>
@@ -94,7 +94,7 @@ export default function Inadimplencia() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <AlertTriangle className="h-4 w-4 text-orange-400" />
-                <span className="text-xs text-muted-foreground">Parcelas</span>
+                <span className="text-xs text-muted-foreground">{t('common.parcels')}</span>
               </div>
               <p className="text-2xl font-bold text-orange-400">{totalParcelas}</p>
             </CardContent>
@@ -103,7 +103,7 @@ export default function Inadimplencia() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <DollarSign className="h-4 w-4 text-yellow-400" />
-                <span className="text-xs text-muted-foreground">Total Devido</span>
+                <span className="text-xs text-muted-foreground">{t('inadimplencia.totalOwed')}</span>
               </div>
               <p className="text-lg font-bold text-yellow-400">{formatarMoeda(totalDevido)}</p>
             </CardContent>
@@ -112,7 +112,7 @@ export default function Inadimplencia() {
             <CardContent className="p-4">
               <div className="flex items-center gap-2 mb-1">
                 <Calendar className="h-4 w-4 text-purple-400" />
-                <span className="text-xs text-muted-foreground">Maior Atraso</span>
+                <span className="text-xs text-muted-foreground">{t('inadimplencia.longestDelay')}</span>
               </div>
               <p className="text-2xl font-bold text-purple-400">{maiorAtraso}d</p>
             </CardContent>
@@ -122,7 +122,7 @@ export default function Inadimplencia() {
         {/* Filtros */}
         <div className="flex flex-col sm:flex-row gap-3">
           <Input
-            placeholder="Buscar por nome do cliente..."
+            placeholder={t('clients.searchClient')}
             value={busca}
             onChange={e => setBusca(e.target.value)}
             className="flex-1"
@@ -132,9 +132,9 @@ export default function Inadimplencia() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="dias">Ordenar por dias de atraso</SelectItem>
-              <SelectItem value="valor">Ordenar por valor devido</SelectItem>
-              <SelectItem value="nome">Ordenar por nome</SelectItem>
+              <SelectItem value="dias">{t('inadimplencia.sortByDays')}</SelectItem>
+              <SelectItem value="valor">{t('inadimplencia.sortByValue')}</SelectItem>
+              <SelectItem value="nome">{t('inadimplencia.sortByName')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -151,11 +151,11 @@ export default function Inadimplencia() {
             <CardContent className="p-12 text-center">
               <TrendingDown className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
               <p className="text-lg font-medium text-muted-foreground">
-                {busca ? "Nenhum cliente encontrado" : "Nenhum inadimplente"}
+                {busca ? t('common.noResults') : t('inadimplencia.noDelinquents')}
               </p>
               {!busca && (
                 <p className="text-sm text-muted-foreground mt-1">
-                  Todos os clientes estão em dia com seus pagamentos!
+                  {t('inadimplencia.allClientsOnTime')}
                 </p>
               )}
             </CardContent>
@@ -176,14 +176,14 @@ export default function Inadimplencia() {
                             variant="outline"
                             className={`text-[10px] px-1.5 py-0.5 ${getBadgeDias(cliente.maiorDiasAtraso)}`}
                           >
-                            {cliente.maiorDiasAtraso}d atraso
+                            {cliente.maiorDiasAtraso}d {t('inadimplencia.delay')}
                           </Badge>
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 text-muted-foreground">
                             {cliente.parcelas.length} parcela{cliente.parcelas.length !== 1 ? "s" : ""}
                           </Badge>
                         </div>
                         <p className="text-sm text-red-400 font-medium mt-0.5">
-                          Total devido: {formatarMoeda(cliente.totalDevido)}
+                          {t('inadimplencia.totalOwed')}: {formatarMoeda(cliente.totalDevido)}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
@@ -223,7 +223,7 @@ export default function Inadimplencia() {
                     {/* Parcelas expandidas */}
                     {isExpanded && (
                       <div className="mt-3 pt-3 border-t border-border space-y-2">
-                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Parcelas em atraso</p>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">{t('inadimplencia.overdueInstallments')}</p>
                         {cliente.parcelas.map((p: any) => (
                           <div
                             key={p.id}
@@ -231,7 +231,7 @@ export default function Inadimplencia() {
                           >
                             <div className="flex items-center gap-3">
                               <span className="text-muted-foreground">#{p.numeroParcela}</span>
-                              <span>Venc: {formatarData(p.dataVencimento)}</span>
+                              <span>{t('common.dueDate')}: {formatarData(p.dataVencimento)}</span>
                               <Badge
                                 variant="outline"
                                 className={`text-[10px] px-1.5 py-0 ${getBadgeDias(p.diasAtraso)}`}
@@ -243,7 +243,7 @@ export default function Inadimplencia() {
                               <p className="font-medium">{formatarMoeda(p.totalParcela)}</p>
                               {p.valorMulta > 0 && (
                                 <p className="text-[10px] text-orange-400">
-                                  +{formatarMoeda(p.valorMulta)} multa
+                                  +{formatarMoeda(p.valorMulta)} {t('common.fine')}
                                 </p>
                               )}
                             </div>

@@ -54,16 +54,16 @@ export function Scores() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-white">{t('scores.title')}</h1>
-          <p className="text-slate-400 mt-1">Ranking de confiabilidade e desempenho</p>
+          <p className="text-slate-400 mt-1">{t('scores.subtitle')}</p>
         </div>
         <Select value={ordenarPor} onValueChange={(value: any) => setOrdenarPor(value)}>
           <SelectTrigger className="w-40">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="score">Ordenar por Score</SelectItem>
-            <SelectItem value="lucro">Ordenar por Lucro</SelectItem>
-            <SelectItem value="nome">Ordenar por Nome</SelectItem>
+            <SelectItem value="score">{t('scores.sortByScore')}</SelectItem>
+            <SelectItem value="lucro">{t('scores.sortByProfit')}</SelectItem>
+            <SelectItem value="nome">{t('scores.sortByName')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -71,23 +71,23 @@ export function Scores() {
       {/* KPIs */}
       <div className="grid grid-cols-4 gap-4">
         <Card className="bg-slate-800/50 border-slate-700 p-4">
-          <div className="text-slate-400 text-sm">Total de Clientes</div>
+          <div className="text-slate-400 text-sm">{t('scores.totalClients')}</div>
           <div className="text-2xl font-bold text-white mt-2">{clientes.length}</div>
         </Card>
         <Card className="bg-emerald-500/10 border-emerald-500/30 p-4">
-          <div className="text-emerald-400 text-sm">Excelentes (100+)</div>
+          <div className="text-emerald-400 text-sm">{t('scores.excellent')}</div>
           <div className="text-2xl font-bold text-emerald-400 mt-2">
             {clientes.filter((c: any) => c.score >= 100).length}
           </div>
         </Card>
         <Card className="bg-blue-500/10 border-blue-500/30 p-4">
-          <div className="text-blue-400 text-sm">Bons (70-99)</div>
+          <div className="text-blue-400 text-sm">{t('scores.good')}</div>
           <div className="text-2xl font-bold text-blue-400 mt-2">
             {clientes.filter((c: any) => c.score >= 70 && c.score < 100).length}
           </div>
         </Card>
         <Card className="bg-red-500/10 border-red-500/30 p-4">
-          <div className="text-red-400 text-sm">Ruim (&lt;40)</div>
+          <div className="text-red-400 text-sm">{t('scores.poor')}</div>
           <div className="text-2xl font-bold text-red-400 mt-2">
             {clientes.filter((c: any) => c.score < 40).length}
           </div>
@@ -98,7 +98,7 @@ export function Scores() {
       <div className="space-y-3">
         {clientes.length === 0 ? (
           <Card className="bg-slate-800/50 border-slate-700 p-8 text-center">
-            <p className="text-slate-400">Nenhum cliente encontrado</p>
+            <p className="text-slate-400">{t('common.noResults')}</p>
           </Card>
         ) : (
           clientes.map((cliente: any, idx: number) => (
@@ -114,7 +114,7 @@ export function Scores() {
                   </Avatar>
                   <div className="flex-1">
                     <div className="font-semibold text-white">{cliente.nome}</div>
-                    <div className="text-sm text-slate-400">{cliente.cpfCnpj || 'Sem CPF'}</div>
+                    <div className="text-sm text-slate-400">{cliente.cpfCnpj || t('scores.noCpf')}</div>
                   </div>
                 </div>
 
@@ -122,7 +122,7 @@ export function Scores() {
                 <div className="flex items-center gap-6">
                   <div className="text-right">
                     <div className="text-3xl font-bold text-white">{cliente.score}</div>
-                    <div className="text-xs text-slate-400">pontos</div>
+                    <div className="text-xs text-slate-400">{t('scores.points')}</div>
                   </div>
                   <Badge className={`${getBadgeColor(cliente.score)} border`}>{cliente.badge}</Badge>
                 </div>
@@ -131,28 +131,28 @@ export function Scores() {
                 <div className="flex gap-4 ml-6 text-sm">
                   <div className="text-center">
                     <div className="text-emerald-400 font-semibold">{cliente.parcelasQuitadas}</div>
-                    <div className="text-slate-400 text-xs">Quitadas</div>
+                    <div className="text-slate-400 text-xs">{t('scores.paid')}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-blue-400 font-semibold">{cliente.parcelasEmDia}</div>
-                    <div className="text-slate-400 text-xs">Em Dia</div>
+                    <div className="text-slate-400 text-xs">{t('scores.onTime')}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-red-400 font-semibold">{cliente.parcelasAtrasadas}</div>
-                    <div className="text-slate-400 text-xs">Atrasadas</div>
+                    <div className="text-slate-400 text-xs">{t('scores.late')}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-yellow-400 font-semibold">R$ {(cliente.lucroGerado || 0).toFixed(2)}</div>
-                    <div className="text-slate-400 text-xs">Lucro</div>
+                    <div className="text-slate-400 text-xs">{t('scores.profit')}</div>
                   </div>
                   <div className="text-center">
                     <div className="text-purple-400 font-semibold">{cliente.taxaAdimplencia ?? 0}%</div>
-                    <div className="text-slate-400 text-xs">Adimpl.</div>
+                    <div className="text-slate-400 text-xs">{t('scores.compliance')}</div>
                   </div>
                   {(cliente.pontosRecuperacao ?? 0) > 0 && (
                     <div className="text-center">
                       <div className="text-orange-400 font-semibold">+{cliente.pontosRecuperacao}</div>
-                      <div className="text-slate-400 text-xs">Recup.</div>
+                      <div className="text-slate-400 text-xs">{t('scores.recovery')}</div>
                     </div>
                   )}
                 </div>

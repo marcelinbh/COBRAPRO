@@ -951,3 +951,11 @@
 - [x] Adicionar chaves common.daily/weekly/biweekly/monthly/annual/installment ao pt-BR.json e es.json
 - [x] Corrigir bug Relatórios R$ 0.00: aumentar limit de transações para 1000
 - [x] Corrigir parsing de datas no Relatorios.tsx (usar slice(0,10) para evitar timezone issues)
+
+## Fase 48: 3 Sugestões de Melhoria i18n + Relatórios
+- [x] Corrigir MODALIDADE_LABELS hardcoded no Simulador (convertido para função getModalidadeLabel com t())
+- [x] Auditar e corrigir textos hardcoded em Inadimplência (Inadimplencia.tsx) - 15 substituições
+- [x] Auditar e corrigir textos hardcoded em Score de Clientes (Scores.tsx) - 15 substituições
+- [x] Auditar e corrigir textos hardcoded em Mensagens Automáticas (NotificacoesAutomaticas.tsx) - 22 substituições
+- [x] Adicionar 43 chaves de tradução faltantes em pt-BR.json e es.json (common, inadimplencia, scores, notifications)
+- [x] Verificar e corrigir Relatórios: limit de transações=1000 e parsing de datas com slice(0,10)

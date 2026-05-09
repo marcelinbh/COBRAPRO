@@ -32,14 +32,18 @@ interface ResultadoSimulacao {
   parcelas: { numero: number; vencimento: string; valor: number }[];
 }
 
-const MODALIDADE_LABELS: Record<Modalidade, string> = {
-  emprestimo_padrao: "Juros Simples",
-  emprestimo_diario: "Diario",
-  emprestimo_semanal: "Semanal",
-  emprestimo_quinzenal: "Quinzenal",
-  tabela_price: "Parcela Fixa",
-  desconto_cheque: "Desconto de Cheque",
-};
+// getModalidadeLabel usa t() para suportar i18n
+function getModalidadeLabel(mod: Modalidade, t: (key: string) => string): string {
+  const labels: Record<Modalidade, string> = {
+    emprestimo_padrao: t('simulator.simpleInterest'),
+    emprestimo_diario: t('common.daily'),
+    emprestimo_semanal: t('common.weekly'),
+    emprestimo_quinzenal: t('common.biweekly'),
+    tabela_price: t('simulator.fixedInstallment'),
+    desconto_cheque: t('simulator.checkDiscount'),
+  };
+  return labels[mod] ?? mod;
+}
 
 // Mapeia modalidade do simulador para modalidade do contrato
 function mapModalidadeParaContrato(mod: Modalidade): string {
@@ -264,7 +268,7 @@ export default function Simulador() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     const params = [
-      [t('simulator.modality'), MODALIDADE_LABELS[r.modalidade]],
+      [t('simulator.modality'), getModalidadeLabel(r.modalidade, t)],
       ["Capital Emprestado", formatarMoeda(r.valorPrincipal)],
       [t('simulator.interestRate'), `${parseFloat(r.taxaJuros.toFixed(4))}% ${getTaxaLabelCurto(r.tipoTaxa)}`],
       ["Numero de Parcelas", `${r.numeroParcelas}x`],
@@ -339,7 +343,7 @@ export default function Simulador() {
       startY: yPos,
       head: [[t('simulator.modality'), "Periodicidade", "Parcela", "Total Juros", "Total a Pagar", "CET (%)"]],
       body: comparacoes.map(r => [
-        MODALIDADE_LABELS[r.modalidade],
+        getModalidadeLabel(r.modalidade, t),
         getTaxaLabelCurto(r.tipoTaxa),
         formatarMoeda(r.valorParcela),
         formatarMoeda(r.totalJuros),
@@ -674,7 +678,7 @@ export default function Simulador() {
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
                             <Badge variant={isMelhor ? "default" : "outline"} className={`text-xs ${isMelhor ? "bg-emerald-600" : ""}`}>
-                              {MODALIDADE_LABELS[r.modalidade]}
+                              {getModalidadeLabel(r.modalidade, t)}
                             </Badge>
                             {isMelhor && <span className="text-xs text-emerald-400">{t('simulator.lowestCost')}</span>}
                           </div>
@@ -711,7 +715,7 @@ export default function Simulador() {
                 const isMelhor = r.modalidade === melhor.modalidade;
                 return (
                   <div key={r.modalidade} className={`p-3 rounded-lg border ${isMelhor ? "border-emerald-500/40 bg-emerald-500/10" : "border-border bg-muted/20"}`}>
-                    <p className="text-xs font-medium text-muted-foreground mb-1">{MODALIDADE_LABELS[r.modalidade]}</p>
+                    <p className="text-xs font-medium text-muted-foreground mb-1">{getModalidadeLabel(r.modalidade, t)}</p>
                     <p className="text-xs text-muted-foreground/70 mb-2">{getTaxaLabelCurto(r.tipoTaxa)}</p>
                     <p className="text-lg font-bold text-foreground">{formatarMoeda(r.valorParcela)}</p>
                     <p className="text-xs text-muted-foreground">{r.numeroParcelas}x - {formatarMoeda(r.totalPagar)} total</p>

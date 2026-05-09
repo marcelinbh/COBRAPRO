@@ -125,10 +125,10 @@ export default function NotificacoesAutomaticas() {
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Bell className="w-6 h-6 text-primary" />
-              Mensagens Automáticas
+              {t('notifications.title')}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Configure mensagens automáticas de WhatsApp para seus clientes
+              {t('notifications.subtitle')}
             </p>
           </div>
           <Button
@@ -139,7 +139,7 @@ export default function NotificacoesAutomaticas() {
             className="gap-2"
           >
             <Zap className="w-4 h-4" />
-            {disparando ? "Disparando..." : "Disparar Agora"}
+            {disparando ? t('common.sending') : t('notifications.fireNow')}
           </Button>
         </div>
 
@@ -153,12 +153,12 @@ export default function NotificacoesAutomaticas() {
                 </div>
                 <div>
                   <p className="font-semibold text-foreground">
-                    {globalAtivo ? "Mensagens automáticas ATIVAS" : "Mensagens automáticas DESATIVADAS"}
+                    {globalAtivo ? t('notifications.globalActive') : t('notifications.globalInactive')}
                   </p>
                   <p className="text-sm text-muted-foreground">
                     {globalAtivo
-                      ? "O sistema enviará mensagens automaticamente todos os dias"
-                      : "Nenhuma mensagem automática será enviada"}
+                      ? t('notifications.globalActiveDesc')
+                      : t('notifications.globalInactiveDesc')}
                   </p>
                 </div>
               </div>
@@ -176,11 +176,11 @@ export default function NotificacoesAutomaticas() {
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="regras" className="gap-2">
               <Settings2 className="w-4 h-4" />
-              Regras de Envio
+              {t('notifications.rules')}
             </TabsTrigger>
             <TabsTrigger value="historico" className="gap-2">
               <History className="w-4 h-4" />
-              Histórico
+              {t('notifications.history')}
             </TabsTrigger>
           </TabsList>
 
@@ -192,7 +192,7 @@ export default function NotificacoesAutomaticas() {
                 <div className="flex items-start gap-2">
                   <Info className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
                   <div>
-                    <p className="text-sm text-blue-300 font-medium">Variáveis disponíveis nas mensagens:</p>
+                    <p className="text-sm text-blue-300 font-medium">{t('notifications.availableVars')}:</p>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {VARIAVEIS.map(v => (
                         <span key={v.var} className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded font-mono" title={v.desc}>
@@ -246,7 +246,7 @@ export default function NotificacoesAutomaticas() {
                               className="h-8 px-2 text-xs"
                             >
                               <MessageSquare className="w-3.5 h-3.5 mr-1" />
-                              Editar
+                              {t('common.edit')}
                             </Button>
                             <Switch
                               checked={regra.ativo}
@@ -267,8 +267,8 @@ export default function NotificacoesAutomaticas() {
           <TabsContent value="historico" className="mt-4">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base">Histórico de Envios</CardTitle>
-                <CardDescription>Últimas 50 mensagens enviadas automaticamente</CardDescription>
+                <CardTitle className="text-base">{t('notifications.sendHistory')}</CardTitle>
+                <CardDescription>{t('notifications.historyDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingHistorico ? (
@@ -278,7 +278,7 @@ export default function NotificacoesAutomaticas() {
                 ) : !historico || historico.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">Nenhuma mensagem enviada ainda</p>
+                    <p className="text-sm">{t('notifications.noMessages')}</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -332,7 +332,7 @@ export default function NotificacoesAutomaticas() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-primary" />
-              Editar Mensagem — {regraEditando?.label}
+              {t('notifications.editMessage')} — {regraEditando?.label}
             </DialogTitle>
           </DialogHeader>
 
@@ -340,7 +340,7 @@ export default function NotificacoesAutomaticas() {
             {/* Variáveis */}
             <div>
               <Label className="text-xs text-muted-foreground mb-2 block">
-                Clique para inserir variável na mensagem:
+                {t('notifications.clickToInsert')}:
               </Label>
               <div className="flex flex-wrap gap-1">
                 {VARIAVEIS.map(v => (
@@ -358,24 +358,24 @@ export default function NotificacoesAutomaticas() {
 
             {/* Textarea */}
             <div>
-              <Label htmlFor="msg">Mensagem</Label>
+              <Label htmlFor="msg">{t('notifications.message')}</Label>
               <Textarea
                 id="msg"
                 value={editando?.mensagem ?? ""}
                 onChange={(e) => setEditando(prev => prev ? { ...prev, mensagem: e.target.value } : null)}
                 rows={6}
-                placeholder="Digite a mensagem..."
+placeholder={t('notifications.messagePlaceholder')}
                 className="mt-1 font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Use *texto* para negrito no WhatsApp
+                {t('notifications.boldHint')}
               </p>
             </div>
 
             {/* Preview */}
             {editando?.mensagem && (
               <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
-                <p className="text-xs text-green-400 font-medium mb-1">Preview (com dados de exemplo):</p>
+                <p className="text-xs text-green-400 font-medium mb-1">{t('notifications.preview')}:</p>
                 <p className="text-sm text-foreground whitespace-pre-wrap">
                   {editando.mensagem
                     .replace(/{nome}/g, "João Silva")
@@ -394,11 +394,11 @@ export default function NotificacoesAutomaticas() {
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => testar.mutate({ tipo: editando?.tipo ?? "", mensagem_template: editando?.mensagem ?? "" })} disabled={testar.isPending} className="gap-2">
               <Send className="w-4 h-4" />
-              {testar.isPending ? "Enviando..." : "Testar"}
+              {testar.isPending ? t('common.sending') : t('common.test')}
             </Button>
             <Button onClick={handleSalvar} disabled={salvar.isPending} className="gap-2">
               <CheckCircle2 className="w-4 h-4" />
-              {salvar.isPending ? "Salvando..." : "Salvar"}
+              {salvar.isPending ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>
