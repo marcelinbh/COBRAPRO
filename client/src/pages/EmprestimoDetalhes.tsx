@@ -146,7 +146,7 @@ export default function EmprestimoDetalhes() {
   if (!emprestimo) {
     return (
       <div className="text-center py-16">
-        <p className="text-muted-foreground mb-4">Empréstimo não encontrado</p>
+        <p className="text-muted-foreground mb-4">{t('loanDetails.loanNotFound')}</p>
         <Button onClick={() => setLocation('/emprestimos')}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Voltar para Empréstimos
@@ -826,7 +826,7 @@ export default function EmprestimoDetalhes() {
             {isAtrasado && (
               <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm">
                 <p className="text-red-400 font-semibold">{diasAtraso} dias de atraso</p>
-                <p className="text-xs text-muted-foreground mt-1">A multa será adicionada ao valor das parcelas em atraso.</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('loanDetails.fineWillBeAdded')}</p>
               </div>
             )}
             <div>
@@ -909,7 +909,7 @@ function HistoricoAba({ contratoId }: { contratoId: number }) {
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <History className="h-12 w-12 text-muted-foreground/30 mb-3" />
         <p className="text-muted-foreground text-sm">{t('emprestimos.noHistory')}</p>
-        <p className="text-muted-foreground/60 text-xs mt-1">As ações futuras (pagamentos, multas, edições) aparecerão aqui.</p>
+        <p className="text-muted-foreground/60 text-xs mt-1">{t('loanDetails.futureActionsWillAppear')}</p>
       </div>
     );
   }

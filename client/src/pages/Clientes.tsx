@@ -164,11 +164,11 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
 
   const createMutation = trpc.clientes.create.useMutation({
     onSuccess: () => {
-      toast.success(isEdit ? "Cliente atualizado!" : "Cliente criado com sucesso!");
+      toast.success(isEdit ? t("toast.clientUpdated") : t("toast.clientCreated"));
       onSuccess();
       onClose();
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
   const updateMutation = trpc.clientes.update.useMutation({
     onSuccess: () => {
@@ -176,7 +176,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
       onSuccess();
       onClose();
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   // Popular campos ao editar
@@ -668,7 +668,7 @@ export default function Clientes() {
   const utils = trpc.useUtils();
 
   const createClienteMutation = trpc.clientes.create.useMutation({
-    onError: (e) => toast.error("Erro ao criar cliente: " + e.message),
+    onError: (e) => toast.error(t("toast.errorCreateClient") + e.message),
   });
 
   const deleteClienteMutation = trpc.clientes.deletar.useMutation({
@@ -677,7 +677,7 @@ export default function Clientes() {
       setDeleteClienteId(null);
       utils.clientes.list.invalidate();
     },
-    onError: (e) => toast.error("Erro ao deletar: " + e.message),
+    onError: (e) => toast.error(t("toast.errorDelete") + e.message),
   });
 
   const filteredClientes = (clientes as any[]).filter((c: any) => {

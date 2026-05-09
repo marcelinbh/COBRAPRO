@@ -98,7 +98,7 @@ export default function ClienteDetalhe() {
   if (!cliente) {
     return (
       <div className="text-center py-16">
-        <p className="text-muted-foreground">Cliente não encontrado</p>
+        <p className="text-muted-foreground">{t('common.clientNotFound')}</p>
         <Button variant="ghost" className="mt-4" onClick={() => setLocation("/clientes")}>
           Voltar para Clientes
         </Button>
@@ -206,7 +206,7 @@ export default function ClienteDetalhe() {
                   <div className={`font-display text-lg ${metricas.taxaAdimplencia >= 80 ? "text-emerald-400" : metricas.taxaAdimplencia >= 50 ? "text-yellow-400" : "text-red-400"}`}>
                     {metricas.taxaAdimplencia}%
                   </div>
-                  <div className="text-xs text-muted-foreground mt-1">Adimplência</div>
+                  <div className="text-xs text-muted-foreground mt-1">{t('common.adimplencia')}</div>
                 </div>
               </div>
             </div>
@@ -329,7 +329,7 @@ export default function ClienteDetalhe() {
             {cliente.observacoes && (
               <Card className="border-border">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Observações</CardTitle>
+                  <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide">{t('checks.observations')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <p className="text-sm text-foreground whitespace-pre-wrap">{cliente.observacoes}</p>

@@ -149,7 +149,7 @@ export default function NovoContrato() {
       utils.dashboard.kpis.invalidate();
       setLocation('/contratos');
     },
-    onError: (e) => toast.error("Erro ao criar contrato: " + e.message),
+    onError: (e) => toast.error(t("toast.errorCreateContract") + e.message),
   });
 
   const handleSubmit = () => {
@@ -285,7 +285,7 @@ export default function NovoContrato() {
                   <Select value={form.tipoTaxa} onValueChange={v => setForm(f => ({ ...f, tipoTaxa: v }))}>
                     <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="diaria">Diária</SelectItem>
+                      <SelectItem value="diaria">{t('newContract.daily')}</SelectItem>
                       <SelectItem value="semanal">{t('novoContrato.weekly')}</SelectItem>
                       <SelectItem value="quinzenal">{t('novoContrato.biweekly')}</SelectItem>
                       <SelectItem value="mensal">{t('novoContrato.monthly')}</SelectItem>
@@ -298,7 +298,7 @@ export default function NovoContrato() {
 
             {/* Parcelas */}
             <div>
-              <Label>Número de Parcelas *</Label>
+              <Label>{t('newContract.numberOfInstallments')}</Label>
               <Input
                 className="mt-1"
                 type="number"
@@ -348,7 +348,7 @@ export default function NovoContrato() {
             {/* Datas */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Data de Início *</Label>
+                <Label>{t('newContract.startDate')}</Label>
                 <Input
                   className="mt-1"
                   type="date"
@@ -474,7 +474,7 @@ export default function NovoContrato() {
 
             {/* Descrição */}
             <div>
-              <Label>Descrição / Observações</Label>
+              <Label>{t('newContract.descriptionObservations')}</Label>
               <textarea
                 className="mt-1 w-full rounded-md border border-input bg-input px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-none"
                 rows={2}
@@ -544,7 +544,7 @@ export default function NovoContrato() {
           {(modoParcelaFixa || modoDataManual || tipoMulta === 'fixo') && (
             <Card className="border-border">
               <CardContent className="p-4 space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Opções Ativas</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{t('newContract.activeOptions')}</p>
                 {modoParcelaFixa && (
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-2 h-2 rounded-full bg-primary" />

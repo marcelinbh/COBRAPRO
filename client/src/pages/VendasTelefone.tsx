@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState, useMemo, useCallback } from "react";
 import { useLocation } from "wouter";
 import jsPDF from "jspdf";
@@ -23,10 +24,10 @@ import {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function fmt(v: number) {
-  return v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return v.toLocaleString(i18n.language === "es" ? "es-ES" : "pt-BR", { style: "currency", currency: "BRL" });
 }
 function fmtN(v: number, dec = 2) {
-  return v.toLocaleString("pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+  return v.toLocaleString(i18n.language === "es" ? "es-ES" : "pt-BR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
 // ─── Geração de PDF do Contrato ─────────────────────────────────────────────
@@ -37,7 +38,7 @@ function gerarPDFContrato(venda: any, parcelas: any[]) {
   let y = 20;
 
   // Helpers internos
-  const fmtBRL = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const fmtBRL = (v: number) => v.toLocaleString(i18n.language === "es" ? "es-ES" : "pt-BR", { style: "currency", currency: "BRL" });
   const line = (text: string, x: number, yPos: number, size = 10, bold = false, color: [number,number,number] = [30,30,30]) => {
     doc.setFontSize(size);
     doc.setFont("helvetica", bold ? "bold" : "normal");
@@ -54,8 +55,8 @@ function gerarPDFContrato(venda: any, parcelas: any[]) {
   doc.setFillColor(17, 24, 39);
   doc.rect(0, 0, W, 30, "F");
   line("CONTRATO DE VENDA PARCELADA", margin, 13, 14, true, [255,255,255]);
-  line("CobraPro · Sistema de Gestão de Cobranças", margin, 21, 9, false, [156,163,175]);
-  const dataHoje = new Date().toLocaleDateString("pt-BR");
+  line(i18n.t('phoneSales.systemTitle'), margin, 21, 9, false, [156,163,175]);
+  const dataHoje = new Date().toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR");
   line(`Emitido em: ${dataHoje}`, W - margin - 40, 21, 9, false, [156,163,175]);
   y = 40;
 
@@ -92,12 +93,12 @@ function gerarPDFContrato(venda: any, parcelas: any[]) {
     ["CPF", venda.comprador_cpf ?? "-"],
     ["RG", venda.comprador_rg ?? "-"],
     ["Estado Civil", venda.comprador_estado_civil ?? "-"],
-    ["Profissão", venda.comprador_profissao ?? "-"],
+    [i18n.t('phoneSales.profession'), venda.comprador_profissao ?? "-"],
     ["Telefone", venda.comprador_telefone ?? "-"],
     ["E-mail", venda.comprador_email ?? "-"],
     ["Instagram", venda.comprador_instagram ?? "-"],
     ["Local Trabalho", venda.comprador_local_trabalho ?? "-"],
-    ["Endereço", [venda.comprador_endereco, venda.comprador_cidade, venda.comprador_estado].filter(Boolean).join(", ") || "-"],
+    [i18n.t('phoneSales.address'), [venda.comprador_endereco, venda.comprador_cidade, venda.comprador_estado].filter(Boolean).join(", ") || "-"],
   ];
   compradorItems.forEach(([label, value], i) => {
     const col = i % 2 === 0 ? margin : W / 2 + 5;
@@ -115,11 +116,11 @@ function gerarPDFContrato(venda: any, parcelas: any[]) {
   // ── Condições Financeiras ──
   doc.setFillColor(240, 253, 244);
   doc.rect(margin, y, W - margin * 2, 8, "F");
-  line("CONDIÇÕES FINANCEIRAS", margin + 3, y + 5.5, 10, true, [5,150,105]);
+  line(i18n.t('phoneSales.financialConditions'), margin + 3, y + 5.5, 10, true, [5,150,105]);
   y += 12;
 
   const finItems: [string, string][] = [
-    ["Preço de Venda", fmtBRL(parseFloat(venda.preco_venda))],
+    [i18n.t('phoneSales.salePrice'), fmtBRL(parseFloat(venda.preco_venda))],
     ["Entrada", `${fmtBRL(parseFloat(venda.entrada_valor))} (${parseFloat(venda.entrada_percentual).toFixed(0)}%)`],
     ["Nº de Parcelas", `${venda.num_parcelas}x de ${fmtBRL(parseFloat(venda.valor_parcela))}`],
     ["Juros Mensal", `${parseFloat(venda.juros_mensal).toFixed(0)}% a.m.`],
@@ -160,7 +161,7 @@ function gerarPDFContrato(venda: any, parcelas: any[]) {
         doc.setFillColor(249, 250, 251);
         doc.rect(margin, y - 3, W - margin * 2, 6, "F");
       }
-      const venc = new Date(p.vencimento).toLocaleDateString("pt-BR");
+      const venc = new Date(p.vencimento).toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR");
       const statusLabel = p.status === "paga" ? "PAGA" : p.status === "atrasada" ? "ATRASADA" : "PENDENTE";
       const statusColor: [number,number,number] = p.status === "paga" ? [5,150,105] : p.status === "atrasada" ? [220,38,38] : [107,114,128];
       line(`${p.numero}`, margin + 3, y + 1, 8, false, [30,30,30]);
@@ -177,13 +178,13 @@ function gerarPDFContrato(venda: any, parcelas: any[]) {
   if (y > 230) { doc.addPage(); y = 20; }
   doc.setFillColor(240, 253, 244);
   doc.rect(margin, y, W - margin * 2, 8, "F");
-  line("TERMOS E CONDIÇÕES", margin + 3, y + 5.5, 10, true, [5,150,105]);
+  line(i18n.t('phoneSales.termsAndConditions'), margin + 3, y + 5.5, 10, true, [5,150,105]);
   y += 12;
 
   const termos = [
     "1. O comprador se compromete a pagar as parcelas nas datas acordadas.",
-    "2. O atraso no pagamento implicará em juros de mora de 2% ao mês.",
-    "3. O aparelho permanece como garantia até a quitação total do contrato.",
+    i18n.t('phoneSales.lateInterestTerms'),
+    i18n.t('phoneSales.deviceGuaranteeTerms'),
     "4. Em caso de inadimplência, o vendedor poderá retomar o aparelho.",
     "5. Este contrato é válido como instrumento particular de compra e venda.",
   ];
@@ -406,17 +407,17 @@ export default function VendasTelefone() {
       setTela("lista");
       resetForm();
     },
-    onError: (err) => toast.error("Erro: " + err.message),
+    onError: (err) => toast.error(t("toast.errorPrefix") + err.message),
   });
 
   const deletarMutation = trpc.vendasTelefone.deletar.useMutation({
     onSuccess: () => { toast.success(t('toast_success.excluído_com_sucesso')); refetch(); },
-    onError: (err) => toast.error("Erro: " + err.message),
+    onError: (err) => toast.error(t("toast.errorPrefix") + err.message),
   });
 
   const pagarMutation = trpc.vendasTelefone.pagarParcela.useMutation({
     onSuccess: () => { toast.success(t('toast_success.parcela_paga')); refetch(); },
-    onError: (err) => toast.error("Erro: " + err.message),
+    onError: (err) => toast.error(t("toast.errorPrefix") + err.message),
   });
 
   // ── Cálculo do simulador ──
@@ -706,7 +707,7 @@ export default function VendasTelefone() {
                 <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border ${p.status === 'paga' ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}>
                   <div>
                     <p className="font-medium text-sm">Parcela {p.numero}/{vendaSelecionada?.num_parcelas}</p>
-                    <p className="text-xs text-gray-500">{new Date(p.vencimento).toLocaleDateString("pt-BR")}</p>
+                    <p className="text-xs text-gray-500">{new Date(p.vencimento).toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR")}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-bold text-sm">{fmt(parseFloat(p.valor))}</span>
@@ -938,7 +939,7 @@ export default function VendasTelefone() {
         <div className="bg-gradient-to-r from-gray-900 to-gray-800 rounded-2xl p-5 text-white">
           <h3 className="text-sm font-medium text-gray-400 mb-3">{t('vendaTelefone.operationSummary')}</h3>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <div><p className="text-gray-400 text-xs">Preço de Venda</p><p className="font-bold">{fmt(precoVenda)}</p></div>
+            <div><p className="text-gray-400 text-xs">{t('phoneSales.salePrice')}</p><p className="font-bold">{fmt(precoVenda)}</p></div>
             <div><p className="text-gray-400 text-xs">Entrada</p><p className="font-bold">{fmt(sim.entradaValor)}</p></div>
             <div><p className="text-gray-400 text-xs">Parcelas</p><p className="font-bold">{parcelas}x {fmt(sim.valorParcela)}</p></div>
             <div><p className="text-gray-400 text-xs">Lucro Bruto</p><p className="font-bold text-emerald-400">{fmt(sim.lucroBruto)}</p></div>

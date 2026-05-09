@@ -35,7 +35,7 @@ export default function Vendas() {
       setProdutoForm({ nome: "", descricao: "", preco: "", estoque: "0" });
       toast.success(t('toast_success.produto_cadastrado_com_sucesso'));
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   function handleCriarProduto() {
@@ -97,7 +97,7 @@ export default function Vendas() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>Preço (R$) *</Label>
+                  <Label>{t('sales.price')}</Label>
                   <Input
                     className="bg-background border-border"
                     placeholder="0,00"
@@ -117,10 +117,10 @@ export default function Vendas() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Descrição</Label>
+                <Label>{t('sales.description')}</Label>
                 <Textarea
                   className="bg-background border-border resize-none"
-                  placeholder="Descrição do produto..."
+                  placeholder={t('sales.descriptionPlaceholder')}
                   rows={2}
                   value={produtoForm.descricao}
                   onChange={(e) => setProdutoForm({ ...produtoForm, descricao: e.target.value })}
@@ -162,7 +162,7 @@ export default function Vendas() {
             <CardContent className="py-12 text-center">
               <Package className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
               <p className="text-muted-foreground">Nenhum produto cadastrado</p>
-              <p className="text-sm text-muted-foreground mt-1">Clique em "Novo Produto" para começar</p>
+              <p className="text-sm text-muted-foreground mt-1">{t('sales.clickNewProduct')}</p>
             </CardContent>
           </Card>
         ) : (

@@ -60,7 +60,7 @@ function BotaoPDF({ contratoId }: { contratoId: number }) {
       });
       toast.success(t('toast_success.pdf_gerado_com_sucesso'));
     } catch (err: any) {
-      toast.error("Erro ao gerar PDF: " + (err?.message ?? "erro desconhecido"));
+      toast.error(t("toast.errorGeneratePdf") + (err?.message ?? t("toast.unknownError")));
     } finally {
       setLoading(false);
     }

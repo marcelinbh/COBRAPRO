@@ -65,7 +65,7 @@ export default function PortalCliente() {
           <div className="h-16 w-16 rounded-full bg-primary/15 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="h-8 w-8 text-primary" />
           </div>
-          <h1 className="font-display text-2xl text-foreground mb-2">LINK INVÁLIDO</h1>
+          <h1 className="font-display text-2xl text-foreground mb-2">{t('clientPortal.invalidLink')}</h1>
           <p className="text-muted-foreground text-sm">
             Este link de acesso é inválido ou expirou. Solicite um novo link ao seu credor.
           </p>
@@ -100,7 +100,7 @@ export default function PortalCliente() {
         {/* Boas-vindas */}
         <div>
           <h1 className="font-display text-2xl text-foreground">Olá, {cliente.nome.split(' ')[0]}!</h1>
-          <p className="text-sm text-muted-foreground mt-1">Aqui estão suas parcelas e informações de pagamento.</p>
+          <p className="text-sm text-muted-foreground mt-1">{t('clientPortal.paymentInfo')}</p>
         </div>
 
         {/* Resumo */}
@@ -209,8 +209,8 @@ export default function PortalCliente() {
 
         {/* Rodapé */}
         <div className="text-center text-xs text-muted-foreground pt-4 pb-8">
-          <p>Em caso de dúvidas, entre em contato com seu credor.</p>
-          <p className="mt-1 opacity-50">CobraPro — Sistema de Gestão de Cobranças</p>
+          <p>{t('clientPortal.contactCreditor')}</p>
+          <p className="mt-1 opacity-50">{t('clientPortal.systemName')}</p>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,7 @@ import { useLocation } from "wouter";
 
 function formatMoeda(v: number | string | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : (v ?? 0);
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+  return new Intl.NumberFormat(i18n.language === "es" ? "es-ES" : "pt-BR", { style: "currency", currency: "BRL" }).format(n);
 }
 
 export default function Reparcelamento() {
@@ -87,7 +88,7 @@ export default function Reparcelamento() {
         <CardContent>
           <div className="flex gap-3">
             <Input
-              placeholder="Número do contrato (ex: 42)"
+              placeholder={t('rescheduling.contractNumberPlaceholder')}
               value={contratoIdInput}
               onChange={(e) => setContratoIdInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && buscarContrato()}
@@ -129,7 +130,7 @@ export default function Reparcelamento() {
           {/* Configuração do reparcelamento */}
           <Card className="border-border bg-card">
             <CardHeader>
-              <CardTitle className="text-base">Condições do Reparcelamento</CardTitle>
+              <CardTitle className="text-base">{t('rescheduling.conditions')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -230,7 +231,7 @@ export default function Reparcelamento() {
                           <tr key={p.numero} className="border-t border-border/50">
                             <td className="p-2 text-foreground">{p.numero}</td>
                             <td className="p-2 text-foreground">
-                              {new Date(p.vencimento + "T00:00:00").toLocaleDateString("pt-BR")}
+                              {new Date(p.vencimento + "T00:00:00").toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR")}
                             </td>
                             <td className="p-2 text-right text-foreground font-medium">{formatMoeda(p.valor)}</td>
                           </tr>
@@ -250,7 +251,7 @@ export default function Reparcelamento() {
 
                 {/* Observações */}
                 <div>
-                  <Label>Observações (opcional)</Label>
+                  <Label>{t('rescheduling.observations')}</Label>
                   <Textarea
                     value={observacoes}
                     onChange={(e) => setObservacoes(e.target.value)}

@@ -83,7 +83,7 @@ export default function Cheques() {
       setForm({ clienteId: "", numeroCheque: "", banco: "", agencia: "", conta: "", emitente: "", cpfCnpjEmitente: "", valorNominal: "", dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], taxaDesconto: "3", tipoTaxa: "mensal", contaCaixaId: "", observacoes: "" });
       toast.success(`Cheque registrado! Valor líquido: ${formatarMoeda(data.valorLiquido)}`);
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const compensarMutation = trpc.cheques.compensar.useMutation({
@@ -92,7 +92,7 @@ export default function Cheques() {
       utils.cheques.resumo.invalidate();
       toast.success(t('toast_success.cheque_marcado_como_compensado'));
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const devolverMutation = trpc.cheques.devolver.useMutation({
@@ -103,7 +103,7 @@ export default function Cheques() {
       setMotivoDevolucao("");
       toast.success(t('toast_success.cheque_marcado_como_devolvido'));
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const cancelarMutation = trpc.cheques.cancelar.useMutation({
@@ -148,7 +148,7 @@ export default function Cheques() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Desconto de Cheques</h1>
-            <p className="text-sm text-muted-foreground">Antecipe recebíveis com cálculo automático de desconto</p>
+            <p className="text-sm text-muted-foreground">{t('checks.anticipateReceivables')}</p>
           </div>
         </div>
         <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
@@ -194,7 +194,7 @@ export default function Cheques() {
                   <Input className="bg-background border-border" placeholder="Ex: Bradesco" value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Agência</Label>
+                  <Label>{t('checks.agency')}</Label>
                   <Input className="bg-background border-border" placeholder="0000" value={form.agencia} onChange={(e) => setForm({ ...form, agencia: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
@@ -219,7 +219,7 @@ export default function Cheques() {
                     <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="mensal">Mensal</SelectItem>
-                      <SelectItem value="diaria">Diária</SelectItem>
+                      <SelectItem value="diaria">{t('checks.dailyRate')}</SelectItem>
                       <SelectItem value="anual">Anual</SelectItem>
                     </SelectContent>
                   </Select>
@@ -238,7 +238,7 @@ export default function Cheques() {
                   </Select>
                 </div>
                 <div className="col-span-2 space-y-1.5">
-                  <Label>Observações</Label>
+                  <Label>{t('checks.observations')}</Label>
                   <Textarea className="bg-background border-border resize-none" rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
                 </div>
               </div>
@@ -303,7 +303,7 @@ export default function Cheques() {
                 <SelectTrigger className="bg-background border-border h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="mensal">Mensal</SelectItem>
-                  <SelectItem value="diaria">Diária</SelectItem>
+                  <SelectItem value="diaria">{t('checks.dailyRate')}</SelectItem>
                   <SelectItem value="anual">Anual</SelectItem>
                 </SelectContent>
               </Select>
@@ -391,7 +391,7 @@ export default function Cheques() {
                         <p className="font-bold text-sm">{formatarMoeda(parseFloat(cheque.valorNominal))}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-xs text-muted-foreground">Líquido</p>
+                        <p className="text-xs text-muted-foreground">{t('checks.netAmount')}</p>
                         <p className="font-bold text-base text-emerald-400">{formatarMoeda(parseFloat(cheque.valorLiquido))}</p>
                       </div>
                       <Badge className={`text-xs border ${statusCfg.color} flex items-center gap-1`}>

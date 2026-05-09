@@ -168,7 +168,7 @@ export default function Assinaturas() {
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
           <AlertCircle className="text-amber-400 shrink-0 mt-0.5" size={20} />
           <div>
-            <p className="text-amber-300 font-medium text-sm">Configuração necessária</p>
+            <p className="text-amber-300 font-medium text-sm">{t('subscriptions.setupRequired')}</p>
             <p className="text-amber-400/80 text-xs mt-1">Para usar o módulo de Assinaturas, execute o SQL abaixo no <strong>Supabase Dashboard → SQL Editor</strong>:</p>
             <pre className="mt-2 text-[10px] bg-black/30 rounded p-2 text-amber-300 overflow-x-auto whitespace-pre-wrap">CREATE TABLE IF NOT EXISTS assinaturas (id BIGSERIAL PRIMARY KEY, cliente_id BIGINT NOT NULL REFERENCES clientes(id) ON DELETE CASCADE, servico TEXT NOT NULL, descricao TEXT, valor_mensal NUMERIC(10,2) NOT NULL, dia_vencimento INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'ativa', data_inicio DATE NOT NULL DEFAULT CURRENT_DATE, data_fim DATE, observacoes TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assinatura_id BIGINT NOT NULL REFERENCES assinaturas(id) ON DELETE CASCADE, valor_pago NUMERIC(10,2) NOT NULL, data_pagamento TIMESTAMPTZ DEFAULT NOW(), mes_referencia TEXT NOT NULL, forma_pagamento TEXT DEFAULT 'dinheiro', observacoes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());</pre>
@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
             <Tv2 className="text-purple-400" size={32} />
             Assinaturas / IPTV
           </h1>
-          <p className="text-slate-400 mt-1">Gerencie serviços recorrentes e assinaturas de clientes</p>
+          <p className="text-slate-400 mt-1">{t('subscriptions.manageSubscriptions')}</p>
         </div>
         <Button
           onClick={() => setModalCriar(true)}
@@ -463,7 +463,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
               />
             </div>
             <div>
-              <Label className="text-slate-300">Descrição</Label>
+              <Label className="text-slate-300">{t('subscriptions.description')}</Label>
               <Textarea
                 placeholder="Detalhes do plano..."
                 value={form.descricao}
@@ -525,7 +525,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
                 </div>
               </div>
               <div>
-                <Label className="text-slate-300">Observações</Label>
+                <Label className="text-slate-300">{t('subscriptions.observations')}</Label>
                 <Input
                   placeholder="Opcional..."
                   value={formPagamento.observacoes}
@@ -599,7 +599,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
                 />
               </div>
               <div>
-                <Label className="text-slate-300">Observações</Label>
+                <Label className="text-slate-300">{t('subscriptions.observations')}</Label>
                 <Textarea
                   value={modalEditar.observacoes || ''}
                   onChange={(e) => setModalEditar((ed: any) => ({ ...ed, observacoes: e.target.value }))}

@@ -25,7 +25,7 @@ const MODALIDADE_LABELS: Record<string, string> = {
 };
 
 export default function Relatorios() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const hoje = new Date();
   const [dataInicio, setDataInicio] = useState(
     new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString().split('T')[0]
@@ -101,7 +101,7 @@ export default function Relatorios() {
       .filter(t => t.tipo === 'saida' && String(t.dataTransacao).slice(0, 10) === dayKey)
       .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
     return {
-      dia: d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      dia: d.toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { day: '2-digit', month: '2-digit' }),
       entradas,
       saidas,
     };
@@ -160,7 +160,7 @@ export default function Relatorios() {
     doc.setTextColor(180, 180, 180);
     doc.text('Relatório Operacional', 14, 20);
     doc.text(`Período: ${dataInicio} a ${dataFim}`, pageW - 14, 20, { align: 'right' });
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')}`, pageW - 14, 12, { align: 'right' });
+    doc.text(`Gerado em: ${new Date().toLocaleString(i18n.language === 'es' ? 'es-ES' : 'pt-BR')}`, pageW - 14, 12, { align: 'right' });
     // KPIs
     doc.setTextColor(0, 0, 0);
     doc.setFontSize(11);
@@ -219,10 +219,10 @@ export default function Relatorios() {
         head: [['Cliente', 'Vencimento', 'Valor', 'Status', 'Pago em']],
         body: parcelasPeriodo.slice(0, 100).map(p => [
           p.clienteNome ?? '-',
-          new Date(p.dataVencimento).toLocaleDateString('pt-BR'),
+          new Date(p.dataVencimento).toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR'),
           `R$ ${parseFloat(p.valorOriginal).toFixed(2).replace('.', ',')}`,
           p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : p.status === 'pendente' ? 'Pendente' : p.status,
-          p.dataPagamento ? new Date(p.dataPagamento).toLocaleDateString('pt-BR') : '-',
+          p.dataPagamento ? new Date(p.dataPagamento).toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR') : '-',
         ]),
         theme: 'striped',
         headStyles: { fillColor: [15, 15, 15], textColor: 255, fontSize: 8 },
@@ -267,7 +267,7 @@ export default function Relatorios() {
     <div className="space-y-6">
       <div>
         <h1 className="font-display text-3xl text-foreground tracking-wide">{t('reports.title').toUpperCase()}</h1>
-        <p className="text-sm text-muted-foreground mt-1">Análise financeira e desempenho</p>
+        <p className="text-sm text-muted-foreground mt-1">{t('reports.subtitle')}</p>
       </div>
 
       {/* Botão Exportar PDF */}
@@ -286,7 +286,7 @@ export default function Relatorios() {
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-4 items-end">
             <div className="flex-1">
-              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Data Início</Label>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">{t('reports.startDate')}</Label>
               <Input type="date" className="mt-1" value={dataInicio} onChange={e => setDataInicio(e.target.value)} />
             </div>
             <div className="flex-1">
@@ -400,7 +400,7 @@ export default function Relatorios() {
                   formatter={(v: number) => formatarMoeda(v)}
                 />
                 <Bar dataKey="entradas" fill="#22c55e" radius={[4, 4, 0, 0]} name="Entradas" />
-                <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} name="Saídas" />
+                <Bar dataKey="saidas" fill="#ef4444" radius={[4, 4, 0, 0]} name={t('reports.expenses')} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -628,7 +628,7 @@ export default function Relatorios() {
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground uppercase tracking-wide">Descrição</Label>
+              <Label className="text-xs text-muted-foreground uppercase tracking-wide">{t('reports.description')}</Label>
               <input
                 className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 placeholder="Ex: Aluguel, Combustível..."
@@ -645,7 +645,7 @@ export default function Relatorios() {
               {caixaExtraMutation.isPending ? 'Salvando...' : 'Lançar no Caixa'}
             </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-2">O lançamento será registrado no caixa do dia atual e aparecerá no fluxo de caixa.</p>
+          <p className="text-xs text-muted-foreground mt-2">{t('reports.entryWillBeRegistered')}</p>
         </CardContent>
       </Card>
 

@@ -150,7 +150,7 @@ export default function AnaliseRisco() {
           <CardContent className="pt-6">
             <div className="text-center">
               <p className="text-3xl font-bold text-red-600">{estatisticas.criticoRisco}</p>
-              <p className="text-sm text-muted-foreground">Crítico</p>
+              <p className="text-sm text-muted-foreground">{t('riskAnalysis.critical')}</p>
             </div>
           </CardContent>
         </Card>
@@ -203,7 +203,7 @@ export default function AnaliseRisco() {
                   <div className="flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-semibold text-sm mb-1">Recomendação</p>
+                      <p className="font-semibold text-sm mb-1">{t('riskAnalysis.recommendation')}</p>
                       <p className="text-sm text-muted-foreground">{cliente.recomendacao}</p>
                     </div>
                   </div>

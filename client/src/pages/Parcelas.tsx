@@ -93,7 +93,7 @@ function gerarMensagemCobranca(
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const map: Record<string, { label: string; className: string; icon: React.ElementType }> = {
     paga: { label: "Paga", className: "bg-success/15 text-success border-success/30", icon: CheckCircle },
     pendente: { label: t('parcels.pending'), className: "bg-muted text-muted-foreground border-border", icon: Clock },
@@ -174,7 +174,7 @@ function PagamentoDialog({
       onSuccess();
       utils.dashboard.kpis.invalidate();
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   return (
@@ -332,7 +332,7 @@ function PagamentoDialog({
 }
 
 export default function Parcelas() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroModalidade, setFiltroModalidade] = useState("todas");
@@ -403,7 +403,7 @@ export default function Parcelas() {
       busca ? `Busca: ${busca}` : '',
     ].filter(Boolean).join(' | ');
     if (filtroInfo) doc.text(filtroInfo, 14, 24);
-    doc.text(`Gerado em: ${new Date().toLocaleString('pt-BR')} — Total: ${filtradas.length} parcelas`, 14, filtroInfo ? 30 : 24);
+    doc.text(`Gerado em: ${new Date().toLocaleString(i18n.language === 'es' ? 'es-ES' : 'pt-BR')} — Total: ${filtradas.length} parcelas`, 14, filtroInfo ? 30 : 24);
     autoTable(doc, {
       startY: filtroInfo ? 36 : 30,
       head: [['Cliente', 'Parcela', 'Modalidade', 'Vencimento', 'Valor', 'Status']],

@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 export default function RelatorioDiario() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [ativo, setAtivo] = useState(false);
   const [horario, setHorario] = useState("08:00");
   const [telefone, setTelefone] = useState("");
@@ -97,7 +97,7 @@ export default function RelatorioDiario() {
             <div className="flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
               <div>
-                <p className="text-sm font-medium text-yellow-300">WhatsApp não conectado</p>
+                <p className="text-sm font-medium text-yellow-300">{t('dailyReport.whatsappNotConnected')}</p>
                 <p className="text-xs text-yellow-400/80 mt-0.5">
                   Para enviar relatórios automáticos, conecte seu WhatsApp em{" "}
                   <a href="/perfil" className="underline">Meu Perfil</a>.
@@ -124,8 +124,8 @@ export default function RelatorioDiario() {
             {/* Ativar/Desativar */}
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border border-border">
               <div>
-                <p className="text-sm font-medium">Relatório Automático</p>
-                <p className="text-xs text-muted-foreground">Enviar relatório diariamente no horário configurado</p>
+                <p className="text-sm font-medium">{t('dailyReport.automaticReport')}</p>
+                <p className="text-xs text-muted-foreground">{t('dailyReport.subtitle')}</p>
               </div>
               <Switch
                 checked={ativo}
@@ -233,7 +233,7 @@ export default function RelatorioDiario() {
                   <MessageSquare className="w-6 h-6 text-green-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Visualize o relatório</p>
+                  <p className="text-sm font-medium">{t('dailyReport.viewReport')}</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Clique em "Visualizar" para ver como a mensagem ficará
                   </p>
@@ -262,7 +262,7 @@ export default function RelatorioDiario() {
                       </pre>
                       <div className="text-right mt-1">
                         <span className="text-[10px] text-green-300/60">
-                          {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                          {new Date().toLocaleTimeString(i18n.language === "es" ? "es-ES" : "pt-BR", { hour: "2-digit", minute: "2-digit" })}
                         </span>
                       </div>
                     </div>
@@ -289,14 +289,14 @@ export default function RelatorioDiario() {
           <div className="flex items-start gap-3">
             <BarChart3 className="w-5 h-5 text-primary mt-0.5 shrink-0" />
             <div>
-              <p className="text-sm font-medium">O que está incluído no relatório</p>
+              <p className="text-sm font-medium">{t('dailyReport.whatIsIncluded')}</p>
               <div className="grid grid-cols-2 gap-x-6 gap-y-1 mt-2">
                 {[
                   "Parcelas vencendo hoje",
                   "Parcelas em atraso",
                   "Total a cobrar no dia",
                   "Clientes ativos",
-                  "Empréstimos ativos",
+                  t('dailyReport.activeLoans'),
                   "Capital na rua",
                 ].map((item) => (
                   <div key={item} className="flex items-center gap-1.5 text-xs text-muted-foreground">

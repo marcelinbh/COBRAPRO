@@ -100,7 +100,7 @@ export default function Cobradores() {
             <Users className="w-6 h-6 text-primary" />
             Cobradores
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Gerencie sua equipe de cobrança</p>
+          <p className="text-muted-foreground text-sm mt-1">{t('collectors.manageTeam')}</p>
         </div>
         <Button onClick={abrirNovo} className="bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4 mr-2" /> Novo Cobrador
@@ -152,7 +152,7 @@ export default function Cobradores() {
                     <p className="text-foreground font-medium">{k.whatsapp ?? "-"}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-xs">Comissão</p>
+                    <p className="text-muted-foreground text-xs">{t('collectors.commission')}</p>
                     <p className="text-foreground font-medium">{parseFloat(k.comissaoPercentual ?? "0").toFixed(1)}%</p>
                   </div>
                   <div>
@@ -191,7 +191,7 @@ export default function Cobradores() {
           {performance.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>Nenhum dado de performance disponível.</p>
+              <p>{t('collectors.noPerformanceData')}</p>
             </div>
           )}
           {performance.map((p) => (
@@ -210,7 +210,7 @@ export default function Cobradores() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Comissão estimada</p>
+                    <p className="text-xs text-muted-foreground">{t('collectors.estimatedCommission')}</p>
                     <p className="text-lg font-bold text-green-400">{formatMoeda(p.comissao)}</p>
                   </div>
                 </div>
@@ -245,7 +245,7 @@ export default function Cobradores() {
                 {/* Barra de progresso de inadimplência */}
                 <div className="mt-3">
                   <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span>Taxa de inadimplência</span>
+                    <span>{t('collectors.delinquencyRate')}</span>
                     <span>{p.taxaInadimplencia.toFixed(1)}%</span>
                   </div>
                   <div className="h-2 bg-background rounded-full overflow-hidden">
@@ -295,7 +295,7 @@ export default function Cobradores() {
                 </Select>
               </div>
               <div>
-                <Label>Comissão (%)</Label>
+                <Label>{t('collectors.commissionPercent')}</Label>
                 <Input type="number" value={form.comissaoPercentual} onChange={(e) => setForm({ ...form, comissaoPercentual: parseFloat(e.target.value) || 0 })} className="bg-background border-border" />
               </div>
               <div className="col-span-2">
@@ -303,7 +303,7 @@ export default function Cobradores() {
                 <Input type="number" value={form.limiteEmprestimo} onChange={(e) => setForm({ ...form, limiteEmprestimo: parseFloat(e.target.value) || 0 })} className="bg-background border-border" />
               </div>
               <div className="col-span-2">
-                <Label>Observações</Label>
+                <Label>{t('collectors.observations')}</Label>
                 <Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} className="bg-background border-border" rows={2} />
               </div>
             </div>

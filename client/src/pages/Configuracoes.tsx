@@ -75,7 +75,7 @@ export default function Configuracoes() {
       toast.success(t('toast_success.configurações_salvas_com_sucesso'));
       utils.configuracoes.get.invalidate();
     },
-    onError: (e: { message: string }) => toast.error("Erro: " + e.message),
+    onError: (e: { message: string }) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   // Templates de mensagem - carrega do backend se existir, senão usa padrão
@@ -400,7 +400,7 @@ export default function Configuracoes() {
                     />
                     <button
                       onClick={resetarTemplate}
-                      title="Restaurar template padrão"
+                      title={t('settings.restoreDefaultTemplate')}
                       className="absolute top-2 right-2 p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
                     >
                       <RotateCcw className="h-3.5 w-3.5" />
@@ -502,7 +502,7 @@ export default function Configuracoes() {
           </div>
           <div className="flex items-center gap-3">
             <input type="checkbox" id="relatorioDiarioAtivo" checked={relatorioDiarioAtivo} onChange={e => setRelatorioDiarioAtivo(e.target.checked)} className="w-4 h-4 rounded border-border" />
-            <Label htmlFor="relatorioDiarioAtivo" className="cursor-pointer">Ativar lembrete de horário no navegador</Label>
+            <Label htmlFor="relatorioDiarioAtivo" className="cursor-pointer">{t('settings.enableBrowserReminder')}</Label>
           </div>
           <div className="flex gap-2">
             <Button size="sm" className="gap-2" onClick={() => {
@@ -554,7 +554,7 @@ export default function Configuracoes() {
             <div>
               <Label>Juros Mora Diário Padrão (%)</Label>
               <Input className="mt-1" type="number" step="0.001" value={jurosMora} onChange={e => setJurosMora(e.target.value)} />
-              <p className="text-xs text-muted-foreground mt-1">Acumulado por dia após o vencimento</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('settings.accumulatedPerDay')}</p>
             </div>
             <div>
               <Label>Multa por Dia de Atraso (R$)</Label>

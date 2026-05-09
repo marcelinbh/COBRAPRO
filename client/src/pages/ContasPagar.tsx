@@ -80,7 +80,7 @@ export default function ContasPagar() {
       setForm({ descricao: "", categoria: "outros", valor: "", dataVencimento: new Date().toISOString().split("T")[0], recorrente: false, periodicidade: "unica", observacoes: "" });
       toast.success(t('toast_success.conta_a_pagar_registrada_com_sucesso'));
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const pagarMutation = trpc.contasPagar.pagar.useMutation({
@@ -90,7 +90,7 @@ export default function ContasPagar() {
       setDialogPagarId(null);
       toast.success(t('toast_success.conta_marcada_como_paga'));
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const cancelarMutation = trpc.contasPagar.cancelar.useMutation({
@@ -143,7 +143,7 @@ export default function ContasPagar() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">Contas a Pagar</h1>
-            <p className="text-sm text-muted-foreground">Controle de despesas e obrigações financeiras</p>
+            <p className="text-sm text-muted-foreground">{t('accountsPayable.subtitle')}</p>
           </div>
         </div>
         <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
@@ -226,7 +226,7 @@ export default function ContasPagar() {
                 </div>
               )}
               <div className="space-y-1.5">
-                <Label>Observações</Label>
+                <Label>{t('accountsPayable.observations')}</Label>
                 <Textarea
                   className="bg-background border-border resize-none"
                   placeholder="Informações adicionais..."

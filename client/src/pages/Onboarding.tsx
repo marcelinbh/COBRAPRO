@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -22,9 +23,9 @@ type TipoConta = "caixa" | "banco" | "digital";
 
 const ETAPAS = [
   { id: 1, titulo: "Bem-vindo ao CobraPro!", descricao: "Vamos configurar sua conta em poucos passos" },
-  { id: 2, titulo: "Nome da sua empresa", descricao: "Como se chama o seu negócio?" },
-  { id: 3, titulo: "Conta de caixa inicial", descricao: "Configure onde você controla seu dinheiro" },
-  { id: 4, titulo: "Tudo pronto!", descricao: "Sua conta está configurada e pronta para usar" },
+  { id: 2, titulo: "Nome da sua empresa", descricao: i18n.t('onboarding.businessName') },
+  { id: 3, titulo: "Conta de caixa inicial", descricao: i18n.t('onboarding.setupCashControl') },
+  { id: 4, titulo: "Tudo pronto!", descricao: i18n.t('onboarding.accountReady') },
 ];
 
 export default function Onboarding() {
@@ -59,8 +60,8 @@ export default function Onboarding() {
   const handleVoltar = () => setEtapa((e) => e - 1);
 
   const tipoContaOpcoes: { value: TipoConta; label: string; descricao: string; icon: React.ReactNode }[] = [
-    { value: "caixa", label: "Dinheiro em Caixa", descricao: "Controle de dinheiro físico", icon: <Banknote className="h-5 w-5" /> },
-    { value: "banco", label: "Conta Bancária", descricao: "Banco tradicional (Bradesco, Itaú...)", icon: <CreditCard className="h-5 w-5" /> },
+    { value: "caixa", label: "Dinheiro em Caixa", descricao: t('onboarding.cashControl'), icon: <Banknote className="h-5 w-5" /> },
+    { value: "banco", label: t('onboarding.bankAccount'), descricao: t('onboarding.bankAccountDesc'), icon: <CreditCard className="h-5 w-5" /> },
     { value: "digital", label: "Conta Digital", descricao: "Nubank, PicPay, Mercado Pago...", icon: <Smartphone className="h-5 w-5" /> },
   ];
 
@@ -109,8 +110,8 @@ export default function Onboarding() {
               </div>
               <div className="grid grid-cols-3 gap-3 text-center">
                 {[
-                  { label: "Contratos", desc: "Gerencie empréstimos" },
-                  { label: "Parcelas", desc: "Controle cobranças" },
+                  { label: "Contratos", desc: t('onboarding.manageLoans') },
+                  { label: "Parcelas", desc: t('onboarding.controlCharges') },
                   { label: "Relatórios", desc: "Veja resultados" },
                 ].map((item) => (
                   <div key={item.label} className="bg-muted/50 rounded-xl p-3">
@@ -241,7 +242,7 @@ export default function Onboarding() {
                 </p>
               </div>
               <div className="bg-muted/50 rounded-xl p-4 text-left space-y-2">
-                <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Próximos passos sugeridos</p>
+                <p className="text-xs font-semibold text-foreground uppercase tracking-wide">{t('onboarding.nextSuggestedSteps')}</p>
                 {[
                   "Cadastre seu primeiro cliente",
                   "Crie um contrato de empréstimo",

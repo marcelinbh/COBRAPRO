@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -23,7 +24,7 @@ const VARIAVEIS = [
   { var: "{data_vencimento}", desc: "Data de vencimento (dd/mm/aaaa)" },
   { var: "{dias_atraso}", desc: "Dias em atraso" },
   { var: "{empresa}", desc: "Nome da sua empresa" },
-  { var: "{parcela}", desc: "Número da parcela" },
+  { var: "{parcela}", desc: i18n.t('whatsapp.installmentNumber') },
   { var: "{total_parcelas}", desc: "Total de parcelas do contrato" },
 ];
 
@@ -31,13 +32,13 @@ const VARIAVEIS = [
 function getCategoria(tipo: string) {
   if (tipo.startsWith("antes_")) return { cor: "bg-blue-500/10 text-blue-400 border-blue-500/30", icone: Clock, label: "Lembrete" };
   if (tipo === "no_vencimento") return { cor: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30", icone: Bell, label: "Vencimento" };
-  if (tipo.startsWith("apos_")) return { cor: "bg-red-500/10 text-red-400 border-red-500/30", icone: BellOff, label: "Cobrança" };
-  return { cor: "bg-green-500/10 text-green-400 border-green-500/30", icone: CheckCircle2, label: "Confirmação" };
+  if (tipo.startsWith("apos_")) return { cor: "bg-red-500/10 text-red-400 border-red-500/30", icone: BellOff, label: i18n.t('whatsapp.chargeType') };
+  return { cor: "bg-green-500/10 text-green-400 border-green-500/30", icone: CheckCircle2, label: i18n.t('whatsapp.confirmationType') };
 }
 
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function NotificacoesAutomaticas() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [editando, setEditando] = useState<{ tipo: string; mensagem: string } | null>(null);
   const [disparando, setDisparando] = useState(false);
 
@@ -314,7 +315,7 @@ export default function NotificacoesAutomaticas() {
                           {log.erro && <p className="text-xs text-red-400 mt-0.5">{log.erro}</p>}
                         </div>
                         <span className="text-xs text-muted-foreground shrink-0">
-                          {new Date(log.createdAt).toLocaleString("pt-BR")}
+                          {new Date(log.createdAt).toLocaleString(i18n.language === "es" ? "es-ES" : "pt-BR")}
                         </span>
                       </div>
                     ))}
@@ -378,9 +379,9 @@ placeholder={t('notifications.messagePlaceholder')}
                 <p className="text-xs text-green-400 font-medium mb-1">{t('notifications.preview')}:</p>
                 <p className="text-sm text-foreground whitespace-pre-wrap">
                   {editando.mensagem
-                    .replace(/{nome}/g, "João Silva")
+                    .replace(/{nome}/g, t('whatsapp.exampleName') ?? 'João Silva')
                     .replace(/{valor}/g, "250,00")
-                    .replace(/{data_vencimento}/g, new Date().toLocaleDateString("pt-BR"))
+                    .replace(/{data_vencimento}/g, new Date().toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR"))
                     .replace(/{dias_atraso}/g, "2")
                     .replace(/{empresa}/g, "Sua Empresa")
                     .replace(/{parcela}/g, "3")

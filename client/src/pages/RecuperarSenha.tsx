@@ -28,10 +28,10 @@ export default function RecuperarSenha() {
       if (res.ok && data.success) {
         setSuccess(true);
       } else {
-        setError(data.error ?? "Erro ao solicitar recuperação de senha.");
+        setError(data.error ?? t('recoverPassword.errorRecoverPassword'));
       }
     } catch {
-      setError("Erro de conexão. Tente novamente.");
+      setError(t('recoverPassword.connectionError'));
     } finally {
       setLoading(false);
     }
@@ -43,7 +43,7 @@ export default function RecuperarSenha() {
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-green-400">CobraPro</h1>
-          <p className="text-gray-500 text-sm mt-1">Sistema de Gestão de Cobranças</p>
+          <p className="text-gray-500 text-sm mt-1">{t('recoverPassword.managementSystem')}</p>
         </div>
 
         <div className="bg-[#111111] border border-[#1f2937] rounded-2xl p-8 shadow-2xl">
@@ -108,7 +108,7 @@ export default function RecuperarSenha() {
                   disabled={loading || !email}
                   className="w-full bg-green-500 hover:bg-green-600 text-black font-semibold h-11 mt-2"
                 >
-                  {loading ? "Enviando..." : "Enviar instruções"}
+                  {loading ? "Enviando..." : t('recoverPassword.sendInstructions')}
                 </Button>
               </form>
 

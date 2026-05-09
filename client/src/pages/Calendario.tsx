@@ -130,7 +130,7 @@ export default function Calendario() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl text-foreground tracking-wide">CALENDÁRIO</h1>
-          <p className="text-sm text-muted-foreground mt-1">Vencimentos e cobranças</p>
+          <p className="text-sm text-muted-foreground mt-1">{t('calendar.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Filtro por cobrador */}

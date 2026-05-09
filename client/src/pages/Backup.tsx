@@ -225,7 +225,7 @@ export default function Backup() {
           <div className="flex items-center gap-3">
             <Car className="w-8 h-8 text-orange-400" />
             <div>
-              <div className="text-orange-400 text-sm">Veículos</div>
+              <div className="text-orange-400 text-sm">{t('backup.vehicles')}</div>
               <div className="text-2xl font-bold text-orange-300">{vendas?.totalVeiculos ?? '—'}</div>
             </div>
           </div>

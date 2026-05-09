@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -13,12 +14,12 @@ import {
 } from "lucide-react";
 
 const TEMPLATE_LABELS: Record<string, { label: string; desc: string; emoji: string }> = {
-  cobranca_geral:        { label: "Cobrança Geral",           desc: "Enviada ao cobrar manualmente um cliente",  emoji: "💰" },
+  cobranca_geral:        { label: i18n.t('whatsapp.generalCharge'),           desc: "Enviada ao cobrar manualmente um cliente",  emoji: "💰" },
   cobranca_vencida:      { label: "Parcela Vencida",          desc: "Enviada para parcelas em atraso",           emoji: "🚨" },
   lembrete_vencimento:   { label: "Lembrete de Vencimento",   desc: "Enviada antes do vencimento da parcela",    emoji: "⏰" },
-  confirmacao_pagamento: { label: "Confirmação de Pagamento", desc: "Enviada ao confirmar um pagamento",         emoji: "✅" },
+  confirmacao_pagamento: { label: i18n.t('whatsapp.paymentConfirmation'), desc: "Enviada ao confirmar um pagamento",         emoji: "✅" },
   boas_vindas:           { label: "Boas-vindas",              desc: "Enviada ao cadastrar um novo cliente",      emoji: "👋" },
-  pix_transferencia:     { label: "PIX / Transferência",      desc: "Enviada com os dados de pagamento PIX",     emoji: "💳" },
+  pix_transferencia:     { label: i18n.t('whatsapp.pixTransfer'),      desc: "Enviada com os dados de pagamento PIX",     emoji: "💳" },
   personalizado:         { label: "Personalizado",            desc: "Template personalizado para uso manual",    emoji: "✏️" },
 };
 
@@ -26,7 +27,7 @@ const VARIAVEIS = [
   ["{CLIENTE}", "Nome do cliente"],
   ["{VALOR}", "Valor da parcela"],
   ["{DATA}", "Data de vencimento"],
-  ["{PARCELA}", "Número da parcela"],
+  ["{PARCELA}", i18n.t('whatsapp.installmentNumber')],
   ["{DIAS_ATRASO}", "Dias em atraso"],
   ["{DIAS_PARA_VENCER}", "Dias para vencer"],
   ["{PIX}", "Chave PIX"],
@@ -44,6 +45,7 @@ function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, 
   loading: boolean; onRefresh: () => void; onDisconnect: () => void; connected: boolean;
 }) {
   const [seconds, setSeconds] = useState(40);
+  const { t } = useTranslation();
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -73,7 +75,7 @@ function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, 
               </div>
               <div className="text-center">
                 <p className="font-semibold text-green-600 dark:text-green-400">WhatsApp Conectado!</p>
-                <p className="text-xs text-muted-foreground mt-1">As mensagens serão enviadas automaticamente</p>
+                <p className="text-xs text-muted-foreground mt-1">{t('whatsapp.messagesWillBeSentAuto')}</p>
               </div>
               <Button variant="outline" size="sm" onClick={onDisconnect} className="w-full gap-2 text-red-500 border-red-500/30 hover:bg-red-500/10">
                 <WifiOff className="h-4 w-4" /> Desconectar WhatsApp
@@ -196,7 +198,7 @@ export default function WhatsAppConfig() {
   const { data: templates, refetch: refetchTemplates } = trpc.configuracoes.templates.useQuery();
   const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
     onSuccess: () => { setTimeout(() => { refetchQR(); refetchStatus(); }, 1500); },
-    onError: (e) => toast.error("Erro ao conectar: " + e.message),
+    onError: (e) => toast.error(t("toast.errorConnect") + e.message),
   });
   const disconnect = trpc.whatsappEvolution.disconnect.useMutation({
     onSuccess: () => { toast.success(t('toast_success.whatsapp_desconectado')); refetchStatus(); setQrModalOpen(false); },
@@ -204,7 +206,7 @@ export default function WhatsAppConfig() {
   });
   const updateTemplate = trpc.configuracoes.updateTemplate.useMutation({
     onSuccess: () => { toast.success(t('toast_success.template_salvo')); refetchTemplates(); },
-    onError: (e) => toast.error("Erro ao salvar: " + e.message),
+    onError: (e) => toast.error(t("toast.errorSave") + e.message),
   });
   const connected = status?.connected ?? false;
   const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) { connectWpp.mutate(); setTimeout(() => refetchQR(), 2000); } };
@@ -219,11 +221,11 @@ export default function WhatsAppConfig() {
           </div>
           <div>
             <h1 className="text-xl font-bold">WhatsApp</h1>
-            <p className="text-sm text-muted-foreground">Conecte seu WhatsApp para envio automático de cobranças</p>
+            <p className="text-sm text-muted-foreground">{t('whatsapp.connectWhatsapp')}</p>
           </div>
         </div>
         <Badge variant="outline" className={connected ? "border-green-500/40 text-green-600 dark:text-green-400 bg-green-500/10" : "border-muted-foreground/30 text-muted-foreground"}>
-          {connected ? <><Wifi className="h-3 w-3 mr-1" />Conectado</> : <><WifiOff className="h-3 w-3 mr-1" />Não Conectado</>}
+          {connected ? <><Wifi className="h-3 w-3 mr-1" />Conectado</> : <><WifiOff className="h-3 w-3 mr-1" />{t('whatsapp.notConnected')}</>}
         </Badge>
       </div>
 
@@ -236,7 +238,7 @@ export default function WhatsAppConfig() {
               </div>
               <div>
                 <p className="font-semibold text-lg text-green-600 dark:text-green-400">WhatsApp Conectado!</p>
-                <p className="text-sm text-muted-foreground mt-1">As cobranças serão enviadas automaticamente via WhatsApp</p>
+                <p className="text-sm text-muted-foreground mt-1">{t('whatsapp.chargesWillBeSentViaWhatsapp')}</p>
               </div>
               <div className="flex gap-3 w-full max-w-xs">
                 <Button variant="outline" size="sm" onClick={() => refetchStatus()} className="flex-1 gap-2">
@@ -282,7 +284,7 @@ export default function WhatsAppConfig() {
           <CardContent className="p-4">
             <div className="flex items-center gap-2 mb-3">
               <Info className="h-4 w-4 text-primary" />
-              <span className="text-sm font-medium">Variáveis disponíveis</span>
+              <span className="text-sm font-medium">{t('whatsapp.availableVariables')}</span>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               {VARIAVEIS.map(([v, desc]) => (

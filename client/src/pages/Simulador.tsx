@@ -91,7 +91,7 @@ function getTaxaLabelCurto(tipoTaxa: string, t: (key: string) => string): string
 }
 
 export default function Simulador() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [, setLocation] = useLocation();
   const [modalidade, setModalidade] = useState<Modalidade>("emprestimo_padrao");
   const [valorPrincipal, setValorPrincipal] = useState("");
@@ -148,7 +148,7 @@ export default function Simulador() {
       }
       parcelas.push({
         numero: i,
-        vencimento: vencimento.toLocaleDateString("pt-BR"),
+        vencimento: vencimento.toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR"),
         valor: valorParcela,
       });
     }
@@ -256,7 +256,7 @@ export default function Simulador() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
-    doc.text(`${nomeEmpresa} - ${t('simulator.geradoEm')} ${new Date().toLocaleDateString("pt-BR")}`, 14, yPos + 12);
+    doc.text(`${nomeEmpresa} - ${t('simulator.geradoEm')} ${new Date().toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR")}`, 14, yPos + 12);
     doc.setTextColor(0, 0, 0);
     yPos += 20;
 
@@ -334,7 +334,7 @@ export default function Simulador() {
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(120, 120, 120);
-    doc.text(`${nomeEmpresa} - ${t('simulator.geradoEm')} ${new Date().toLocaleDateString("pt-BR")}`, 14, yPos + 12);
+    doc.text(`${nomeEmpresa} - ${t('simulator.geradoEm')} ${new Date().toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR")}`, 14, yPos + 12);
     doc.setTextColor(0, 0, 0);
     yPos += 22;
 

@@ -35,7 +35,7 @@ export default function Login() {
 
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error ?? "Email ou senha incorretos");
+        toast.error(data.error ?? t("toast.incorrectCredentials"));
         return;
       }
 
@@ -83,9 +83,9 @@ export default function Login() {
           <div className="grid grid-cols-2 gap-3">
             {[
               { icon: <Infinity className="w-5 h-5 text-green-400" />, value: "∞", label: "Clientes ativos" },
-              { icon: <BarChart3 className="w-5 h-5 text-green-400" />, value: "12+", label: "Módulos disponíveis" },
-              { icon: <Clock className="w-5 h-5 text-green-400" />, title: "Tempo real", label: "Relatórios" },
-              { icon: <Zap className="w-5 h-5 text-green-400" />, title: "Automático", label: "Cron jobs" },
+              { icon: <BarChart3 className="w-5 h-5 text-green-400" />, value: "12+", label: t('login.availableModules') },
+              { icon: <Clock className="w-5 h-5 text-green-400" />, title: "Tempo real", label: t('login.reports') },
+              { icon: <Zap className="w-5 h-5 text-green-400" />, title: t('login.automatic'), label: "Cron jobs" },
             ].map((item, i) => (
               <div
                 key={i}

@@ -142,7 +142,7 @@ function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: stri
           </div>
           <div>
             <Label>{t('cashbox.description')}</Label>
-            <Input className="mt-1" placeholder="Descrição da transação" value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
+            <Input className="mt-1" placeholder={t('cashflow.descriptionPlaceholder')} value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
           </div>
           <Button
             className="w-full"
@@ -180,7 +180,7 @@ function LancamentoRapido({
 
   const mutation = trpc.caixa.registrarTransacao.useMutation({
     onSuccess: () => {
-      toast.success(tipo === "entrada" ? "Saldo adicionado!" : "Saldo debitado!");
+      toast.success(tipo === "entrada" ? t("toast.balanceAdded") : t("toast.balanceDebited"));
       setOpen(false);
       setValor("");
       setDescricao("");

@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,11 +29,11 @@ const PERFIL_COLORS: Record<string, string> = {
 
 function formatMoeda(v: number | string | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : (v ?? 0);
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+  return new Intl.NumberFormat(i18n.language === "es" ? "es-ES" : "pt-BR", { style: "currency", currency: "BRL" }).format(n);
 }
 
 export default function Usuarios() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [tab, setTab] = useState<"lista" | "performance">("lista");
   const [modalOpen, setModalOpen] = useState(false);
   const [editando, setEditando] = useState<any>(null);
@@ -100,7 +101,7 @@ export default function Usuarios() {
             <Users className="w-6 h-6 text-primary" />
             Cobradores
           </h1>
-          <p className="text-muted-foreground text-sm mt-1">Gerencie sua equipe de cobrança</p>
+          <p className="text-muted-foreground text-sm mt-1">{t('users.manageTeam')}</p>
         </div>
         <Button onClick={abrirNovo} className="bg-primary hover:bg-primary/90">
           <Plus className="w-4 h-4 mr-2" /> Novo Cobrador
@@ -152,7 +153,7 @@ export default function Usuarios() {
                     <p className="text-foreground font-medium">{k.whatsapp ?? "-"}</p>
                   </div>
                   <div>
-                    <p className="text-muted-foreground text-xs">Comissão</p>
+                    <p className="text-muted-foreground text-xs">{t('users.commission')}</p>
                     <p className="text-foreground font-medium">{parseFloat(k.comissaoPercentual ?? "0").toFixed(1)}%</p>
                   </div>
                   <div>
@@ -186,12 +187,12 @@ export default function Usuarios() {
       {tab === "performance" && (
         <div className="space-y-4">
           <p className="text-muted-foreground text-sm">
-            Performance de {new Date(anoSelecionado, mesSelecionado - 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+            Performance de {new Date(anoSelecionado, mesSelecionado - 1).toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR", { month: "long", year: "numeric" })}
           </p>
           {performance.length === 0 && (
             <div className="text-center py-12 text-muted-foreground">
               <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>Nenhum dado de performance disponível.</p>
+              <p>{t('users.noPerformanceData')}</p>
             </div>
           )}
           {performance.map((p) => (
@@ -210,7 +211,7 @@ export default function Usuarios() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-muted-foreground">Comissão estimada</p>
+                    <p className="text-xs text-muted-foreground">{t('users.estimatedCommission')}</p>
                     <p className="text-lg font-bold text-green-400">{formatMoeda(p.comissao)}</p>
                   </div>
                 </div>
@@ -245,7 +246,7 @@ export default function Usuarios() {
                 {/* Barra de progresso de inadimplência */}
                 <div className="mt-3">
                   <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span>Taxa de inadimplência</span>
+                    <span>{t('users.delinquencyRate')}</span>
                     <span>{p.taxaInadimplencia.toFixed(1)}%</span>
                   </div>
                   <div className="h-2 bg-background rounded-full overflow-hidden">
@@ -295,15 +296,15 @@ export default function Usuarios() {
                 </Select>
               </div>
               <div>
-                <Label>Comissão (%)</Label>
+                <Label>{t('users.commissionPercent')}</Label>
                 <Input type="number" value={form.comissaoPercentual} onChange={(e) => setForm({ ...form, comissaoPercentual: parseFloat(e.target.value) || 0 })} className="bg-background border-border" />
               </div>
               <div className="col-span-2">
-                <Label>Limite de Empréstimo (R$)</Label>
+                <Label>{t('users.loanLimit')}</Label>
                 <Input type="number" value={form.limiteEmprestimo} onChange={(e) => setForm({ ...form, limiteEmprestimo: parseFloat(e.target.value) || 0 })} className="bg-background border-border" />
               </div>
               <div className="col-span-2">
-                <Label>Observações</Label>
+                <Label>{t('users.observations')}</Label>
                 <Textarea value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} className="bg-background border-border" rows={2} />
               </div>
             </div>

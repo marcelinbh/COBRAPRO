@@ -530,7 +530,19 @@
     "biweekly": "Quinzenal",
     "monthly": "Mensal",
     "allContracts": "Todos os Contratos",
-    "dailyLoans": "Empréstimos Diários"
+    "dailyLoans": "Empréstimos Diários",
+    "loan": "Empréstimo",
+    "closed": "Encerrado",
+    "startDate": "Data de Início",
+    "confirmDelete": "Confirmar Exclusão",
+    "deleteMessage": "Tem certeza que deseja excluir este contrato?",
+    "contractDetails": "Detalhes do Contrato",
+    "totalValue": "Valor Total",
+    "paidValue": "Valor Pago",
+    "remainingValue": "Valor Restante",
+    "interestRate": "Taxa de Juros",
+    "description": "Descrição",
+    "observations": "Observações"
   },
   "parcels": {
     "title": "Parcelas",
@@ -692,7 +704,9 @@
     "received": "Recebido (R$)",
     "totalProfit": "Lucro Total (R$)",
     "searchPlaceholder": "Buscar por marca, modelo ou comprador...",
-    "inProgress": "Em Andamento"
+    "inProgress": "Em Andamento",
+    "newVehicleLabel": "Novo veículo:",
+    "observations": "Observações"
   },
   "phoneSales": {
     "title": "Venda de Telefone",
@@ -744,7 +758,16 @@
     "paidSales": "Vendas Pagas",
     "overdueSales": "Vendas Atrasadas",
     "totalToReceive": "Total a Receber",
-    "totalReceived": "Total Recebido"
+    "totalReceived": "Total Recebido",
+    "profession": "Profissão",
+    "address": "Endereço",
+    "financialConditions": "CONDIÇÕES FINANCEIRAS",
+    "salePrice": "Preço de Venda",
+    "termsAndConditions": "TERMOS E CONDIÇÕES",
+    "lateInterestTerms": "2. O atraso no pagamento implicará em juros de mora de 2% ao mês.",
+    "deviceGuaranteeTerms": "3. O aparelho permanece como garantia até a quitação total do contrato.",
+    "recoversInMonth": "Recupera no mês",
+    "systemTitle": "CobraPro · Sistema de Gestão de Cobranças"
   },
   "sales": {
     "title": "Vendas",
@@ -815,7 +838,11 @@
     "topProducts": "Produtos Mais Vendidos",
     "topClients": "Melhores Clientes",
     "averageTicket": "Ticket Médio",
-    "conversionRate": "Taxa de Conversão"
+    "conversionRate": "Taxa de Conversão",
+    "price": "Preço (R$) *",
+    "descriptionPlaceholder": "Descrição do produto...",
+    "clickNewProduct": "Clique em \"Novo Produto\" para começar",
+    "newProduct": "Novo Produto"
   },
   "checks": {
     "title": "Cheques",
@@ -857,7 +884,14 @@
     "totalChecks": "Total de Cheques",
     "pendingChecks": "Cheques Pendentes",
     "depositedChecks": "Cheques Depositados",
-    "returnedChecks": "Cheques Devolvidos"
+    "returnedChecks": "Cheques Devolvidos",
+    "anticipateReceivables": "Antecipe recebíveis com cálculo automático de desconto",
+    "dailyRate": "Diária",
+    "observations": "Observações",
+    "netAmount": "Líquido",
+    "checkNumber": "Número do Cheque",
+    "compensated": "Compensado",
+    "discount": "Desconto"
   },
   "accountsPayable": {
     "title": "Contas a Pagar",
@@ -910,7 +944,10 @@
     "maintenance": "Manutenção",
     "marketing": "Marketing",
     "technology": "Tecnologia",
-    "other": "Outros"
+    "other": "Outros",
+    "subtitle": "Controle de despesas e obrigações financeiras",
+    "observations": "Observações",
+    "additionalInfo": "Informações adicionais"
   },
   "reparcelamento": {
     "title": "Reparcelamento",
@@ -1095,7 +1132,10 @@
     "late": "Atrasadas",
     "profit": "Lucro",
     "compliance": "Adimpl.",
-    "recovery": "Recup."
+    "recovery": "Recup.",
+    "critical": "Crítico",
+    "recommendation": "Recomendação",
+    "noData": "Sem dados"
   },
   "riskAnalysis": {
     "title": "Análise de Risco",
@@ -1113,7 +1153,10 @@
     "alerts": "Alertas",
     "filters": "Filtros",
     "period": "Período",
-    "exportReport": "Exportar Relatório"
+    "exportReport": "Exportar Relatório",
+    "critical": "Crítico",
+    "recommendation": "Recomendação",
+    "noData": "Sem dados de análise"
   },
   "backup": {
     "title": "Backup de Dados",
@@ -1152,7 +1195,9 @@
     "totalVehicles": "Veículos",
     "paid": "Pagas",
     "pending": "Pendentes",
-    "overdue": "Atrasadas"
+    "overdue": "Atrasadas",
+    "exportAll": "Exporta todos os dados em um único arquivo",
+    "vehicles": "Veículos"
   },
   "collectors": {
     "title": "Cobradores",
@@ -1184,7 +1229,14 @@
     "commission": "Comissão",
     "filters": "Filtros",
     "allStatus": "Todos os status",
-    "exportCollectors": "Exportar Cobradores"
+    "exportCollectors": "Exportar Cobradores",
+    "manageTeam": "Gerencie sua equipe de cobrança",
+    "estimatedCommission": "Comissão estimada",
+    "delinquencyRate": "Taxa de inadimplência",
+    "commissionPercent": "Comissão (%)",
+    "loanLimit": "Limite de Empréstimo (R$)",
+    "observations": "Observações",
+    "noPerformanceData": "Nenhum dado de performance disponível."
   },
   "configuration": {
     "title": "Configuração",
@@ -1230,7 +1282,19 @@
     "user": "Usuário",
     "collector": "Cobrador",
     "createdAt": "Cadastrado em",
-    "lastLogin": "Último acesso"
+    "lastLogin": "Último acesso",
+    "accountInfo": "Informações da sua conta",
+    "cannotBeChanged": "Não pode ser alterado",
+    "validUntil": "Válido até",
+    "renewEarly": "Renove antecipadamente e os dias serão acumulados ao seu plano atual.",
+    "pixKey": "Chave PIX para Cobranças",
+    "pixKeyDesc": "Configure sua chave PIX. Ela será incluída automaticamente nas mensagens de cobrança.",
+    "chargesName": "Nome para cobranças",
+    "chargesNameDesc": "Este nome será exibido no final das mensagens de cobrança enviadas aos seus clientes via WhatsApp.",
+    "logoDesc": "Esta logo será usada nos documentos e relatórios.",
+    "random": "Aleatória",
+    "updateNow": "Atualize agora para continuar enviando cobranças aos seus clientes.",
+    "canSendMessages": "Você pode enviar mensagens de cobrança diretamente aos seus clientes."
   },
   "users": {
     "title": "Usuários",
@@ -1264,7 +1328,15 @@
     "exportUsers": "Exportar Usuários",
     "totalUsers": "Total de Usuários",
     "activeUsers": "Usuários Ativos",
-    "inactiveUsers": "Usuários Inativos"
+    "inactiveUsers": "Usuários Inativos",
+    "manageTeam": "Gerencie sua equipe de cobrança",
+    "commission": "Comissão",
+    "estimatedCommission": "Comissão estimada",
+    "delinquencyRate": "Taxa de inadimplência",
+    "commissionPercent": "Comissão (%)",
+    "loanLimit": "Limite de Empréstimo (R$)",
+    "observations": "Observações",
+    "noPerformanceData": "Nenhum dado de performance disponível."
   },
   "reports": {
     "title": "Relatórios",
@@ -1292,7 +1364,19 @@
     "delinquencyRate": "Taxa de Inadimplência",
     "collectionRate": "Taxa de Cobrança",
     "averageLoan": "Empréstimo Médio",
-    "averageInterest": "Juros Médio"
+    "averageInterest": "Juros Médio",
+    "subtitle": "Análise financeira e desempenho",
+    "standardLoan": "Empréstimo Padrão",
+    "dailyLoan": "Empréstimo Diário",
+    "receivedInPeriod": "Recebido no Período",
+    "cashExpenses": "Saídas no Caixa",
+    "periodBalance": "Saldo do Período",
+    "startDate": "Data Início",
+    "expenses": "Saídas",
+    "expensesInMonth": "Saídas no",
+    "expense": "Saída",
+    "description": "Descrição",
+    "entryWillBeRegistered": "O lançamento será registrado no caixa do dia atual e aparecerá no fluxo de caixa."
   },
   "forms": {
     "paymentModal": "Modal de Pagamento",
@@ -1387,7 +1471,16 @@
     "finish": "Concluir",
     "skip": "Pular",
     "complete": "Configuração concluída!",
-    "completeMessage": "Sua conta está pronta para uso."
+    "completeMessage": "Sua conta está pronta para uso.",
+    "businessName": "Como se chama o seu negócio?",
+    "setupCashControl": "Configure onde você controla seu dinheiro",
+    "accountReady": "Sua conta está configurada e pronta para usar",
+    "cashControl": "Controle de dinheiro físico",
+    "bankAccount": "Conta Bancária",
+    "bankAccountDesc": "Banco tradicional (Bradesco, Itaú...)",
+    "manageLoans": "Gerencie empréstimos",
+    "controlCharges": "Controle cobranças",
+    "nextSuggestedSteps": "Próximos passos sugeridos"
   },
   "novoContrato": {
     "title": "Novo Contrato",
@@ -2126,5 +2219,157 @@
     "dueToday": "Vence Hoje",
     "pending": "Pendentes",
     "paid": "Pagas"
+  },
+  "rescheduling": {
+    "title": "Reparcelamento",
+    "contractNumber": "Número do contrato",
+    "contractNumberPlaceholder": "Número do contrato (ex: 42)",
+    "conditions": "Condições do Reparcelamento",
+    "observations": "Observações",
+    "newInstallments": "Novas Parcelas",
+    "newDueDate": "Novo Vencimento",
+    "confirm": "Confirmar Reparcelamento",
+    "success": "Reparcelamento realizado com sucesso!",
+    "error": "Erro ao realizar reparcelamento."
+  },
+  "cashflow": {
+    "title": "Caixa",
+    "balance": "Saldo",
+    "income": "Entradas",
+    "expense": "Saídas",
+    "transactions": "Transações",
+    "newTransaction": "Nova Transação",
+    "descriptionPlaceholder": "Descrição da transação",
+    "amount": "Valor",
+    "type": "Tipo",
+    "date": "Data",
+    "category": "Categoria",
+    "account": "Conta",
+    "noTransactions": "Nenhuma transação encontrada",
+    "allAccounts": "Todas as contas",
+    "transfer": "Transferência",
+    "income2": "Entrada",
+    "expense2": "Saída"
+  },
+  "calendar": {
+    "subtitle": "Vencimentos e cobranças",
+    "noEvents": "Nenhum evento neste dia",
+    "today": "Hoje"
+  },
+  "settings": {
+    "systemParams": "Parâmetros do sistema",
+    "addressPlaceholder": "Rua, número",
+    "appearsInHeader": "Aparece no cabeçalho dos documentos",
+    "restoreDefaultTemplate": "Restaurar template padrão",
+    "scheduleTime": "Horário de envio",
+    "scheduleTimeDesc": "Horário preferido para receber o relatório",
+    "phoneNumberDesc": "Número que receberá o relatório diário",
+    "enableBrowserReminder": "Ativar lembrete de horário no navegador",
+    "accumulatedPerDay": "Acumulado por dia após o vencimento"
+  },
+  "loanDetails": {
+    "loanNotFound": "Empréstimo não encontrado",
+    "payingOnlyInterest": "Pagando apenas os juros, o contrato é renovado sem abater o capital.",
+    "fineWillBeAdded": "A multa será adicionada ao valor das parcelas em atraso.",
+    "futureActionsWillAppear": "As ações futuras (pagamentos, multas, edições) aparecerão aqui.",
+    "paymentHistory": "Histórico de pagamentos",
+    "editLoan": "Editar empréstimo",
+    "deleteLoan": "Deletar empréstimo",
+    "noReceiptsInPeriod": "Nenhum recebimento no período",
+    "balanceShortfall": "Saldo que faltará",
+    "transferBalanceToNext": "Transferir saldo para próxima parcela",
+    "balanceWillNotBe": "O saldo não será transferido."
+  },
+  "dailyReport": {
+    "whatsappNotConnected": "WhatsApp não conectado",
+    "automaticReport": "Relatório Automático",
+    "subtitle": "Enviar relatório diariamente no horário configurado",
+    "viewReport": "Visualize o relatório",
+    "whatIsIncluded": "O que está incluído no relatório",
+    "activeLoans": "Empréstimos ativos"
+  },
+  "newContract": {
+    "daily": "Diária",
+    "numberOfInstallments": "Número de Parcelas *",
+    "startDate": "Data de Início *",
+    "dailyInterestMora": "Juros Mora Diário (%)",
+    "descriptionObservations": "Descrição / Observações",
+    "activeOptions": "Opções Ativas"
+  },
+  "clientPortal": {
+    "invalidLink": "LINK INVÁLIDO",
+    "paymentInfo": "Aqui estão suas parcelas e informações de pagamento.",
+    "contactCreditor": "Em caso de dúvidas, entre em contato com seu credor.",
+    "systemName": "CobraPro — Sistema de Gestão de Cobranças"
+  },
+  "subscriptions": {
+    "setupRequired": "Configuração necessária",
+    "setupRequiredDesc": "Para usar o módulo de assinaturas, configure primeiro.",
+    "manageSubscriptions": "Gerencie serviços recorrentes e assinaturas de clientes",
+    "paymentHistory": "Histórico de pagamentos",
+    "service": "Serviço",
+    "description": "Descrição",
+    "billingMonth": "Mês de cobrança",
+    "observations": "Observações"
+  },
+  "login": {
+    "availableModules": "Módulos disponíveis",
+    "reports": "Relatórios",
+    "automatic": "Automático"
+  },
+  "install": {
+    "addToHomeScreen": "Adicionar à Tela de Início",
+    "appAlreadyInstalled": "App já instalado",
+    "selectDevice": "Selecione seu dispositivo e siga as instruções",
+    "iosInstructions": "Toque no ícone de compartilhar (quadrado com seta ↑) na barra inferior do Safari",
+    "iosAddToHome": "Adicionar à Tela de Início",
+    "iosIconWillAppear": "O ícone do CobraPro aparecerá na sua tela inicial.",
+    "androidInstructions": "Toque nos três pontos verticais no canto superior direito do Chrome.",
+    "androidAddToHome": "Adicionar à tela inicial",
+    "notifications": "Notificações",
+    "faster": "Mais rápido",
+    "quickAccess": "Acesso rápido",
+    "homeScreenIcon": "Ícone na tela inicial",
+    "openInSafari": "Abra este site no Safari (não no Chrome ou Firefox)",
+    "tapShareIcon": "Toque no ícone de Compartilhar (quadrado com seta ↑) na barra inferior"
+  },
+  "whatsapp": {
+    "notConnected": "Não Conectado",
+    "connectWhatsapp": "Conecte seu WhatsApp para envio automático de cobranças",
+    "messagesWillBeSentAuto": "As mensagens serão enviadas automaticamente",
+    "chargesWillBeSentViaWhatsapp": "As cobranças serão enviadas automaticamente via WhatsApp",
+    "availableVariables": "Variáveis disponíveis",
+    "generalCharge": "Cobrança Geral",
+    "paymentConfirmation": "Confirmação de Pagamento",
+    "pixTransfer": "PIX / Transferência",
+    "installmentNumber": "Número da parcela",
+    "chargeType": "Cobrança",
+    "confirmationType": "Confirmação"
+  },
+  "recoverPassword": {
+    "sendInstructions": "Enviar instruções",
+    "connectionError": "Erro de conexão. Tente novamente.",
+    "errorRecoverPassword": "Erro ao solicitar recuperação de senha.",
+    "managementSystem": "Sistema de Gestão de Cobranças"
+  },
+  "toast": {
+    "success": "Sucesso!",
+    "error": "Erro",
+    "balanceAdded": "Saldo adicionado!",
+    "balanceDebited": "Saldo debitado!",
+    "clientUpdated": "Cliente atualizado!",
+    "clientCreated": "Cliente criado com sucesso!",
+    "errorPrefix": "Erro: ",
+    "errorCreateClient": "Erro ao criar cliente: ",
+    "errorDelete": "Erro ao deletar: ",
+    "errorGeneratePdf": "Erro ao gerar PDF: ",
+    "errorRegisterPayment": "Erro ao registrar pagamento: ",
+    "errorPayInterest": "Erro ao pagar juros: ",
+    "errorSendLogo": "Erro ao enviar logo: ",
+    "errorCreateContract": "Erro ao criar contrato: ",
+    "errorConnect": "Erro ao conectar: ",
+    "errorSave": "Erro ao salvar: ",
+    "incorrectCredentials": "Email ou senha incorretos",
+    "unknownError": "erro desconhecido"
   }
 }

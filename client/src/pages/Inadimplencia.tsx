@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
@@ -10,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { TrendingDown, Phone, MessageCircle, ChevronDown, ChevronUp, AlertTriangle, Users, DollarSign, Calendar } from "lucide-react";
 
 function formatarMoeda(valor: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(valor);
+  return new Intl.NumberFormat(i18n.language === "es" ? "es-ES" : "pt-BR", { style: "currency", currency: "BRL" }).format(valor);
 }
 
 function formatarData(data: string) {

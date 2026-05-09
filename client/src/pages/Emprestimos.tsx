@@ -79,7 +79,7 @@ function EditarEmprestimoModal({
   onSuccess: () => void;
   abaInicial?: 'editar' | 'detalhes' | 'historico' | 'comprovante' | 'etiquetas';
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [aba, setAba] = useState<'editar' | 'detalhes' | 'historico' | 'comprovante' | 'etiquetas'>(abaInicial);
 
   // ── Estados da aba Editar ──
@@ -698,7 +698,7 @@ function EditarEmprestimoModal({
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
                           <span className={`text-xs font-semibold uppercase tracking-wide ${tipoColor[h.tipo] ?? 'text-foreground'}`}>{tipoLabel[h.tipo] ?? h.tipo}</span>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">{new Date(h.createdAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">{new Date(h.createdAt).toLocaleString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                         </div>
                         <p className="text-sm text-foreground mt-0.5">{h.descricao}</p>
                         {(h.valorAnterior || h.valorNovo) && (
@@ -931,7 +931,7 @@ function EditarEmprestimoModal({
       <DialogContent className="max-w-md">
         <DialogHeader><DialogTitle>APLICAR MULTA POR ATRASO</DialogTitle><DialogDescription>{emprestimo.clienteNome}</DialogDescription></DialogHeader>
         <div className="space-y-4">
-          {diasAtraso > 0 && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm"><p className="text-red-400 font-semibold">{diasAtraso} dias de atraso</p><p className="text-xs text-muted-foreground mt-1">A multa será adicionada ao valor das parcelas em atraso.</p></div>}
+          {diasAtraso > 0 && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm"><p className="text-red-400 font-semibold">{diasAtraso} dias de atraso</p><p className="text-xs text-muted-foreground mt-1">{t('loanDetails.fineWillBeAdded')}</p></div>}
           <div><Label>Valor da Multa (R$)</Label><Input type="number" step="0.01" min="0" placeholder="Ex: 50.00" value={valorMulta} onChange={e => setValorMulta(e.target.value)} className="mt-1" /></div>
           <div className="flex gap-2">
             <Button variant="outline" className="flex-1" onClick={() => setModalMulta(false)}>{t('common.cancel')}</Button>
@@ -999,7 +999,7 @@ function PagamentoModal({
       }, 300);
     },
     onError: (e) => {
-      toast.error("Erro ao registrar pagamento: " + e.message);
+      toast.error(t("toast.errorRegisterPayment") + e.message);
     },
   });
 
@@ -1014,7 +1014,7 @@ function PagamentoModal({
       }, 300);
     },
     onError: (e) => {
-      toast.error("Erro ao pagar juros: " + e.message);
+      toast.error(t("toast.errorPayInterest") + e.message);
       setOpen(false);
     },
   });
@@ -1281,11 +1281,11 @@ function PagamentoModal({
                       Pagamento Parcial Detectado
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Saldo que faltará</span>
+                      <span className="text-muted-foreground">{t('loanDetails.balanceShortfall')}</span>
                       <span className="text-blue-400 font-bold">{formatarMoeda(Math.max(0, totalDevido - valorDigitado))}</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground text-xs">Transferir saldo para próxima parcela</span>
+                      <span className="text-muted-foreground text-xs">{t('loanDetails.transferBalanceToNext')}</span>
                       <button
                         type="button"
                         onClick={() => setTransferirSaldo(!transferirSaldo)}
@@ -1376,14 +1376,14 @@ function EmprestimoCardCobra({
 
   const criarEtiquetaMutation = trpc.etiquetas.criar.useMutation({
     onSuccess: () => { toast.success(t('toast_success.etiqueta_criada')); setNovaEtiquetaNome(""); utils.etiquetas.listar.invalidate(); },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
   const removerEtiquetaMutation = trpc.etiquetas.remover.useMutation({
     onSuccess: () => { utils.etiquetas.listar.invalidate(); },
   });
   const aplicarEtiquetasMutation = trpc.etiquetas.aplicarContrato.useMutation({
     onSuccess: () => { toast.success(t('toast_success.etiquetas_salvas')); setShowEtiquetasModal(false); onRefresh(); utils.contratos.listComParcelas.invalidate(); },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const editarJurosMutation = trpc.contratos.editarJuros.useMutation({
@@ -1395,7 +1395,7 @@ function EmprestimoCardCobra({
       utils.contratos.listComParcelas.invalidate();
       utils.dashboard.kpis.invalidate();
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
   const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation({
     onSuccess: () => {
@@ -1407,7 +1407,7 @@ function EmprestimoCardCobra({
       utils.contratos.listComParcelas.invalidate();
       utils.dashboard.kpis.invalidate();
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
   const deletarMutation = trpc.contratos.deletar.useMutation({
     onSuccess: () => {
@@ -1416,7 +1416,7 @@ function EmprestimoCardCobra({
       utils.contratos.listComParcelas.invalidate();
       utils.dashboard.kpis.invalidate();
     },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const parcela = emp.proximaParcela ?? emp.parcelasComAtraso[0];
@@ -1711,7 +1711,7 @@ function EmprestimoCardCobra({
               size="sm"
               variant="outline"
               className="h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20"
-              title="Histórico de pagamentos"
+              title={t('loanDetails.paymentHistory')}
               onClick={() => setLocation(`/emprestimos/${emp.id}`)}
             >
               <Clock className="h-4 w-4" />
@@ -1722,7 +1722,7 @@ function EmprestimoCardCobra({
               size="sm"
               variant="outline"
               className="h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20"
-              title="Editar empréstimo"
+              title={t('loanDetails.editLoan')}
               onClick={() => { setAbaModalInicial('editar'); setShowEditarModal(true); }}
             >
               <Edit className="h-4 w-4" />
@@ -1754,7 +1754,7 @@ function EmprestimoCardCobra({
             <Button
               size="sm"
               className="h-9 w-9 p-0 bg-red-700 hover:bg-red-800 text-white border-0"
-              title="Deletar empréstimo"
+              title={t('loanDetails.deleteLoan')}
               onClick={() => { if (confirm('Tem certeza que deseja deletar este empréstimo?')) deletarMutation.mutate({ id: emp.id }); }}
             >
               <Trash2 className="h-4 w-4" />
@@ -1999,7 +1999,7 @@ function EmprestimoCardCobra({
 
 // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────────────
 export default function Emprestimos() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [busca, setBusca] = useState("");
   const [abaSelecionada, setAbaSelecionada] = useState("emprestimos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
@@ -2406,7 +2406,7 @@ export default function Emprestimos() {
             ))}
             {recebimentosData && (
               <span className="ml-auto text-sm font-bold text-emerald-400">
-                Total: {recebimentosData.totalValor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                Total: {recebimentosData.totalValor.toLocaleString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { style: 'currency', currency: 'BRL' })}
               </span>
             )}
           </div>
@@ -2415,7 +2415,7 @@ export default function Emprestimos() {
           {loadingRecebimentos ? (
             <div className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
           ) : recebimentosData?.recebimentos.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">Nenhum recebimento no período</div>
+            <div className="p-8 text-center text-muted-foreground">{t('loanDetails.noReceiptsInPeriod')}</div>
           ) : (
             <div className="space-y-2">
               {recebimentosData?.recebimentos.map(r => (
@@ -2426,11 +2426,11 @@ export default function Emprestimos() {
                     </div>
                     <div>
                       <div className="text-sm font-medium">{r.descricao}</div>
-                      <div className="text-xs text-muted-foreground">{r.contaNome} · {new Date(r.dataTransacao).toLocaleDateString('pt-BR')}</div>
+                      <div className="text-xs text-muted-foreground">{r.contaNome} · {new Date(r.dataTransacao).toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR')}</div>
                     </div>
                   </div>
                   <div className="text-sm font-bold text-emerald-400">
-                    +{r.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    +{r.valor.toLocaleString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { style: 'currency', currency: 'BRL' })}
                   </div>
                 </div>
               ))}

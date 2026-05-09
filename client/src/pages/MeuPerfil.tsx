@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next';
+import i18n from '../i18n/i18n';
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
@@ -18,12 +19,12 @@ import {
 } from "lucide-react";
 
 function formatarMoeda(valor: number) {
-  return valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  return valor.toLocaleString(i18n.language === "es" ? "es-ES" : "pt-BR", { style: "currency", currency: "BRL" });
 }
 
 function formatarData(data: string | Date | null | undefined) {
   if (!data) return "-";
-  return new Date(data).toLocaleDateString("pt-BR", { day: "numeric", month: "long", year: "numeric" });
+  return new Date(data).toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR", { day: "numeric", month: "long", year: "numeric" });
 }
 
 export default function MeuPerfil() {
@@ -121,7 +122,7 @@ export default function MeuPerfil() {
 
   const uploadLogo = trpc.perfil.uploadLogo.useMutation({
     onSuccess: () => { toast.success(t('toast_success.logo_enviada_com_sucesso')); refetchPerfil(); },
-    onError: (e) => toast.error("Erro ao enviar logo: " + e.message),
+    onError: (e) => toast.error(t("toast.errorSendLogo") + e.message),
   });
 
   const removerLogo = trpc.perfil.removerLogo.useMutation({
@@ -140,7 +141,7 @@ export default function MeuPerfil() {
 
   const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
     onSuccess: () => { setTimeout(() => { refetchQR(); refetchWpp(); }, 2000); },
-    onError: (e) => toast.error("Erro: " + e.message),
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const handleAbrirQRModal = useCallback(() => {
@@ -199,7 +200,7 @@ export default function MeuPerfil() {
           <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0 mt-0.5 sm:mt-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-yellow-500">Sua chave PIX precisa ser atualizada.</p>
-            <p className="text-xs text-yellow-500/70">Atualize agora para continuar enviando cobranças aos seus clientes.</p>
+            <p className="text-xs text-yellow-500/70">{t('profile.updateNow')}</p>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
             <Select value={tipoPix} onValueChange={setTipoPix}>
@@ -211,7 +212,7 @@ export default function MeuPerfil() {
                 <SelectItem value="cnpj">CNPJ</SelectItem>
                 <SelectItem value="email">Email</SelectItem>
                 <SelectItem value="telefone">Telefone</SelectItem>
-                <SelectItem value="aleatoria">Aleatória</SelectItem>
+                <SelectItem value="aleatoria">{t('profile.random')}</SelectItem>
               </SelectContent>
             </Select>
             <Input
@@ -231,7 +232,7 @@ export default function MeuPerfil() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Meu Perfil</h1>
-          <p className="text-sm text-muted-foreground">Informações da sua conta</p>
+          <p className="text-sm text-muted-foreground">{t('profile.accountInfo')}</p>
         </div>
         {!editando ? (
           <Button variant="outline" size="sm" onClick={() => setEditando(true)}>
@@ -295,7 +296,7 @@ export default function MeuPerfil() {
               <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Email</p>
                 <p className="text-sm font-medium text-foreground truncate">{user?.email}</p>
-                <p className="text-xs text-muted-foreground">Não pode ser alterado</p>
+                <p className="text-xs text-muted-foreground">{t('profile.cannotBeChanged')}</p>
               </div>
             </div>
 
@@ -411,7 +412,7 @@ export default function MeuPerfil() {
                   <Clock className="h-5 w-5 text-blue-500" />
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Válido até</p>
+                  <p className="text-xs text-muted-foreground">{t('profile.validUntil')}</p>
                   <p className="text-base font-bold text-foreground">{formatarData(perfil.assinaturaValidade)}</p>
                 </div>
               </div>
@@ -436,7 +437,7 @@ export default function MeuPerfil() {
               <Crown className="h-4 w-4 mr-2" />
               Renovar Agora
             </Button>
-            <p className="text-xs text-muted-foreground">Renove antecipadamente e os dias serão acumulados ao seu plano atual.</p>
+            <p className="text-xs text-muted-foreground">{t('profile.renewEarly')}</p>
           </div>
         </CardContent>
       </Card>
@@ -444,7 +445,7 @@ export default function MeuPerfil() {
       {/* Chave PIX */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Chave PIX para Cobranças</CardTitle>
+          <CardTitle className="text-base">{t('profile.pixKey')}</CardTitle>
           <CardDescription>Configure sua chave PIX. Ela será incluída automaticamente nas mensagens de cobrança com o valor exato da parcela.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -465,7 +466,7 @@ export default function MeuPerfil() {
                 <SelectItem value="cnpj">CNPJ</SelectItem>
                 <SelectItem value="email">Email</SelectItem>
                 <SelectItem value="telefone">Telefone</SelectItem>
-                <SelectItem value="aleatoria">Aleatória</SelectItem>
+                <SelectItem value="aleatoria">{t('profile.random')}</SelectItem>
               </SelectContent>
             </Select>
             <Input
@@ -497,7 +498,7 @@ export default function MeuPerfil() {
           </div>
           {editando && (
             <div className="space-y-2">
-              <Label>Nome para cobranças</Label>
+              <Label>{t('profile.chargesName')}</Label>
               <Input value={nomeCobranca} onChange={(e) => setNomeCobranca(e.target.value)} placeholder="Ex: Vital Financeira" />
             </div>
           )}
@@ -601,7 +602,7 @@ export default function MeuPerfil() {
                 <CheckCircle2 className="h-8 w-8 text-green-500 shrink-0" />
                 <div>
                   <p className="font-medium text-green-500">WhatsApp Conectado!</p>
-                  <p className="text-sm text-muted-foreground">Você pode enviar mensagens de cobrança diretamente aos seus clientes.</p>
+                  <p className="text-sm text-muted-foreground">{t('profile.canSendMessages')}</p>
                 </div>
               </div>
               <Button
