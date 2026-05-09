@@ -318,7 +318,7 @@ export default function EmprestimoDetalhes() {
                 <p className="text-xl font-bold text-green-500">{formatarMoeda(emprestimo.lucroRealizado)}</p>
               </div>
               <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                <p className="text-xs text-muted-foreground mb-1">Vencimento</p>
+                <p className="text-xs text-muted-foreground mb-1">{t('common.dueDate')}</p>
                 <p className="text-xl font-bold text-foreground">{formatarData(emprestimo.dataVencimento)}</p>
               </div>
             </div>
@@ -339,7 +339,7 @@ export default function EmprestimoDetalhes() {
                       <span className="font-semibold text-red-400">{p.diasAtraso} dias</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Vencimento</span>
+                      <span className="text-muted-foreground">{t('common.dueDate')}</span>
                       <span>{formatarData(p.data_vencimento)}</span>
                     </div>
                     <div className="flex justify-between">
@@ -398,7 +398,7 @@ export default function EmprestimoDetalhes() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left px-3 py-2 text-muted-foreground font-medium">#</th>
-                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">Vencimento</th>
+                      <th className="text-left px-3 py-2 text-muted-foreground font-medium">{t('common.dueDate')}</th>
                       <th className="text-right px-3 py-2 text-muted-foreground font-medium">Valor</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Status</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Editar</th>
@@ -639,7 +639,7 @@ export default function EmprestimoDetalhes() {
                 }}>
                   <Download className="h-3.5 w-3.5" /> Comprovante PDF
                 </Button>
-                <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setModalPagar(false); }}>Fechar</Button>
+                <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setModalPagar(false); }}>{t('common.close')}</Button>
               </div>
             </div>
           ) : (
@@ -647,11 +647,11 @@ export default function EmprestimoDetalhes() {
               {/* Resumo Capital / Juros / Total */}
               <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
                 <div className="flex justify-between items-center">
-                  <span>Capital</span>
+                  <span>{t('common.capital')}</span>
                   <span>{formatarMoeda(emprestimo.valorPrincipal)}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span>Juros</span>
+                  <span>{t('common.interest')}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-amber-400">{formatarMoeda(jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : valorJurosParcela)}</span>
                     <button
@@ -681,7 +681,7 @@ export default function EmprestimoDetalhes() {
                   </div>
                 )}
                 <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                  <span>Total</span>
+                  <span>{t('common.total')}</span>
                   <span className="text-emerald-400">{formatarMoeda(valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela))}</span>
                 </div>
               </div>
@@ -724,7 +724,7 @@ export default function EmprestimoDetalhes() {
                 </Select>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setModalPagar(false)}>Cancelar</Button>
+                <Button variant="outline" className="flex-1" onClick={() => setModalPagar(false)}>{t('common.cancel')}</Button>
                 <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={!contaCaixaId || pagarTotalMutation.isPending} onClick={handlePagar}>
                   {pagarTotalMutation.isPending ? 'Processando...' : 'Confirmar'}
                 </Button>
@@ -769,7 +769,7 @@ export default function EmprestimoDetalhes() {
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setModalPagarJuros(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setModalPagarJuros(false)}>{t('common.cancel')}</Button>
               <Button className="flex-1 bg-amber-600 hover:bg-amber-700" disabled={!contaCaixaId || pagarJurosMutation.isPending} onClick={handlePagarJuros}>
                 {pagarJurosMutation.isPending ? 'Processando...' : 'Confirmar'}
               </Button>
@@ -802,7 +802,7 @@ export default function EmprestimoDetalhes() {
               />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setModalEditarJuros(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setModalEditarJuros(false)}>{t('common.cancel')}</Button>
               <Button
                 className="flex-1 bg-blue-600 hover:bg-blue-700"
                 disabled={!novaTaxa.trim() || editarJurosMutation.isPending}
@@ -842,7 +842,7 @@ export default function EmprestimoDetalhes() {
               />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setModalMulta(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setModalMulta(false)}>{t('common.cancel')}</Button>
               <Button
                 className="flex-1 bg-red-600 hover:bg-red-700"
                 disabled={!valorMulta.trim() || aplicarMultaMutation.isPending}
@@ -868,6 +868,7 @@ export default function EmprestimoDetalhes() {
 }
 
 function HistoricoAba({ contratoId }: { contratoId: number }) {
+  const { t } = useTranslation();
   const { data: historico, isLoading } = trpc.contratos.historico.useQuery(
     { contratoId },
     { enabled: contratoId > 0 }
@@ -907,7 +908,7 @@ function HistoricoAba({ contratoId }: { contratoId: number }) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <History className="h-12 w-12 text-muted-foreground/30 mb-3" />
-        <p className="text-muted-foreground text-sm">Nenhum histórico registrado ainda.</p>
+        <p className="text-muted-foreground text-sm">{t('emprestimos.noHistory')}</p>
         <p className="text-muted-foreground/60 text-xs mt-1">As ações futuras (pagamentos, multas, edições) aparecerão aqui.</p>
       </div>
     );

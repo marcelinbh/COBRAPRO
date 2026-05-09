@@ -72,16 +72,15 @@ type EmprestimoCard = {
 function EditarEmprestimoModal({
   emprestimo,
   onClose,
-  onSuccess,
-  abaInicial = 'editar',
+  onSuccess,  abaInicial = 'editar',
 }: {
   emprestimo: EmprestimoCard;
   onClose: () => void;
   onSuccess: () => void;
-  abaInicial?: 'editar' | 'detalhes' | 'historico' | 'comprovante';
+  abaInicial?: 'editar' | 'detalhes' | 'historico' | 'comprovante' | 'etiquetas';
 }) {
   const { t } = useTranslation();
-  const [aba, setAba] = useState<'editar' | 'detalhes' | 'historico' | 'comprovante'>(abaInicial);
+  const [aba, setAba] = useState<'editar' | 'detalhes' | 'historico' | 'comprovante' | 'etiquetas'>(abaInicial);
 
   // ── Estados da aba Editar ──
   const [valor, setValor] = useState(parseFloat(emprestimo.valorPrincipal));
@@ -127,8 +126,21 @@ function EditarEmprestimoModal({
   const valorParcela = (valor + jurosTotal) / parcelas;
   const totalReceber = valor + jurosTotal;
 
+  // ── Estados da aba Etiquetas ──
+  const [novaEtiquetaNome, setNovaEtiquetaNome] = useState('');
+  const [novaEtiquetaCor, setNovaEtiquetaCor] = useState('#6366f1');
+  const [etiquetasSelecionadas, setEtiquetasSelecionadas] = useState<string[]>(emprestimo.etiquetas ?? []);
   const utils = trpc.useUtils();
-
+  const { data: todasEtiquetasModal = [] } = trpc.etiquetas.listar.useQuery();
+  const criarEtiquetaModalMutation = trpc.etiquetas.criar.useMutation({
+    onSuccess: () => { toast.success(t('toast_success.etiqueta_criada')); setNovaEtiquetaNome(''); utils.etiquetas.listar.invalidate(); },
+  });
+  const removerEtiquetaModalMutation = trpc.etiquetas.remover.useMutation({
+    onSuccess: () => { utils.etiquetas.listar.invalidate(); },
+  });
+  const aplicarEtiquetasModalMutation = trpc.etiquetas.aplicarContrato.useMutation({
+    onSuccess: () => { toast.success(t('toast_success.etiquetas_salvas')); onSuccess(); utils.contratos.listComParcelas.invalidate(); },
+  });
   // Buscar dados completos para abas Detalhes/Histórico
   const { data: detalhes, refetch: refetchDetalhes } = trpc.contratos.obterDetalhes.useQuery(
     { id: emprestimo.id },
@@ -314,6 +326,7 @@ function EditarEmprestimoModal({
     { id: 'detalhes', label: '📋 Detalhes' },
     { id: 'historico', label: '📜 Histórico' },
     { id: 'comprovante', label: '📄 Comprovante' },
+    { id: 'etiquetas', label: '🏷️ Etiquetas' },
   ] as const;
 
   return (
@@ -702,6 +715,72 @@ function EditarEmprestimoModal({
             </div>
           )}
 
+          {/* ─── ABA ETIQUETAS ─── */}
+          {aba === 'etiquetas' && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{t('emprestimos.labelsDesc') || 'Gerencie as etiquetas deste contrato'}</p>
+              {/* Criar nova etiqueta */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nome da etiqueta"
+                  value={novaEtiquetaNome}
+                  onChange={(e) => setNovaEtiquetaNome(e.target.value)}
+                  className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
+                />
+                <input
+                  type="color"
+                  value={novaEtiquetaCor}
+                  onChange={(e) => setNovaEtiquetaCor(e.target.value)}
+                  className="w-10 h-9 rounded border border-border cursor-pointer"
+                />
+                <Button
+                  size="sm"
+                  onClick={() => { if (novaEtiquetaNome.trim()) criarEtiquetaModalMutation.mutate({ nome: novaEtiquetaNome.trim(), cor: novaEtiquetaCor }); }}
+                  disabled={criarEtiquetaModalMutation.isPending}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+              {/* Lista de etiquetas */}
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {todasEtiquetasModal.map((et: any) => {
+                  const selecionada = etiquetasSelecionadas.includes(et.nome);
+                  return (
+                    <div key={et.id} className="flex items-center justify-between p-2 rounded border border-border hover:bg-accent/30">
+                      <button
+                        onClick={() => setEtiquetasSelecionadas(selecionada ? etiquetasSelecionadas.filter((n: string) => n !== et.nome) : [...etiquetasSelecionadas, et.nome])}
+                        className="flex items-center gap-2"
+                      >
+                        <div className="w-4 h-4 rounded border flex items-center justify-center" style={{ backgroundColor: selecionada ? et.cor : 'transparent', borderColor: et.cor }}>
+                          {selecionada && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium text-white" style={{ backgroundColor: et.cor }}>
+                          <Tag className="w-2.5 h-2.5" />{et.nome}
+                        </span>
+                      </button>
+                      <button onClick={() => removerEtiquetaModalMutation.mutate({ id: et.id })} className="text-muted-foreground hover:text-red-400 transition-colors">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {todasEtiquetasModal.length === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-4">Nenhuma etiqueta criada ainda</p>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={onClose}>{t('common.cancel')}</Button>
+                <Button
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700"
+                  onClick={() => aplicarEtiquetasModalMutation.mutate({ contratoId: emprestimo.id, etiquetas: etiquetasSelecionadas })}
+                  disabled={aplicarEtiquetasModalMutation.isPending}
+                >
+                  {aplicarEtiquetasModalMutation.isPending ? 'Salvando...' : 'Salvar Etiquetas'}
+                </Button>
+              </div>
+            </div>
+          )}
           {/* ─── ABA COMPROVANTE ─── */}
           {aba === 'comprovante' && (
             <div className="space-y-4">

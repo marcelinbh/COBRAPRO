@@ -345,7 +345,7 @@ export default function Relatorios() {
           <CardContent className="p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-primary/15"><AlertTriangle className="h-4 w-4 text-primary" /></div>
-              <span className="text-xs text-muted-foreground uppercase tracking-wide">Inadimplência</span>
+              <span className="text-xs text-muted-foreground uppercase tracking-wide">{t('relatorios.defaulters')}</span>
             </div>
             <div className="font-display text-2xl text-primary">{formatarMoeda(inadimplentePeriodo)}</div>
             <div className="text-xs text-muted-foreground mt-1">{parcelasPeriodo.filter(p => p.status === 'atrasada').length} parcelas atrasadas</div>

@@ -343,14 +343,14 @@ function DashboardLayoutContent({
                   className="cursor-pointer"
                 >
                   <User className="mr-2 h-4 w-4" />
-                  <span>Meu Perfil</span>
+                  <span>{t('menu.my_profile')}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={logout}
                   className="cursor-pointer text-destructive focus:text-destructive"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sair</span>
+                  <span>{t('common.logout') || 'Sair'}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

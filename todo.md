@@ -999,3 +999,9 @@
 - [x] Chaves analiseRisco.*, calendario.*, cheques.*, cobradores.*, contratos.*, reparcelamento.*, relatorios.*: 187 novas chaves adicionadas
 - [x] Zero erros TypeScript após todas as correções
 - [ ] Pendente: aplicar t() nas páginas Clientes.tsx, Parcelas.tsx, EmprestimoDetalhes.tsx, MeuPerfil.tsx, Relatorios.tsx (chaves já adicionadas, falta substituir textos hardcoded)
+
+## Fase 55: 3 Melhorias (i18n páginas, aba Etiquetas, menu ES)
+- [x] Aplicar t() em Clientes.tsx, Parcelas.tsx, EmprestimoDetalhes.tsx, Relatorios.tsx (scripts de substituição em lote)
+- [x] Adicionar aba "Etiquetas" ao modal unificado EditarEmprestimoModal (5ª aba com CRUD completo)
+- [x] Corrigir menu lateral (DashboardLayout): "Meu Perfil" e "Sair" agora usam t() - traduzidos em ES
+- [x] Adicionar chave common.logout em pt-BR.json (Sair) e es.json (Salir)

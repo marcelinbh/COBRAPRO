@@ -381,18 +381,18 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
                     </div>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">Avatar gerado automaticamente</p>
+                <p className="text-xs text-muted-foreground">{t('clientes.avatarAuto')}</p>
                 <Button variant="outline" size="sm" className="gap-2" onClick={() => fotoInputRef.current?.click()} disabled={uploadingFoto}>
                   <Camera className="h-3.5 w-3.5" />
                   {fotoUrl ? "Trocar foto" : "Adicionar foto"}
                 </Button>
-                <p className="text-xs text-muted-foreground">A foto será enviada ao salvar o cliente</p>
+                <p className="text-xs text-muted-foreground">{t('clientes.photoWillBeSaved')}</p>
                 <input ref={fotoInputRef} type="file" accept="image/*" className="hidden" onChange={e => e.target.files?.[0] && handleFotoChange(e.target.files[0])} />
               </div>
 
               {/* Nome */}
               <div>
-                <Label>Nome Completo *</Label>
+                <Label>{t('clientes.fullNameRequired')}</Label>
                 <Input placeholder="Nome completo" value={nome} onChange={e => setNome(e.target.value)} className="mt-1" />
               </div>
 
@@ -415,47 +415,47 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
               {/* Email / Telefone */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">E-mail</Label>
+                  <Label className="text-xs">{t('common.email')}</Label>
                   <Input placeholder="cliente@email.com" value={email} onChange={e => setEmail(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label className="text-xs">Telefone (com DDD)</Label>
+                  <Label className="text-xs">{t('clientes.phoneWithDDD')}</Label>
                   <Input placeholder="(00) 00000-0000" value={telefone} onChange={e => setTelefone(maskPhone(e.target.value))} className="mt-1" />
-                  <p className="text-xs text-muted-foreground mt-0.5">Inclua o DDD para envio via WhatsApp</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{t('clientes.includeDDD')}</p>
                 </div>
               </div>
 
               {/* Instagram / Facebook */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs">Instagram</Label>
+                  <Label className="text-xs">{t('clientes.instagram')}</Label>
                   <Input placeholder="@usuario" value={instagram} onChange={e => setInstagram(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label className="text-xs">Facebook</Label>
+                  <Label className="text-xs">{t('clientes.facebook')}</Label>
                   <Input placeholder="Nome ou URL do perfil" value={facebook} onChange={e => setFacebook(e.target.value)} className="mt-1" />
                 </div>
               </div>
 
               {/* Profissão */}
               <div>
-                <Label className="text-xs">Profissão</Label>
+                <Label className="text-xs">{t('clientes.profession')}</Label>
                 <Input placeholder="Ex: Eletricista, Comerciante, Motorista..." value={profissao} onChange={e => setProfissao(e.target.value)} className="mt-1" />
               </div>
 
               {/* Tipo de Cliente */}
               <div>
-                <Label className="text-xs">Tipo de Cliente</Label>
+                <Label className="text-xs">{t('clientes.clientType')}</Label>
                 <Select value={tipoCliente} onValueChange={setTipoCliente}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="emprestimo">Empréstimo</SelectItem>
-                    <SelectItem value="mensalidade">Mensalidade</SelectItem>
-                    <SelectItem value="ambos">Ambos</SelectItem>
-                    <SelectItem value="cheque">Cheque</SelectItem>
-                    <SelectItem value="veiculo">Veículo</SelectItem>
+                    <SelectItem value="emprestimo">{t('clientes.typeEmprestimo')}</SelectItem>
+                    <SelectItem value="mensalidade">{t('clientes.typeMensalidade')}</SelectItem>
+                    <SelectItem value="ambos">{t('clientes.typeBoth')}</SelectItem>
+                    <SelectItem value="cheque">{t('clientes.typeCheque')}</SelectItem>
+                    <SelectItem value="veiculo">{t('clientes.typeVeiculo')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -463,22 +463,22 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
               {/* Switches */}
               <div className="flex items-center justify-between py-2 border-t border-border">
                 <div>
-                  <p className="text-sm font-medium">Cliente veio por indicação</p>
-                  <p className="text-xs text-muted-foreground">Marque se este cliente foi indicado por outro</p>
+                  <p className="text-sm font-medium">{t('clientes.referral')}</p>
+                  <p className="text-xs text-muted-foreground">{t('clientes.referralDesc')}</p>
                 </div>
                 <Switch checked={isReferral} onCheckedChange={setIsReferral} />
               </div>
               <div className="flex items-center justify-between py-2 border-t border-border">
                 <div>
-                  <p className="text-sm font-medium">Cliente ativo</p>
-                  <p className="text-xs text-muted-foreground">Clientes inativos não aparecem nas cobranças</p>
+                  <p className="text-sm font-medium">{t('clientes.activeClient')}</p>
+                  <p className="text-xs text-muted-foreground">{t('clientes.inactiveDesc')}</p>
                 </div>
                 <Switch checked={ativo} onCheckedChange={setAtivo} />
               </div>
 
               {/* Observações */}
               <div>
-                <Label className="text-xs">Observações</Label>
+                <Label className="text-xs">{t('common.notes')}</Label>
                 <Textarea placeholder="Notas sobre o cliente..." value={observacoes} onChange={e => setObservacoes(e.target.value)} className="mt-1 resize-none" rows={3} />
               </div>
             </>
@@ -500,34 +500,34 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
                     }}
                     className="flex-1"
                   />
-                  {buscandoCep && <div className="flex items-center px-3 text-muted-foreground text-sm">Buscando...</div>}
+                  {buscandoCep && <div className="flex items-center px-3 text-muted-foreground text-sm">{t('common.loading')}</div>}
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2">
-                  <Label className="text-xs">Rua / Logradouro</Label>
+                  <Label className="text-xs">{t('clientes.street')}</Label>
                   <Input placeholder="Rua, Av., etc." value={endereco} onChange={e => setEndereco(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label className="text-xs">Número</Label>
+                  <Label className="text-xs">{t('clientes.number')}</Label>
                   <Input placeholder="Nº" value={numero} onChange={e => setNumero(e.target.value)} className="mt-1" />
                 </div>
               </div>
               <div>
-                <Label className="text-xs">Complemento</Label>
+                <Label className="text-xs">{t('clientes.complement')}</Label>
                 <Input placeholder="Apto, Bloco, Casa..." value={complemento} onChange={e => setComplemento(e.target.value)} className="mt-1" />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <Label className="text-xs">Bairro</Label>
+                  <Label className="text-xs">{t('clientes.neighborhood')}</Label>
                   <Input placeholder="Bairro" value={bairro} onChange={e => setBairro(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label className="text-xs">Cidade</Label>
+                  <Label className="text-xs">{t('common.address')}</Label>
                   <Input placeholder={t('clients.city')} value={cidade} onChange={e => setCidade(e.target.value)} className="mt-1" />
                 </div>
                 <div>
-                  <Label className="text-xs">Estado</Label>
+                  <Label className="text-xs">{t('clientes.state')}</Label>
                   <Input placeholder="UF" maxLength={2} value={estado} onChange={e => setEstado(e.target.value.toUpperCase())} className="mt-1" />
                 </div>
               </div>
@@ -538,7 +538,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
           {aba === "documentos" && (
             <>
               <div>
-                <Label className="text-xs">Descrição do Documento (opcional)</Label>
+                <Label className="text-xs">{t('clientes.docDescription')}</Label>
                 <Input
                   placeholder="Ex: RG, CPF, Comprovante de residência..."
                   value={docDescricao}
@@ -631,7 +631,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
               ← Voltar
             </Button>
           ) : (
-            <Button variant="outline" onClick={onClose}>Cancelar</Button>
+            <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
           )}
           {aba !== "documentos" ? (
             <Button className="bg-green-600 hover:bg-green-700" onClick={() => setAba(aba === "dados" ? "endereco" : "documentos")}>
@@ -733,8 +733,8 @@ export default function Clientes() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
-          <p className="text-sm text-muted-foreground mt-1">Gerencie seus clientes</p>
+          <h1 className="text-3xl font-bold text-foreground">{t('clientes.title')}</h1>
+          <p className="text-sm text-muted-foreground mt-1">{t('clientes.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="gap-2" onClick={exportarCSV}>
@@ -768,10 +768,10 @@ export default function Clientes() {
             <SelectValue placeholder="Tipo de cliente" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos os tipos</SelectItem>
-            <SelectItem value="emprestimo">Empréstimo</SelectItem>
-            <SelectItem value="mensalidade">Mensalidade</SelectItem>
-            <SelectItem value="ambos">Ambos</SelectItem>
+            <SelectItem value="todos">{t('clientes.allTypes')}</SelectItem>
+            <SelectItem value="emprestimo">{t('clientes.typeEmprestimo')}</SelectItem>
+            <SelectItem value="mensalidade">{t('clientes.typeMensalidade')}</SelectItem>
+            <SelectItem value="ambos">{t('clientes.typeBoth')}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filtroIndicado} onValueChange={setFiltroIndicado}>
@@ -779,9 +779,9 @@ export default function Clientes() {
             <SelectValue placeholder="Indicação" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos</SelectItem>
-            <SelectItem value="sim">Indicados</SelectItem>
-            <SelectItem value="nao">Não indicados</SelectItem>
+            <SelectItem value="todos">{t('common.all')}</SelectItem>
+            <SelectItem value="sim">{t('clientes.referred')}</SelectItem>
+            <SelectItem value="nao">{t('clientes.notReferred')}</SelectItem>
           </SelectContent>
         </Select>
         <div className="flex items-center text-xs text-muted-foreground whitespace-nowrap">
@@ -795,7 +795,7 @@ export default function Clientes() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Cliente</th>
+                <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">{t('common.client')}</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Telefone</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Tipo</th>
                 <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">Status</th>
@@ -904,7 +904,7 @@ export default function Clientes() {
               </div>
             </div>
             <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => setDeleteClienteId(null)}>Cancelar</Button>
+              <Button variant="outline" onClick={() => setDeleteClienteId(null)}>{t('common.cancel')}</Button>
               <Button
                 variant="destructive"
                 onClick={() => deleteClienteMutation.mutate({ id: deleteClienteId! })}

@@ -195,15 +195,15 @@ function PagamentoDialog({
           <div className="space-y-4 mt-2">
             <div className="p-4 rounded-lg bg-muted border border-border space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Cliente</span>
+                <span className="text-muted-foreground">{t('common.client')}</span>
                 <span className="text-foreground font-medium">{parcela.clienteNome}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Parcela</span>
+                <span className="text-muted-foreground">{t('common.installment')}</span>
                 <span className="text-foreground">{parcela.numeroParcela}/{parcela.numeroParcelas}</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Valor Original</span>
+                <span className="text-muted-foreground">{t('parcelas.originalValue')}</span>
                 <span className="text-foreground">{formatarMoeda(parcela.valorOriginal)}</span>
               </div>
               {diasAtraso > 0 && (
@@ -213,11 +213,11 @@ function PagamentoDialog({
                     <span className="text-warning">{formatarMoeda(multa)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Juros Mora</span>
+                    <span className="text-muted-foreground">{t('parcelas.lateInterest')}</span>
                     <span className="text-warning">{formatarMoeda(juros)}</span>
                   </div>
                   <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
-                    <span className="text-foreground">Total Atualizado</span>
+                    <span className="text-foreground">{t('parcelas.updatedTotal')}</span>
                     <span className="text-primary">{formatarMoeda(total)}</span>
                   </div>
                 </>
@@ -226,7 +226,7 @@ function PagamentoDialog({
 
             {/* Botões rápidos */}
             <div className="space-y-2">
-              <Label className="text-xs text-muted-foreground">Atalhos de pagamento</Label>
+              <Label className="text-xs text-muted-foreground">{t('parcelas.paymentShortcuts')}</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Button
                   variant="outline"
@@ -248,7 +248,7 @@ function PagamentoDialog({
             </div>
 
             <div>
-              <Label>Valor Recebido (R$) *</Label>
+              <Label>{t('parcelas.receivedValue')}</Label>
               <Input
                 className="mt-1"
                 type="number"
@@ -259,7 +259,7 @@ function PagamentoDialog({
             </div>
 
             <div>
-              <Label>Desconto (R$)</Label>
+              <Label>{t('parcelas.discount')}</Label>
               <Input
                 className="mt-1"
                 type="number"
@@ -270,7 +270,7 @@ function PagamentoDialog({
             </div>
 
             <div>
-              <Label>Conta de Caixa <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+              <Label>{t('emprestimos.cashAccount')} <span className="text-muted-foreground text-xs">(opcional)</span></Label>
               <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder="Selecione a conta" />
@@ -286,7 +286,7 @@ function PagamentoDialog({
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>Cancelar</Button>
+              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
               <Button
                 className="flex-1"
                 disabled={!valorPago || pagarMutation.isPending}
@@ -487,12 +487,12 @@ export default function Parcelas() {
             <SelectValue placeholder="Modalidade" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas as Modalidades</SelectItem>
-            <SelectItem value="diario">Diário</SelectItem>
-            <SelectItem value="semanal">Semanal</SelectItem>
-            <SelectItem value="quinzenal">Quinzenal</SelectItem>
-            <SelectItem value="mensal">Mensal</SelectItem>
-            <SelectItem value="tabela_price">Tabela Price</SelectItem>
+            <SelectItem value="todas">{t('parcelas.allModalities')}</SelectItem>
+            <SelectItem value="diario">{t('common.daily')}</SelectItem>
+            <SelectItem value="semanal">{t('common.weekly')}</SelectItem>
+            <SelectItem value="quinzenal">{t('common.biweekly')}</SelectItem>
+            <SelectItem value="mensal">{t('common.monthly')}</SelectItem>
+            <SelectItem value="tabela_price">{t('parcelas.priceTable')}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
@@ -501,12 +501,12 @@ export default function Parcelas() {
             <SelectValue placeholder="Filtrar status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos os Status</SelectItem>
-            <SelectItem value="atrasada">Atrasadas</SelectItem>
-            <SelectItem value="vencendo_hoje">Vence Hoje</SelectItem>
-            <SelectItem value="pendente">Pendentes</SelectItem>
-            <SelectItem value="paga">Pagas</SelectItem>
-            <SelectItem value="parcial">Parcial</SelectItem>
+            <SelectItem value="todos">{t('parcelas.allStatuses')}</SelectItem>
+            <SelectItem value="atrasada">{t('parcelas.overduePlural')}</SelectItem>
+            <SelectItem value="vencendo_hoje">{t('parcelas.dueTodayLabel')}</SelectItem>
+            <SelectItem value="pendente">{t('parcelas.pending')}</SelectItem>
+            <SelectItem value="paga">{t('parcelas.paidPlural')}</SelectItem>
+            <SelectItem value="parcial">{t('common.partial')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -524,7 +524,7 @@ export default function Parcelas() {
       {!isLoading && filtradas?.length === 0 && (
         <div className="text-center py-16">
           <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Nenhuma parcela encontrada</p>
+          <p className="text-muted-foreground">{t('parcelas.noParcelas')}</p>
         </div>
       )}
 
