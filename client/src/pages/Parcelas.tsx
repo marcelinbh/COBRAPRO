@@ -131,6 +131,7 @@ type ParcelaRow = {
   taxaJuros?: string | null;
   tipoTaxa?: string | null;
   valorPrincipalContrato?: string | null;
+  valorPrincipal?: string | null;
 };
 
 function PagamentoDialog({
@@ -156,17 +157,30 @@ function PagamentoDialog({
 
   // Calcular valor dos juros do período (taxa do contrato)
   const valorOriginal = parseFloat(parcela.valorOriginal);
-  // Para juros simples: juros = principal * (taxa/100)
-  // valorParcela = principal/n + principal * taxa/100
-  // Então: jurosParcela = valorParcela - principal/n
-  const principalContrato = parcela.valorPrincipalContrato ? parseFloat(parcela.valorPrincipalContrato) : 0;
+  // Usar valor_juros do banco se disponível (calculado na criação da parcela)
+  // Fallback: calcular a partir do principal e taxa
+  const principalContrato = parseFloat(parcela.valorPrincipal ?? parcela.valorPrincipalContrato ?? '0');
   const nParcelas = parcela.numeroParcelas || 1;
-  const amortizacao = principalContrato > 0 ? principalContrato / nParcelas : 0;
-  const jurosParcela = principalContrato > 0 ? Math.max(0, valorOriginal - amortizacao) : valorOriginal * 0.5;
-  // taxa real do contrato
   const taxaContrato = parcela.taxaJuros ? parseFloat(parcela.taxaJuros) : 0;
+  // jurosParcela: usar valor_juros do banco se disponível, senão calcular
+  const jurosParcela = parcela.valorJuros && parseFloat(parcela.valorJuros) > 0
+    ? parseFloat(parcela.valorJuros)
+    : principalContrato > 0
+      ? Math.round(principalContrato * (taxaContrato / 100) * 100) / 100
+      : Math.max(0, valorOriginal - (principalContrato > 0 ? principalContrato / nParcelas : 0));
 
+  const [modoSoJuros, setModoSoJuros] = useState(false);
   const utils = trpc.useUtils();
+  const pagarJurosMutation = trpc.parcelas.pagarJuros.useMutation({
+    onSuccess: (data) => {
+      toast.success(`✅ Juros pagos! Nova parcela criada com vencimento em ${data.novaDataVencimento}`);
+      setOpen(false);
+      setModoSoJuros(false);
+      onSuccess();
+      utils.dashboard.kpis.invalidate();
+    },
+    onError: (e) => toast.error('Erro ao pagar juros: ' + e.message),
+  });
   const pagarMutation = trpc.parcelas.registrarPagamento.useMutation({
     onSuccess: () => {
       toast.success(t('toast_success.pagamento_registrado_com_sucesso'));
@@ -231,18 +245,19 @@ function PagamentoDialog({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10"
-                  onClick={() => setValorPago(total.toFixed(2))}
+                  className={`text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 ${!modoSoJuros ? 'ring-1 ring-emerald-400' : ''}`}
+                  onClick={() => { setValorPago(total.toFixed(2)); setModoSoJuros(false); }}
                 >
                   ✅ Pagar Total ({formatarMoeda(total)})
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10"
-                  onClick={() => setValorPago(jurosParcela.toFixed(2))}
+                  className={`text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10 ${modoSoJuros ? 'ring-1 ring-amber-400 bg-amber-500/10' : ''}`}
+                  onClick={() => { setValorPago(jurosParcela.toFixed(2)); setModoSoJuros(true); }}
                 >
                   💰 Só Juros ({formatarMoeda(jurosParcela)})
+                  {modoSoJuros && <span className="ml-1 text-[10px] bg-amber-500/20 px-1 rounded">↺ Renova</span>}
                 </Button>
               </div>
             </div>
@@ -285,22 +300,39 @@ function PagamentoDialog({
               </Select>
             </div>
 
+            {modoSoJuros && (
+              <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs text-amber-300">
+                ⚠️ <strong>Modo Renovação:</strong> Ao confirmar, os juros serão pagos e uma nova parcela será criada automaticamente com vencimento +{parcela.modalidade === 'diario' ? '1 dia' : parcela.modalidade === 'semanal' ? '7 dias' : parcela.modalidade === 'quinzenal' ? '15 dias' : '30 dias'}.
+              </div>
+            )}
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
+              <Button variant="outline" className="flex-1" onClick={() => { setOpen(false); setModoSoJuros(false); }}>{t('common.cancel')}</Button>
               <Button
-                className="flex-1"
-                disabled={!valorPago || pagarMutation.isPending}
+                className={`flex-1 ${modoSoJuros ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}`}
+                disabled={!valorPago || pagarMutation.isPending || pagarJurosMutation.isPending}
                 onClick={() => {
-                  pagarMutation.mutate({
-                    parcelaId: parcela.id,
-                    valorPago: parseFloat(valorPago),
-                    contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
-                    desconto: parseFloat(desconto),
-                  });
-                  // Gerar comprovante após sucesso (será feito no onSuccess)
+                  if (modoSoJuros) {
+                    pagarJurosMutation.mutate({
+                      parcelaId: parcela.id,
+                      valorJurosPago: parseFloat(valorPago),
+                      contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
+                    });
+                  } else {
+                    pagarMutation.mutate({
+                      parcelaId: parcela.id,
+                      valorPago: parseFloat(valorPago),
+                      contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
+                      desconto: parseFloat(desconto),
+                    });
+                  }
                 }}
               >
-                {pagarMutation.isPending ? "Salvando..." : "Confirmar Pagamento"}
+                {(pagarMutation.isPending || pagarJurosMutation.isPending)
+                  ? 'Salvando...'
+                  : modoSoJuros
+                    ? `💰 Confirmar Só Juros (${formatarMoeda(parseFloat(valorPago || '0'))})`
+                    : 'Confirmar Pagamento'
+                }
               </Button>
             </div>
             
