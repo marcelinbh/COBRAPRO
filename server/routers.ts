@@ -1237,6 +1237,8 @@ const contratosRouter = router({
           contratoId = result[0].id;
 
           // Gerar parcelas via Drizzle
+          // Calcular valor_juros por parcela: capital × taxa%
+          const valorJurosPorParcela = Math.round(input.valorPrincipal * (input.taxaJuros / 100) * 100) / 100;
           const primeiraData = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
           const hoje2 = new Date(); hoje2.setHours(0, 0, 0, 0);
           for (let i = 0; i < input.numeroParcelas; i++) {
@@ -1256,6 +1258,7 @@ const contratosRouter = router({
               clienteId: input.clienteId,
               numeroParcela: i + 1,
               valorOriginal: valorParcela.toFixed(2),
+              valorJuros: valorJurosPorParcela.toFixed(2),
               dataVencimento: dataVenc.toISOString().split('T')[0],
               status,
               contaCaixaId: input.contaCaixaId,
@@ -1353,6 +1356,7 @@ const contratosRouter = router({
           numero_parcela: i + 1,
           valor: parseFloat(valorParcela.toFixed(2)),
           valor_original: parseFloat(valorParcela.toFixed(2)),
+          valor_juros: parseFloat((Math.round(input.valorPrincipal * (input.taxaJuros / 100) * 100) / 100).toFixed(2)),
           data_vencimento: dataVenc.toISOString().split('T')[0],
           status,
           conta_caixa_id: input.contaCaixaId ?? null,
@@ -1548,18 +1552,11 @@ const contratosRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          const parcelasNaoPagas = await db.select().from(parcelas).where(
-            and(eq(parcelas.contratoId, input.id), ne(parcelas.status, 'paga'))
-          );
-          if (parcelasNaoPagas.length > 0) {
-            throw new TRPCError({ code: 'CONFLICT', message: `Nao eh possivel deletar contrato com ${parcelasNaoPagas.length} parcela(s) nao paga(s).` });
-          }
           // IMPORTANTE: deletar parcelas ANTES do contrato (foreign key constraint)
           await db.delete(parcelas).where(eq(parcelas.contratoId, input.id));
           await db.delete(contratos).where(eq(contratos.id, input.id));
           return { success: true };
         } catch (err: any) {
-          if (err?.code === 'CONFLICT') throw err;
           console.warn('[contratos.deletar] Drizzle failed, trying REST:', err.message);
           resetDb();
         }
@@ -1567,11 +1564,7 @@ const contratosRouter = router({
       // Fallback: Supabase REST
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: pNaoPagas } = await supabase.from('parcelas').select('id').eq('contrato_id', input.id).neq('status', 'paga');
-      if (pNaoPagas && pNaoPagas.length > 0) {
-        throw new TRPCError({ code: 'CONFLICT', message: `Nao eh possivel deletar contrato com ${pNaoPagas.length} parcela(s) nao paga(s).` });
-      }
-      // Filtrar por user_id para garantir isolamento multi-tenant
+      // IMPORTANTE: deletar parcelas ANTES do contrato (foreign key constraint)
       await supabase.from('parcelas').delete().eq('contrato_id', input.id);
       const { error } = await supabase.from('contratos').delete().eq('id', input.id).eq('user_id', ctx.user.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -2131,13 +2124,17 @@ const parcelasRouter = router({
 
         // Calcular valorJuros para a nova parcela (juros = valor pago, pois é só juros)
         const valorJurosNovaParcela = input.valorJurosPago.toFixed(2);
+        // Buscar o maior numero_parcela existente para evitar duplicatas
+        const maxParcelaRows = await db.select({ maxNum: sql<number>`MAX(numero_parcela)` })
+          .from(parcelas).where(eq(parcelas.contratoId, parcela.contratoId as number));
+        const maxNumeroParcela = maxParcelaRows[0]?.maxNum ?? (parcela.numeroParcela as number);
         // Criar nova parcela com o valor (possivelmente customizado) e nova data
         await db.insert(parcelas).values({
           userId: ctx.user.id,
           contratoId: parcela.contratoId as number,
           clienteId: parcela.clienteId as number,
           koletorId: parcela.koletorId ?? undefined,
-          numeroParcela: (parcela.numeroParcela as number) + 1,
+          numeroParcela: maxNumeroParcela + 1,
           valorOriginal: valorNovaParcela,
           valorJuros: valorJurosNovaParcela,
           dataVencimento: novaDataVencStr,
@@ -2175,7 +2172,14 @@ const parcelasRouter = router({
           data_transacao: new Date().toISOString().split('T')[0],
         });
 
-        const novoNumero = (parcela.numeroParcela as number) + 1;
+        // Buscar o maior numero_parcela existente para evitar duplicatas no fallback REST
+        const { data: maxParcelaRest } = await supabase.from('parcelas')
+          .select('numero_parcela')
+          .eq('contrato_id', parcela.contratoId)
+          .order('numero_parcela', { ascending: false })
+          .limit(1)
+          .single();
+        const novoNumero = ((maxParcelaRest?.numero_parcela as number) ?? (parcela.numeroParcela as number)) + 1;
         const novoValorRest = parseFloat(valorNovaParcela);
         const novaContagemRenovacoes = (((parcela as any).contagemRenovacoes as number) || 0) + 1;
         await supabase.from('parcelas').insert({
