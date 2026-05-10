@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import {
-  Search, MessageCircle, CheckCircle, Clock, AlertTriangle, Filter, Download, FileSpreadsheet, FileText
+  Search, MessageCircle, CheckCircle, Clock, AlertTriangle, Filter, Download, FileSpreadsheet, FileText, ArrowLeft
 } from "lucide-react";
 import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
@@ -369,9 +369,17 @@ export default function Parcelas() {
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroModalidade, setFiltroModalidade] = useState("todas");
 
+  // Bug #4 corrigido: ler contratoId da URL (?contratoId=X) para filtrar por contrato
+  const contratoIdFiltro = useMemo(() => {
+    const params = new URLSearchParams(window.location.search);
+    const val = params.get('contratoId');
+    return val ? parseInt(val, 10) : undefined;
+  }, []);
+
   const { data: parcelas, isLoading, refetch } = trpc.parcelas.list.useQuery({
     status: filtroStatus !== "todos" ? filtroStatus : undefined,
     modalidade: filtroModalidade !== "todas" ? filtroModalidade : undefined,
+    contratoId: contratoIdFiltro,
   });
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: configData } = trpc.configuracoes.get.useQuery();
@@ -457,6 +465,22 @@ export default function Parcelas() {
 
   return (
     <div className="space-y-6">
+      {/* Banner de filtro por contrato (Bug #4 corrigido) */}
+      {contratoIdFiltro && (
+        <div className="flex items-center gap-3 p-3 rounded-lg border border-primary/30 bg-primary/5">
+          <Filter className="h-4 w-4 text-primary shrink-0" />
+          <span className="text-sm text-primary font-medium">
+            Exibindo apenas parcelas do Contrato #{contratoIdFiltro}
+          </span>
+          <button
+            className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => { window.location.href = '/parcelas'; }}
+          >
+            <ArrowLeft className="h-3 w-3" />
+            Ver todas
+          </button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="font-display text-3xl text-foreground tracking-wide">{t('installments.title')}</h1>
@@ -553,7 +577,8 @@ export default function Parcelas() {
         </div>
       )}
 
-      {!isLoading && filtradas?.length === 0 && (
+      {/* Bug #3 corrigido: só mostrar empty state quando dados já foram carregados (parcelas !== undefined) */}
+      {!isLoading && parcelas !== undefined && filtradas?.length === 0 && (
         <div className="text-center py-16">
           <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
           <p className="text-muted-foreground">{t('parcelas.noParcelas')}</p>
