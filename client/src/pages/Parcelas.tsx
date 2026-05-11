@@ -137,11 +137,13 @@ type ParcelaRow = {
 function PagamentoDialog({
   parcela,
   contas,
+  configData,
   onSuccess,
 }: {
   parcela: ParcelaRow;
   contas: { id: number; nome: string; saldoAtual: number }[];
   onSuccess: () => void;
+  configData?: { multaPadrao?: number; multaDiaria?: number; jurosMoraDiario?: number; jurosMultaAutomatico?: boolean } | null;
 }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -149,10 +151,15 @@ function PagamentoDialog({
   const [contaCaixaId, setContaCaixaId] = useState("");
   const [desconto, setDesconto] = useState("0");
 
+  // Usar parâmetros de multa/juros das configurações quando jurosMultaAutomatico estiver ativo
+  const multaDiariaConfig = configData?.jurosMultaAutomatico ? (configData?.multaDiaria ?? 0) : 0;
+  const multaPercentualConfig = configData?.jurosMultaAutomatico ? (configData?.multaPadrao ?? 0) : 0;
   const { juros, multa, total, diasAtraso } = calcularJurosMora(
     parseFloat(parcela.valorOriginal),
     new Date(parcela.dataVencimento),
-    new Date()
+    new Date(),
+    multaDiariaConfig,
+    multaPercentualConfig
   );
 
   // Calcular valor dos juros do período (taxa do contrato)
@@ -204,7 +211,14 @@ function PagamentoDialog({
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-display text-xl tracking-wide">REGISTRAR PAGAMENTO</DialogTitle>
+            <DialogTitle className="font-display text-xl tracking-wide flex items-center gap-2">
+              REGISTRAR PAGAMENTO
+              {configData?.jurosMultaAutomatico && diasAtraso > 0 && (
+                <span className="text-xs font-normal bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full">
+                  ⚡ Juros/Multa Auto
+                </span>
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="p-4 rounded-lg bg-muted border border-border space-y-2">
@@ -666,6 +680,7 @@ export default function Parcelas() {
                           parcela={parcela as any}
                           contas={contas ?? []}
                           onSuccess={() => refetch()}
+                          configData={configData}
                         />
                       </div>
                     )}

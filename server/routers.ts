@@ -3000,6 +3000,7 @@ const configuracoesRouter = router({
       templateAtraso: get('templateAtraso', 'template_atraso'),
       templateVenceHoje: get('templateVenceHoje', 'template_vence_hoje'),
       templateAntecipada: get('templateAntecipada', 'template_antecipada'),
+      jurosMultaAutomatico: (map['jurosMultaAutomatico'] ?? map['juros_multa_automatico'] ?? 'false') === 'true',
     };
   }),
   save: protectedProcedure
@@ -3013,6 +3014,7 @@ const configuracoesRouter = router({
       linkPagamento: z.string().optional(), logoUrl: z.string().optional(),
       templateAtraso: z.string().optional(), templateVenceHoje: z.string().optional(),
       templateAntecipada: z.string().optional(),
+      jurosMultaAutomatico: z.boolean().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();

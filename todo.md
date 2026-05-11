@@ -1033,3 +1033,8 @@
 - [x] Testar fluxo de renovação quinzenal no cobrapro.online (pagar só juros → nova parcela +15 dias)
 - [x] Criar módulo de Relatórios: empréstimos ativos, projeção de recebimentos, extrato por cliente
 - [x] Adicionar configuração de juros/multas automáticos no painel de Configurações (ativável manualmente)
+
+## Fase 60: 3 Melhorias (11/05/2026)
+- [x] Cálculo automático de juros/multas no modal de pagamento (quando toggle ativo nas Configurações)
+- [x] Exportação PDF no Extrato por Cliente nos Relatórios
+- [x] Filtros avançados nos Relatórios (faixa de valor de capital nos empréstimos ativos)

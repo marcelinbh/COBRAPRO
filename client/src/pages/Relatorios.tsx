@@ -32,6 +32,9 @@ export default function Relatorios() {
   );
   const [dataFim, setDataFim] = useState(hoje.toISOString().split('T')[0]);
   const [filtroModalidade, setFiltroModalidade] = useState('todas');
+  // Filtros avançados — Empréstimos Ativos
+  const [filtroValorMin, setFiltroValorMin] = useState('');
+  const [filtroValorMax, setFiltroValorMax] = useState('');
 
   const { data: kpis } = trpc.dashboard.kpis.useQuery();
   const { data: contratos } = trpc.contratos.list.useQuery({});
@@ -141,7 +144,17 @@ export default function Relatorios() {
     .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
 
   // === Empréstimos Ativos ===
-  const emprestimosAtivos = useMemo(() => (contratos ?? []).filter(c => c.status === 'ativo'), [contratos]);
+  const todosEmprestimosAtivos = useMemo(() => (contratos ?? []).filter(c => c.status === 'ativo'), [contratos]);
+  const emprestimosAtivos = useMemo(() => {
+    const vMin = filtroValorMin !== '' ? parseFloat(filtroValorMin.replace(',', '.')) : null;
+    const vMax = filtroValorMax !== '' ? parseFloat(filtroValorMax.replace(',', '.')) : null;
+    return todosEmprestimosAtivos.filter(c => {
+      const val = parseFloat(String(c.valorPrincipal ?? 0));
+      if (vMin !== null && !isNaN(vMin) && val < vMin) return false;
+      if (vMax !== null && !isNaN(vMax) && val > vMax) return false;
+      return true;
+    });
+  }, [todosEmprestimosAtivos, filtroValorMin, filtroValorMax]);
   const capitalEmCirculacao = emprestimosAtivos.reduce((sum, c) => sum + parseFloat(String(c.valorPrincipal ?? 0)), 0);
 
   // === Projeção de Recebimentos (próximos 30 dias) ===
@@ -177,6 +190,40 @@ export default function Relatorios() {
   const totalClienteRecebido = parcelasCliente.filter(p => p.status === 'paga').reduce((sum, p) => sum + parseFloat(String(p.valorPago ?? p.valorOriginal ?? 0)), 0);
   const totalClientePendente = parcelasCliente.filter(p => p.status !== 'paga' && p.status !== 'cancelada').reduce((sum, p) => sum + parseFloat(String(p.valorOriginal ?? 0)), 0);
 
+  // Exportar Extrato por Cliente em PDF
+  const exportarExtratoPDF = () => {
+    if (clienteSelecionado === 'todos' || parcelasCliente.length === 0) {
+      toast.error('Selecione um cliente com parcelas para exportar');
+      return;
+    }
+    const clienteNome = (clientesData?.clientes ?? []).find((c: any) => String(c.id) === clienteSelecionado)?.nome ?? 'Cliente';
+    const doc = new jsPDF();
+    doc.setFontSize(16);
+    doc.text(`Extrato do Cliente: ${clienteNome}`, 14, 20);
+    doc.setFontSize(10);
+    doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 28);
+    doc.text(`Total Recebido: ${formatarMoeda(totalClienteRecebido)}  |  Pendente: ${formatarMoeda(totalClientePendente)}  |  Parcelas: ${parcelasCliente.length}`, 14, 35);
+    autoTable(doc, {
+      startY: 42,
+      head: [['Parcela', 'Vencimento', 'Valor', 'Status', 'Pago em', 'Valor Pago']],
+      body: parcelasCliente.map(p => {
+        const statusLabel = p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : p.status === 'vencendo_hoje' ? 'Vence Hoje' : p.status === 'parcial' ? 'Parcial' : 'Pendente';
+        return [
+          String(p.numeroParcela ?? '-'),
+          new Date(String(p.dataVencimento).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR'),
+          formatarMoeda(parseFloat(String(p.valorOriginal ?? 0))),
+          statusLabel,
+          p.dataPagamento ? new Date(String(p.dataPagamento).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR') : '-',
+          p.valorPago ? formatarMoeda(parseFloat(String(p.valorPago))) : '-',
+        ];
+      }),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [30, 30, 30] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+    doc.save(`extrato_${clienteNome.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`);
+    toast.success('PDF exportado com sucesso!');
+  };
   // Distribuição de vendas por modalidade (gráfico de pizza)
   const distribuicaoVendas = Object.entries(modalidadesMap).map(([key, val], idx) => ({
     name: MODALIDADE_LABELS[key] ?? key,
@@ -693,10 +740,45 @@ export default function Relatorios() {
       {/* === Empréstimos Ativos === */}
       <Card className="border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Empréstimos Ativos
-          </CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <Activity className="h-4 w-4" />
+              Empréstimos Ativos
+              {(filtroValorMin !== '' || filtroValorMax !== '') && (
+                <span className="ml-2 text-xs font-normal text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                  {emprestimosAtivos.length} de {todosEmprestimosAtivos.length}
+                </span>
+              )}
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Capital:</span>
+              <input
+                type="number"
+                placeholder="Mín (R$)"
+                value={filtroValorMin}
+                onChange={e => setFiltroValorMin(e.target.value)}
+                className="h-7 w-24 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              <span className="text-xs text-muted-foreground">—</span>
+              <input
+                type="number"
+                placeholder="Máx (R$)"
+                value={filtroValorMax}
+                onChange={e => setFiltroValorMax(e.target.value)}
+                className="h-7 w-24 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              />
+              {(filtroValorMin !== '' || filtroValorMax !== '') && (
+                <button
+                  onClick={() => { setFiltroValorMin(''); setFiltroValorMax(''); }}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  title="Limpar filtros"
+                >
+                  × Limpar
+                </button>
+              )}
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
@@ -804,10 +886,18 @@ export default function Relatorios() {
       {/* === Extrato por Cliente === */}
       <Card className="border-border">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Extrato por Cliente
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Extrato por Cliente
+            </CardTitle>
+            {clienteSelecionado !== 'todos' && parcelasCliente.length > 0 && (
+              <Button variant="outline" size="sm" onClick={exportarExtratoPDF} className="gap-1.5 text-xs">
+                <Download className="h-3.5 w-3.5" />
+                Exportar PDF
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4">
