@@ -1038,3 +1038,13 @@
 - [x] Cálculo automático de juros/multas no modal de pagamento (quando toggle ativo nas Configurações)
 - [x] Exportação PDF no Extrato por Cliente nos Relatórios
 - [x] Filtros avançados nos Relatórios (faixa de valor de capital nos empréstimos ativos)
+
+## Fase 61: Auditoria Completa de Código e Cálculos (11/05/2026)
+- [x] Auditoria de segurança: contratos.deletar (Drizzle path) sem user_id → corrigido
+- [x] Auditoria de segurança: clientes.deletar (Drizzle path) sem user_id → corrigido
+- [x] Auditoria de segurança: contratos.updateStatus (Drizzle path) sem user_id → corrigido
+- [x] Bug cálculo: valor_juros para Tabela Price era fixo (capital × taxa) → corrigido para juros decrescentes (saldo_devedor × taxa) em ambos os paths (Drizzle + REST)
+- [x] Bug campo: Dashboard fallback REST usava 'saldo' e 'ativo' (campos inexistentes) → corrigido para 'saldo_inicial' e 'ativa'
+- [x] Bug campo: caixa.contas fallback REST usava 'saldo' e 'ativo' → corrigido para 'saldo_inicial' e 'ativa'
+- [x] Bug campo: vendasTelefone tentava atualizar campo 'saldo' inexistente → removido update desnecessário
+- [x] Cálculos verificados como CORRETOS: calcularParcelaPadrao, calcularParcelaBullet, calcularJurosMora, saldoResidual, pagarJuros (renovação), lucroRealizado, lucroPrevisto

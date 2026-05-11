@@ -125,7 +125,7 @@ const dashboardRouter = router({
     // Fetch data via Supabase REST (filtrado por user_id para isolamento entre contas)
     const userId = ctx.user.id;
     const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
-      supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true).eq('user_id', userId),
+      supabase.from('contas_caixa').select('id, saldo_inicial, ativa').eq('ativa', true).eq('user_id', userId),
       supabase.from('contratos').select('valor_principal').eq('status', 'ativo').eq('user_id', userId),
       supabase.from('parcelas').select('valor_original, valor_juros, valor_multa, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
       supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao').eq('user_id', userId)
@@ -137,7 +137,7 @@ const dashboardRouter = router({
         const transacoesConta = (transRes.data ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
         const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
         const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-        saldoTotal += parseFloat(conta.saldo ?? '0') + totalEntradas - totalSaidas;
+        saldoTotal += parseFloat(conta.saldo_inicial ?? '0') + totalEntradas - totalSaidas;
       }
     }
 
@@ -773,7 +773,7 @@ const clientesRouter = router({
               message: `Nao eh possivel deletar cliente com ${contratosAtivos.length} contrato(s) ativo(s).`
             });
           }
-          await db.delete(clientes).where(eq(clientes.id, input.id));
+          await db.delete(clientes).where(and(eq(clientes.id, input.id), eq(clientes.userId, ctx.user.id)));
           return { success: true };
         } catch (err: any) {
           if (err?.code === 'CONFLICT') throw err;
@@ -1237,11 +1237,23 @@ const contratosRouter = router({
           contratoId = result[0].id;
 
           // Gerar parcelas via Drizzle
-          // Calcular valor_juros por parcela: capital × taxa%
-          const valorJurosPorParcela = Math.round(input.valorPrincipal * (input.taxaJuros / 100) * 100) / 100;
+          // Para Tabela Price: juros decrescentes (saldo_devedor × taxa)
+          // Para demais modalidades: juros simples = capital × taxa% (constante)
+          const isPrice = input.modalidade === 'tabela_price';
+          const taxaDecimal = input.taxaJuros / 100;
+          let saldoDevedor = input.valorPrincipal;
           const primeiraData = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
           const hoje2 = new Date(); hoje2.setHours(0, 0, 0, 0);
           for (let i = 0; i < input.numeroParcelas; i++) {
+            // Calcular juros desta parcela
+            let valorJurosParcela: number;
+            if (isPrice) {
+              valorJurosParcela = Math.round(saldoDevedor * taxaDecimal * 100) / 100;
+              const amortizacao = Math.round((valorParcela - valorJurosParcela) * 100) / 100;
+              saldoDevedor = Math.max(0, Math.round((saldoDevedor - amortizacao) * 100) / 100);
+            } else {
+              valorJurosParcela = Math.round(input.valorPrincipal * taxaDecimal * 100) / 100;
+            }
             const dataVenc = new Date(primeiraData);
             if (i > 0) {
               if (input.tipoTaxa === 'diaria') dataVenc.setDate(dataVenc.getDate() + i);
@@ -1258,7 +1270,7 @@ const contratosRouter = router({
               clienteId: input.clienteId,
               numeroParcela: i + 1,
               valorOriginal: valorParcela.toFixed(2),
-              valorJuros: valorJurosPorParcela.toFixed(2),
+              valorJuros: valorJurosParcela.toFixed(2),
               dataVencimento: dataVenc.toISOString().split('T')[0],
               status,
               contaCaixaId: input.contaCaixaId,
@@ -1333,10 +1345,23 @@ const contratosRouter = router({
       contratoId = contratoData.id;
 
       // Gerar parcelas via REST
+      // Para Tabela Price: juros decrescentes (saldo_devedor × taxa)
+      // Para demais modalidades: juros simples = capital × taxa% (constante)
+      const isPrice2 = input.modalidade === 'tabela_price';
+      const taxaDecimal2 = input.taxaJuros / 100;
+      let saldoDevedor2 = input.valorPrincipal;
       const primeiraData = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
       const hoje2 = new Date(); hoje2.setHours(0, 0, 0, 0);
       const parcelasPayload = [];
       for (let i = 0; i < input.numeroParcelas; i++) {
+        let valorJurosRest: number;
+        if (isPrice2) {
+          valorJurosRest = Math.round(saldoDevedor2 * taxaDecimal2 * 100) / 100;
+          const amortizacao2 = Math.round((valorParcela - valorJurosRest) * 100) / 100;
+          saldoDevedor2 = Math.max(0, Math.round((saldoDevedor2 - amortizacao2) * 100) / 100);
+        } else {
+          valorJurosRest = Math.round(input.valorPrincipal * taxaDecimal2 * 100) / 100;
+        }
         const dataVenc = new Date(primeiraData);
         if (i > 0) {
           if (input.tipoTaxa === 'diaria') dataVenc.setDate(dataVenc.getDate() + i);
@@ -1356,7 +1381,7 @@ const contratosRouter = router({
           numero_parcela: i + 1,
           valor: parseFloat(valorParcela.toFixed(2)),
           valor_original: parseFloat(valorParcela.toFixed(2)),
-          valor_juros: parseFloat((Math.round(input.valorPrincipal * (input.taxaJuros / 100) * 100) / 100).toFixed(2)),
+          valor_juros: parseFloat(valorJurosRest.toFixed(2)),
           data_vencimento: dataVenc.toISOString().split('T')[0],
           status,
           conta_caixa_id: input.contaCaixaId ?? null,
@@ -1375,7 +1400,7 @@ const contratosRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(contratos).set({ status: input.status }).where(eq(contratos.id, input.id));
+          await db.update(contratos).set({ status: input.status }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
           return { success: true };
         } catch (err) {
           console.warn('[contratos.updateStatus] Drizzle failed, trying REST:', (err as Error).message);
@@ -1553,8 +1578,9 @@ const contratosRouter = router({
       if (db) {
         try {
           // IMPORTANTE: deletar parcelas ANTES do contrato (foreign key constraint)
-          await db.delete(parcelas).where(eq(parcelas.contratoId, input.id));
-          await db.delete(contratos).where(eq(contratos.id, input.id));
+          // Verificar user_id para garantir isolamento entre usuários (segurança)
+          await db.delete(parcelas).where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id)));
+          await db.delete(contratos).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
           return { success: true };
         } catch (err: any) {
           console.warn('[contratos.deletar] Drizzle failed, trying REST:', err.message);
@@ -2323,22 +2349,22 @@ const caixaRouter = router({
     // Fallback REST
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const { data: contasData } = await supabase.from('contas_caixa').select('*').eq('ativo', true).eq('user_id', ctx.user.id);
+    const { data: contasData } = await supabase.from('contas_caixa').select('*').eq('ativa', true).eq('user_id', ctx.user.id);
     const { data: transData } = await supabase.from('transacoes_caixa').select('conta_caixa_id, tipo, valor');
     const result2 = [];
     for (const conta of (contasData || [])) {
       const transacoesConta = (transData ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
       const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
       const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-      const saldoAtual = parseFloat(conta.saldo ?? '0') + totalEntradas - totalSaidas;
+      const saldoAtual = parseFloat(conta.saldo_inicial ?? '0') + totalEntradas - totalSaidas;
       result2.push({
         id: conta.id,
         nome: conta.nome,
         tipo: conta.tipo,
         banco: conta.banco ?? null,
-        saldoInicial: parseFloat(conta.saldo ?? '0'),
+        saldoInicial: parseFloat(conta.saldo_inicial ?? '0'),
         saldoAtual,
-        ativa: conta.ativo,
+        ativa: conta.ativa,
       });
     }
     return result2;
@@ -3965,8 +3991,8 @@ const vendasTelefoneRouter = router({
               data_transacao: new Date().toISOString(),
             });
             // Atualizar saldo da conta
-            const novoSaldo = parseFloat(conta.saldo ?? '0') + input.entradaValor;
-            await supabase.from('contas_caixa').update({ saldo: novoSaldo }).eq('id', conta.id);
+            // Registrar transação de entrada (saldo calculado via transações)
+            // Não atualizar campo saldo diretamente (campo inexistente, saldo é calculado)
           }
         } catch (caixaErr) {
           console.warn('[vendasTelefone.criar] Erro ao registrar no caixa:', caixaErr);
@@ -4016,8 +4042,8 @@ const vendasTelefoneRouter = router({
             descricao,
             data_transacao: new Date().toISOString(),
           });
-          const novoSaldo = parseFloat(conta.saldo ?? '0') + input.valorPago;
-          await supabase.from('contas_caixa').update({ saldo: novoSaldo }).eq('id', conta.id);
+          // Registrar transação de entrada (saldo calculado via transações)
+          // Não atualizar campo saldo diretamente (campo inexistente, saldo é calculado)
         }
       } catch (caixaErr) {
         console.warn('[vendasTelefone.pagarParcela] Erro ao registrar no caixa:', caixaErr);
