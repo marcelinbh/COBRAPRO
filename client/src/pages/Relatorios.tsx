@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { trpc } from "@/lib/trpc";
@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { BarChart2, TrendingUp, AlertTriangle, DollarSign, Filter, ArrowDownCircle, Plus, Minus, Download, FileText } from "lucide-react";
+import { BarChart2, TrendingUp, AlertTriangle, DollarSign, Filter, ArrowDownCircle, Plus, Minus, Download, FileText, Users, Calendar, Activity, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { formatarMoeda } from "../../../shared/finance";
@@ -34,6 +34,10 @@ export default function Relatorios() {
   const [filtroModalidade, setFiltroModalidade] = useState('todas');
 
   const { data: kpis } = trpc.dashboard.kpis.useQuery();
+  const { data: contratos } = trpc.contratos.list.useQuery({});
+  const { data: clientesData } = trpc.clientes.list.useQuery({});
+  const [clienteSelecionado, setClienteSelecionado] = useState<string>('todos');
+  const [expandirProjecao, setExpandirProjecao] = useState(false);
   const { data: parcelas } = trpc.parcelas.list.useQuery({});
   const { data: transacoes } = trpc.caixa.transacoes.useQuery({ limit: 1000 });
   const { data: contasCaixa } = trpc.caixa.contas.useQuery();
@@ -135,6 +139,43 @@ export default function Relatorios() {
       return t.tipo === 'entrada' && d >= dataInicio && d <= dataFim;
     })
     .reduce((sum, t) => sum + parseFloat(String(t.valor)), 0);
+
+  // === Empréstimos Ativos ===
+  const emprestimosAtivos = useMemo(() => (contratos ?? []).filter(c => c.status === 'ativo'), [contratos]);
+  const capitalEmCirculacao = emprestimosAtivos.reduce((sum, c) => sum + parseFloat(String(c.valorPrincipal ?? 0)), 0);
+
+  // === Projeção de Recebimentos (próximos 30 dias) ===
+  const hojeStr = new Date().toISOString().slice(0, 10);
+  const em30DiasStr = (() => { const d = new Date(); d.setDate(d.getDate() + 30); return d.toISOString().slice(0, 10); })();
+  const projecaoRecebimentos = useMemo(() => {
+    const pendentes = (parcelas ?? []).filter(p => {
+      if (p.status === 'paga' || p.status === 'cancelada') return false;
+      const venc = String(p.dataVencimento).slice(0, 10);
+      return venc >= hojeStr && venc <= em30DiasStr;
+    });
+    const semanas: Record<string, { total: number; count: number; atrasadas: number }> = {};
+    pendentes.forEach(p => {
+      const d = new Date(String(p.dataVencimento).slice(0, 10) + 'T00:00:00');
+      const semanaInicio = new Date(d); semanaInicio.setDate(d.getDate() - d.getDay());
+      const key = semanaInicio.toISOString().slice(0, 10);
+      if (!semanas[key]) semanas[key] = { total: 0, count: 0, atrasadas: 0 };
+      semanas[key].total += parseFloat(String(p.valorOriginal ?? 0));
+      semanas[key].count += 1;
+      if (p.status === 'atrasada') semanas[key].atrasadas += 1;
+    });
+    return Object.entries(semanas).sort(([a], [b]) => a.localeCompare(b)).map(([key, val]) => ({ semana: key, ...val }));
+  }, [parcelas, hojeStr, em30DiasStr]);
+  const totalProjecao30Dias = projecaoRecebimentos.reduce((sum, s) => sum + s.total, 0);
+
+  // === Extrato por Cliente ===
+  const parcelasCliente = useMemo(() => {
+    if (clienteSelecionado === 'todos') return [];
+    const cid = parseInt(clienteSelecionado);
+    return (parcelas ?? []).filter(p => (p.clienteId ?? (p as any).cliente_id) === cid)
+      .sort((a, b) => String(a.dataVencimento).localeCompare(String(b.dataVencimento)));
+  }, [parcelas, clienteSelecionado]);
+  const totalClienteRecebido = parcelasCliente.filter(p => p.status === 'paga').reduce((sum, p) => sum + parseFloat(String(p.valorPago ?? p.valorOriginal ?? 0)), 0);
+  const totalClientePendente = parcelasCliente.filter(p => p.status !== 'paga' && p.status !== 'cancelada').reduce((sum, p) => sum + parseFloat(String(p.valorOriginal ?? 0)), 0);
 
   // Distribuição de vendas por modalidade (gráfico de pizza)
   const distribuicaoVendas = Object.entries(modalidadesMap).map(([key, val], idx) => ({
@@ -646,6 +687,198 @@ export default function Relatorios() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">{t('reports.entryWillBeRegistered')}</p>
+        </CardContent>
+      </Card>
+
+      {/* === Empréstimos Ativos === */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Empréstimos Ativos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Ativos</div>
+              <div className="font-display text-2xl text-foreground">{emprestimosAtivos.length}</div>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Capital em Circulação</div>
+              <div className="font-display text-xl text-warning">{formatarMoeda(capitalEmCirculacao)}</div>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Média por Contrato</div>
+              <div className="font-display text-xl text-foreground">{formatarMoeda(emprestimosAtivos.length > 0 ? capitalEmCirculacao / emprestimosAtivos.length : 0)}</div>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Inadimplentes</div>
+              <div className="font-display text-xl text-destructive">{(parcelas ?? []).filter(p => p.status === 'atrasada').length} parcelas</div>
+            </div>
+          </div>
+          {emprestimosAtivos.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Cliente</th>
+                    <th className="text-left py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Modalidade</th>
+                    <th className="text-right py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Capital</th>
+                    <th className="text-right py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Taxa</th>
+                    <th className="text-right py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Parcelas</th>
+                    <th className="text-left py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Início</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {emprestimosAtivos.map(c => (
+                    <tr key={c.id} className="border-b border-border/50 hover:bg-muted/20">
+                      <td className="py-2 px-3 font-medium text-foreground">{c.clienteNome}</td>
+                      <td className="py-2 px-3 text-muted-foreground">{MODALIDADE_LABELS[c.modalidade ?? ''] ?? c.modalidade}</td>
+                      <td className="py-2 px-3 text-right font-semibold text-warning">{formatarMoeda(parseFloat(String(c.valorPrincipal ?? 0)))}</td>
+                      <td className="py-2 px-3 text-right text-muted-foreground">{c.taxaJuros}%</td>
+                      <td className="py-2 px-3 text-right text-muted-foreground">{c.numeroParcelas}x</td>
+                      <td className="py-2 px-3 text-muted-foreground">{c.dataInicio ? new Date(String(c.dataInicio).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground text-sm">Nenhum empréstimo ativo encontrado</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* === Projeção de Recebimentos (30 dias) === */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <Calendar className="h-4 w-4" />
+              Projeção de Recebimentos — Próximos 30 Dias
+            </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => setExpandirProjecao(v => !v)} className="text-xs text-muted-foreground">
+              {expandirProjecao ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {expandirProjecao ? 'Recolher' : 'Ver detalhes'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Previsto (30 dias)</div>
+              <div className="font-display text-xl text-success">{formatarMoeda(totalProjecao30Dias)}</div>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Parcelas a Vencer</div>
+              <div className="font-display text-xl text-foreground">{projecaoRecebimentos.reduce((s, w) => s + w.count, 0)}</div>
+            </div>
+            <div className="p-4 rounded-lg bg-muted/30 border border-border">
+              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Semanas com Recebimento</div>
+              <div className="font-display text-xl text-foreground">{projecaoRecebimentos.length}</div>
+            </div>
+          </div>
+          {projecaoRecebimentos.length > 0 ? (
+            <div className="space-y-2">
+              {projecaoRecebimentos.map(s => (
+                <div key={s.semana} className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">
+                      Semana de {new Date(s.semana + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{s.count} parcela{s.count !== 1 ? 's' : ''}{s.atrasadas > 0 ? ` · ${s.atrasadas} atrasada${s.atrasadas !== 1 ? 's' : ''}` : ''}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-success">{formatarMoeda(s.total)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground text-sm">Nenhuma parcela a vencer nos próximos 30 dias</div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* === Extrato por Cliente === */}
+      <Card className="border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Extrato por Cliente
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Selecionar Cliente</Label>
+            <Select value={clienteSelecionado} onValueChange={setClienteSelecionado}>
+              <SelectTrigger className="mt-1 max-w-xs">
+                <SelectValue placeholder="Selecione um cliente..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">— Selecione um cliente —</SelectItem>
+                {(clientesData?.clientes ?? []).map((c: any) => (
+                  <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          {clienteSelecionado !== 'todos' && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+                <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Recebido</div>
+                  <div className="font-display text-xl text-success">{formatarMoeda(totalClienteRecebido)}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Pendente</div>
+                  <div className="font-display text-xl text-warning">{formatarMoeda(totalClientePendente)}</div>
+                </div>
+                <div className="p-4 rounded-lg bg-muted/30 border border-border">
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total de Parcelas</div>
+                  <div className="font-display text-xl text-foreground">{parcelasCliente.length}</div>
+                </div>
+              </div>
+              {parcelasCliente.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Parcela</th>
+                        <th className="text-left py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Vencimento</th>
+                        <th className="text-right py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Valor</th>
+                        <th className="text-left py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Status</th>
+                        <th className="text-left py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Pago em</th>
+                        <th className="text-right py-2 px-3 text-xs text-muted-foreground uppercase tracking-wide">Valor Pago</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parcelasCliente.map(p => {
+                        const statusColor = p.status === 'paga' ? 'text-success' : p.status === 'atrasada' ? 'text-destructive' : p.status === 'vencendo_hoje' ? 'text-warning' : 'text-muted-foreground';
+                        const statusLabel = p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : p.status === 'vencendo_hoje' ? 'Vence Hoje' : p.status === 'parcial' ? 'Parcial' : 'Pendente';
+                        return (
+                          <tr key={p.id} className="border-b border-border/50 hover:bg-muted/20">
+                            <td className="py-2 px-3 text-muted-foreground">{p.numeroParcela ?? '-'}</td>
+                            <td className="py-2 px-3 text-foreground">{new Date(String(p.dataVencimento).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR')}</td>
+                            <td className="py-2 px-3 text-right font-semibold text-foreground">{formatarMoeda(parseFloat(String(p.valorOriginal ?? 0)))}</td>
+                            <td className={`py-2 px-3 font-medium ${statusColor}`}>{statusLabel}</td>
+                            <td className="py-2 px-3 text-muted-foreground">{p.dataPagamento ? new Date(String(p.dataPagamento).slice(0,10)+'T00:00:00').toLocaleDateString('pt-BR') : '-'}</td>
+                            <td className="py-2 px-3 text-right text-success">{p.valorPago ? formatarMoeda(parseFloat(String(p.valorPago))) : '-'}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground text-sm">Nenhuma parcela encontrada para este cliente</div>
+              )}
+            </>
+          )}
+          {clienteSelecionado === 'todos' && (
+            <div className="text-center py-8 text-muted-foreground text-sm">Selecione um cliente para ver o extrato completo</div>
+          )}
         </CardContent>
       </Card>
 

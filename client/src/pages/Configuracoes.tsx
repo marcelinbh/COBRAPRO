@@ -9,8 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import {
   Settings, MessageCircle, Bell, Building2, Save, RotateCcw,
-  CheckCircle2, Info, Upload, ImageIcon, X, Clock, Send
+  CheckCircle2, Info, Upload, ImageIcon, X, Clock, Send, Zap, AlertTriangle
 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 // Variáveis disponíveis - idênticas ao Cobra Fácil
 const VARIAVEIS = [
@@ -94,6 +95,7 @@ export default function Configuracoes() {
     if ((config as any).nomeCobranca !== undefined) setNomeCobranca((config as any).nomeCobranca);
     if ((config as any).linkPagamento !== undefined) setLinkPagamento((config as any).linkPagamento);
     if ((config as any).logoUrl !== undefined) setLogoUrl((config as any).logoUrl);
+    if ((config as any).jurosMultaAutomatico !== undefined) setJurosMultaAutomatico((config as any).jurosMultaAutomatico);
     if (config.nomeEmpresa) setNomeEmpresa(config.nomeEmpresa);
     if (config.cnpjEmpresa) setCnpj(config.cnpjEmpresa);
     if (config.telefoneEmpresa) setTelefone(config.telefoneEmpresa);
@@ -130,6 +132,8 @@ export default function Configuracoes() {
   const [horarioRelatorio, setHorarioRelatorio] = useState((config as any)?.horarioRelatorio ?? "08:00");
   const [telefoneRelatorio, setTelefoneRelatorio] = useState((config as any)?.telefoneRelatorio ?? "");
   const [relatorioDiarioAtivo, setRelatorioDiarioAtivo] = useState((config as any)?.relatorioDiarioAtivo ?? false);
+  // Cobrança automática de juros/multas
+  const [jurosMultaAutomatico, setJurosMultaAutomatico] = useState((config as any)?.jurosMultaAutomatico ?? false);
 
   const relatorioDiarioMutation = trpc.whatsapp.relatorioDiario.useMutation();
 
@@ -238,6 +242,7 @@ export default function Configuracoes() {
       jurosMoraDiario: parseFloat(jurosMora) || 0.033,
       diasLembrete: parseInt(diasLembrete) || 3,
       multaDiaria: parseFloat(multaDiaria) || 100,
+      jurosMultaAutomatico,
       pixKey,
       nomeCobranca,
       linkPagamento,
@@ -561,6 +566,36 @@ export default function Configuracoes() {
               <Input className="mt-1" type="number" step="0.01" min="0" value={multaDiaria} onChange={e => setMultaDiaria(e.target.value)} />
               <p className="text-xs text-muted-foreground mt-1">Valor em R$ cobrado por dia de atraso nos empréstimos</p>
             </div>
+          </div>
+          {/* Toggle de Cobrança Automática de Juros/Multas */}
+          <div className="mt-2 p-4 rounded-lg border border-border bg-muted/20">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${jurosMultaAutomatico ? 'bg-warning/15' : 'bg-muted/30'}`}>
+                  <Zap className={`h-4 w-4 ${jurosMultaAutomatico ? 'text-warning' : 'text-muted-foreground'}`} />
+                </div>
+                <div>
+                  <div className="text-sm font-semibold text-foreground">Cobrança Automática de Juros/Multas</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">
+                    {jurosMultaAutomatico
+                      ? 'Ativo — juros e multa serão calculados automaticamente nas parcelas vencidas'
+                      : 'Inativo — juros e multa devem ser aplicados manualmente em cada parcela'}
+                  </div>
+                </div>
+              </div>
+              <Switch
+                checked={jurosMultaAutomatico}
+                onCheckedChange={setJurosMultaAutomatico}
+              />
+            </div>
+            {jurosMultaAutomatico && (
+              <div className="mt-3 flex items-start gap-2 p-3 rounded-md bg-warning/10 border border-warning/30">
+                <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                <div className="text-xs text-warning">
+                  <strong>Atenção:</strong> Com esta opção ativa, o sistema calculará automaticamente multa de <strong>{multaPadrao}%</strong> e juros de mora de <strong>{jurosMora}%/dia</strong> em todas as parcelas vencidas. Os valores serão exibidos no modal de pagamento. Você pode desativar a qualquer momento.
+                </div>
+              </div>
+            )}
           </div>
           <Button size="sm" className="gap-2" onClick={salvarEmpresa} disabled={saveConfigMutation.isPending}>
             <Save className="h-3 w-3" /> Salvar Parâmetros

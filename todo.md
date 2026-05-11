@@ -1028,3 +1028,8 @@
 - [ ] Testar fluxo completo PT-BR: Empréstimos, Clientes, Parcelas, Simulador, Caixa
 - [ ] Testar fluxo completo ES: todas as páginas com tradução
 - [ ] Corrigir bugs encontrados na auditoria
+
+## Fase 59: Renovação Quinzenal + Relatórios + Juros Automáticos Configuráveis
+- [x] Testar fluxo de renovação quinzenal no cobrapro.online (pagar só juros → nova parcela +15 dias)
+- [x] Criar módulo de Relatórios: empréstimos ativos, projeção de recebimentos, extrato por cliente
+- [x] Adicionar configuração de juros/multas automáticos no painel de Configurações (ativável manualmente)
