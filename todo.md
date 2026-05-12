@@ -1056,3 +1056,8 @@
 - [x] Eventos disparados na landing page: PageView (carregamento), Lead (CTA principal), InitiateCheckout (botão assinar)
 - [x] noscript do Pixel movido para o body (correção do warning parse5)
 - [ ] Fazer push para GitHub
+
+## Fase 63: Purchase CAPI via Webhook Kiwify (11/05/2026)
+- [x] Integrar sendMetaEvent("Purchase") no webhook da Kiwify (order_approved)
+- [x] Enviar valor, moeda, email e telefone hasheados para o Meta
+- [ ] Fazer push para GitHub
