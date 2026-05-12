@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useEffect } from "react";
+import { trackPageView, trackLead, trackMetaEvent } from "@/lib/metaEvents";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -125,6 +126,11 @@ export default function Home() {
     }
   }, [loading, isAuthenticated, setLocation]);
 
+  // Meta Pixel + CAPI: PageView ao carregar a landing page
+  useEffect(() => {
+    trackPageView();
+  }, []);
+
   const goToLogin = () => setLocation("/login");
 
   const plano = PLANOS[planoAtivo];
@@ -189,6 +195,7 @@ export default function Home() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8">
             <Button
               onClick={() => {
+                trackLead(); // Meta: evento Lead ao clicar no CTA principal
                 const el = document.getElementById("precos");
                 el?.scrollIntoView({ behavior: "smooth" });
               }}
@@ -376,6 +383,7 @@ export default function Home() {
                 href={plano.link}
                 target="_blank"
                 rel="noopener noreferrer"
+                onClick={() => trackMetaEvent("InitiateCheckout", { customData: { content_name: plano.titulo } })}
                 className="block w-full bg-red-600 hover:bg-red-700 text-white font-black text-base uppercase tracking-wide py-5 rounded-xl text-center transition-all hover:scale-[1.02] shadow-xl shadow-red-900/40"
               >
                 {plano.botao}

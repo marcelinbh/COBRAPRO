@@ -11,4 +11,6 @@ export const ENV = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   evolutionApiUrl: process.env.EVOLUTION_API_URL ?? "http://147.182.191.118:8080",
   evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "cobrapro_evo_key_2024",
+  facebookCapiToken: process.env.FACEBOOK_CAPI_TOKEN ?? "",
+  facebookPixelId: "2507235503035747",
 };

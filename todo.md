@@ -1048,3 +1048,11 @@
 - [x] Bug campo: caixa.contas fallback REST usava 'saldo' e 'ativo' → corrigido para 'saldo_inicial' e 'ativa'
 - [x] Bug campo: vendasTelefone tentava atualizar campo 'saldo' inexistente → removido update desnecessário
 - [x] Cálculos verificados como CORRETOS: calcularParcelaPadrao, calcularParcelaBullet, calcularJurosMora, saldoResidual, pagarJuros (renovação), lucroRealizado, lucroPrevisto
+
+## Fase 62: Meta Pixel (11/05/2026)
+- [x] Meta Pixel (ID 2507235503035747) adicionado no index.html (client-side)
+- [x] API de Conversões (CAPI) server-side configurada: helper metaCapi.ts + endpoint /api/meta/event
+- [x] Helper frontend metaEvents.ts: trackPageView, trackLead, trackMetaEvent, trackPurchase
+- [x] Eventos disparados na landing page: PageView (carregamento), Lead (CTA principal), InitiateCheckout (botão assinar)
+- [x] noscript do Pixel movido para o body (correção do warning parse5)
+- [ ] Fazer push para GitHub
