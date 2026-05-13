@@ -16,7 +16,6 @@ import type { Express, Request, Response } from "express";
 import { users } from "../drizzle/schema";
 import { getDb, getSupabaseClientAsync } from "./db";
 import { enviarEmail } from "./_core/email";
-import { sendMetaEvent, hashSha256 } from "./_core/metaCapi";
 
 // ─── Tipos do payload da Kiwify ──────────────────────────────────────────────
 // A Kiwify envia os dados dentro de um campo "order" aninhado
@@ -322,41 +321,7 @@ async function processarCompraAprovada(payload: KiwifyPayload) {
     console.error(`[Kiwify] Erro ao processar compra ${orderId}:`, erro);
   }
 
-  // ── 4. Enviar evento Purchase para o Meta CAPI ────────────────────────────
-  try {
-    const order = payload.order;
-    const customer = order?.Customer ?? payload.Customer ?? payload.customer ?? {};
-    const telefone = (customer.mobile ?? "").replace(/\D/g, "");
-    // Valor da venda — a Kiwify envia em centavos ou reais dependendo da versão
-    const valorRaw = (payload as Record<string, unknown>).amount
-      ?? (order as Record<string, unknown> | undefined)?.amount
-      ?? 0;
-    const valor = typeof valorRaw === "number"
-      ? (valorRaw > 1000 ? valorRaw / 100 : valorRaw) // normaliza centavos
-      : 0;
-
-    const userData: Record<string, string> = {};
-    if (email) userData.em = await hashSha256(email);
-    if (telefone) userData.ph = await hashSha256(telefone);
-
-    await sendMetaEvent([{
-      event_name: "Purchase",
-      event_id: `kiwify_${orderId}`,
-      event_source_url: "https://cobrapro.online",
-      user_data: userData,
-      custom_data: {
-        value: valor,
-        currency: "BRL",
-        content_name: produto,
-        order_id: orderId,
-      },
-    }]);
-    console.log(`[Kiwify] Evento Purchase enviado ao Meta CAPI | order: ${orderId} | valor: R$${valor}`);
-  } catch (capiErr) {
-    console.error("[Kiwify] Falha ao enviar Purchase para Meta CAPI:", capiErr);
-  }
-
-  // ── 5. Registrar log ─────────────────────────────────────────────────────
+  // ── 4. Registrar log ─────────────────────────────────────────────────────
   await logWebhook({
     orderId,
     email,

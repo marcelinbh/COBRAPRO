@@ -8,7 +8,6 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerAuthRoutes } from "../authRoutes";
 import { registerWebhookRoutes } from "../webhookRoutes";
 import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
-import { sendMetaEvent, hashSha256 } from "./metaCapi";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -49,56 +48,6 @@ async function startServer() {
   // Webhook da Kiwify (vendas → criação de usuário + e-mail)
   registerKiwifyWebhookRoutes(app);
 
-  // ─── Meta Conversions API (CAPI) — Server-Side Event Relay ───
-  // O frontend envia eventos para cá e o servidor repassa ao Meta com dados enriquecidos
-  app.post('/api/meta/event', async (req, res) => {
-    try {
-      const { event_name, event_id, event_source_url, custom_data, user_email, user_phone } = req.body as {
-        event_name: string;
-        event_id?: string;
-        event_source_url?: string;
-        custom_data?: Record<string, unknown>;
-        user_email?: string;
-        user_phone?: string;
-      };
-
-      if (!event_name) {
-        return res.status(400).json({ error: 'event_name obrigatório' });
-      }
-
-      // Enriquecer com dados do servidor (IP real, User-Agent)
-      const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim()
-        || req.socket.remoteAddress
-        || '';
-      const userAgent = req.headers['user-agent'] || '';
-
-      // Cookies do Meta Pixel (enviados pelo frontend)
-      const fbp = req.body.fbp as string | undefined;
-      const fbc = req.body.fbc as string | undefined;
-
-      const userData: Record<string, string> = {
-        client_ip_address: clientIp,
-        client_user_agent: userAgent,
-      };
-      if (fbp) userData.fbp = fbp;
-      if (fbc) userData.fbc = fbc;
-      if (user_email) userData.em = await hashSha256(user_email);
-      if (user_phone) userData.ph = await hashSha256(user_phone.replace(/\D/g, ''));
-
-      const ok = await sendMetaEvent([{
-        event_name,
-        event_id,
-        event_source_url: event_source_url || 'https://cobrapro.online',
-        user_data: userData,
-        custom_data,
-      }]);
-
-      res.json({ success: ok });
-    } catch (err) {
-      console.error('[/api/meta/event]', err);
-      res.status(500).json({ error: String(err) });
-    }
-  });
   // Diagnostic endpoint to test Supabase connectivity
   app.get('/api/diag', async (req, res) => {
     const results: Record<string, string> = {};
