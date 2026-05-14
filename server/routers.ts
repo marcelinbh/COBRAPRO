@@ -2172,6 +2172,7 @@ const parcelasRouter = router({
           .from(parcelas).where(eq(parcelas.contratoId, parcela.contratoId as number));
         const maxNumeroParcela = maxParcelaRows[0]?.maxNum ?? (parcela.numeroParcela as number);
         // Criar nova parcela com o valor (possivelmente customizado) e nova data
+        // Nota: não incluir campos que não existem no schema (ex: contagemRenovacoes)
         await db.insert(parcelas).values({
           userId: ctx.user.id,
           contratoId: parcela.contratoId as number,
@@ -2224,8 +2225,7 @@ const parcelasRouter = router({
           .single();
         const novoNumero = ((maxParcelaRest?.numero_parcela as number) ?? (parcela.numeroParcela as number)) + 1;
         const novoValorRest = parseFloat(valorNovaParcela);
-        const novaContagemRenovacoes = (((parcela as any).contagemRenovacoes as number) || 0) + 1;
-        await supabase.from('parcelas').insert({
+        const { error: insertParcelaErr } = await supabase.from('parcelas').insert({
           user_id: ctx.user.id,
           cliente_id: parcela.clienteId,
           contrato_id: parcela.contratoId,
@@ -2237,9 +2237,12 @@ const parcelasRouter = router({
           valor_juros: parseFloat(input.valorJurosPago.toFixed(2)),
           data_vencimento: novaDataVencStr,
           status: 'pendente',
-          conta_caixa_id: input.contaCaixaId,
-          contagem_renovacoes: novaContagemRenovacoes,
+          conta_caixa_id: input.contaCaixaId ?? null,
         });
+        if (insertParcelaErr) {
+          console.error('[pagarJuros] ERRO ao criar nova parcela:', insertParcelaErr.message);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Erro ao criar nova parcela: ${insertParcelaErr.message}` });
+        }
 
         await supabase.from('contratos')
           .update({ numero_parcelas: (contrato.numeroParcelas as number) + 1 })

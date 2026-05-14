@@ -13,7 +13,7 @@ import {
 import { toast } from "sonner";
 import {
   MessageCircle, Edit2, AlertTriangle, DollarSign, TrendingUp,
-  Trash2, FileText, Send, CheckCircle, Download, Loader2, Pencil
+  Trash2, FileText, Send, CheckCircle, Download, Loader2, Pencil, CreditCard
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { trpc } from '@/lib/trpc';
@@ -55,9 +55,27 @@ export function EmprestimoDetalhesModal({
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
   const [parcelaEditando, setParcelaEditando] = useState<{ id: number; valor: string; data: string } | null>(null);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada'>('todas');
+  const [parcelaSelecionadaPagamento, setParcelaSelecionadaPagamento] = useState<{ id: number; numero: number; valor: number } | null>(null);
+  const [modalPagarParcela, setModalPagarParcela] = useState(false);
+  const [valorCustomPagarParcela, setValorCustomPagarParcela] = useState('');
+  const [pagamentoParcelaRealizado, setPagamentoParcelaRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
 
   const { data: config } = trpc.configuracoes.get.useQuery();
   const utils = trpc.useUtils();
+
+  const pagarParcelaIndividualMutation = trpc.parcelas.registrarPagamento.useMutation({
+    onSuccess: (_data, variables) => {
+      const parcelaNum = parcelaSelecionadaPagamento?.numero ?? 1;
+      setPagamentoParcelaRealizado({ valorPago: variables.valorPago, parcelaNum });
+      toast.success('Pagamento registrado!');
+      setTimeout(() => {
+        onRefresh();
+        utils.contratos.listComParcelas.invalidate();
+        utils.dashboard.kpis.invalidate();
+      }, 300);
+    },
+    onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
+  });
 
   const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
     onSuccess: (_data, variables) => {
@@ -375,6 +393,24 @@ export function EmprestimoDetalhesModal({
                             </Badge>
                             {p.status !== 'paga' && (
                               <button
+                                onClick={() => {
+                                  setParcelaSelecionadaPagamento({
+                                    id: p.id,
+                                    numero: p.numero_parcela,
+                                    valor: parseFloat(String(p.valor_original ?? '0')),
+                                  });
+                                  setValorCustomPagarParcela('');
+                                  setPagamentoParcelaRealizado(null);
+                                  setModalPagarParcela(true);
+                                }}
+                                className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300"
+                                title="Pagar parcela"
+                              >
+                                <CreditCard className="h-3 w-3" />
+                              </button>
+                            )}
+                            {p.status !== 'paga' && (
+                              <button
                                 onClick={() => setParcelaEditando({
                                   id: p.id,
                                   valor: String(parseFloat(p.valor_original).toFixed(2)),
@@ -519,6 +555,96 @@ export function EmprestimoDetalhesModal({
                 <Button variant="outline" className="flex-1" onClick={() => setModalPagar(false)}>Cancelar</Button>
                 <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={!contaCaixaId || pagarTotalMutation.isPending} onClick={handlePagar}>
                   {pagarTotalMutation.isPending ? 'Processando...' : 'Confirmar'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── SUB-MODAL PAGAR PARCELA INDIVIDUAL ── */}
+      <Dialog open={modalPagarParcela} onOpenChange={(v) => { setModalPagarParcela(v); if (!v) { setPagamentoParcelaRealizado(null); setParcelaSelecionadaPagamento(null); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>PAGAR PARCELA #{parcelaSelecionadaPagamento?.numero}</DialogTitle>
+            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
+          </DialogHeader>
+          {pagamentoParcelaRealizado ? (
+            <div className="space-y-4">
+              <div className="flex flex-col items-center gap-3 py-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-emerald-500" />
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-bold text-emerald-500">Pagamento Registrado!</div>
+                  <div className="text-2xl font-bold text-foreground mt-1">{formatarMoeda(pagamentoParcelaRealizado.valorPago)}</div>
+                  <div className="text-xs text-muted-foreground">Parcela {pagamentoParcelaRealizado.parcelaNum}</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1 gap-1.5" onClick={() => {
+                  gerarComprovantePDF({
+                    clienteNome: emprestimo.clienteNome,
+                    contratoId: emprestimo.id,
+                    parcelaNumero: pagamentoParcelaRealizado.parcelaNum,
+                    valorOriginal: parcelaSelecionadaPagamento?.valor ?? 0,
+                    juros: 0,
+                    valorPago: pagamentoParcelaRealizado.valorPago,
+                    dataPagamento: new Date().toISOString(),
+                    modalidade: emprestimo.modalidade,
+                  });
+                }}>
+                  <Download className="h-3.5 w-3.5" /> Comprovante PDF
+                </Button>
+                <Button className="flex-1" onClick={() => { setPagamentoParcelaRealizado(null); setModalPagarParcela(false); }}>Fechar</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Parcela #{parcelaSelecionadaPagamento?.numero}</span>
+                  <span className="font-semibold">{formatarMoeda(parcelaSelecionadaPagamento?.valor ?? 0)}</span>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Valor a Pagar (deixe em branco para usar o valor da parcela)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  placeholder={String((parcelaSelecionadaPagamento?.valor ?? 0).toFixed(2))}
+                  value={valorCustomPagarParcela}
+                  onChange={e => setValorCustomPagarParcela(e.target.value)}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Conta de Caixa</Label>
+                <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
+                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                  <SelectContent>
+                    {contas.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setModalPagarParcela(false)}>Cancelar</Button>
+                <Button
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                  disabled={!contaCaixaId || pagarParcelaIndividualMutation.isPending}
+                  onClick={() => {
+                    if (!parcelaSelecionadaPagamento) return;
+                    const valor = valorCustomPagarParcela ? parseFloat(valorCustomPagarParcela) : (parcelaSelecionadaPagamento.valor);
+                    pagarParcelaIndividualMutation.mutate({
+                      parcelaId: parcelaSelecionadaPagamento.id,
+                      valorPago: valor,
+                      contaCaixaId: parseInt(contaCaixaId),
+                    });
+                  }}
+                >
+                  {pagarParcelaIndividualMutation.isPending ? 'Processando...' : 'Confirmar'}
                 </Button>
               </div>
             </div>

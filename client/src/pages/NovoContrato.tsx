@@ -247,7 +247,7 @@ export default function NovoContrato() {
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0" align="start" style={{ minWidth: '320px' }}>
-                  <Command>
+                  <Command shouldFilter={false}>
                     <CommandInput
                       placeholder="Buscar cliente..."
                       value={clienteBusca}

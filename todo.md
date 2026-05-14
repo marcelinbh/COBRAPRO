@@ -1106,3 +1106,4 @@
 - [x] FEATURE: Adicionar botão "Pagar" em cada linha de parcela pendente na tabela de detalhes do contrato (implementado: botão Pagar com modal de pagamento individual)
 - [x] BUG CRÍTICO: Pagar Juros marca contrato como quitado incorretamente (corrigido: nova parcela agora usa valor_parcela do contrato, não apenas os juros pagos)
 - [x] BUG CRÍTICO: Não é possível excluir empréstimo (corrigido: deletar transacoes_caixa antes das parcelas, e parcelas antes do contrato)
+- [x] BUG CRÍTICO: Pagar juros não criava nova parcela (campo contagem_renovacoes inexistente causava insert silencioso) - corrigido: removido campo inválido, adicionado tratamento de erro, 6 contratos afetados restaurados

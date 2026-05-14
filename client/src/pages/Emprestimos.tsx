@@ -16,7 +16,7 @@ import {
   Search, Plus, MessageCircle, CheckCircle, Clock, AlertTriangle,
   TrendingUp, DollarSign, Filter, RefreshCw, FileText, ChevronDown, ChevronUp,
   Edit, Trash2, Send, Phone, Eye, List, Zap, Users, ExternalLink, Loader2, Tag, X, Check, FolderOpen, LayoutGrid, Download,
-  Edit2, History, Pencil
+  Edit2, History, Pencil, CreditCard
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
@@ -121,6 +121,10 @@ function EditarEmprestimoModal({
   const [gerandoPDF, setGerandoPDF] = useState(false);
   const [loadingWpp, setLoadingWpp] = useState(false);
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
+  const [parcelaSelecionadaPagamento, setParcelaSelecionadaPagamento] = useState<{ id: number; numero: number; valor: number } | null>(null);
+  const [modalPagarParcela, setModalPagarParcela] = useState(false);
+  const [valorCustomPagarParcela, setValorCustomPagarParcela] = useState('');
+  const [pagamentoParcelaRealizado, setPagamentoParcelaRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
 
   const jurosTotal = valor * (juros / 100);
   const valorParcela = (valor + jurosTotal) / parcelas;
@@ -194,6 +198,16 @@ function EditarEmprestimoModal({
     onSuccess: (_data, variables) => {
       const parcelaNum = detalhes?.todasParcelas?.find((p: any) => p.id === variables.parcelaId)?.numero_parcela ?? 1;
       setPagamentoRealizado({ valorPago: variables.valorPago, parcelaNum });
+      toast.success(t('toast_success.pagamento_registrado'));
+      invalidarTudo();
+    },
+    onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
+  });
+
+  const pagarParcelaIndividualMutation = trpc.parcelas.registrarPagamento.useMutation({
+    onSuccess: (_data, variables) => {
+      const parcelaNum = parcelaSelecionadaPagamento?.numero ?? 1;
+      setPagamentoParcelaRealizado({ valorPago: variables.valorPago, parcelaNum });
       toast.success(t('toast_success.pagamento_registrado'));
       invalidarTudo();
     },
@@ -615,9 +629,27 @@ function EditarEmprestimoModal({
                               </td>
                               <td className="px-3 py-2 text-center">
                                 {p.status !== 'paga' && (
-                                  <button onClick={() => setParcelaEditando({ id: p.id, valor: String(parseFloat(p.valor_original).toFixed(2)), data: p.data_vencimento?.split('T')[0] ?? '' })} className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors" title="Editar parcela">
-                                    <Pencil className="h-3.5 w-3.5" />
-                                  </button>
+                                  <div className="flex gap-1 justify-center">
+                                    <button
+                                      onClick={() => {
+                                        setParcelaSelecionadaPagamento({
+                                          id: p.id,
+                                          numero: p.numero_parcela,
+                                          valor: parseFloat(String(p.valor_original ?? '0')),
+                                        });
+                                        setValorCustomPagarParcela('');
+                                        setPagamentoParcelaRealizado(null);
+                                        setModalPagarParcela(true);
+                                      }}
+                                      className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-colors"
+                                      title="Pagar parcela"
+                                    >
+                                      <CreditCard className="h-3.5 w-3.5" />
+                                    </button>
+                                    <button onClick={() => setParcelaEditando({ id: p.id, valor: String(parseFloat(p.valor_original).toFixed(2)), data: p.data_vencimento?.split('T')[0] ?? '' })} className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors" title="Editar parcela">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
                                 )}
                               </td>
                             </tr>
@@ -941,6 +973,96 @@ function EditarEmprestimoModal({
             <Button className="flex-1 bg-red-600 hover:bg-red-700" disabled={!valorMulta.trim() || aplicarMultaMutation.isPending} onClick={() => aplicarMultaMutation.mutate({ id: emprestimo.id, multa: valorMulta })}>{aplicarMultaMutation.isPending ? 'Aplicando...' : 'Aplicar Multa'}</Button>
           </div>
         </div>
+      </DialogContent>
+    </Dialog>
+
+    {/* Modal Pagar Parcela Individual */}
+    <Dialog open={modalPagarParcela} onOpenChange={(v) => { setModalPagarParcela(v); if (!v) { setPagamentoParcelaRealizado(null); setParcelaSelecionadaPagamento(null); } }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>PAGAR PARCELA #{parcelaSelecionadaPagamento?.numero}</DialogTitle>
+          <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
+        </DialogHeader>
+        {pagamentoParcelaRealizado ? (
+          <div className="space-y-4">
+            <div className="flex flex-col items-center gap-3 py-4">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                <CheckCircle className="h-8 w-8 text-emerald-500" />
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-emerald-500">Pagamento Registrado!</div>
+                <div className="text-2xl font-bold text-foreground mt-1">{formatarMoeda(pagamentoParcelaRealizado.valorPago)}</div>
+                <div className="text-xs text-muted-foreground">Parcela {pagamentoParcelaRealizado.parcelaNum}</div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => {
+                gerarComprovantePDF({
+                  clienteNome: emprestimo.clienteNome,
+                  contratoId: emprestimo.id,
+                  parcelaNumero: pagamentoParcelaRealizado.parcelaNum,
+                  valorOriginal: parcelaSelecionadaPagamento?.valor ?? 0,
+                  juros: 0,
+                  valorPago: pagamentoParcelaRealizado.valorPago,
+                  dataPagamento: new Date().toISOString(),
+                  modalidade: emprestimo.modalidade,
+                });
+              }}>
+                <Download className="h-3.5 w-3.5" /> Comprovante PDF
+              </Button>
+              <Button className="flex-1" onClick={() => { setPagamentoParcelaRealizado(null); setModalPagarParcela(false); }}>{t('common.close')}</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Parcela #{parcelaSelecionadaPagamento?.numero}</span>
+                <span className="font-semibold">{formatarMoeda(parcelaSelecionadaPagamento?.valor ?? 0)}</span>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Valor a Pagar (deixe em branco para usar o valor da parcela)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder={String((parcelaSelecionadaPagamento?.valor ?? 0).toFixed(2))}
+                value={valorCustomPagarParcela}
+                onChange={e => setValorCustomPagarParcela(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Conta de Caixa</Label>
+              <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>
+                  {(contas ?? []).map((c) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setModalPagarParcela(false)}>{t('common.cancel')}</Button>
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                disabled={!contaCaixaId || pagarParcelaIndividualMutation.isPending}
+                onClick={() => {
+                  if (!parcelaSelecionadaPagamento) return;
+                  const valor = valorCustomPagarParcela ? parseFloat(valorCustomPagarParcela) : parcelaSelecionadaPagamento.valor;
+                  pagarParcelaIndividualMutation.mutate({
+                    parcelaId: parcelaSelecionadaPagamento.id,
+                    valorPago: valor,
+                    contaCaixaId: parseInt(contaCaixaId),
+                  });
+                }}
+              >
+                {pagarParcelaIndividualMutation.isPending ? 'Processando...' : 'Confirmar'}
+              </Button>
+            </div>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
 
