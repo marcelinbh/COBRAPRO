@@ -560,7 +560,23 @@ const clientesRouter = router({
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
     const { data } = await supabase.from('contratos').select('*').eq('cliente_id', input.clienteId).eq('user_id', ctx.user.id).order('createdAt', { ascending: false });
-    return data ?? [];
+    return (data ?? []).map((c: any) => ({
+      ...c,
+      clienteId: c.cliente_id,
+      valorPrincipal: c.valor_principal,
+      valorParcela: c.valor_parcela,
+      numeroParcelas: c.numero_parcelas,
+      taxaJuros: c.taxa_juros,
+      tipoTaxa: c.tipo_taxa,
+      dataInicio: c.data_inicio,
+      dataVencimentoPrimeira: c.data_vencimento_primeira,
+      diaVencimento: c.dia_vencimento,
+      multaAtraso: c.multa_atraso,
+      jurosMoraDiario: c.juros_mora_diario,
+      contaCaixaId: c.conta_caixa_id,
+      koletorId: c.koletor_id,
+      userId: c.user_id,
+    }));
   }),
   importarCSV: protectedProcedure
     .input(z.object({
@@ -1908,6 +1924,16 @@ const parcelasRouter = router({
         ? parcelasData.filter((r: any) => contratosMap[r.contrato_id]?.modalidade === input.modalidade)
         : parcelasData;
 
+      // Calcular o total real de parcelas por contrato (maior numero_parcela existente)
+      const totalParcelasMap: Record<number, number> = {};
+      parcelasData.forEach((r: any) => {
+        const contratoId = r.contrato_id;
+        const num = r.numero_parcela ?? 0;
+        if (!totalParcelasMap[contratoId] || num > totalParcelasMap[contratoId]) {
+          totalParcelasMap[contratoId] = num;
+        }
+      });
+
       return resultData.map((r: any) => ({
         id: r.id,
         contratoId: r.contrato_id,
@@ -1924,7 +1950,7 @@ const parcelasRouter = router({
         dataPagamento: r.data_pagamento,
         status: r.status,
         modalidade: contratosMap[r.contrato_id]?.modalidade ?? null,
-        numeroParcelas: contratosMap[r.contrato_id]?.numero_parcelas ?? null,
+        numeroParcelas: totalParcelasMap[r.contrato_id] ?? contratosMap[r.contrato_id]?.numero_parcelas ?? null,
         taxaJuros: contratosMap[r.contrato_id]?.taxa_juros ?? null,
         tipoTaxa: contratosMap[r.contrato_id]?.tipo_taxa ?? null,
         valorPrincipal: contratosMap[r.contrato_id]?.valor_principal ?? null,
@@ -2038,6 +2064,7 @@ const parcelasRouter = router({
           parcela_id: input.parcelaId,
           contrato_id: parcelaData.contrato_id,
           data_transacao: dataPagamentoStr,
+          user_id: ctx.user.id,
         });
         if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
       }
@@ -2214,6 +2241,7 @@ const parcelasRouter = router({
           parcela_id: input.parcelaId,
           contrato_id: parcela.contratoId,
           data_transacao: new Date().toISOString().split('T')[0],
+          user_id: ctx.user.id,
         });
 
         // Buscar o maior numero_parcela existente para evitar duplicatas no fallback REST
@@ -3505,7 +3533,7 @@ const contasPagarRouter = router({
       if (!contaData) throw new Error('Conta não encontrada');
       await supabase.from('contas_pagar').update({ status: 'paga', data_pagamento: dataPag.toISOString(), conta_caixa_id: input.contaCaixaId ?? null }).eq('id', input.id);
       if (input.contaCaixaId) {
-        await supabase.from('transacoes_caixa').insert({ conta_caixa_id: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: contaData.valor, descricao: `Pagamento: ${contaData.descricao}`, data_transacao: dataPag.toISOString() });
+        await supabase.from('transacoes_caixa').insert({ conta_caixa_id: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: contaData.valor, descricao: `Pagamento: ${contaData.descricao}`, data_transacao: dataPag.toISOString(), user_id: ctx.user.id });
       }
       return { success: true };
     }),
@@ -3738,7 +3766,7 @@ const chequesRouter = router({
       }).select('id').single();
       if (chqErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: chqErr.message });
       if (input.contaCaixaId) {
-        await supabase.from('transacoes_caixa').insert({ conta_caixa_id: input.contaCaixaId, tipo: 'saida', categoria: 'outros', valor: valorLiquido, descricao: `Desconto de cheque - ${input.emitente}`, data_transacao: new Date().toISOString() });
+        await supabase.from('transacoes_caixa').insert({ conta_caixa_id: input.contaCaixaId, tipo: 'saida', categoria: 'outros', valor: valorLiquido, descricao: `Desconto de cheque - ${input.emitente}`, data_transacao: new Date().toISOString(), user_id: ctx.user.id });
       }
       return { success: true, id: chqData.id, valorLiquido, valorDesconto };
     }),
@@ -3763,7 +3791,7 @@ const chequesRouter = router({
       if (!chqData) throw new Error('Cheque não encontrado');
       const contaId = input.contaCaixaId ?? chqData.conta_caixa_id;
       await supabase.from('cheques').update({ status: 'compensado', data_compensacao: new Date().toISOString(), conta_caixa_id: contaId }).eq('id', input.id);
-      if (contaId) await supabase.from('transacoes_caixa').insert({ conta_caixa_id: contaId, tipo: 'entrada', categoria: 'outros', valor: chqData.valor_nominal, descricao: `Cheque compensado - ${chqData.emitente}`, data_transacao: new Date().toISOString() });
+      if (contaId) await supabase.from('transacoes_caixa').insert({ conta_caixa_id: contaId, tipo: 'entrada', categoria: 'outros', valor: chqData.valor_nominal, descricao: `Cheque compensado - ${chqData.emitente}`, data_transacao: new Date().toISOString(), user_id: ctx.user.id });
       return { success: true };
     }),
 
@@ -3938,7 +3966,7 @@ const vendasTelefoneRouter = router({
       compradorLocalTrabalho: z.string().optional(),
       dataPrimeiraParcela: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
@@ -4017,6 +4045,7 @@ const vendasTelefoneRouter = router({
               valor: input.entradaValor,
               descricao: `Entrada venda ${input.marca} ${input.modelo} - ${input.compradorNome}`,
               data_transacao: new Date().toISOString(),
+              user_id: ctx.user.id,
             });
             // Atualizar saldo da conta
             // Registrar transação de entrada (saldo calculado via transações)
@@ -4035,7 +4064,7 @@ const vendasTelefoneRouter = router({
       parcelaId: z.number(),
       valorPago: z.number().positive(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       // Buscar dados da parcela para obter informações da venda
@@ -4069,6 +4098,7 @@ const vendasTelefoneRouter = router({
             valor: input.valorPago,
             descricao,
             data_transacao: new Date().toISOString(),
+            user_id: ctx.user.id,
           });
           // Registrar transação de entrada (saldo calculado via transações)
           // Não atualizar campo saldo diretamente (campo inexistente, saldo é calculado)

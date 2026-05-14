@@ -1107,3 +1107,9 @@
 - [x] BUG CRÍTICO: Pagar Juros marca contrato como quitado incorretamente (corrigido: nova parcela agora usa valor_parcela do contrato, não apenas os juros pagos)
 - [x] BUG CRÍTICO: Não é possível excluir empréstimo (corrigido: deletar transacoes_caixa antes das parcelas, e parcelas antes do contrato)
 - [x] BUG CRÍTICO: Pagar juros não criava nova parcela (campo contagem_renovacoes inexistente causava insert silencioso) - corrigido: removido campo inválido, adicionado tratamento de erro, 6 contratos afetados restaurados
+- [x] TESTE: Verificar fluxo "Pagar Juros" nos contratos restaurados (35, 36, 37, 39, 49, 62) - confirmado: nova parcela criada corretamente
+- [x] FEATURE: Notificação de erro visível - backend agora lança TRPCError quando insert falha (toast de erro já funciona no frontend)
+- [x] BUG: Contratos na aba do cliente mostravam valores zerados (snake_case vs camelCase na procedure contratosByCliente - corrigido com mapeamento)
+- [x] BUG: Denominador de parcelas incorreto após renovação de juros (usava numero_parcelas do contrato em vez do maior numero_parcela real - corrigido com totalParcelasMap)
+- [x] BUG: Caixa - transações não apareciam (user_id null em todos os inserts de transacoes_caixa - corrigido em 7 pontos do backend + 53 registros históricos corrigidos no banco)
+- [x] BUG: Relatório - Fluxo de Caixa vazio (causado pelo mesmo bug de user_id nas transações - corrigido automaticamente)
