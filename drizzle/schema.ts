@@ -142,8 +142,9 @@ export const contasCaixa = pgTable("contas_caixa", {
   banco: varchar("banco", { length: 100 }),
   agencia: varchar("agencia", { length: 20 }),
   numeroConta: varchar("numero_conta", { length: 30 }),
-  saldoInicial: decimal("saldo_inicial", { precision: 15, scale: 2 }).default("0.00").notNull(),
-  ativa: boolean("ativa").default(true).notNull(),
+  // O banco real usa 'saldo' (não 'saldo_inicial') e 'ativo' (não 'ativa')
+  saldo: decimal("saldo", { precision: 15, scale: 2 }).default("0.00").notNull(),
+  ativo: boolean("ativo").default(true).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
 });

@@ -1077,3 +1077,28 @@
 - [x] 13 novas chaves adicionadas (total: 2.299 chaves em pt-BR e es)
 - [x] TypeScript: 0 erros
 - [x] Fazer push para GitHub
+
+## Fase 67: Teste Completo do Fluxo (14/05/2026)
+- [ ] Dashboard: KPIs, gráficos, saúde da carteira
+- [ ] Clientes: criar, editar, detalhe, score
+- [ ] Empréstimos: criar todos os tipos, pagar parcela, pagar só juros, renovar
+- [ ] Parcelas: filtros, modal de pagamento, comprovante PDF
+- [ ] Caixa: contas, transações, saldo
+- [ ] Cheques: criar, compensar, devolver
+- [ ] Relatórios: empréstimos ativos, inadimplência, extrato PDF
+- [ ] Assinaturas: criar, renovar
+- [ ] Veículos: criar, pagar parcela
+- [ ] Configurações: salvar dados da empresa
+- [ ] Troca de idioma PT → ES: verificar todas as telas
+- [ ] Corrigir todos os bugs encontrados
+
+## Fase BUGS: Bugs Encontrados nos Testes (14/05/2026)
+- [x] BUG: Caixa - conta criada não aparece na lista (corrigido: campo ativo em vez de ativa, saldo em vez de saldo_inicial)
+- [x] BUG: Parcelas - página mostra "0 parcelas" mesmo com contratos ativos (era temporário, está funcionando)
+- [x] BUG CRÍTICO: Criar parcela manual falha com erro "null value in column violates not-null constraint" (corrigido: campo numero NOT NULL agora preenchido no insert)
+- [x] BUG: Tabs Diário/Parcela Fixa - contagem sempre 0 (corrigido: filtro por modalidade)
+- [x] BUG: Lucro Realizado - sempre R$0 (corrigido: cálculo totalPago - capitalProporcional)
+- [x] FEATURE: Adicionar campo de busca/pesquisa no dropdown de seleção de cliente no formulário de criação de empréstimo (implementado: Combobox com Popover + Command)
+- [x] BUG CRÍTICO: Relatórios mostra todos os valores zerados (corrigido: dashboard.kpis fallback REST agora usa campo ativo e saldo corretos)
+- [x] BUG: Textos hardcoded em espanhol (Etiqueta, Detalhes, Comprovante, Cobça preventiva) - corrigidos com chaves de tradução
+- [x] BUG: Botão Fechar hardcoded - corrigido com t('common.close')

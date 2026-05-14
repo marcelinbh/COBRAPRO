@@ -214,7 +214,8 @@
     "downloadReport": "Baixar Relatório",
     "default": "Padrão",
     "cpfCnpj": "CPF/CNPJ",
-    "clearFilters": "Limpar filtros"
+    "clearFilters": "Limpar filtros",
+    "todayDefault": "Hoje (padrão)"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -510,7 +511,13 @@
     "folder": "Pasta",
     "selected": "selecionado(s)",
     "fixedInstallment": "Parcela Fixa",
-    "receipts": "Recebimentos"
+    "receipts": "Recebimentos",
+    "label": "Etiqueta",
+    "details": "Detalhes",
+    "preventiveCollection": "Cobrança preventiva",
+    "collectWhatsApp": "Cobrar via WhatsApp",
+    "generatingPDF": "Gerando PDF...",
+    "generateReceiptPDF": "Gerar Comprovante em PDF"
   },
   "contracts": {
     "title": "Contratos",

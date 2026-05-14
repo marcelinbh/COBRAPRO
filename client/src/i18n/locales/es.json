@@ -214,7 +214,8 @@
     "downloadReport": "Descargar Informe",
     "default": "Predeterminado",
     "cpfCnpj": "CPF/CNPJ",
-    "clearFilters": "Limpiar filtros"
+    "clearFilters": "Limpiar filtros",
+    "todayDefault": "Hoy (predeterminado)"
   },
   "navigation": {
     "dashboard": "Panel",
@@ -510,7 +511,13 @@
     "folder": "Carpeta",
     "selected": "seleccionado(s)",
     "fixedInstallment": "Cuota Fija",
-    "receipts": "Cobros"
+    "receipts": "Cobros",
+    "label": "Etiqueta",
+    "details": "Detalles",
+    "preventiveCollection": "Cobro preventivo",
+    "collectWhatsApp": "Cobrar por WhatsApp",
+    "generatingPDF": "Generando PDF...",
+    "generateReceiptPDF": "Generar Comprobante en PDF"
   },
   "contracts": {
     "title": "Contratos",

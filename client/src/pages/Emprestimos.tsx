@@ -794,7 +794,7 @@ function EditarEmprestimoModal({
               )}
               <Button className="gap-2 w-full" size="lg" onClick={handleGerarComprovante} disabled={gerandoPDF}>
                 <Download className="h-4 w-4" />
-                {gerandoPDF ? 'Gerando PDF...' : 'Gerar Comprovante em PDF'}
+                {gerandoPDF ? t('loans.generatingPDF') : t('loans.generateReceiptPDF')}
               </Button>
             </div>
           )}
@@ -831,11 +831,14 @@ function EditarEmprestimoModal({
                 <div className="text-2xl font-bold text-foreground mt-1">{formatarMoeda(pagamentoRealizado.valorPago)}</div>
                 <div className="text-xs text-muted-foreground">Parcela {pagamentoRealizado.parcelaNum}</div>
               </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => gerarComprovantePDF({ clienteNome: emprestimo.clienteNome, contratoId: emprestimo.id, parcelaNumero: pagamentoRealizado.parcelaNum, valorOriginal: valorOriginalParcela, juros: valorJurosParcela, valorPago: pagamentoRealizado.valorPago, dataPagamento: new Date().toISOString(), modalidade: emprestimo.modalidade })}>
-                <Download className="h-3.5 w-3.5" /> Comprovante PDF
+              <div className="flex gap-2 w-full">
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={handleGerarComprovante} disabled={gerandoPDF}>
+                <Download className="h-3.5 w-3.5" /> {t('loans.receipt')} PDF
               </Button>
+              <Button variant="outline" className="flex-1 gap-1.5" onClick={() => gerarComprovantePDF({ clienteNome: emprestimo.clienteNome, contratoId: emprestimo.id, parcelaNumero: pagamentoRealizado.parcelaNum, valorOriginal: valorOriginalParcela, juros: valorJurosParcela, valorPago: pagamentoRealizado.valorPago, dataPagamento: new Date().toISOString(), modalidade: emprestimo.modalidade })}>
+                <Download className="h-3.5 w-3.5" /> {t('loans.receipt')} PDF
+              </Button>
+              </div>
               <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setModalPagar(false); }}>Fechar</Button>
             </div>
           </div>
@@ -1118,9 +1121,9 @@ function PagamentoModal({
                     modalidade: emprestimo.modalidade,
                   });
                 }}>
-                  <Download className="h-3.5 w-3.5" /> Comprovante PDF
+                  <Download className="h-3.5 w-3.5" /> {t('loans.receipt')} PDF
                 </Button>
-                <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setOpen(false); }}>Fechar</Button>
+                <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setOpen(false); }}>{t('common.close')}</Button>
               </div>
             </div>
           ) : (
@@ -1523,7 +1526,7 @@ function EmprestimoCardCobra({
                 className="h-7 px-2 text-[10px] gap-1 border-border/50 bg-transparent hover:bg-accent/20"
                 onClick={() => setShowEtiquetasModal(true)}
               >
-                <Tag className="w-3 h-3" /> Etiqueta
+                <Tag className="w-3 h-3" /> {t('loans.label')}
               </Button>
               <Button
                 size="sm"
@@ -1531,7 +1534,7 @@ function EmprestimoCardCobra({
                 className="h-7 px-2 text-[10px] gap-1 border-border/50 bg-transparent hover:bg-accent/20"
                 onClick={() => { setAbaModalInicial('detalhes'); setShowEditarModal(true); }}
               >
-                <Eye className="w-3 h-3" /> Detalhes
+                <Eye className="w-3 h-3" /> {t('loans.details')}
               </Button>
               <Button
                 size="sm"
@@ -1540,7 +1543,7 @@ function EmprestimoCardCobra({
                 onClick={handleGerarComprovante}
                 disabled={gerandoPDF}
               >
-                <FileText className="w-3 h-3" /> Comprovante
+                <FileText className="w-3 h-3" /> {t('loans.receipt')}
               </Button>
             </div>
           </div>
@@ -1743,7 +1746,7 @@ function EmprestimoCardCobra({
               size="sm"
               variant="outline"
               className={`h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20 ${diasAtraso > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300'}`}
-              title={diasAtraso > 0 ? 'Cobrar via WhatsApp' : 'Cobça preventiva'}
+              title={diasAtraso > 0 ? t('loans.collectWhatsApp') : t('loans.preventiveCollection')}
               onClick={() => handleWhatsApp(diasAtraso > 0 ? 'atraso' : 'preventivo')}
               disabled={loadingWpp}
             >
@@ -2146,9 +2149,9 @@ export default function Emprestimos() {
       {/* Abas */}
       <div className="flex gap-1 sm:gap-4 border-b border-border overflow-x-auto">
         {[
-          { id: 'emprestimos', label: t('loans.title'), count: emprestimos?.length ?? 0 },
-          { id: 'diario', label: t('loans.daily'), count: 0 },
-          { id: 'price', label: t('loans.fixedInstallment'), count: 0 },
+          { id: 'emprestimos', label: t('loans.title'), count: emprestimos?.filter(e => e.modalidade !== 'diario' && e.modalidade !== 'emprestimo_diario' && e.modalidade !== 'tabela_price').length ?? 0 },
+          { id: 'diario', label: t('loans.daily'), count: emprestimos?.filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').length ?? 0 },
+          { id: 'price', label: t('loans.fixedInstallment'), count: emprestimos?.filter(e => e.modalidade === 'tabela_price').length ?? 0 },
           { id: 'recebimentos', label: t('loans.receipts'), count: recebimentosData?.total ?? 0 },
         ].map(aba => (
           <button
@@ -2439,11 +2442,42 @@ export default function Emprestimos() {
         </div>
       )}
 
-      {/* Abas placeholder */}
-      {(abaSelecionada === 'diario' || abaSelecionada === 'price') && (
-        <div className="p-8 text-center text-muted-foreground">
-          Em breve: {abaSelecionada === 'diario' ? 'Empréstimos Diários' : 'Parcela Fixa'}
-        </div>
+      {/* Aba Diário */}
+      {abaSelecionada === 'diario' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(emprestimos ?? []).filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').map(emp => (
+              <EmprestimoCardCobra
+                key={emp.id}
+                emp={emp}
+                contas={contas ?? []}
+                onRefresh={() => refetch()}
+              />
+            ))}
+          </div>
+          {(emprestimos ?? []).filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').length === 0 && (
+            <div className="p-8 text-center text-muted-foreground">{t('loans.noLoansFound')}</div>
+          )}
+        </>
+      )}
+
+      {/* Aba Parcela Fixa (Price) */}
+      {abaSelecionada === 'price' && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {(emprestimos ?? []).filter(e => e.modalidade === 'tabela_price').map(emp => (
+              <EmprestimoCardCobra
+                key={emp.id}
+                emp={emp}
+                contas={contas ?? []}
+                onRefresh={() => refetch()}
+              />
+            ))}
+          </div>
+          {(emprestimos ?? []).filter(e => e.modalidade === 'tabela_price').length === 0 && (
+            <div className="p-8 text-center text-muted-foreground">{t('loans.noLoansFound')}</div>
+          )}
+        </>
       )}
 
 

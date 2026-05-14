@@ -57,7 +57,7 @@ const dashboardRouter = router({
       hoje.setHours(0, 0, 0, 0);
       const hojeStr = hoje.toISOString().split('T')[0];
 
-      const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativa, true), eq(contasCaixa.userId, ctx.user.id)));
+      const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativo, true), eq(contasCaixa.userId, ctx.user.id)));
       let saldoTotal = 0;
       for (const conta of contas) {
         const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
@@ -66,7 +66,7 @@ const dashboardRouter = router({
         const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
           .from(transacoesCaixa)
           .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
-        saldoTotal += parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
+        saldoTotal += parseFloat(conta.saldo) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
       }
 
       const capitalResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
@@ -125,7 +125,7 @@ const dashboardRouter = router({
     // Fetch data via Supabase REST (filtrado por user_id para isolamento entre contas)
     const userId = ctx.user.id;
     const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
-      supabase.from('contas_caixa').select('id, saldo_inicial, ativa').eq('ativa', true).eq('user_id', userId),
+      supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true).eq('user_id', userId),
       supabase.from('contratos').select('valor_principal').eq('status', 'ativo').eq('user_id', userId),
       supabase.from('parcelas').select('valor_original, valor_juros, valor_multa, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
       supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao').eq('user_id', userId)
@@ -137,7 +137,7 @@ const dashboardRouter = router({
         const transacoesConta = (transRes.data ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
         const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
         const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-        saldoTotal += parseFloat(conta.saldo_inicial ?? '0') + totalEntradas - totalSaidas;
+        saldoTotal += parseFloat(conta.saldo ?? '0') + totalEntradas - totalSaidas;
       }
     }
 
@@ -899,8 +899,11 @@ const contratosRouter = router({
         const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
         // Lucro previsto = juros × número de parcelas abertas
         const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
-        // Lucro realizado = soma dos juros das parcelas já pagas
-        const lucroRealizado = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_juros ?? p.juros ?? '0'), 0);
+        // Lucro realizado = total pago - capital proporcional às parcelas pagas
+        // Fórmula: totalPago - (valorPrincipal × parcelasPagas / numeroParcelas)
+        // Isso captura tanto os juros do contrato quanto os juros de mora pagos
+        const capitalProporcional = numeroParcelas > 0 ? valorPrincipal * (parcelasPagas.length / numeroParcelas) : 0;
+        const lucroRealizado = Math.max(0, totalPago - capitalProporcional);
 
         // Próxima parcela em aberto
         const proximaParcela = parcelasAbertas.length > 0 ? parcelasAbertas[0] : null;
@@ -2309,7 +2312,9 @@ const parcelasRouter = router({
         contrato_id: input.contratoId,
         cliente_id: contrato.cliente_id,
         koletor_id: contrato.koletor_id ?? null,
+        numero: novaNumeroParcela,
         numero_parcela: novaNumeroParcela,
+        valor: parseFloat(input.valorOriginal.toFixed(2)),
         valor_original: input.valorOriginal.toFixed(2),
         data_vencimento: dataVenc,
         status,
@@ -2328,7 +2333,7 @@ const caixaRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativa, true), eq(contasCaixa.userId, ctx.user.id)));
+        const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativo, true), eq(contasCaixa.userId, ctx.user.id)));
         const result = [];
         for (const conta of contas) {
           const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
@@ -2337,7 +2342,7 @@ const caixaRouter = router({
           const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
             .from(transacoesCaixa)
             .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
-          const saldo = parseFloat(conta.saldoInicial) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
+          const saldo = parseFloat(conta.saldo) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
           result.push({ ...conta, saldoAtual: saldo });
         }
         return result;
@@ -2349,22 +2354,26 @@ const caixaRouter = router({
     // Fallback REST
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const { data: contasData } = await supabase.from('contas_caixa').select('*').eq('ativa', true).eq('user_id', ctx.user.id);
-    const { data: transData } = await supabase.from('transacoes_caixa').select('conta_caixa_id, tipo, valor');
+    // Tabela usa 'ativo' (não 'ativa') e 'saldo' (não 'saldo_inicial')
+    const { data: contasData, error: contasErr } = await supabase.from('contas_caixa').select('*').eq('ativo', true).eq('user_id', ctx.user.id);
+    if (contasErr) { console.error('[caixa.contas] REST error:', contasErr.message); return []; }
+    const { data: transData } = await supabase.from('transacoes_caixa').select('conta_caixa_id, tipo, valor').eq('user_id', ctx.user.id);
     const result2 = [];
     for (const conta of (contasData || [])) {
       const transacoesConta = (transData ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
       const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
       const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-      const saldoAtual = parseFloat(conta.saldo_inicial ?? '0') + totalEntradas - totalSaidas;
+      // Campo real é 'saldo' (não 'saldo_inicial')
+      const saldoBase = parseFloat(conta.saldo ?? conta.saldo_inicial ?? '0');
+      const saldoAtual = saldoBase + totalEntradas - totalSaidas;
       result2.push({
         id: conta.id,
         nome: conta.nome,
         tipo: conta.tipo,
         banco: conta.banco ?? null,
-        saldoInicial: parseFloat(conta.saldo_inicial ?? '0'),
+        saldoInicial: saldoBase,
         saldoAtual,
-        ativa: conta.ativa,
+        ativa: conta.ativo ?? conta.ativa ?? true,
       });
     }
     return result2;
@@ -2445,7 +2454,8 @@ const caixaRouter = router({
             nome: input.nome,
             tipo: input.tipo,
             banco: input.banco,
-            saldoInicial: input.saldoInicial.toFixed(2),
+            saldo: input.saldoInicial.toFixed(2),
+            ativo: true,
             userId: ctx.user.id,
           }).returning({ id: contasCaixa.id });
           return { id: result[0].id };
@@ -2461,6 +2471,7 @@ const caixaRouter = router({
         nome: input.nome,
         tipo: input.tipo,
         saldo: input.saldoInicial,
+        ativo: true,
         user_id: ctx.user.id,
       }).select('id').single();
       if (error) throw new Error(error.message);

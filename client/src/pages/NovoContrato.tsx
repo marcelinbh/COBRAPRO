@@ -11,14 +11,19 @@ import { Badge } from "@/components/ui/badge";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { toast } from "sonner";
-import { ArrowLeft, Calculator, CheckCircle, Info } from "lucide-react";
+import { ArrowLeft, Calculator, CheckCircle, Info, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { formatarMoeda, calcularParcelaPadrao, calcularParcelasPrice, MODALIDADE_LABELS } from "../../../shared/finance";
 
 export default function NovoContrato() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
+  const [clienteComboOpen, setClienteComboOpen] = useState(false);
+  const [clienteBusca, setClienteBusca] = useState("");
 
   // Ler parâmetros da URL (vindos do Simulador ou Vendas)
   const urlParams = new URLSearchParams(window.location.search);
@@ -225,16 +230,56 @@ export default function NovoContrato() {
             {/* Cliente */}
             <div>
               <Label>{t('novoContrato.client')} *</Label>
-              <Select value={form.clienteId} onValueChange={v => setForm(f => ({ ...f, clienteId: v }))}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue placeholder={t('novoContrato.selectClient')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {clientes?.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={clienteComboOpen} onOpenChange={setClienteComboOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={clienteComboOpen}
+                    className="w-full mt-1 justify-between bg-background font-normal"
+                  >
+                    {form.clienteId
+                      ? clientes.find(c => String(c.id) === form.clienteId)?.nome
+                      : t('novoContrato.selectClient')}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start" style={{ minWidth: '320px' }}>
+                  <Command>
+                    <CommandInput
+                      placeholder="Buscar cliente..."
+                      value={clienteBusca}
+                      onValueChange={setClienteBusca}
+                    />
+                    <CommandList>
+                      <CommandEmpty>Nenhum cliente encontrado.</CommandEmpty>
+                      <CommandGroup>
+                        {clientes
+                          .filter(c => c.nome.toLowerCase().includes(clienteBusca.toLowerCase()))
+                          .map(c => (
+                            <CommandItem
+                              key={c.id}
+                              value={String(c.id)}
+                              onSelect={(val) => {
+                                setForm(f => ({ ...f, clienteId: val }));
+                                setClienteComboOpen(false);
+                                setClienteBusca("");
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  form.clienteId === String(c.id) ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {c.nome}
+                            </CommandItem>
+                          ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
 
             {/* Modalidade */}
