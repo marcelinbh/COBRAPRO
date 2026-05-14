@@ -16,15 +16,19 @@ import {
 } from "lucide-react";
 import { formatarMoeda } from "../../../shared/finance";
 
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  aguardando: { label: "Aguardando", color: "text-amber-400 bg-amber-400/10 border-amber-400/20", icon: <Clock className="h-3 w-3" /> },
-  compensado: { label: "Compensado", color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20", icon: <CheckCircle2 className="h-3 w-3" /> },
-  devolvido: { label: "Devolvido", color: "text-red-400 bg-red-400/10 border-red-400/20", icon: <AlertTriangle className="h-3 w-3" /> },
-  cancelado: { label: "Cancelado", color: "text-muted-foreground bg-muted/30 border-border", icon: <XCircle className="h-3 w-3" /> },
-};
+// STATUS_CONFIG is now a function that returns translated labels
+function getStatusConfig(t: (key: string) => string): Record<string, { label: string; color: string; icon: React.ReactNode }> {
+  return {
+    aguardando: { label: t('common.pending'), color: "text-amber-400 bg-amber-400/10 border-amber-400/20", icon: <Clock className="h-3 w-3" /> },
+    compensado: { label: t('common.completed'), color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20", icon: <CheckCircle2 className="h-3 w-3" /> },
+    devolvido: { label: t('cheques.returned'), color: "text-red-400 bg-red-400/10 border-red-400/20", icon: <AlertTriangle className="h-3 w-3" /> },
+    cancelado: { label: t('common.cancelled'), color: "text-muted-foreground bg-muted/30 border-border", icon: <XCircle className="h-3 w-3" /> },
+  };
+}
 
 export default function Cheques() {
   const { t } = useTranslation();
+  const STATUS_CONFIG = getStatusConfig(t);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [dialogAberto, setDialogAberto] = useState(false);
   const [dialogDevolverAberto, setDialogDevolverAberto] = useState(false);
@@ -178,57 +182,57 @@ export default function Cheques() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Emitente do Cheque *</Label>
-                  <Input className="bg-background border-border" placeholder="Nome do emitente" value={form.emitente} onChange={(e) => setForm({ ...form, emitente: e.target.value })} />
+                  <Label>{t('cheques.issuer')} *</Label>
+                  <Input className="bg-background border-border" placeholder={t('cheques.issuer')} value={form.emitente} onChange={(e) => setForm({ ...form, emitente: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>CPF/CNPJ Emitente</Label>
+                  <Label>{t('common.cpfCnpj')}</Label>
                   <Input className="bg-background border-border" placeholder="000.000.000-00" value={form.cpfCnpjEmitente} onChange={(e) => setForm({ ...form, cpfCnpjEmitente: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Nº do Cheque</Label>
+                  <Label>{t('cheques.checkNumber')}</Label>
                   <Input className="bg-background border-border" placeholder="000000" value={form.numeroCheque} onChange={(e) => setForm({ ...form, numeroCheque: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Banco</Label>
-                  <Input className="bg-background border-border" placeholder="Ex: Bradesco" value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} />
+                  <Label>{t('cheques.bank')}</Label>
+                  <Input className="bg-background border-border" placeholder={t('cheques.bank')} value={form.banco} onChange={(e) => setForm({ ...form, banco: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label>{t('checks.agency')}</Label>
                   <Input className="bg-background border-border" placeholder="0000" value={form.agencia} onChange={(e) => setForm({ ...form, agencia: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Conta</Label>
+                  <Label>{t('cashbox.account')}</Label>
                   <Input className="bg-background border-border" placeholder="00000-0" value={form.conta} onChange={(e) => setForm({ ...form, conta: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Valor Nominal (R$) *</Label>
+                  <Label>{t('cheques.nominalValue')} (R$) *</Label>
                   <Input className="bg-background border-border" placeholder="0,00" value={form.valorNominal} onChange={(e) => setForm({ ...form, valorNominal: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Data de Vencimento *</Label>
+                  <Label>{t('common.dueDate')} *</Label>
                   <Input type="date" className="bg-background border-border" value={form.dataVencimento} onChange={(e) => setForm({ ...form, dataVencimento: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Taxa de Desconto (%) *</Label>
+                  <Label>{t('cheques.discountRate')} (%) *</Label>
                   <Input className="bg-background border-border" placeholder="3" value={form.taxaDesconto} onChange={(e) => setForm({ ...form, taxaDesconto: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Tipo de Taxa</Label>
+                  <Label>{t('cheques.rateType')}</Label>
                   <Select value={form.tipoTaxa} onValueChange={(v) => setForm({ ...form, tipoTaxa: v as "mensal" | "diaria" | "anual" })}>
                     <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="mensal">Mensal</SelectItem>
+                      <SelectItem value="mensal">{t('common.monthly')}</SelectItem>
                       <SelectItem value="diaria">{t('checks.dailyRate')}</SelectItem>
-                      <SelectItem value="anual">Anual</SelectItem>
+                      <SelectItem value="anual">{t('common.annual')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="col-span-2 space-y-1.5">
-                  <Label>Conta de Caixa (opcional)</Label>
+                  <Label>{t('emprestimos.cashAccount')} ({t('common.optional')})</Label>
                   <Select value={form.contaCaixaId} onValueChange={(v) => setForm({ ...form, contaCaixaId: v })}>
                     <SelectTrigger className="bg-background border-border">
-                      <SelectValue placeholder="Selecionar conta..." />
+                      <SelectValue placeholder={t('emprestimos.cashAccount')} />
                     </SelectTrigger>
                     <SelectContent>
                       {contasCaixa?.map((c) => (
@@ -243,7 +247,7 @@ export default function Cheques() {
                 </div>
               </div>
               <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCriar} disabled={criarMutation.isPending}>
-                {criarMutation.isPending ? "Registrando..." : "Registrar Cheque"}
+                {criarMutation.isPending ? t('common.saving') : t('cheques.newCheque')}
               </Button>
             </div>
           </DialogContent>

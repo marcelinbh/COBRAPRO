@@ -19,11 +19,11 @@ function getInitials(nome: string) {
   return nome.split(" ").slice(0, 2).map(n => n[0]).join("").toUpperCase();
 }
 
-function getScoreBadge(score: number) {
-  if (score >= 150) return { label: "Excelente", color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
-  if (score >= 100) return { label: "Bom", color: "bg-blue-500/15 text-blue-400 border-blue-500/30" };
-  if (score >= 60)  return { label: "Regular", color: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" };
-  return { label: "Baixo", color: "bg-red-500/15 text-red-400 border-red-500/30" };
+function getScoreBadge(score: number, t: (k: string) => string) {
+  if (score >= 150) return { label: t('common.excellent'), color: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" };
+  if (score >= 100) return { label: t('common.good'), color: "bg-blue-500/15 text-blue-400 border-blue-500/30" };
+  if (score >= 60)  return { label: t('common.regular'), color: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" };
+  return { label: t('common.poor'), color: "bg-red-500/15 text-red-400 border-red-500/30" };
 }
 
 function getStatusColor(status: string) {
@@ -40,13 +40,7 @@ function getStatusColor(status: string) {
   return map[status] ?? "bg-muted text-muted-foreground border-border";
 }
 
-const STATUS_PARCELA_LABELS: Record<string, string> = {
-  pendente: "Pendente",
-  paga: "Paga",
-  atrasada: "Atrasada",
-  vencendo_hoje: "Vence Hoje",
-  parcial: "Parcial",
-};
+// STATUS_PARCELA_LABELS is now generated via t() inside the component
 
 // ─── component ───────────────────────────────────────────────────────────────
 export default function ClienteDetalhe() {
@@ -82,7 +76,14 @@ export default function ClienteDetalhe() {
 
   // Score
   const score = (cliente as any)?.score ?? 0;
-  const scoreBadge = getScoreBadge(score);
+  const STATUS_PARCELA_LABELS: Record<string, string> = {
+    pendente: t('parcelas.status.pendente'),
+    paga: t('parcelas.status.paga'),
+    atrasada: t('parcelas.status.atrasada'),
+    vencendo_hoje: t('parcelas.status.vencendo_hoje'),
+    parcial: t('parcelas.status.parcial'),
+  };
+  const scoreBadge = getScoreBadge(score, t);
 
   // ─── loading ───────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -235,12 +236,12 @@ export default function ClienteDetalhe() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { icon: <Phone className="h-4 w-4 text-muted-foreground" />, label: "Telefone", value: cliente.telefone },
+                  { icon: <Phone className="h-4 w-4 text-muted-foreground" />, label: t('clients.phone'), value: cliente.telefone },
                   { icon: <MessageCircle className="h-4 w-4 text-emerald-400" />, label: "WhatsApp", value: cliente.whatsapp, link: whatsappNum ? `https://wa.me/55${whatsappNum}` : undefined },
-                  { icon: <Mail className="h-4 w-4 text-blue-400" />, label: "E-mail", value: (cliente as any).email },
+                  { icon: <Mail className="h-4 w-4 text-blue-400" />, label: t('clients.email'), value: (cliente as any).email },
                   { icon: <Instagram className="h-4 w-4 text-pink-400" />, label: "Instagram", value: (cliente as any).instagram },
                   { icon: <Facebook className="h-4 w-4 text-blue-500" />, label: "Facebook", value: (cliente as any).facebook },
-                  { icon: <Briefcase className="h-4 w-4 text-muted-foreground" />, label: "Profissão", value: (cliente as any).profissao },
+                  { icon: <Briefcase className="h-4 w-4 text-muted-foreground" />, label: t('clients.profession'), value: (cliente as any).profissao },
                 ].filter(f => f.value).map(f => (
                   <div key={f.label} className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-muted">{f.icon}</div>
@@ -272,12 +273,12 @@ export default function ClienteDetalhe() {
                   { label: "CPF", value: (cliente as any).cpfCnpj },
                   { label: "CNPJ", value: (cliente as any).cnpj },
                   { label: "RG", value: (cliente as any).rg },
-                  { label: "Data de Nascimento", value: (cliente as any).dataNascimento ? formatarData((cliente as any).dataNascimento) : null },
-                  { label: "Sexo", value: (cliente as any).sexo },
-                  { label: "Estado Civil", value: (cliente as any).estadoCivil },
-                  { label: "Nome da Mãe", value: (cliente as any).nomeMae },
-                  { label: "Nome do Pai", value: (cliente as any).nomePai },
-                  { label: "Chave PIX", value: (cliente as any).chavePix ? `${(cliente as any).chavePix} (${(cliente as any).tipoChavePix ?? ""})` : null },
+                  { label: t('clients.birthDate'), value: (cliente as any).dataNascimento ? formatarData((cliente as any).dataNascimento) : null },
+                  { label: t('clients.gender'), value: (cliente as any).sexo },
+                  { label: t('clients.maritalStatus'), value: (cliente as any).estadoCivil },
+                  { label: t('clients.motherName'), value: (cliente as any).nomeMae },
+                  { label: t('clients.fatherName'), value: (cliente as any).nomePai },
+                  { label: t('clients.pixKey'), value: (cliente as any).chavePix ? `${(cliente as any).chavePix} (${(cliente as any).tipoChavePix ?? ""})` : null },
                 ].filter(f => f.value).map(f => (
                   <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/50 last:border-0">
                     <span className="text-xs text-muted-foreground">{f.label}</span>
@@ -301,10 +302,10 @@ export default function ClienteDetalhe() {
                 <CardContent className="space-y-2">
                   {[
                     { label: "CEP", value: (cliente as any).cep },
-                    { label: "Logradouro", value: [cliente.endereco, (cliente as any).numero].filter(Boolean).join(", ") },
-                    { label: "Complemento", value: (cliente as any).complemento },
-                    { label: "Bairro", value: (cliente as any).bairro },
-                    { label: "Cidade / UF", value: [cliente.cidade, cliente.estado].filter(Boolean).join(" — ") },
+                    { label: t('clients.address'), value: [cliente.endereco, (cliente as any).numero].filter(Boolean).join(", ") },
+                    { label: t('clients.complement'), value: (cliente as any).complemento },
+                    { label: t('clients.neighborhood'), value: (cliente as any).bairro },
+                    { label: t('clients.cityState'), value: [cliente.cidade, cliente.estado].filter(Boolean).join(" — ") },
                   ].filter(f => f.value).map(f => (
                     <div key={f.label} className="flex justify-between items-center py-1.5 border-b border-border/50 last:border-0">
                       <span className="text-xs text-muted-foreground">{f.label}</span>

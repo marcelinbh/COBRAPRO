@@ -214,7 +214,7 @@ export default function NovoContrato() {
         </Button>
         <div>
           <h1 className="font-display text-3xl text-foreground tracking-wide">{t('novoContrato.title').toUpperCase()}</h1>
-          <p className="text-sm text-muted-foreground">Preencha os dados do contrato</p>
+          <p className="text-sm text-muted-foreground">{t('novoContrato.fillContractData')}</p>
         </div>
       </div>
 
@@ -224,10 +224,10 @@ export default function NovoContrato() {
           <CardContent className="p-6 space-y-5">
             {/* Cliente */}
             <div>
-              <Label>Cliente *</Label>
+              <Label>{t('novoContrato.client')} *</Label>
               <Select value={form.clienteId} onValueChange={v => setForm(f => ({ ...f, clienteId: v }))}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecione o cliente" />
+                  <SelectValue placeholder={t('novoContrato.selectClient')} />
                 </SelectTrigger>
                 <SelectContent>
                   {clientes?.map(c => (
@@ -239,7 +239,7 @@ export default function NovoContrato() {
 
             {/* Modalidade */}
             <div>
-              <Label>Modalidade *</Label>
+              <Label>{t('novoContrato.modality')} *</Label>
               <Select value={form.modalidade} onValueChange={v => setForm(f => ({ ...f, modalidade: v }))}>
                 <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -498,41 +498,41 @@ export default function NovoContrato() {
             <CardContent className="space-y-3">
               {!preview ? (
                 <p className="text-xs text-muted-foreground text-center py-4">
-                  Preencha os valores para ver a simulação
+                  {t('novoContrato.fillToSimulate')}
                 </p>
               ) : (
                 <>
                   <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
-                    <div className="text-xs text-muted-foreground">Valor da Parcela</div>
+                    <div className="text-xs text-muted-foreground">{t('novoContrato.installmentValue')}</div>
                     <div className="font-display text-2xl text-primary">{formatarMoeda(preview.valorParcela)}</div>
                     {modoParcelaFixa && (
-                      <div className="text-xs text-muted-foreground mt-1">Valor fixo definido manualmente</div>
+                      <div className="text-xs text-muted-foreground mt-1">{t('emprestimos.fixedValueInstallment')}</div>
                     )}
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Capital</span>
+                      <span className="text-muted-foreground">{t('emprestimos.capital')}</span>
                       <span className="text-foreground font-medium">{formatarMoeda(parseFloat(form.valorPrincipal) || 0)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Juros por Parcela ({form.taxaJuros}%)</span>
+                      <span className="text-muted-foreground">{t('novoContrato.interestPerInstallment')} ({form.taxaJuros}%)</span>
                       <span className="text-amber-400 font-medium">{formatarMoeda((parseFloat(form.valorPrincipal) || 0) * (parseFloat(form.taxaJuros) || 0) / 100)}</span>
                     </div>
                     {parseInt(form.numeroParcelas) > 1 && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Total Juros ({form.numeroParcelas}x)</span>
+                        <span className="text-muted-foreground">{t('novoContrato.totalInterest')} ({form.numeroParcelas}x)</span>
                         <span className="text-warning">{formatarMoeda(preview.totalJuros)}</span>
                       </div>
                     )}
                     <div className="flex justify-between text-sm font-semibold border-t border-border pt-2">
-                      <span className="text-foreground">Total a Pagar</span>
+                      <span className="text-foreground">{t('novoContrato.totalToPay')}</span>
                       <span className="text-emerald-400">{formatarMoeda(preview.totalPagar)}</span>
                     </div>
                   </div>
                   <div className="text-xs text-center mt-1 p-2 rounded bg-muted/40 text-muted-foreground">
                     {parseInt(form.numeroParcelas) > 1
-                      ? `${form.numeroParcelas}x de ${formatarMoeda(preview.valorParcela)}`
-                      : `Pagamento único: ${formatarMoeda(preview.totalPagar)}`
+                      ? `${form.numeroParcelas}x ${t('common.of')} ${formatarMoeda(preview.valorParcela)}`
+                      : `${t('novoContrato.singlePayment')}: ${formatarMoeda(preview.totalPagar)}`
                     }
                   </div>
                 </>
@@ -548,19 +548,19 @@ export default function NovoContrato() {
                 {modoParcelaFixa && (
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-2 h-2 rounded-full bg-primary" />
-                    <span>Parcela com valor fixo</span>
+                    <span>{t('emprestimos.fixedValueInstallment')}</span>
                   </div>
                 )}
                 {modoDataManual && (
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-2 h-2 rounded-full bg-primary" />
-                    <span>Datas de vencimento manuais</span>
+                    <span>{t('novoContrato.manualDueDates')}</span>
                   </div>
                 )}
                 {tipoMulta === 'fixo' && form.multaAtraso && (
                   <div className="flex items-center gap-2 text-xs">
                     <div className="w-2 h-2 rounded-full bg-primary" />
-                    <span>Multa em valor fixo: {formatarMoeda(parseFloat(form.multaAtraso))}</span>
+                    <span>{t('novoContrato.fixedFine')}: {formatarMoeda(parseFloat(form.multaAtraso))}</span>
                   </div>
                 )}
               </CardContent>
@@ -574,7 +574,7 @@ export default function NovoContrato() {
             onClick={handleSubmit}
           >
             <CheckCircle className="h-4 w-4" />
-            {createMutation.isPending ? "Criando..." : "Criar Contrato"}
+            {createMutation.isPending ? t('common.saving') : t('contracts.createContract')}
           </Button>
         </div>
       </div>

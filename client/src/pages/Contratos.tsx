@@ -114,7 +114,7 @@ export default function Contratos() {
           <p className="text-sm text-muted-foreground mt-1">{filtrados?.length ?? 0} contratos</p>
         </div>
         <Button className="gap-2" onClick={() => setLocation('/contratos/novo')}>
-          <Plus className="h-4 w-4" />Novo Contrato
+          <Plus className="h-4 w-4" />{t('common.newContract')}
         </Button>
       </div>
 
@@ -122,27 +122,27 @@ export default function Contratos() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input className="pl-9" placeholder="Buscar por cliente..." value={busca} onChange={e => setBusca(e.target.value)} />
+          <Input className="pl-9" placeholder={t('contratos.searchPlaceholder')} value={busca} onChange={e => setBusca(e.target.value)} />
         </div>
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
           <SelectTrigger className="w-full sm:w-44"><SelectValue placeholder={t('contracts.status')} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todos">Todos os status</SelectItem>
-            <SelectItem value="ativo">Ativo</SelectItem>
-            <SelectItem value="quitado">Quitado</SelectItem>
-            <SelectItem value="inadimplente">Inadimplente</SelectItem>
-            <SelectItem value="cancelado">Cancelado</SelectItem>
+            <SelectItem value="todos">{t('contratos.allStatuses')}</SelectItem>
+            <SelectItem value="ativo">{t('contratos.active')}</SelectItem>
+            <SelectItem value="quitado">{t('common.settled')}</SelectItem>
+            <SelectItem value="inadimplente">{t('common.defaulter')}</SelectItem>
+            <SelectItem value="cancelado">{t('common.cancelled')}</SelectItem>
           </SelectContent>
         </Select>
         <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
-          <SelectTrigger className="w-full sm:w-52"><SelectValue placeholder="Modalidade" /></SelectTrigger>
+          <SelectTrigger className="w-full sm:w-52"><SelectValue placeholder={t('contratos.type')} /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="todas">Todas as modalidades</SelectItem>
-            <SelectItem value="emprestimo_padrao">Empréstimo Padrão</SelectItem>
-            <SelectItem value="emprestimo_diario">Empréstimo Diário</SelectItem>
-            <SelectItem value="tabela_price">Parcela Fixa</SelectItem>
-            <SelectItem value="venda_produto">Venda de Produto</SelectItem>
-            <SelectItem value="desconto_cheque">Desconto de Cheque</SelectItem>
+            <SelectItem value="todas">{t('parcelas.allModalities')}</SelectItem>
+            <SelectItem value="emprestimo_padrao">{t('common.loans')}</SelectItem>
+            <SelectItem value="emprestimo_diario">{t('common.daily')}</SelectItem>
+            <SelectItem value="tabela_price">{t('parcelas.priceTable')}</SelectItem>
+            <SelectItem value="venda_produto">{t('common.sales')}</SelectItem>
+            <SelectItem value="desconto_cheque">{t('common.checks')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -160,7 +160,7 @@ export default function Contratos() {
       {!isLoading && filtrados?.length === 0 && (
         <div className="text-center py-16">
           <FileText className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-muted-foreground">Nenhum contrato encontrado</p>
+          <p className="text-muted-foreground">{t('contratos.noContracts')}</p>
         </div>
       )}
 
@@ -188,14 +188,14 @@ export default function Contratos() {
                       </span>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {contrato.numeroParcelas}x de {formatarMoeda(contrato.valorParcela)} · {contrato.taxaJuros}% {contrato.tipoTaxa} · Início: {formatarData(contrato.dataInicio)}
+                      {contrato.numeroParcelas}x de {formatarMoeda(contrato.valorParcela)} · {contrato.taxaJuros}% {contrato.tipoTaxa} · {t('contratos.startDate')}: {formatarData(contrato.dataInicio)}
                     </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 ml-4">
                   <div className="text-right hidden sm:block">
                     <div className="font-display text-lg text-foreground">{formatarMoeda(contrato.valorPrincipal)}</div>
-                    <div className="text-xs text-muted-foreground">Principal</div>
+                    <div className="text-xs text-muted-foreground">{t('common.capital')}</div>
                   </div>
                   <BotaoPDF contratoId={contrato.id} />
                   <ChevronRight className="h-4 w-4 text-muted-foreground" />

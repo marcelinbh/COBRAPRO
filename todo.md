@@ -1061,3 +1061,16 @@
 - [x] Integrar sendMetaEvent("Purchase") no webhook da Kiwify (order_approved)
 - [x] Enviar valor, moeda, email e telefone hasheados para o Meta
 - [ ] Fazer push para GitHub
+
+## Fase 66: Tradução 100% — Corrigir textos PT hardcoded (14/05/2026)
+- [x] Corrigir Contratos.tsx (status, modalidades via t())
+- [x] Corrigir NovoContrato.tsx (labels do formulário via t())
+- [x] Corrigir Parcelas.tsx (StatusBadge, modal de pagamento, placeholders via t())
+- [x] Corrigir Caixa.tsx (labels de conta e operações via t())
+- [x] Corrigir Cheques.tsx (STATUS_CONFIG, labels e placeholders via t())
+- [x] Corrigir Clientes.tsx (botão Concluir via t())
+- [x] Corrigir Configuracoes.tsx (botão Salvar Dados da Empresa via t())
+- [x] Corrigir ClienteDetalhe.tsx (labels de contato, identificação, endereço e score via t())
+- [x] 51 novas chaves adicionadas ao pt-BR.json e es.json
+- [x] TypeScript: 0 erros
+- [ ] Fazer push para GitHub

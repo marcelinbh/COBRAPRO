@@ -95,11 +95,11 @@ function gerarMensagemCobranca(
 function StatusBadge({ status }: { status: string }) {
   const { t, i18n } = useTranslation();
   const map: Record<string, { label: string; className: string; icon: React.ElementType }> = {
-    paga: { label: "Paga", className: "bg-success/15 text-success border-success/30", icon: CheckCircle },
-    pendente: { label: t('parcels.pending'), className: "bg-muted text-muted-foreground border-border", icon: Clock },
-    atrasada: { label: "Atrasada", className: "bg-primary/15 text-primary border-primary/30", icon: AlertTriangle },
+    paga: { label: t('parcelas.paid'), className: "bg-success/15 text-success border-success/30", icon: CheckCircle },
+    pendente: { label: t('parcelas.pending'), className: "bg-muted text-muted-foreground border-border", icon: Clock },
+    atrasada: { label: t('parcelas.overdue'), className: "bg-primary/15 text-primary border-primary/30", icon: AlertTriangle },
     vencendo_hoje: { label: t('installments.dueToday'), className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
-    parcial: { label: "Parcial", className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
+    parcial: { label: t('parcelas.partial'), className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
   };
   const s = map[status] ?? map.pendente;
   const Icon = s.icon;
@@ -206,13 +206,13 @@ function PagamentoDialog({
         onClick={(e) => { e.stopPropagation(); setValorPago(total.toFixed(2)); setOpen(true); }}
       >
         <CheckCircle className="h-3 w-3" />
-        Pagar
+        {t('emprestimos.pay')}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="font-display text-xl tracking-wide flex items-center gap-2">
-              REGISTRAR PAGAMENTO
+              {t('parcelas.payInstallment').toUpperCase()}
               {configData?.jurosMultaAutomatico && diasAtraso > 0 && (
                 <span className="text-xs font-normal bg-orange-500/20 text-orange-400 border border-orange-500/30 px-2 py-0.5 rounded-full">
                   ⚡ Juros/Multa Auto
@@ -237,7 +237,7 @@ function PagamentoDialog({
               {diasAtraso > 0 && (
                 <>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Multa ({diasAtraso} dias)</span>
+                    <span className="text-muted-foreground">{t('common.fine')} ({diasAtraso} dias)</span>
                     <span className="text-warning">{formatarMoeda(multa)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
@@ -262,7 +262,7 @@ function PagamentoDialog({
                   className={`text-xs border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 ${!modoSoJuros ? 'ring-1 ring-emerald-400' : ''}`}
                   onClick={() => { setValorPago(total.toFixed(2)); setModoSoJuros(false); }}
                 >
-                  ✅ Pagar Total ({formatarMoeda(total)})
+                  ✅ {t('emprestimos.pay')} Total ({formatarMoeda(total)})
                 </Button>
                 <Button
                   variant="outline"
@@ -270,7 +270,7 @@ function PagamentoDialog({
                   className={`text-xs border-amber-500/40 text-amber-400 hover:bg-amber-500/10 ${modoSoJuros ? 'ring-1 ring-amber-400 bg-amber-500/10' : ''}`}
                   onClick={() => { setValorPago(jurosParcela.toFixed(2)); setModoSoJuros(true); }}
                 >
-                  💰 Só Juros ({formatarMoeda(jurosParcela)})
+                  💰 {t('emprestimos.payInterest')} ({formatarMoeda(jurosParcela)})
                   {modoSoJuros && <span className="ml-1 text-[10px] bg-amber-500/20 px-1 rounded">↺ Renova</span>}
                 </Button>
               </div>
@@ -302,7 +302,7 @@ function PagamentoDialog({
               <Label>{t('emprestimos.cashAccount')} <span className="text-muted-foreground text-xs">(opcional)</span></Label>
               <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecione a conta" />
+                  <SelectValue placeholder={t('emprestimos.cashAccount')} />
                 </SelectTrigger>
                 <SelectContent>
                   {contas.map(c => (
@@ -554,7 +554,7 @@ export default function Parcelas() {
         </div>
         <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
           <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Modalidade" />
+            <SelectValue placeholder={t('novoContrato.modality')} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">{t('parcelas.allModalities')}</SelectItem>
@@ -568,7 +568,7 @@ export default function Parcelas() {
         <Select value={filtroStatus} onValueChange={setFiltroStatus}>
           <SelectTrigger className="w-full sm:w-48">
             <Filter className="h-4 w-4 mr-2" />
-            <SelectValue placeholder="Filtrar status" />
+            <SelectValue placeholder={t('parcelas.filterByStatus')} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todos">{t('parcelas.allStatuses')}</SelectItem>

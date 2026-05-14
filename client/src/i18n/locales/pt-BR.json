@@ -212,7 +212,8 @@
     "partial": "Parcial",
     "tutorial": "Tutorial",
     "downloadReport": "Baixar Relatório",
-    "default": "Padrão"
+    "default": "Padrão",
+    "cpfCnpj": "CPF/CNPJ"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -391,7 +392,16 @@
     "registeredAt": "Cadastrado em",
     "loadingClients": "Carregando clientes...",
     "noClientsFound": "Nenhum cliente encontrado",
-    "registerFirstClient": "Cadastrar primeiro cliente"
+    "registerFirstClient": "Cadastrar primeiro cliente",
+    "conclude": "Concluir",
+    "gender": "Sexo",
+    "maritalStatus": "Estado Civil",
+    "motherName": "Nome da Mãe",
+    "fatherName": "Nome do Pai",
+    "pixKey": "Chave PIX",
+    "complement": "Complemento",
+    "neighborhood": "Bairro",
+    "cityState": "Cidade / UF"
   },
   "loans": {
     "title": "Empréstimos",
@@ -542,7 +552,8 @@
     "remainingValue": "Valor Restante",
     "interestRate": "Taxa de Juros",
     "description": "Descrição",
-    "observations": "Observações"
+    "observations": "Observações",
+    "createContract": "Criar Contrato"
   },
   "parcels": {
     "title": "Parcelas",
@@ -629,7 +640,13 @@
     "operationalExpense": "Despesa Operacional",
     "other": "Outro",
     "noTransactions": "Nenhuma transação encontrada",
-    "status": "Status"
+    "status": "Status",
+    "createAccount": "Criar Conta",
+    "addBalance": "Adicionar Saldo",
+    "debitBalance": "Debitar Saldo",
+    "transfer": "Transferência",
+    "manualAdjustment": "Ajuste Manual",
+    "debit": "Debitar"
   },
   "vehicles": {
     "title": "Veículos",
@@ -1294,7 +1311,10 @@
     "logoDesc": "Esta logo será usada nos documentos e relatórios.",
     "random": "Aleatória",
     "updateNow": "Atualize agora para continuar enviando cobranças aos seus clientes.",
-    "canSendMessages": "Você pode enviar mensagens de cobrança diretamente aos seus clientes."
+    "canSendMessages": "Você pode enviar mensagens de cobrança diretamente aos seus clientes.",
+    "company": "Empresa",
+    "memberSince": "Membro desde",
+    "paymentLink": "Link de pagamento"
   },
   "users": {
     "title": "Usuários",
@@ -1502,7 +1522,16 @@
     "generate": "Gerar Contrato",
     "print": "Imprimir",
     "send": "Enviar",
-    "download": "Baixar"
+    "download": "Baixar",
+    "fillContractData": "Preencha os dados do contrato",
+    "fillToSimulate": "Preencha os valores para ver a simulação",
+    "installmentValue": "Valor da Parcela",
+    "interestPerInstallment": "Juros por Parcela",
+    "totalInterest": "Total Juros",
+    "totalToPay": "Total a Pagar",
+    "singlePayment": "Pagamento único",
+    "manualDueDates": "Datas de vencimento manuais",
+    "fixedFine": "Multa em valor fixo"
   },
   "inadimplencia": {
     "title": "Inadimplência",
@@ -1777,7 +1806,10 @@
     "ex_aluguel_combustível": "Ex: Aluguel, Combustível...",
     "buscar_por_comprador_marca_ou_modelo": "Buscar por comprador, marca ou modelo...",
     "descrição_da_transação": "Descrição da transação",
-    "selecione_a_conta": "Selecione a conta"
+    "selecione_a_conta": "Selecione a conta",
+    "ex_banco": "Ex: Nubank, Itaú...",
+    "ex_deposito": "Ex: Depósito em dinheiro",
+    "ex_retirada": "Ex: Retirada para despesa"
   },
   "label": {
     "data_início": "Data Início",
@@ -1969,7 +2001,11 @@
     "totalReturned": "Total Devolvido",
     "filterByStatus": "Filtrar por Status",
     "allStatuses": "Todos os Status",
-    "searchPlaceholder": "Buscar por emitente, banco..."
+    "searchPlaceholder": "Buscar por emitente, banco...",
+    "checkNumber": "Nº do Cheque",
+    "nominalValue": "Valor Nominal",
+    "discountRate": "Taxa de Desconto",
+    "rateType": "Tipo de Taxa"
   },
   "cobradores": {
     "title": "Cobradores",
@@ -2098,7 +2134,21 @@
     "payInterest": "Pagar Juros",
     "editInterest": "Editar Juros",
     "applyFine": "Aplicar Multa",
-    "labelsDesc": "Gerenciar etiquetas do contrato"
+    "labelsDesc": "Gerenciar etiquetas do contrato",
+    "allStatus": "Todos os status",
+    "allModalities": "Todas as modalidades",
+    "settled": "Quitado",
+    "defaulted": "Inadimplente",
+    "daily": "Diário",
+    "weekly": "Semanal",
+    "biweekly": "Quinzenal",
+    "monthly": "Mensal",
+    "fixedInstallment": "Parcela Fixa",
+    "bullet": "Bullet (Único)",
+    "noInstallments": "Nenhuma parcela",
+    "automaticCalc": "Calculado automaticamente",
+    "capital": "Capital",
+    "fixedValueInstallment": "Parcela com valor fixo"
   },
   "clientes": {
     "title": "Clientes",
@@ -2265,7 +2315,11 @@
     "scheduleTimeDesc": "Horário preferido para receber o relatório",
     "phoneNumberDesc": "Número que receberá o relatório diário",
     "enableBrowserReminder": "Ativar lembrete de horário no navegador",
-    "accumulatedPerDay": "Acumulado por dia após o vencimento"
+    "accumulatedPerDay": "Acumulado por dia após o vencimento",
+    "address": "Endereço",
+    "reportTime": "Horário preferido para receber o relatório",
+    "attention": "Atenção:",
+    "saveCompanyData": "Salvar Dados da Empresa"
   },
   "loanDetails": {
     "loanNotFound": "Empréstimo não encontrado",
@@ -2315,7 +2369,8 @@
   "login": {
     "availableModules": "Módulos disponíveis",
     "reports": "Relatórios",
-    "automatic": "Automático"
+    "automatic": "Automático",
+    "enterPlatform": "Entrar na plataforma"
   },
   "install": {
     "addToHomeScreen": "Adicionar à Tela de Início",

@@ -38,7 +38,7 @@ function NovaConta({ onSuccess }: { onSuccess: () => void }) {
         <div className="space-y-4 mt-2">
           <div>
             <Label>{t('cashbox.account')} *</Label>
-            <Input className="mt-1" placeholder="Ex: Caixa Principal" value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
+            <Input className="mt-1" placeholder={t('placeholder.ex_caixa_principal')} value={form.nome} onChange={e => setForm(f => ({ ...f, nome: e.target.value }))} />
           </div>
           <div>
             <Label>{t('cashbox.type')}</Label>
@@ -54,7 +54,7 @@ function NovaConta({ onSuccess }: { onSuccess: () => void }) {
           {form.tipo === 'banco' && (
             <div>
               <Label>{t('cashbox.account')}</Label>
-              <Input className="mt-1" placeholder="Ex: Nubank, Itaú..." value={form.banco} onChange={e => setForm(f => ({ ...f, banco: e.target.value }))} />
+              <Input className="mt-1" placeholder={t('placeholder.ex_banco')} value={form.banco} onChange={e => setForm(f => ({ ...f, banco: e.target.value }))} />
             </div>
           )}
           <div>
@@ -66,7 +66,7 @@ function NovaConta({ onSuccess }: { onSuccess: () => void }) {
             disabled={!form.nome || mutation.isPending}
             onClick={() => mutation.mutate({ nome: form.nome, tipo: form.tipo as any, banco: form.banco || undefined, saldoInicial: parseFloat(form.saldoInicial) })}
           >
-            {mutation.isPending ? "Criando..." : "Criar Conta"}
+            {mutation.isPending ? t('common.saving') : t('cashbox.createAccount')}
           </Button>
         </div>
       </DialogContent>
@@ -98,7 +98,7 @@ function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: stri
           <div>
             <Label>{t('cashbox.account')} *</Label>
             <Select value={form.contaCaixaId} onValueChange={v => setForm(f => ({ ...f, contaCaixaId: v }))}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+              <SelectTrigger className="mt-1"><SelectValue placeholder={t('emprestimos.cashAccount')} /></SelectTrigger>
               <SelectContent>
                 {contas.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
               </SelectContent>
@@ -155,7 +155,7 @@ function NovaTransacao({ contas, onSuccess }: { contas: { id: number; nome: stri
               descricao: form.descricao || undefined,
             })}
           >
-            {mutation.isPending ? "Salvando..." : "Registrar"}
+            {mutation.isPending ? t('common.saving') : t('common.save')}
           </Button>
         </div>
       </DialogContent>
@@ -201,7 +201,7 @@ function LancamentoRapido({
               ? "bg-success/15 hover:bg-success/30 text-success"
               : "bg-primary/15 hover:bg-primary/30 text-primary"
           }`}
-          title={isEntrada ? "Adicionar saldo" : "Debitar saldo"}
+          title={isEntrada ? t('cashbox.addBalance') : t('cashbox.debitBalance')}
         >
           {isEntrada ? <PlusCircle className="h-4 w-4" /> : <MinusCircle className="h-4 w-4" />}
         </button>
@@ -209,12 +209,12 @@ function LancamentoRapido({
       <DialogContent className="max-w-sm" onClick={e => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle className="font-display text-xl tracking-wide">
-            {isEntrada ? "➕ ADICIONAR SALDO" : "➖ DEBITAR SALDO"}
+            {isEntrada ? `➕ ${t('cashbox.addBalance').toUpperCase()}` : `➖ ${t('cashbox.debitBalance').toUpperCase()}`}
           </DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <div className="p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-            Conta: <span className="font-medium text-foreground">{conta.nome}</span>
+            {t('cashbox.account')}: <span className="font-medium text-foreground">{conta.nome}</span>
           </div>
           <div>
             <Label>{t('cashbox.amount')} (R$) *</Label>
@@ -233,7 +233,7 @@ function LancamentoRapido({
             <Label>{t('cashbox.description')} ({t('common.optional')})</Label>
             <Input
               className="mt-1"
-              placeholder={isEntrada ? "Ex: Depósito em dinheiro" : "Ex: Retirada para despesa"}
+              placeholder={isEntrada ? t('placeholder.ex_deposito') : t('placeholder.ex_retirada')}
               value={descricao}
               onChange={e => setDescricao(e.target.value)}
             />
@@ -249,10 +249,10 @@ function LancamentoRapido({
                 tipo,
                 categoria: "ajuste_manual",
                 valor: parseFloat(valor),
-                descricao: descricao || (isEntrada ? "Adição manual de saldo" : "Débito manual de saldo"),
+                descricao: descricao || (isEntrada ? t('cashbox.addBalance') : t('cashbox.debitBalance')),
               })}
             >
-              {mutation.isPending ? "Salvando..." : isEntrada ? "Adicionar" : "Debitar"}
+              {mutation.isPending ? t('common.saving') : isEntrada ? t('common.add') : t('cashbox.debit')}
             </Button>
           </div>
         </div>
@@ -274,12 +274,12 @@ export default function Caixa() {
 
   const tipoIcons = { entrada: ArrowUpRight, saida: ArrowDownRight };
   const categoriaLabels: Record<string, string> = {
-    pagamento_parcela: "Pagamento de Parcela",
-    emprestimo_liberado: "Empréstimo Liberado",
-    despesa_operacional: "Despesa Operacional",
-    transferencia_conta: "Transferência",
-    ajuste_manual: "Ajuste Manual",
-    outros: "Outros",
+    pagamento_parcela: t('cashbox.paymentReceived'),
+    emprestimo_liberado: t('cashbox.loanDisbursement'),
+    despesa_operacional: t('cashbox.operationalExpense'),
+    transferencia_conta: t('cashbox.transfer'),
+    ajuste_manual: t('cashbox.manualAdjustment'),
+    outros: t('cashbox.other'),
   };
 
   const invalidarTudo = () => {

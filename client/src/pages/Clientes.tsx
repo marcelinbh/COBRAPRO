@@ -639,7 +639,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
             </Button>
           ) : (
             <Button className="bg-green-600 hover:bg-green-700" onClick={handleSalvar} disabled={isPending}>
-              {isPending ? "Salvando..." : "Concluir"}
+              {isPending ? t('common.saving') : t('clients.conclude')}
             </Button>
           )}
         </div>

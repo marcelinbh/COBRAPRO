@@ -352,7 +352,7 @@ export default function Configuracoes() {
             </div>
           </div>
           <Button size="sm" className="gap-2" onClick={salvarEmpresa} disabled={saveConfigMutation.isPending}>
-            <Save className="h-3 w-3" /> {saveConfigMutation.isPending ? "Salvando..." : "Salvar Dados da Empresa"}
+            <Save className="h-3 w-3" /> {saveConfigMutation.isPending ? t('common.saving') : t('settings.saveCompanyData')}
           </Button>
         </CardContent>
       </Card>
