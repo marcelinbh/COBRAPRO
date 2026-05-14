@@ -1071,6 +1071,9 @@
 - [x] Corrigir Clientes.tsx (botão Concluir via t())
 - [x] Corrigir Configuracoes.tsx (botão Salvar Dados da Empresa via t())
 - [x] Corrigir ClienteDetalhe.tsx (labels de contato, identificação, endereço e score via t())
-- [x] 51 novas chaves adicionadas ao pt-BR.json e es.json
+- [x] 51 novas chaves adicionadas ao pt-BR.json e es.json (rodada 1)
+- [x] Corrigir Relatorios.tsx (placeholders, labels, botões via t())
+- [x] Corrigir Assinaturas.tsx (placeholders, mensagens de vazio, labels via t())
+- [x] 13 novas chaves adicionadas (total: 2.299 chaves em pt-BR e es)
 - [x] TypeScript: 0 erros
-- [ ] Fazer push para GitHub
+- [x] Fazer push para GitHub

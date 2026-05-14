@@ -217,12 +217,12 @@ export default function MeuPerfil() {
             </Select>
             <Input
               className="h-8 text-xs flex-1 sm:w-48"
-              placeholder="Digite sua chave PIX"
+              placeholder={t('profile.pixKeyPlaceholder') || 'Digite sua chave PIX'}
               value={chavePix}
               onChange={(e) => setChavePix(e.target.value)}
             />
             <Button size="sm" className="h-8 text-xs shrink-0" onClick={() => salvarPix.mutate({ pixKey: chavePix, tipoPix })} disabled={salvarPix.isPending}>
-              Salvar PIX
+              {t('profile.savePix') || 'Salvar PIX'}
             </Button>
           </div>
         </div>
@@ -471,12 +471,12 @@ export default function MeuPerfil() {
             </Select>
             <Input
               className="flex-1"
-              placeholder="Digite sua chave PIX"
+              placeholder={t('profile.pixKeyPlaceholder') || 'Digite sua chave PIX'}
               value={chavePix}
               onChange={(e) => setChavePix(e.target.value)}
             />
             <Button onClick={() => salvarPix.mutate({ pixKey: chavePix, tipoPix })} disabled={salvarPix.isPending || !chavePix}>
-              Salvar PIX
+              {t('profile.savePix') || 'Salvar PIX'}
             </Button>
           </div>
         </CardContent>
@@ -555,7 +555,7 @@ export default function MeuPerfil() {
               className="bg-primary hover:bg-primary/90"
             >
               <Upload className="h-4 w-4 mr-2" />
-              {uploadLogo.isPending ? "Enviando..." : "Enviar Logo"}
+              {uploadLogo.isPending ? t('common.sending') : t('profile.uploadLogo')}
             </Button>
             {perfil?.logoUrl && (
               <Button
@@ -564,7 +564,7 @@ export default function MeuPerfil() {
                 disabled={removerLogo.isPending}
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                Remover
+                {t('common.remove')}
               </Button>
             )}
           </div>
@@ -634,7 +634,7 @@ export default function MeuPerfil() {
                   disabled={connectWpp.isPending}
                 >
                   <QrCode className="h-4 w-4 mr-2" />
-                  {connectWpp.isPending ? "Aguardando..." : "Conectar WhatsApp"}
+                  {connectWpp.isPending ? t('common.waiting') : t('profile.connectWhatsapp')}
                 </Button>
               </div>
 
@@ -724,9 +724,9 @@ export default function MeuPerfil() {
             {/* Instruções */}
             <div className="space-y-2 mb-4">
               {[
-                { icon: Smartphone, step: "1. Abra o WhatsApp", sub: "No seu celular" },
-                { icon: Link, step: "2. Aparelhos conectados", sub: "Menu ⋮ → Aparelhos conectados" },
-                { icon: QrCode, step: "3. Conectar com número de telefone", sub: 'Toque em "Conectar um aparelho" e depois em "Conectar com número de telefone"' },
+                { icon: Smartphone, step: t('profile.wppStep1') || '1. Abra o WhatsApp', sub: t('profile.wppStep1Sub') || 'No seu celular' },
+                { icon: Link, step: t('profile.wppStep2') || '2. Aparelhos conectados', sub: t('profile.wppStep2Sub') || 'Menu ⋮ → Aparelhos conectados' },
+                { icon: QrCode, step: t('profile.wppStep3') || '3. Conectar com número de telefone', sub: t('profile.wppStep3Sub') || 'Toque em "Conectar um aparelho" e depois em "Conectar com número de telefone"' },
               ].map(({ icon: Icon, step, sub }) => (
                 <div key={step} className="flex items-start gap-3 p-2.5 rounded-lg bg-[#1a2420]">
                   <div className="h-7 w-7 rounded-md bg-green-500/20 flex items-center justify-center shrink-0">
@@ -783,7 +783,7 @@ export default function MeuPerfil() {
               <Input
                 id="novaSenha"
                 type={mostrarNovaSenha ? "text" : "password"}
-                placeholder="Digite a nova senha"
+                placeholder={t('profile.newPasswordPlaceholder') || 'Digite a nova senha'}
                 value={novaSenha}
                 onChange={(e) => setNovaSenha(e.target.value)}
                 className="pr-10"
@@ -803,7 +803,7 @@ export default function MeuPerfil() {
               <Input
                 id="confirmarSenha"
                 type={mostrarConfirmarSenha ? "text" : "password"}
-                placeholder="Confirme a nova senha"
+                placeholder={t('profile.confirmPasswordPlaceholder') || 'Confirme a nova senha'}
                 value={confirmarSenha}
                 onChange={(e) => setConfirmarSenha(e.target.value)}
                 className="pr-10"

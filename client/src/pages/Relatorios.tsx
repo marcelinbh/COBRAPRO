@@ -387,7 +387,7 @@ export default function Relatorios() {
               </Label>
               <Select value={filtroModalidade} onValueChange={setFiltroModalidade}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Todas as modalidades" />
+                  <SelectValue placeholder={t('contracts.allModalities') || 'Todas as modalidades'} />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todas">Todas as Modalidades</SelectItem>
@@ -719,7 +719,7 @@ export default function Relatorios() {
               <Label className="text-xs text-muted-foreground uppercase tracking-wide">{t('reports.description')}</Label>
               <input
                 className="mt-1 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                placeholder="Ex: Aluguel, Combustível..."
+                placeholder={t('cashflow.expenseDescPlaceholder') || 'Ex: Aluguel, Combustível...'}
                 value={caixaExtraDesc}
                 onChange={e => setCaixaExtraDesc(e.target.value)}
               />
@@ -730,7 +730,7 @@ export default function Relatorios() {
               className={caixaExtraTipo === 'entrada' ? 'bg-success hover:bg-success/90 text-white' : 'bg-destructive hover:bg-destructive/90 text-white'}
             >
               {caixaExtraTipo === 'entrada' ? <Plus className="h-4 w-4 mr-1" /> : <Minus className="h-4 w-4 mr-1" />}
-              {caixaExtraMutation.isPending ? 'Salvando...' : 'Lançar no Caixa'}
+              {caixaExtraMutation.isPending ? t('common.saving') : t('reports.registerCashflow')}
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-2">{t('reports.entryWillBeRegistered')}</p>
@@ -755,7 +755,7 @@ export default function Relatorios() {
               <span className="text-xs text-muted-foreground">Capital:</span>
               <input
                 type="number"
-                placeholder="Mín (R$)"
+                placeholder={t('reports.minValue') || 'Mín (R$)'}
                 value={filtroValorMin}
                 onChange={e => setFiltroValorMin(e.target.value)}
                 className="h-7 w-24 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -763,7 +763,7 @@ export default function Relatorios() {
               <span className="text-xs text-muted-foreground">—</span>
               <input
                 type="number"
-                placeholder="Máx (R$)"
+                placeholder={t('reports.maxValue') || 'Máx (R$)'}
                 value={filtroValorMax}
                 onChange={e => setFiltroValorMax(e.target.value)}
                 className="h-7 w-24 rounded-md border border-input bg-transparent px-2 py-1 text-xs shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
@@ -772,7 +772,7 @@ export default function Relatorios() {
                 <button
                   onClick={() => { setFiltroValorMin(''); setFiltroValorMax(''); }}
                   className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  title="Limpar filtros"
+                  title={t('common.clearFilters') || 'Limpar filtros'}
                 >
                   × Limpar
                 </button>
@@ -901,10 +901,10 @@ export default function Relatorios() {
         </CardHeader>
         <CardContent>
           <div className="mb-4">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wide">Selecionar Cliente</Label>
+            <Label className="text-xs text-muted-foreground uppercase tracking-wide">{t('clients.selectClient') || 'Selecionar Cliente'}</Label>
             <Select value={clienteSelecionado} onValueChange={setClienteSelecionado}>
               <SelectTrigger className="mt-1 max-w-xs">
-                <SelectValue placeholder="Selecione um cliente..." />
+                <SelectValue placeholder={t('clients.selectClientPlaceholder') || 'Selecione um cliente...'} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">— Selecione um cliente —</SelectItem>

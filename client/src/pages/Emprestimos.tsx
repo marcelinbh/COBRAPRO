@@ -723,7 +723,7 @@ function EditarEmprestimoModal({
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Nome da etiqueta"
+                  placeholder={t('emprestimos.labelName') || 'Nome da etiqueta'}
                   value={novaEtiquetaNome}
                   onChange={(e) => setNovaEtiquetaNome(e.target.value)}
                   className="flex-1 h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
@@ -1082,7 +1082,7 @@ function PagamentoModal({
         onClick={handleOpen}
       >
         {triggerIcon ?? <CheckCircle className="h-3.5 w-3.5" />}
-        {triggerLabel ?? "Pagar"}
+        {triggerLabel ?? t('parcelas.pay')}
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -1168,7 +1168,7 @@ function PagamentoModal({
                       type="number"
                       step="0.01"
                       min="0"
-                      placeholder="Valor dos juros (R$)"
+                      placeholder={t('emprestimos.interestValue') || 'Valor dos juros (R$)'}
                       value={jurosCustom}
                       onChange={e => setJurosCustom(e.target.value)}
                       className="h-8 text-sm"
@@ -1223,7 +1223,7 @@ function PagamentoModal({
                   value={dataPagamentoCustom}
                   onChange={e => setDataPagamentoCustom(e.target.value)}
                   className="mt-1 h-9 text-sm [color-scheme:dark]"
-                  placeholder="Hoje (padrão)"
+                  placeholder={t('common.todayDefault') || 'Hoje (padrão)'}
                 />
                 {!dataPagamentoCustom && (
                   <p className="text-[10px] text-muted-foreground mt-1">{t('emprestimos.leaveBlankToday')}</p>
@@ -1332,7 +1332,7 @@ function PagamentoModal({
                   disabled={!contaCaixaId || isPending}
                   onClick={handleConfirmar}
                 >
-                  {isPending ? "Processando..." : "Confirmar"}
+                  {isPending ? t('common.processing') : t('common.confirm')}
                 </Button>
               </div>
             </div>
@@ -1875,7 +1875,7 @@ function EmprestimoCardCobra({
                   }}
                   disabled={editarJurosMutation.isPending}
                 >
-                  {editarJurosMutation.isPending ? "Salvando..." : "Salvar"}
+                  {editarJurosMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </div>
             </div>
@@ -1904,7 +1904,7 @@ function EmprestimoCardCobra({
                 <Label>Motivo</Label>
                 <Input 
                   type="text" 
-                  placeholder="Ex: Atraso de 30 dias"
+                  placeholder={t('emprestimos.penaltyDesc') || 'Ex: Atraso de 30 dias'}
                   value={motivoMulta}
                   onChange={(e) => setMotivoMulta(e.target.value)}
                 />
@@ -1925,7 +1925,7 @@ function EmprestimoCardCobra({
                   }}
                   disabled={aplicarMultaMutation.isPending}
                 >
-                  {aplicarMultaMutation.isPending ? "Aplicando..." : "Aplicar"}
+                  {aplicarMultaMutation.isPending ? t('common.applying') : t('common.apply')}
                 </Button>
               </div>
             </div>
@@ -1986,7 +1986,7 @@ function EmprestimoCardCobra({
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setShowEtiquetasModal(false)}>{t('common.cancel')}</Button>
                 <Button className="flex-1 bg-indigo-600 hover:bg-indigo-700" onClick={() => aplicarEtiquetasMutation.mutate({ contratoId: emp.id, etiquetas: etiquetasSelecionadas })} disabled={aplicarEtiquetasMutation.isPending}>
-                  {aplicarEtiquetasMutation.isPending ? "Salvando..." : "Salvar Etiquetas"}
+                  {aplicarEtiquetasMutation.isPending ? t('common.saving') : t('emprestimos.saveLabels')}
                 </Button>
               </div>
             </div>

@@ -213,7 +213,8 @@
     "tutorial": "Tutorial",
     "downloadReport": "Descargar Informe",
     "default": "Predeterminado",
-    "cpfCnpj": "CPF/CNPJ"
+    "cpfCnpj": "CPF/CNPJ",
+    "clearFilters": "Limpiar filtros"
   },
   "navigation": {
     "dashboard": "Panel",
@@ -401,7 +402,9 @@
     "pixKey": "Clave PIX",
     "complement": "Complemento",
     "neighborhood": "Barrio",
-    "cityState": "Ciudad / Estado"
+    "cityState": "Ciudad / Estado",
+    "selectClient": "Seleccionar Cliente",
+    "selectClientPlaceholder": "Seleccione un cliente..."
   },
   "loans": {
     "title": "Préstamos",
@@ -1396,7 +1399,10 @@
     "expensesInMonth": "Salidas en",
     "expense": "Salida",
     "description": "Descripción",
-    "entryWillBeRegistered": "El registro se registrará en la caja del día actual y aparecerá en el flujo de caja."
+    "entryWillBeRegistered": "El registro se registrará en la caja del día actual y aparecerá en el flujo de caja.",
+    "minValue": "Mín (R$)",
+    "maxValue": "Máx (R$)",
+    "registerCashflow": "Registrar en Caja"
   },
   "forms": {
     "paymentModal": "Modal de Pago",
@@ -2299,7 +2305,8 @@
     "allAccounts": "Todas las cuentas",
     "transfer": "Transferencia",
     "income2": "Entrada",
-    "expense2": "Salida"
+    "expense2": "Salida",
+    "expenseDescPlaceholder": "Ej: Alquiler, Combustible..."
   },
   "calendar": {
     "subtitle": "Vencimientos y cobros",
@@ -2364,7 +2371,13 @@
     "service": "Servicio",
     "description": "Descripción",
     "billingMonth": "Mes de facturación",
-    "observations": "Observaciones"
+    "observations": "Observaciones",
+    "searchPlaceholder": "Buscar por cliente o servicio...",
+    "noSubscriptions": "No se encontraron suscripciones",
+    "tryChangeFilter": "Intente cambiar el filtro de estado",
+    "clickToStart": "Haga clic en \"Nueva Suscripción\" para comenzar",
+    "servicePlaceholder": "Ej: IPTV Premium, Netflix, Spotify...",
+    "planDetailsPlaceholder": "Detalles del plan..."
   },
   "login": {
     "availableModules": "Módulos disponibles",

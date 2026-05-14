@@ -213,7 +213,8 @@
     "tutorial": "Tutorial",
     "downloadReport": "Baixar Relatório",
     "default": "Padrão",
-    "cpfCnpj": "CPF/CNPJ"
+    "cpfCnpj": "CPF/CNPJ",
+    "clearFilters": "Limpar filtros"
   },
   "navigation": {
     "dashboard": "Dashboard",
@@ -401,7 +402,9 @@
     "pixKey": "Chave PIX",
     "complement": "Complemento",
     "neighborhood": "Bairro",
-    "cityState": "Cidade / UF"
+    "cityState": "Cidade / UF",
+    "selectClient": "Selecionar Cliente",
+    "selectClientPlaceholder": "Selecione um cliente..."
   },
   "loans": {
     "title": "Empréstimos",
@@ -1396,7 +1399,10 @@
     "expensesInMonth": "Saídas no",
     "expense": "Saída",
     "description": "Descrição",
-    "entryWillBeRegistered": "O lançamento será registrado no caixa do dia atual e aparecerá no fluxo de caixa."
+    "entryWillBeRegistered": "O lançamento será registrado no caixa do dia atual e aparecerá no fluxo de caixa.",
+    "minValue": "Mín (R$)",
+    "maxValue": "Máx (R$)",
+    "registerCashflow": "Lançar no Caixa"
   },
   "forms": {
     "paymentModal": "Modal de Pagamento",
@@ -2299,7 +2305,8 @@
     "allAccounts": "Todas as contas",
     "transfer": "Transferência",
     "income2": "Entrada",
-    "expense2": "Saída"
+    "expense2": "Saída",
+    "expenseDescPlaceholder": "Ex: Aluguel, Combustível..."
   },
   "calendar": {
     "subtitle": "Vencimentos e cobranças",
@@ -2364,7 +2371,13 @@
     "service": "Serviço",
     "description": "Descrição",
     "billingMonth": "Mês de cobrança",
-    "observations": "Observações"
+    "observations": "Observações",
+    "searchPlaceholder": "Buscar por cliente ou serviço...",
+    "noSubscriptions": "Nenhuma assinatura encontrada",
+    "tryChangeFilter": "Tente mudar o filtro de status",
+    "clickToStart": "Clique em \"Nova Assinatura\" para começar",
+    "servicePlaceholder": "Ex: IPTV Premium, Netflix, Spotify...",
+    "planDetailsPlaceholder": "Detalhes do plano..."
   },
   "login": {
     "availableModules": "Módulos disponíveis",

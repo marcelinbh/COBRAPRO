@@ -256,7 +256,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
               <Input
-                placeholder="Buscar por cliente ou serviço..."
+                placeholder={t('subscriptions.searchPlaceholder') || 'Buscar por cliente ou serviço...'}
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
                 className="pl-9 bg-slate-700 border-slate-600 text-white"
@@ -281,14 +281,14 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
       {/* Lista */}
       <div className="space-y-3">
         {isLoading ? (
-          <div className="text-center py-12 text-slate-400">Carregando...</div>
+          <div className="text-center py-12 text-slate-400">{t('common.loading')}</div>
         ) : assinaturas.length === 0 ? (
           <Card className="bg-slate-800/50 border-slate-700">
             <CardContent className="py-12 text-center">
               <Tv2 className="mx-auto text-slate-600 mb-3" size={40} />
-              <p className="text-slate-400">Nenhuma assinatura encontrada</p>
+              <p className="text-slate-400">{t('subscriptions.noSubscriptions')}</p>
               <p className="text-slate-500 text-sm mt-1">
-                {filtroStatus !== 'todas' ? 'Tente mudar o filtro de status' : 'Clique em "Nova Assinatura" para começar'}
+                {filtroStatus !== 'todas' ? t('subscriptions.tryChangeFilter') : t('subscriptions.clickToStart')}
               </p>
             </CardContent>
           </Card>
@@ -412,7 +412,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
               <Label className="text-slate-300">Cliente *</Label>
               <Select value={form.clienteId} onValueChange={(v) => setForm(f => ({ ...f, clienteId: v }))}>
                 <SelectTrigger className="bg-slate-700 border-slate-600 text-white mt-1">
-                  <SelectValue placeholder="Selecione o cliente" />
+                  <SelectValue placeholder={t('clients.selectClient') || 'Selecione o cliente'} />
                 </SelectTrigger>
                 <SelectContent>
                   {(clientes as any[]).map((c: any) => (
@@ -424,7 +424,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
             <div>
               <Label className="text-slate-300">Serviço / Plano *</Label>
               <Input
-                placeholder="Ex: IPTV Premium, Netflix, Spotify..."
+                placeholder={t('subscriptions.servicePlaceholder') || 'Ex: IPTV Premium, Netflix, Spotify...'}
                 value={form.servico}
                 onChange={(e) => setForm(f => ({ ...f, servico: e.target.value }))}
                 className="bg-slate-700 border-slate-600 text-white mt-1"
@@ -465,7 +465,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
             <div>
               <Label className="text-slate-300">{t('subscriptions.description')}</Label>
               <Textarea
-                placeholder="Detalhes do plano..."
+                placeholder={t('subscriptions.planDetailsPlaceholder') || 'Detalhes do plano...'}
                 value={form.descricao}
                 onChange={(e) => setForm(f => ({ ...f, descricao: e.target.value }))}
                 className="bg-slate-700 border-slate-600 text-white mt-1"
@@ -527,7 +527,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
               <div>
                 <Label className="text-slate-300">{t('subscriptions.observations')}</Label>
                 <Input
-                  placeholder="Opcional..."
+                  placeholder={t('common.optional') || 'Opcional...'}
                   value={formPagamento.observacoes}
                   onChange={(e) => setFormPagamento(f => ({ ...f, observacoes: e.target.value }))}
                   className="bg-slate-700 border-slate-600 text-white mt-1"
