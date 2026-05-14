@@ -18,7 +18,7 @@ import {
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { calcularJurosMora, calcularParcelaPadrao, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
+import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -1193,6 +1193,10 @@ const contratosRouter = router({
       let valorParcela: number;
       if (input.modalidade === 'tabela_price') {
         valorParcela = calcularParcelasPrice(input.valorPrincipal, input.taxaJuros, input.numeroParcelas);
+      } else if (input.modalidade === 'diario') {
+        // Empréstimo Diário: total = capital × (1 + taxa/100), parcela = total ÷ nParcelas
+        // Ex: R$300 × 100% = R$600 ÷ 15 = R$40/parcela
+        valorParcela = calcularParcelaDiario(input.valorPrincipal, input.taxaJuros, input.numeroParcelas);
       } else {
         valorParcela = calcularParcelaPadrao(input.valorPrincipal, input.taxaJuros, input.numeroParcelas);
       }
@@ -1580,8 +1584,11 @@ const contratosRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          // IMPORTANTE: deletar parcelas ANTES do contrato (foreign key constraint)
-          // Verificar user_id para garantir isolamento entre usuários (segurança)
+          // IMPORTANTE: deletar na ordem correta para evitar FK constraints:
+          // 1. transacoes_caixa (referencia parcelas)
+          // 2. parcelas (referencia contratos)
+          // 3. contratos
+          await db.delete(transacoesCaixa).where(eq(transacoesCaixa.contratoId, input.id));
           await db.delete(parcelas).where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id)));
           await db.delete(contratos).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
           return { success: true };
@@ -1593,8 +1600,12 @@ const contratosRouter = router({
       // Fallback: Supabase REST
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      // IMPORTANTE: deletar parcelas ANTES do contrato (foreign key constraint)
+      // IMPORTANTE: deletar na ordem correta para evitar FK constraints
+      // 1. transacoes_caixa que referenciam parcelas deste contrato
+      await supabase.from('transacoes_caixa').delete().eq('contrato_id', input.id);
+      // 2. parcelas do contrato
       await supabase.from('parcelas').delete().eq('contrato_id', input.id);
+      // 3. contrato
       const { error } = await supabase.from('contratos').delete().eq('id', input.id).eq('user_id', ctx.user.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { success: true };
@@ -2100,6 +2111,7 @@ const parcelasRouter = router({
         return data ? {
           id: data.id, modalidade: data.modalidade, tipoTaxa: data.tipo_taxa,
           taxaJuros: data.taxa_juros, valorPrincipal: data.valor_principal,
+          valorParcela: data.valor_parcela,
           numeroParcelas: data.numero_parcelas, clienteId: data.cliente_id,
           koletorId: data.koletor_id, contaCaixaId: data.conta_caixa_id,
           multaAtraso: data.multa_atraso, jurosMoraDiario: data.juros_mora_diario,
@@ -2121,10 +2133,12 @@ const parcelasRouter = router({
         novaDataVenc.setDate(novaDataVenc.getDate() + diasIntervalo);
         novaDataVencStr = novaDataVenc.toISOString().split('T')[0];
       }
-      // Valor da nova parcela: usar o valor informado pelo usuário ou manter o original
+      // Valor da nova parcela: usar o valor informado pelo usuário, ou o valor_parcela do contrato
+      // (capital + juros), nunca o valor_original da parcela atual (que pode ser só juros)
+      const valorContratoStr = (contrato as any).valorParcela ?? String(parcela.valorOriginal);
       const valorNovaParcela = input.novoValorParcela
         ? String(input.novoValorParcela.toFixed(2))
-        : String(parcela.valorOriginal);
+        : String(valorContratoStr);
 
       // Marcar parcela atual como "paga" (juros pagos = renovação)
       const hoje = new Date();

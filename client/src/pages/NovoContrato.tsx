@@ -16,7 +16,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { toast } from "sonner";
 import { ArrowLeft, Calculator, CheckCircle, Info, ChevronsUpDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatarMoeda, calcularParcelaPadrao, calcularParcelasPrice, MODALIDADE_LABELS } from "../../../shared/finance";
+import { formatarMoeda, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, MODALIDADE_LABELS } from "../../../shared/finance";
 
 export default function NovoContrato() {
   const { t } = useTranslation();
@@ -87,6 +87,8 @@ export default function NovoContrato() {
       let valorParcela: number;
       if (form.modalidade === 'tabela_price') {
         valorParcela = calcularParcelasPrice(valor, taxa, parcelas);
+      } else if (form.modalidade === 'diario' || form.modalidade === 'emprestimo_diario') {
+        valorParcela = calcularParcelaDiario(valor, taxa, parcelas);
       } else {
         valorParcela = calcularParcelaPadrao(valor, taxa, parcelas);
       }

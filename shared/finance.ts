@@ -72,6 +72,21 @@ export function calcularParcelaPadrao(
 }
 
 /**
+ * Cálculo para Empréstimo Diário (taxa única sobre o total)
+ * Total = capital × (1 + taxa/100)
+ * Parcela = Total ÷ número de parcelas
+ * Exemplo: R$300, 100%, 15 parcelas → total = R$600, parcela = R$40
+ */
+export function calcularParcelaDiario(
+  principal: number,
+  taxa: number,
+  numParcelas: number
+): number {
+  const total = Math.round(principal * (1 + taxa / 100) * 100) / 100;
+  return Math.round((total / numParcelas) * 100) / 100;
+}
+
+/**
  * Cálculo bullet/renovável (modelo Cobra Fácil)
  * Cada parcela = principal × (1 + taxa/100)
  * Cliente pode pagar total (capital + juros) ou só os juros e renovar

@@ -1102,3 +1102,7 @@
 - [x] BUG CRÍTICO: Relatórios mostra todos os valores zerados (corrigido: dashboard.kpis fallback REST agora usa campo ativo e saldo corretos)
 - [x] BUG: Textos hardcoded em espanhol (Etiqueta, Detalhes, Comprovante, Cobça preventiva) - corrigidos com chaves de tradução
 - [x] BUG: Botão Fechar hardcoded - corrigido com t('common.close')
+- [x] BUG CRÍTICO: Empréstimo Diário - cálculo errado (corrigido: Total = Capital × (1 + taxa/100), Parcela = Total ÷ nº parcelas)
+- [x] FEATURE: Adicionar botão "Pagar" em cada linha de parcela pendente na tabela de detalhes do contrato (implementado: botão Pagar com modal de pagamento individual)
+- [x] BUG CRÍTICO: Pagar Juros marca contrato como quitado incorretamente (corrigido: nova parcela agora usa valor_parcela do contrato, não apenas os juros pagos)
+- [x] BUG CRÍTICO: Não é possível excluir empréstimo (corrigido: deletar transacoes_caixa antes das parcelas, e parcelas antes do contrato)

@@ -48,6 +48,10 @@ export default function EmprestimoDetalhes() {
 
   // Estado para editar parcela individualmente
   const [parcelaEditando, setParcelaEditando] = useState<{ id: number; valor: string; data: string } | null>(null);
+  // Estado para pagar parcela individual
+  const [parcelaPagando, setParcelaPagando] = useState<{ id: number; numero: number; valor: number } | null>(null);
+  const [valorPagIndividual, setValorPagIndividual] = useState('');
+  const [contaPagIndividual, setContaPagIndividual] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada'>('todas');
   // Estado para criar nova parcela
   const [showNovaParcela, setShowNovaParcela] = useState(false);
@@ -402,6 +406,7 @@ export default function EmprestimoDetalhes() {
                       <th className="text-right px-3 py-2 text-muted-foreground font-medium">Valor</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Status</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Editar</th>
+                      <th className="text-center px-3 py-2 text-muted-foreground font-medium">Pagar</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -435,6 +440,7 @@ export default function EmprestimoDetalhes() {
                                 {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
                               </Badge>
                             </td>
+                            <td className="px-3 py-2 text-center">{/* Pagar - modo edição */}</td>
                             <td className="px-2 py-1 text-center">
                               <div className="flex gap-1 justify-center">
                                 <button
@@ -481,6 +487,22 @@ export default function EmprestimoDetalhes() {
                                   title="Editar parcela"
                                 >
                                   <Pencil className="h-3.5 w-3.5" />
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-3 py-2 text-center">
+                              {p.status !== 'paga' && (
+                                <button
+                                  onClick={() => {
+                                    setParcelaPagando({ id: p.id, numero: p.numero_parcela, valor: parseFloat(p.valor_original) });
+                                    setValorPagIndividual(parseFloat(p.valor_original).toFixed(2));
+                                    setContaPagIndividual('');
+                                  }}
+                                  className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors flex items-center gap-1"
+                                  title="Pagar esta parcela"
+                                >
+                                  <DollarSign className="h-3 w-3" />
+                                  Pagar
                                 </button>
                               )}
                             </td>
@@ -849,6 +871,72 @@ export default function EmprestimoDetalhes() {
                 onClick={() => aplicarMultaMutation.mutate({ id: emprestimo.id, multa: valorMulta })}
               >
                 {aplicarMultaMutation.isPending ? 'Aplicando...' : 'Aplicar Multa'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── MODAL PAGAR PARCELA INDIVIDUAL ── */}
+      <Dialog open={!!parcelaPagando} onOpenChange={(v) => { if (!v) { setParcelaPagando(null); setValorPagIndividual(''); setContaPagIndividual(''); } }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>PAGAR PARCELA #{parcelaPagando?.numero}</DialogTitle>
+            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
+              <div className="flex justify-between items-center">
+                <span>Parcela #{parcelaPagando?.numero}</span>
+                <span className="text-emerald-400 font-semibold">{formatarMoeda(parcelaPagando?.valor ?? 0)}</span>
+              </div>
+            </div>
+            <div>
+              <Label className="text-xs">Valor a Pagar (R$)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                placeholder={`Padrão: ${formatarMoeda(parcelaPagando?.valor ?? 0)}`}
+                value={valorPagIndividual}
+                onChange={e => setValorPagIndividual(e.target.value)}
+                className="mt-1 h-9 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Conta de Caixa</Label>
+              <Select value={contaPagIndividual} onValueChange={setContaPagIndividual}>
+                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>
+                  {(contas ?? []).map((c: any) => (
+                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setParcelaPagando(null)}>{t('common.cancel')}</Button>
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                disabled={pagarTotalMutation.isPending}
+                onClick={() => {
+                  if (!parcelaPagando) return;
+                  const valorFinal = valorPagIndividual ? parseFloat(valorPagIndividual) : parcelaPagando.valor;
+                  pagarTotalMutation.mutate({
+                    parcelaId: parcelaPagando.id,
+                    valorPago: valorFinal,
+                    contaCaixaId: contaPagIndividual ? parseInt(contaPagIndividual) : undefined,
+                  }, {
+                    onSuccess: () => {
+                      toast.success(`Parcela #${parcelaPagando.numero} paga com sucesso!`);
+                      setParcelaPagando(null);
+                      setValorPagIndividual('');
+                      setContaPagIndividual('');
+                      refetch();
+                    },
+                  });
+                }}
+              >
+                {pagarTotalMutation.isPending ? 'Processando...' : 'Confirmar Pagamento'}
               </Button>
             </div>
           </div>
