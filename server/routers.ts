@@ -746,7 +746,11 @@ const clientesRouter = router({
         else if (score >= 40) badge = '👌 Regular';
         
         return {
-          ...cliente,
+          id: cliente.id,
+          nome: cliente.nome || cliente.name || '',
+          cpfCnpj: cliente.cpf_cnpj || cliente.cpfCnpj || null,
+          telefone: cliente.telefone || null,
+          email: cliente.email || null,
           score,
           badge,
           lucroGerado,
@@ -1973,7 +1977,7 @@ const parcelasRouter = router({
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
 
       // Buscar parcela
-      const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).single();
+      const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
       if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
 
       // Buscar configuração de multa diária do usuário
@@ -2114,7 +2118,7 @@ const parcelasRouter = router({
         }
         const supabase = await getSupabaseClientAsync();
         if (!supabase) return null;
-        const { data } = await supabase.from('parcelas').select('*').eq('id', input.parcelaId).single();
+        const { data } = await supabase.from('parcelas').select('*').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
         return data ? {
           id: data.id, contratoId: data.contrato_id, clienteId: data.cliente_id,
           numeroParcela: data.numero_parcela, valorOriginal: data.valor_original,
@@ -2388,7 +2392,15 @@ const caixaRouter = router({
             .from(transacoesCaixa)
             .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
           const saldo = parseFloat(conta.saldo) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
-          result.push({ ...conta, saldoAtual: saldo });
+          result.push({
+            id: conta.id,
+            nome: conta.nome,
+            tipo: conta.tipo,
+            banco: conta.banco ?? null,
+            saldoInicial: parseFloat(conta.saldo ?? '0'),
+            saldoAtual: saldo,
+            ativa: conta.ativo ?? true,
+          });
         }
         return result;
       } catch (err) {

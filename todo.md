@@ -1113,3 +1113,9 @@
 - [x] BUG: Denominador de parcelas incorreto após renovação de juros (usava numero_parcelas do contrato em vez do maior numero_parcela real - corrigido com totalParcelasMap)
 - [x] BUG: Caixa - transações não apareciam (user_id null em todos os inserts de transacoes_caixa - corrigido em 7 pontos do backend + 53 registros históricos corrigidos no banco)
 - [x] BUG: Relatório - Fluxo de Caixa vazio (causado pelo mesmo bug de user_id nas transações - corrigido automaticamente)
+- [x] MELHORIA: Relatório - gráfico "Status das Parcelas" agora tem toggle "Todas ativas" / "Período" com "Todas ativas" como padrão
+- [x] VERIFICAR: Página Caixa - transações históricas aparecem corretamente após correção de user_id
+- [x] BUG: Score de Clientes em branco (Max Depth na serialização tRPC - procedure listarComScore retornava spread de objeto Drizzle - corrigido com mapeamento explícito)
+- [x] BUG: Backup mostrando "—" e "0 registros" (campo created_at inexistente na tabela clientes - corrigido para createdAt no backup router)
+- [x] BUG: caixa.contas causando Max Depth (spread de objeto Drizzle com referências internas - corrigido com mapeamento explícito de campos)
+- [x] SEGURANÇA: registrarPagamento e pagarJuros buscavam parcela por id sem filtrar por user_id (vulnerabilidade de acesso entre contas - corrigido adicionando .eq('user_id', ctx.user.id))

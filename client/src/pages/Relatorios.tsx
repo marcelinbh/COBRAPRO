@@ -35,6 +35,7 @@ export default function Relatorios() {
   // Filtros avançados — Empréstimos Ativos
   const [filtroValorMin, setFiltroValorMin] = useState('');
   const [filtroValorMax, setFiltroValorMax] = useState('');
+  const [statusParcelasScope, setStatusParcelasScope] = useState<'periodo' | 'todas'>('todas');
 
   const { data: kpis } = trpc.dashboard.kpis.useQuery();
   const { data: contratos } = trpc.contratos.list.useQuery({});
@@ -497,41 +498,79 @@ export default function Relatorios() {
         {/* Status de Parcelas */}
         <Card className="border-border">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Status das Parcelas {filtroModalidade !== 'todas' ? `— ${MODALIDADE_LABELS[filtroModalidade] ?? filtroModalidade}` : ''}
-            </CardTitle>
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Status das Parcelas {filtroModalidade !== 'todas' ? `— ${MODALIDADE_LABELS[filtroModalidade] ?? filtroModalidade}` : ''}
+              </CardTitle>
+              <div className="flex gap-1 text-xs">
+                <button
+                  onClick={() => setStatusParcelasScope('todas')}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    statusParcelasScope === 'todas'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  Todas ativas
+                </button>
+                <button
+                  onClick={() => setStatusParcelasScope('periodo')}
+                  className={`px-2 py-1 rounded transition-colors ${
+                    statusParcelasScope === 'periodo'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                >
+                  Período
+                </button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            {statusData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
-                  <Pie
-                    data={statusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {statusData.map((entry, index) => (
-                      <Cell key={index} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
-                  />
-                  <Legend
-                    wrapperStyle={{ fontSize: 12, color: '#9ca3af' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
-                Nenhuma parcela no período selecionado
-              </div>
-            )}
+            {(() => {
+              const srcParcelas = statusParcelasScope === 'todas'
+                ? (parcelas ?? []).filter(p => {
+                    const modalOk = filtroModalidade === 'todas' || p.modalidade === filtroModalidade;
+                    return modalOk;
+                  })
+                : parcelasPeriodo;
+              const pieData = [
+                { name: 'Pagas', value: srcParcelas.filter(p => p.status === 'paga').length, color: '#22c55e' },
+                { name: 'Pendentes', value: srcParcelas.filter(p => p.status === 'pendente').length, color: '#6b7280' },
+                { name: 'Atrasadas', value: srcParcelas.filter(p => p.status === 'atrasada').length, color: '#ef4444' },
+                { name: 'Vence Hoje', value: srcParcelas.filter(p => p.status === 'vencendo_hoje').length, color: '#f59e0b' },
+              ].filter(d => d.value > 0);
+              return pieData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={220}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {pieData.map((entry, index) => (
+                        <Cell key={index} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: '#1a1a1a', border: '1px solid #333', borderRadius: 8 }}
+                    />
+                    <Legend
+                      wrapperStyle={{ fontSize: 12, color: '#9ca3af' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
+                  {statusParcelasScope === 'periodo' ? 'Nenhuma parcela no período selecionado' : 'Nenhuma parcela encontrada'}
+                </div>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

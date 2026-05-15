@@ -12,7 +12,7 @@ export const backupRouter = router({
   exportarClientes: protectedProcedure.query(async ({ ctx }) => {
     const { data, error } = await (await sb())
       .from('clientes')
-      .select('id, nome, cpf_cnpj, telefone, whatsapp, email, endereco, cidade, estado, cep, chave_pix, tipo_chave_pix, created_at')
+      .select('id, nome, cpf_cnpj, telefone, whatsapp, email, endereco, cidade, estado, cep, chave_pix, tipo_chave_pix, "createdAt"')
       .order('nome')
       .eq('user_id', ctx.user.id);
     if (error) throw error;
@@ -24,8 +24,8 @@ export const backupRouter = router({
     .query(async ({ ctx, input }) => {
       let query = (await sb())
         .from('contratos')
-        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, dia_vencimento, multa_atraso, juros_mora_diario, etiquetas, created_at, clientes(nome, cpf_cnpj, telefone, whatsapp)')
-        .order('created_at', { ascending: false })
+        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, dia_vencimento, multa_atraso, juros_mora_diario, etiquetas, "createdAt", clientes(nome, cpf_cnpj, telefone, whatsapp)')
+        .order('createdAt', { ascending: false })
         .eq('user_id', ctx.user.id);
 
       if (input?.modalidade && input.modalidade !== 'todos') {
@@ -42,7 +42,7 @@ export const backupRouter = router({
     .query(async ({ ctx, input }) => {
       let query = (await sb())
         .from('parcelas')
-        .select('id, contrato_id, numero_parcela, valor, valor_juros, data_vencimento, data_pagamento, status, valor_pago, forma_pagamento, observacoes, created_at, contratos(modalidade, valor_principal, clientes(nome, cpf_cnpj, telefone))')
+        .select('id, contrato_id, numero_parcela, valor, valor_juros, data_vencimento, data_pagamento, status, valor_pago, forma_pagamento, observacoes, "createdAt", contratos(modalidade, valor_principal, clientes(nome, cpf_cnpj, telefone))') 
         .order('data_vencimento', { ascending: false })
         .eq('user_id', ctx.user.id);
 
@@ -75,7 +75,7 @@ export const backupRouter = router({
       .from('veiculos')
       .select('*')
       .eq('user_id', ctx.user.id)
-      .order('created_at', { ascending: false });
+      .order('"createdAt"', { ascending: false });
     if (errVeic) throw errVeic;
 
     return {
@@ -91,7 +91,7 @@ export const backupRouter = router({
     .query(async ({ ctx, input }) => {
       let query = (await sb())
         .from('transacoes_caixa')
-        .select('id, conta_caixa_id, tipo, categoria, descricao, valor, data_transacao, created_at, contas_caixa(nome)')
+        .select('id, conta_caixa_id, tipo, categoria, descricao, valor, data_transacao, "createdAt", contas_caixa(nome)')
         .order('data_transacao', { ascending: false })
         .eq('user_id', ctx.user.id);
 
