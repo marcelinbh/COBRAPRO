@@ -594,6 +594,7 @@ function EditarEmprestimoModal({
                         <th className="text-left px-3 py-2 text-muted-foreground font-medium">#</th>
                         <th className="text-left px-3 py-2 text-muted-foreground font-medium">{t('common.dueDate')}</th>
                         <th className="text-right px-3 py-2 text-muted-foreground font-medium">{t('common.value')}</th>
+                        <th className="text-right px-3 py-2 text-muted-foreground font-medium">Pago</th>
                         <th className="text-center px-3 py-2 text-muted-foreground font-medium">{t('common.status')}</th>
                         <th className="text-center px-3 py-2 text-muted-foreground font-medium">{t('common.edit')}</th>
                       </tr>
@@ -610,6 +611,11 @@ function EditarEmprestimoModal({
                               </td>
                               <td className="px-2 py-1 text-right">
                                 <Input type="number" step="0.01" value={parcelaEditando?.valor ?? ''} onChange={e => setParcelaEditando(prev => prev ? { ...prev, valor: e.target.value } : null)} className="h-7 text-xs w-28 text-right" />
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {p.status === 'paga' && p.valor_pago
+                                  ? <span className="text-emerald-400 font-medium">{formatarMoeda(parseFloat(p.valor_pago))}</span>
+                                  : <span className="text-muted-foreground text-xs">—</span>}
                               </td>
                               <td className="px-3 py-2 text-center">
                                 <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
@@ -632,6 +638,11 @@ function EditarEmprestimoModal({
                               <td className="px-3 py-2">#{p.numero_parcela}</td>
                               <td className="px-3 py-2">{formatarData(p.data_vencimento)}</td>
                               <td className="px-3 py-2 text-right">{formatarMoeda(p.valor_original)}</td>
+                              <td className="px-3 py-2 text-right">
+                                {p.status === 'paga' && p.valor_pago
+                                  ? <span className="text-emerald-400 font-medium">{formatarMoeda(parseFloat(p.valor_pago))}</span>
+                                  : <span className="text-muted-foreground text-xs">—</span>}
+                              </td>
                               <td className="px-3 py-2 text-center">
                                 <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
                                   {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}

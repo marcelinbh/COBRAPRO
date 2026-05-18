@@ -1122,3 +1122,4 @@
 - [x] BUG: Lucro Previsto multiplicando incorretamente (estava multiplicando juros/parcela × parcelas abertas - corrigido para totalReceber - capitalRestante)
 - [x] FEATURE: Botão deletar parcela na tabela de detalhes do contrato (parcelas pendentes)
 - [x] BUG: Lucro Realizado com fórmula errada (capitalProporcional por parcelas pagas → corrigido para totalPago - valorPrincipal)
+- [x] MELHORIA: Coluna "Pago" na tabela de parcelas do modal mostrando valor efetivamente pago (verde) ou traço para pendentes
