@@ -917,8 +917,10 @@ const contratosRouter = router({
         const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
         // Total pago = soma das parcelas pagas
         const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
-        // Lucro previsto = juros × número de parcelas abertas
-        const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
+        // Lucro previsto = total a receber restante - capital ainda não recebido
+        // Fórmula: totalReceber - (capital proporcional às parcelas abertas)
+        const capitalRestante = numeroParcelas > 0 ? valorPrincipal * (parcelasAbertas.length / numeroParcelas) : 0;
+        const lucroPrevisto = Math.max(0, totalReceber - capitalRestante);
         // Lucro realizado = total pago - capital proporcional às parcelas pagas
         // Fórmula: totalPago - (valorPrincipal × parcelasPagas / numeroParcelas)
         // Isso captura tanto os juros do contrato quanto os juros de mora pagos
