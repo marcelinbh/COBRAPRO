@@ -1120,3 +1120,4 @@
 - [x] BUG: caixa.contas causando Max Depth (spread de objeto Drizzle com referências internas - corrigido com mapeamento explícito de campos)
 - [x] SEGURANÇA: registrarPagamento e pagarJuros buscavam parcela por id sem filtrar por user_id (vulnerabilidade de acesso entre contas - corrigido adicionando .eq('user_id', ctx.user.id))
 - [x] BUG: Lucro Previsto multiplicando incorretamente (estava multiplicando juros/parcela × parcelas abertas - corrigido para totalReceber - capitalRestante)
+- [x] FEATURE: Botão deletar parcela na tabela de detalhes do contrato (parcelas pendentes)

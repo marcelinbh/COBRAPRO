@@ -125,6 +125,7 @@ function EditarEmprestimoModal({
   const [modalPagarParcela, setModalPagarParcela] = useState(false);
   const [valorCustomPagarParcela, setValorCustomPagarParcela] = useState('');
   const [pagamentoParcelaRealizado, setPagamentoParcelaRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
+  const [confirmDeleteParcelaId, setConfirmDeleteParcelaId] = useState<number | null>(null);
 
   const jurosTotal = valor * (juros / 100);
   const valorParcela = (valor + jurosTotal) / parcelas;
@@ -212,6 +213,15 @@ function EditarEmprestimoModal({
       invalidarTudo();
     },
     onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
+  });
+
+  const deletarParcelaMutation = trpc.parcelas.deletarParcela.useMutation({
+    onSuccess: () => {
+      toast.success('Parcela deletada com sucesso!');
+      setConfirmDeleteParcelaId(null);
+      invalidarTudo();
+    },
+    onError: (e) => toast.error('Erro ao deletar parcela: ' + e.message),
   });
 
   const pagarJurosMutation = trpc.parcelas.pagarJuros.useMutation({
@@ -649,6 +659,33 @@ function EditarEmprestimoModal({
                                     <button onClick={() => setParcelaEditando({ id: p.id, valor: String(parseFloat(p.valor_original).toFixed(2)), data: p.data_vencimento?.split('T')[0] ?? '' })} className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors" title="Editar parcela">
                                       <Pencil className="h-3.5 w-3.5" />
                                     </button>
+                                    {confirmDeleteParcelaId === p.id ? (
+                                      <>
+                                        <button
+                                          onClick={() => deletarParcelaMutation.mutate({ parcelaId: p.id })}
+                                          disabled={deletarParcelaMutation.isPending}
+                                          className="px-1.5 py-0.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-medium transition-colors disabled:opacity-50"
+                                          title="Confirmar exclusão"
+                                        >
+                                          {deletarParcelaMutation.isPending ? '...' : 'Sim'}
+                                        </button>
+                                        <button
+                                          onClick={() => setConfirmDeleteParcelaId(null)}
+                                          className="px-1.5 py-0.5 rounded bg-muted hover:bg-muted/80 text-foreground text-xs font-medium transition-colors"
+                                          title="Cancelar"
+                                        >
+                                          Não
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <button
+                                        onClick={() => setConfirmDeleteParcelaId(p.id)}
+                                        className="p-1 rounded hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors"
+                                        title="Deletar parcela"
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </td>

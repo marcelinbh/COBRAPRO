@@ -2333,6 +2333,55 @@ const parcelasRouter = router({
       return { success: true };
     }),
 
+  // Deletar uma parcela pendente/atrasada (não permite deletar parcelas pagas)
+  deletarParcela: protectedProcedure
+    .input(z.object({
+      parcelaId: z.number(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const sb = await getSupabaseClientAsync();
+      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+
+      // Buscar a parcela garantindo que pertence ao usuário
+      const { data: parcela, error: pErr } = await sb
+        .from('parcelas')
+        .select('*')
+        .eq('id', input.parcelaId)
+        .eq('user_id', ctx.user.id)
+        .single();
+
+      if (pErr || !parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+
+      // Não permitir deletar parcelas pagas
+      if (parcela.status === 'paga') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não é possível deletar uma parcela já paga' });
+      }
+
+      // Deletar a parcela
+      const { error: delErr } = await sb
+        .from('parcelas')
+        .delete()
+        .eq('id', input.parcelaId)
+        .eq('user_id', ctx.user.id);
+
+      if (delErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: delErr.message });
+
+      // Verificar se ainda há parcelas pendentes no contrato
+      const { data: parcelasPendentes } = await sb
+        .from('parcelas')
+        .select('id')
+        .eq('contrato_id', parcela.contrato_id)
+        .neq('status', 'paga')
+        .limit(1);
+
+      // Se não há mais parcelas pendentes, marcar contrato como quitado
+      if (!parcelasPendentes || parcelasPendentes.length === 0) {
+        await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcela.contrato_id).eq('user_id', ctx.user.id);
+      }
+
+      return { success: true };
+    }),
+
   // Criar nova parcela manualmente em um contrato existente
   criarParcela: protectedProcedure
     .input(z.object({
