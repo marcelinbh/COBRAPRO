@@ -921,11 +921,11 @@ const contratosRouter = router({
         // Fórmula: totalReceber - (capital proporcional às parcelas abertas)
         const capitalRestante = numeroParcelas > 0 ? valorPrincipal * (parcelasAbertas.length / numeroParcelas) : 0;
         const lucroPrevisto = Math.max(0, totalReceber - capitalRestante);
-        // Lucro realizado = total pago - capital proporcional às parcelas pagas
-        // Fórmula: totalPago - (valorPrincipal × parcelasPagas / numeroParcelas)
-        // Isso captura tanto os juros do contrato quanto os juros de mora pagos
-        const capitalProporcional = numeroParcelas > 0 ? valorPrincipal * (parcelasPagas.length / numeroParcelas) : 0;
-        const lucroRealizado = Math.max(0, totalPago - capitalProporcional);
+        // Lucro realizado = total pago - capital emprestado
+        // Fórmula: totalPago - valorPrincipal
+        // Lógica: tudo que foi recebido além do capital emprestado é lucro
+        // Ex: emprestou 500, recebeu 550 (2x só juros) → lucro = 550 - 500 = 50
+        const lucroRealizado = Math.max(0, totalPago - valorPrincipal);
 
         // Próxima parcela em aberto
         const proximaParcela = parcelasAbertas.length > 0 ? parcelasAbertas[0] : null;
@@ -1037,7 +1037,9 @@ const contratosRouter = router({
       const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
       const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
       const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
-      const lucroRealizado = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_juros ?? p.juros ?? '0'), 0);
+      // Lucro realizado = total pago - capital emprestado
+      // Tudo que foi recebido além do capital emprestado é lucro
+      const lucroRealizado = Math.max(0, totalPago - valorPrincipal);
 
       const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
         const venc = new Date(p.data_vencimento + 'T00:00:00');
