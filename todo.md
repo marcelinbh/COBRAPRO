@@ -1123,3 +1123,11 @@
 - [x] FEATURE: Botão deletar parcela na tabela de detalhes do contrato (parcelas pendentes)
 - [x] BUG: Lucro Realizado com fórmula errada (capitalProporcional por parcelas pagas → corrigido para totalPago - valorPrincipal)
 - [x] MELHORIA: Coluna "Pago" na tabela de parcelas do modal mostrando valor efetivamente pago (verde) ou traço para pendentes
+
+## Fase atual: Login permanente com e-mail/senha
+- [x] FEATURE: Login permanente com e-mail/senha (ultracrediuc@gmail.com / 97556511) - usuário criado no Supabase
+- [x] FEATURE: Página de login com e-mail/senha já existia e funciona
+- [x] BUG: Parcelas.list sem filtro userId - corrigido
+- [x] BUG: Inadimplência mostrando 0 - corrigido para buscar pendente+atrasada com vencimento < hoje
+- [x] FEATURE: Endpoint heartbeat /api/scheduled/update-parcelas-status para atualizar status diariamente
+- [x] FEATURE: Scheduled task diária para atualizar status de parcelas vencidas

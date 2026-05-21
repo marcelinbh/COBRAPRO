@@ -1852,6 +1852,7 @@ const parcelasRouter = router({
           }).from(parcelas)
             .innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
             .innerJoin(contratos, eq(parcelas.contratoId, contratos.id))
+            .where(eq(parcelas.userId, ctx.user.id))
             .orderBy(parcelas.dataVencimento);
           // Buscar perfil do cobrador (se for cobrador, filtrar apenas suas parcelas)
           let myKoletorId: number | null = null;
@@ -3060,11 +3061,13 @@ const relatoriosRouter = router({
       if (!supabase) return [];
       const userId = ctx.user.id;
       const hoje = new Date().toISOString().split('T')[0];
+      // Buscar parcelas com status atrasada OU pendente com vencimento anterior a hoje
       const { data: parcelasAtrasadas } = await supabase
         .from('parcelas')
-        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_multa, data_vencimento, clientes(nome, whatsapp, telefone)')
-        .eq('status', 'atrasada')
+        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_multa, data_vencimento, status, clientes(nome, whatsapp, telefone)')
+        .in('status', ['atrasada', 'pendente', 'vencendo_hoje'])
         .eq('user_id', userId)
+        .lt('data_vencimento', hoje)
         .order('data_vencimento', { ascending: true });
       if (!parcelasAtrasadas || parcelasAtrasadas.length === 0) return [];
       // Agrupar por cliente

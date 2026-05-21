@@ -246,6 +246,31 @@ async function startServer() {
     }
   });
 
+  // ─── Heartbeat: atualizar status de parcelas vencidas ───────────────────────
+  // Chamado pela scheduled task do Manus diariamente para manter status correto
+  app.post('/api/scheduled/atualizar-parcelas', async (req, res) => {
+    try {
+      const { getSupabaseClientAsync } = await import('../db');
+      const sb = await getSupabaseClientAsync();
+      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
+      const hoje = new Date().toISOString().split('T')[0];
+      // Atualizar pendentes/vencendo_hoje com data < hoje → atrasada
+      const { data: updated, error } = await sb
+        .from('parcelas')
+        .update({ status: 'atrasada' })
+        .in('status', ['pendente', 'vencendo_hoje'])
+        .lt('data_vencimento', hoje)
+        .select('id');
+      if (error) throw error;
+      const count = updated?.length ?? 0;
+      console.log(`[heartbeat/atualizar-parcelas] ${count} parcelas atualizadas para atrasada`);
+      return res.json({ success: true, atualizadas: count });
+    } catch (err: any) {
+      console.error('[heartbeat/atualizar-parcelas] Erro:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // ─── Endpoint temporário para migration da tabela contrato_historico ───
   app.post('/api/admin/migration-historico', async (req, res) => {
     try {
