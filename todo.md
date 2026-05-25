@@ -1132,3 +1132,7 @@
 - [x] FEATURE: Endpoint heartbeat /api/scheduled/update-parcelas-status para atualizar status diariamente
 - [x] FEATURE: Scheduled task diária para atualizar status de parcelas vencidas
 - [x] FEATURE: Troca de idioma PT/ESP na página principal (landing page) - todos os textos traduzidos com react-i18next
+- [ ] FEATURE: Tradução PT/ES na página de Login
+- [ ] FEATURE: Persistência do idioma preferido no banco (coluna idioma na tabela users)
+- [ ] FEATURE: Carregar idioma do usuário ao fazer login
+- [ ] FEATURE: Salvar idioma ao trocar no LanguageSwitcher (usuário logado)

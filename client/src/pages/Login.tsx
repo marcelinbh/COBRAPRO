@@ -72,20 +72,20 @@ export default function Login() {
         {/* Conteúdo central */}
         <div>
           <h1 className="text-4xl font-black text-white leading-tight mb-3">
-            Gestão de cobranças<br />
-            <span className="text-green-400">simplificada</span>
+            {t('login.heroTitle')}<br />
+            <span className="text-green-400">{t('login.heroHighlight')}</span>
           </h1>
           <p className="text-white/50 text-base mb-10">
-            Controle assinaturas, empréstimos, aluguéis e muito mais em uma única plataforma profissional.
+            {t('login.heroSubtitle')}
           </p>
 
           {/* Stats grid */}
           <div className="grid grid-cols-2 gap-3">
             {[
-              { icon: <Infinity className="w-5 h-5 text-green-400" />, value: "∞", label: "Clientes ativos" },
+              { icon: <Infinity className="w-5 h-5 text-green-400" />, value: "∞", label: t('login.activeClients') },
               { icon: <BarChart3 className="w-5 h-5 text-green-400" />, value: "12+", label: t('login.availableModules') },
-              { icon: <Clock className="w-5 h-5 text-green-400" />, title: "Tempo real", label: t('login.reports') },
-              { icon: <Zap className="w-5 h-5 text-green-400" />, title: t('login.automatic'), label: "Cron jobs" },
+              { icon: <Clock className="w-5 h-5 text-green-400" />, title: t('login.realTime'), label: t('login.reports') },
+              { icon: <Zap className="w-5 h-5 text-green-400" />, title: t('login.automatic'), label: t('login.cronJobs') },
             ].map((item, i) => (
               <div
                 key={i}
@@ -109,7 +109,7 @@ export default function Login() {
 
         {/* Footer */}
         <div className="text-white/20 text-xs">
-          © 2026 CobraPro — cobrapro.online. Todos os direitos reservados.
+          {t('login.copyright')}
         </div>
 
         {/* Decoração de fundo */}
@@ -133,15 +133,15 @@ export default function Login() {
           </div>
 
           <div className="bg-[#161616] border border-white/8 rounded-2xl p-8 shadow-2xl">
-            <h2 className="text-2xl font-bold text-white mb-1">Entrar na plataforma</h2>
+            <h2 className="text-2xl font-bold text-white mb-1">{t('login.enterPlatform')}</h2>
             <p className="text-white/40 text-sm mb-7">
-              Use as credenciais enviadas para o seu e-mail após a compra
+              {t('login.useCredentials')}
             </p>
 
             <form onSubmit={handleSubmit} className="space-y-5">
               {/* Email */}
               <div>
-                <Label className="text-white/60 text-sm mb-1.5 block">E-mail</Label>
+                <Label className="text-white/60 text-sm mb-1.5 block">{t('login.emailLabel')}</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                   <Input
@@ -158,12 +158,12 @@ export default function Login() {
               {/* Senha */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <Label className="text-white/60 text-sm">Senha</Label>
+                  <Label className="text-white/60 text-sm">{t('login.passwordLabel')}</Label>
                   <a
                     href="/recuperar-senha"
                     className="text-green-400 text-xs hover:text-green-300 transition-colors"
                   >
-                    Esqueceu a senha?
+                    {t('login.forgotPassword')}
                   </a>
                 </div>
                 <div className="relative">
@@ -195,10 +195,10 @@ export default function Login() {
                 {submitting ? (
                   <span className="flex items-center gap-2">
                     <span className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
-                    Entrando...
+                    {t('login.signingIn')}
                   </span>
                 ) : (
-                  "Entrar"
+                  t('login.signIn')
                 )}
               </Button>
             </form>
@@ -206,15 +206,14 @@ export default function Login() {
             {/* Info box */}
             <div className="mt-5 bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 text-center">
               <p className="text-white/30 text-xs leading-relaxed">
-                Suas credenciais foram enviadas por e-mail após a confirmação da compra.
-                Verifique também a caixa de spam.
+                {t('login.credentialsInfo')}
               </p>
             </div>
 
             {/* Voltar */}
             <div className="mt-5 text-center">
               <a href="/" className="text-white/20 hover:text-white/50 text-sm transition-colors">
-                ← Voltar para a página inicial
+                {t('login.backToHome')}
               </a>
             </div>
           </div>

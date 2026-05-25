@@ -7,6 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Globe } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
 
 interface LanguageSwitcherProps {
   compact?: boolean;
@@ -14,6 +15,16 @@ interface LanguageSwitcherProps {
 
 export function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
   const { i18n } = useTranslation();
+
+  // Verificar se o usuário está logado (sem redirecionar)
+  const meQuery = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const isLoggedIn = Boolean(meQuery.data);
+
+  // Mutation para salvar idioma no banco
+  const salvarIdiomaMutation = trpc.auth.salvarIdioma.useMutation();
 
   const languages = [
     { code: 'pt-BR', label: 'PT', name: 'Português' },
@@ -25,6 +36,10 @@ export function LanguageSwitcher({ compact = false }: LanguageSwitcherProps) {
   const handleLanguageChange = (langCode: string) => {
     i18n.changeLanguage(langCode);
     localStorage.setItem('i18nextLng', langCode);
+    // Se o usuário estiver logado, salvar preferência no banco
+    if (isLoggedIn) {
+      salvarIdiomaMutation.mutate({ idioma: langCode as 'pt-BR' | 'es' });
+    }
   };
 
   return (

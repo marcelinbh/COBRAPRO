@@ -5,6 +5,32 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import DashboardLayout from "./components/DashboardLayout";
+import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
+import { trpc } from "@/lib/trpc";
+
+// Sincroniza o idioma salvo no banco com o i18n ao fazer login
+function IdiomaSyncProvider({ children }: { children: React.ReactNode }) {
+  const { i18n } = useTranslation();
+  const idiomaQuery = trpc.auth.getIdioma.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const appliedRef = useRef(false);
+
+  useEffect(() => {
+    if (idiomaQuery.data?.idioma && !appliedRef.current) {
+      appliedRef.current = true;
+      const idioma = idiomaQuery.data.idioma;
+      if (idioma !== i18n.language) {
+        i18n.changeLanguage(idioma);
+        localStorage.setItem('i18nextLng', idioma);
+      }
+    }
+  }, [idiomaQuery.data, i18n]);
+
+  return <>{children}</>;
+}
 
 // Pages
 import Home from "./pages/Home";
@@ -136,7 +162,9 @@ function App() {
       <ThemeProvider defaultTheme="dark">
         <TooltipProvider>
           <Toaster richColors theme="dark" />
-          <Router />
+          <IdiomaSyncProvider>
+            <Router />
+          </IdiomaSyncProvider>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -65,6 +65,7 @@ function mapSupabaseUser(data: Record<string, unknown>): typeof users.$inferSele
     updatedAt: data.updatedAt ? new Date(data.updatedAt as string) : new Date(),
     onboardingCompleto: (data.onboarding_completo ?? false) as boolean,
     nomeEmpresa: (data.nome_empresa ?? null) as string | null,
+    idioma: (data.idioma ?? 'pt-BR') as string | null,
   };
 }
 

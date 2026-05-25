@@ -4319,6 +4319,23 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    salvarIdioma: protectedProcedure
+      .input(z.object({ idioma: z.enum(['pt-BR', 'es']) }))
+      .mutation(async ({ ctx, input }) => {
+        const { getSupabaseClient } = await import('./db.js');
+        const sb = getSupabaseClient();
+        if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB indisponível' });
+        const { error } = await sb.from('users').update({ idioma: input.idioma }).eq('id', ctx.user.id);
+        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        return { success: true };
+      }),
+    getIdioma: protectedProcedure.query(async ({ ctx }) => {
+      const { getSupabaseClient } = await import('./db.js');
+      const sb = getSupabaseClient();
+      if (!sb) return { idioma: 'pt-BR' };
+      const { data } = await sb.from('users').select('idioma').eq('id', ctx.user.id).single();
+      return { idioma: (data?.idioma as string) || 'pt-BR' };
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

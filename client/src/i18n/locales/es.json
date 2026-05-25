@@ -2390,7 +2390,22 @@
     "availableModules": "Módulos disponibles",
     "reports": "Informes",
     "automatic": "Automático",
-    "enterPlatform": "Iniciar sesión en la plataforma"
+    "enterPlatform": "Acceder a la plataforma",
+    "heroTitle": "Gestión de cobros",
+    "heroHighlight": "simplificada",
+    "heroSubtitle": "Controla suscripciones, préstamos, alquileres y mucho más en una única plataforma profesional.",
+    "activeClients": "Clientes activos",
+    "realTime": "Tiempo real",
+    "cronJobs": "Trabajos automáticos",
+    "useCredentials": "Usa las credenciales enviadas a tu correo electrónico tras la compra",
+    "emailLabel": "Correo electrónico",
+    "passwordLabel": "Contraseña",
+    "forgotPassword": "¿Olvidaste tu contraseña?",
+    "signIn": "Entrar",
+    "signingIn": "Iniciando sesión...",
+    "credentialsInfo": "Tus credenciales fueron enviadas por correo electrónico tras la confirmación de la compra. Revisa también la carpeta de spam.",
+    "backToHome": "← Volver a la página principal",
+    "copyright": "© 2026 CobraPro — cobrapro.online. Todos los derechos reservados."
   },
   "install": {
     "addToHomeScreen": "Añadir a la pantalla de inicio",

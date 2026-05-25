@@ -58,6 +58,7 @@ export const users = pgTable("users", {
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
   onboardingCompleto: boolean("onboarding_completo").default(false).notNull(),
   nomeEmpresa: varchar("nome_empresa", { length: 255 }),
+  idioma: varchar("idioma", { length: 10 }).default("pt-BR"),
 });
 
 export type User = typeof users.$inferSelect;
