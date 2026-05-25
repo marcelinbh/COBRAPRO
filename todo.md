@@ -1131,3 +1131,4 @@
 - [x] BUG: Inadimplência mostrando 0 - corrigido para buscar pendente+atrasada com vencimento < hoje
 - [x] FEATURE: Endpoint heartbeat /api/scheduled/update-parcelas-status para atualizar status diariamente
 - [x] FEATURE: Scheduled task diária para atualizar status de parcelas vencidas
+- [x] FEATURE: Troca de idioma PT/ESP na página principal (landing page) - todos os textos traduzidos com react-i18next
