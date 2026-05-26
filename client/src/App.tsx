@@ -12,7 +12,13 @@ import { trpc } from "@/lib/trpc";
 // Sincroniza o idioma salvo no banco com o i18n ao fazer login
 function IdiomaSyncProvider({ children }: { children: React.ReactNode }) {
   const { i18n } = useTranslation();
+  const meQuery = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
+  const isLoggedIn = Boolean(meQuery.data);
   const idiomaQuery = trpc.auth.getIdioma.useQuery(undefined, {
+    enabled: isLoggedIn,
     retry: false,
     refetchOnWindowFocus: false,
   });
