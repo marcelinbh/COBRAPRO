@@ -8,7 +8,6 @@ import superjson from "superjson";
 import i18n from './i18n/i18n';
 import { TranslationProvider } from './contexts/TranslationContext';
 import App from "./App";
-import { getLoginUrl } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -21,7 +20,10 @@ const redirectToLoginIfUnauthorized = (error: unknown) => {
 
   if (!isUnauthorized) return;
 
-  window.location.href = getLoginUrl();
+  // Redirecionar para login próprio (NÃO OAuth do Manus)
+  if (window.location.pathname !== '/login' && window.location.pathname !== '/' && window.location.pathname !== '/recuperar-senha') {
+    window.location.href = '/login';
+  }
 };
 
 queryClient.getQueryCache().subscribe(event => {
