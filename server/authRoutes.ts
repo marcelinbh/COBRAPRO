@@ -256,16 +256,21 @@ export function registerAuthRoutes(app: Express) {
         // Inserir novo token
         await db.insert(passwordResets).values({ userId: user.id, token, expiresAt });
       } else {
-        // Fallback: Supabase REST
+        // Fallback: Supabase REST (usa snake_case conforme o banco)
         const supabase = await getSupabaseClientAsync();
         if (supabase) {
-          await supabase.from("password_resets").update({ usado: true }).eq("userId", user.id);
-          await supabase.from("password_resets").insert({
-            userId: user.id,
+          await supabase.from("password_resets").update({ usado: true }).eq("user_id", user.id);
+          // Omitir 'usado' no insert pois tem DEFAULT false no banco (evita erro de schema cache)
+          const { error: insertErr } = await supabase.from("password_resets").insert({
+            user_id: user.id,
             token,
-            expiresAt: expiresAt.toISOString(),
-            usado: false,
+            expires_at: expiresAt.toISOString(),
           });
+          if (insertErr) {
+            console.error("[Auth] Erro ao inserir password_reset:", insertErr.message);
+          } else {
+            console.log(`[Auth] Token de reset inserido para user_id=${user.id}`);
+          }
         }
       }
 
@@ -275,9 +280,10 @@ export function registerAuthRoutes(app: Express) {
 
       // Enviar e-mail via Brevo
       const brevoApiKey = process.env.BREVO_API_KEY ?? "";
+      console.log(`[Auth] forgot-password: brevoApiKey=${brevoApiKey ? 'presente' : 'AUSENTE'}, destino=${user.email}`);
       if (brevoApiKey) {
         try {
-          await fetch("https://api.brevo.com/v3/smtp/email", {
+          const brevoFetch = await fetch("https://api.brevo.com/v3/smtp/email", {
             method: "POST",
             headers: {
               "api-key": brevoApiKey,
@@ -306,9 +312,14 @@ export function registerAuthRoutes(app: Express) {
               `,
             }),
           });
+          const brevoStatus = brevoFetch.status;
+          const brevoBody = await brevoFetch.text();
+          console.log(`[Brevo] Resposta: status=${brevoStatus}, body=${brevoBody.substring(0, 200)}`);
         } catch (err) {
           console.error("[Brevo] Erro ao enviar e-mail de recuperação:", err);
         }
+      } else {
+        console.warn("[Auth] BREVO_API_KEY não configurada - e-mail de recuperação NÃO enviado");
       }
 
       res.json({
@@ -371,16 +382,17 @@ export function registerAuthRoutes(app: Express) {
           .select("*")
           .eq("token", token)
           .eq("usado", false)
-          .gt("expiresAt", now.toISOString())
+          .gt("expires_at", now.toISOString())
           .limit(1)
           .maybeSingle();
 
         if (resetError || !resetData) {
+          console.error("[Auth] reset-password token error:", resetError?.message, "data:", resetData);
           res.status(400).json({ error: "Token inválido ou expirado" });
           return;
         }
 
-        await supabase.from("users").update({ passwordHash }).eq("id", resetData.userId);
+        await supabase.from("users").update({ passwordHash }).eq("id", resetData.user_id ?? resetData.userId);
         await supabase.from("password_resets").update({ usado: true }).eq("id", resetData.id);
       }
 
