@@ -341,6 +341,48 @@ async function startServer() {
     }
   });
 
+  // ─── Endpoint para criar tabela login_logs ───
+  app.post('/api/admin/migration-login-logs', async (req, res) => {
+    try {
+      const { getSupabaseClientAsync } = await import('../db');
+      const sb = await getSupabaseClientAsync();
+      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
+
+      // Verificar se já existe
+      const { error: checkError } = await sb.from('login_logs').select('id').limit(1);
+      if (!checkError) {
+        return res.json({ success: true, message: 'Tabela login_logs já existe' });
+      }
+
+      // Criar via Supabase REST rpc exec_sql
+      const supabaseUrl = process.env.SUPABASE_URL || '';
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+
+      const ddl = `CREATE TABLE IF NOT EXISTS login_logs (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, ip VARCHAR(64), cidade VARCHAR(128), regiao VARCHAR(128), pais VARCHAR(64), pais_codigo VARCHAR(4), latitude DECIMAL(10,6), longitude DECIMAL(10,6), timezone VARCHAR(64), isp VARCHAR(256), user_agent TEXT, dispositivo VARCHAR(64), navegador VARCHAR(64), os VARCHAR(64), sucesso BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); CREATE INDEX IF NOT EXISTS login_logs_user_id_idx ON login_logs(user_id); CREATE INDEX IF NOT EXISTS login_logs_created_at_idx ON login_logs(created_at DESC); NOTIFY pgrst, 'reload schema';`;
+
+      // Tentar via Supabase REST rpc
+      const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': serviceKey,
+          'Authorization': `Bearer ${serviceKey}`
+        },
+        body: JSON.stringify({ sql: ddl }),
+        signal: AbortSignal.timeout(15000)
+      });
+      const rpcText = await rpcRes.text();
+      return res.json({
+        success: rpcRes.ok,
+        status: rpcRes.status,
+        message: rpcRes.ok ? 'Tabela criada via rpc' : 'Falha no rpc',
+        response: rpcText.substring(0, 500)
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

@@ -1136,3 +1136,11 @@
 - [ ] FEATURE: Persistência do idioma preferido no banco (coluna idioma na tabela users)
 - [ ] FEATURE: Carregar idioma do usuário ao fazer login
 - [ ] FEATURE: Salvar idioma ao trocar no LanguageSwitcher (usuário logado)
+
+## Fase 50: Sistema de Rastreamento de Login (Admin)
+- [ ] Criar tabela login_logs no Supabase (id, user_id, ip, cidade, regiao, pais, latitude, longitude, user_agent, dispositivo, navegador, os, created_at)
+- [ ] Capturar IP + geolocalização via ip-api.com no endpoint de login e salvar em login_logs
+- [ ] Criar procedure tRPC admin.getLoginLogs (somente role=admin)
+- [ ] Criar página AdminLoginLogs.tsx com tabela de logs visível só para admin
+- [ ] Adicionar rota /admin/login-logs no App.tsx e no menu lateral (só admin)
+

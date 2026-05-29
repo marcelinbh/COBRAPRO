@@ -75,6 +75,7 @@ import RelatorioDiario from "./pages/RelatorioDiario";
 import NotificacoesAutomaticas from "./pages/NotificacoesAutomaticas";
 import Onboarding from "./pages/Onboarding";
 import Inadimplencia from "./pages/Inadimplencia";
+import AdminLoginLogs from "./pages/AdminLoginLogs";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -108,6 +109,7 @@ const RelatorioDiarioPage = () => <DashboardLayout><RelatorioDiario /></Dashboar
 const NotificacoesAutomaticasPage = () => <NotificacoesAutomaticas />;
 const OnboardingPage = () => <Onboarding />;
 const InadimplenciaPage = () => <Inadimplencia />;
+const AdminLoginLogsPage = () => <AdminLoginLogs />;
 
 function Router() {
   return (
@@ -155,6 +157,7 @@ function Router() {
       <Route path="/inadimplencia" component={InadimplenciaPage} />
       <Route path="/notificacoes-automaticas" component={NotificacoesAutomaticasPage} />
       <Route path="/onboarding" component={OnboardingPage} />
+      <Route path="/admin/login-logs" component={AdminLoginLogsPage} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

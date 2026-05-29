@@ -8,7 +8,7 @@ import { whatsappEvolutionRouter } from "./routers/whatsappEvolution";
 import { perfilRouter } from "./routers/perfil";
 import { relatorioDiarioRouter } from "./routers/relatorioDiario";
 import { notificacoesRouter } from "./routers/notificacoes";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
 import { TRPCError } from "@trpc/server";
@@ -4314,7 +4314,89 @@ const onboardingRouter = router({
     }),
 });
 
-// ─── APP ROUTER ──────────────────────────────────────────────────────────────
+// ─── ADMIN ROUTER ──────────────────────────────────────────────────────────────────────────────
+const adminRouter = router({
+  getLoginLogs: adminProcedure
+    .input(z.object({
+      page: z.number().min(1).default(1),
+      pageSize: z.number().min(1).max(100).default(50),
+      userId: z.number().optional(),
+    }))
+    .query(async ({ input }) => {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB indisponível' });
+
+      const offset = (input.page - 1) * input.pageSize;
+
+      let query = supabase
+        .from('login_logs')
+        .select('*, users!login_logs_user_id_fkey(id, name, email, role)', { count: 'exact' })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + input.pageSize - 1);
+
+      if (input.userId) {
+        query = query.eq('user_id', input.userId);
+      }
+
+      const { data, error, count } = await query;
+      if (error) {
+        // Fallback: buscar sem join se FK não existir
+        const { data: data2, error: err2, count: count2 } = await supabase
+          .from('login_logs')
+          .select('*', { count: 'exact' })
+          .order('created_at', { ascending: false })
+          .range(offset, offset + input.pageSize - 1);
+        if (err2) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: err2.message });
+
+        // Buscar nomes dos usuários separadamente
+        const userIds = Array.from(new Set((data2 ?? []).map((l: Record<string, unknown>) => l.user_id as number)));
+        const { data: usersData } = await supabase.from('users').select('id, name, email, role').in('id', userIds);
+        const usersMap = Object.fromEntries((usersData ?? []).map((u: Record<string, unknown>) => [u.id, u]));
+
+        return {
+          logs: (data2 ?? []).map((l: Record<string, unknown>) => ({ ...l, user: usersMap[l.user_id as number] ?? null })),
+          total: count2 ?? 0,
+          page: input.page,
+          pageSize: input.pageSize,
+        };
+      }
+
+      return {
+        logs: (data ?? []).map((l: Record<string, unknown>) => ({ ...l, user: (l as Record<string, unknown>).users ?? null })),
+        total: count ?? 0,
+        page: input.page,
+        pageSize: input.pageSize,
+      };
+    }),
+
+  deleteLoginLog: adminProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input }) => {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB indisponível' });
+      const { error } = await supabase.from('login_logs').delete().eq('id', input.id);
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return { success: true };
+    }),
+
+  clearLoginLogs: adminProcedure
+    .input(z.object({ userId: z.number().optional() }))
+    .mutation(async ({ input }) => {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB indisponível' });
+      let query = supabase.from('login_logs').delete();
+      if (input.userId) {
+        query = query.eq('user_id', input.userId);
+      } else {
+        query = query.neq('id', 0); // delete all
+      }
+      const { error } = await query;
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return { success: true };
+    }),
+});
+
+// ─── APP ROUTER ──────────────────────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
   auth: router({
@@ -4366,6 +4448,7 @@ export const appRouter = router({
   relatorioDiario: relatorioDiarioRouter,
   notificacoes: notificacoesRouter,
   onboarding: onboardingRouter,
+  admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

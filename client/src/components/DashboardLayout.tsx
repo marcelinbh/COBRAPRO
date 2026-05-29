@@ -51,6 +51,7 @@ import {
   User,
   ClipboardList,
   Bell,
+  Shield,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -72,6 +73,8 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { t } = useTranslation();
+  const { user: authUser } = useAuth();
+  const isAdmin = authUser?.role === 'admin';
   const menuItems = [
     { icon: LayoutDashboard, label: t("menu.dashboard"), path: "/dashboard" },
     { icon: User, label: t("menu.my_profile"), path: "/perfil" },
@@ -99,7 +102,8 @@ export default function DashboardLayout({
     { icon: ClipboardList, label: t("menu.daily_report"), path: "/relatorio-diario" },
     { icon: TrendingDown, label: t("menu.default"), path: "/inadimplencia" },
     { icon: Bell, label: t("menu.auto_messages"), path: "/notificacoes-automaticas" },
-    { icon: Smartphone, label: t("menu.install_app"), path: "/install" },
+    { icon: Smartphone, label: t('menu.install_app'), path: "/install" },
+    ...(isAdmin ? [{ icon: Shield, label: "Logs de Acesso", path: "/admin/login-logs" }] : []),
   ];
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);

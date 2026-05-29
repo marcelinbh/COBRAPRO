@@ -6,6 +6,7 @@ import { passwordResets, users } from "../drizzle/schema";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { getDb, getSupabaseClientAsync } from "./db";
+import { registrarLoginLog } from "./loginLogger";
 import { sdk } from "./_core/sdk";
 import { storagePut } from "./storage";
 
@@ -130,6 +131,10 @@ export function registerAuthRoutes(app: Express) {
       } catch (_) { /* non-critical */ }
 
       await createSessionForUser(user, req, res);
+
+      // Registrar log de login (não-bloqueante)
+      registrarLoginLog(user.id, req, true).catch(() => {});
+
       res.json({
         success: true,
         user: { id: user.id, name: user.name, email: user.email, role: user.role },
