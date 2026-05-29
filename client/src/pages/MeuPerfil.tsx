@@ -433,7 +433,11 @@ export default function MeuPerfil() {
 
           <Separator />
           <div className="flex flex-col gap-2">
-            <Button variant="outline" className="w-full sm:w-auto border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto border-yellow-500/30 text-yellow-500 hover:bg-yellow-500/10"
+              onClick={() => window.open("https://pay.kiwify.com.br/6CcDjtJ", "_blank", "noopener,noreferrer")}
+            >
               <Crown className="h-4 w-4 mr-2" />
               Renovar Agora
             </Button>
