@@ -436,6 +436,7 @@ export default function Home() {
             href={PLANO_LINKS.anual}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() => trackMetaEvent("InitiateCheckout", { customData: { content_name: "anual", content_ids: ["anual"], content_type: "product" } })}
             className="inline-block bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-black text-xl uppercase tracking-wide px-12 py-7 rounded-2xl shadow-2xl shadow-red-900/50 transition-all hover:scale-105"
           >
             {t('landing.ctaFinalBtn')}
