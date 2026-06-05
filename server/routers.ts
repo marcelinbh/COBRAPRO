@@ -1667,6 +1667,23 @@ const contratosRouter = router({
                 await db.update(parcelas).set({ dataVencimento: input.datasParcelasCustom[i] }).where(eq(parcelas.id, parcelasPendentes[i].id));
               }
             }
+          } else if (input.dataPrimeiraParcela) {
+            // Recalcular datas de todas as parcelas pendentes a partir da nova 1ª parcela
+            const parcelasPendentes = await db.select().from(parcelas)
+              .where(and(eq(parcelas.contratoId, input.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
+              .orderBy(parcelas.numeroParcela);
+            if (parcelasPendentes.length > 0) {
+              const baseDate = new Date(input.dataPrimeiraParcela + 'T00:00:00');
+              for (let i = 0; i < parcelasPendentes.length; i++) {
+                const novaData = new Date(baseDate);
+                if (input.tipoTaxa === 'diaria') novaData.setDate(novaData.getDate() + i);
+                else if (input.tipoTaxa === 'semanal') novaData.setDate(novaData.getDate() + i * 7);
+                else if (input.tipoTaxa === 'quinzenal') novaData.setDate(novaData.getDate() + i * 15);
+                else if (input.tipoTaxa === 'anual') novaData.setFullYear(novaData.getFullYear() + i);
+                else novaData.setMonth(novaData.getMonth() + i);
+                await db.update(parcelas).set({ dataVencimento: novaData.toISOString() }).where(eq(parcelas.id, parcelasPendentes[i].id));
+              }
+            }
           }
           return { success: true };
         } catch (err) {
@@ -1694,6 +1711,25 @@ const contratosRouter = router({
         for (let i = 0; i < (parcelasPendentes ?? []).length; i++) {
           if (input.datasParcelasCustom[i]) {
             await supabase.from('parcelas').update({ data_vencimento: input.datasParcelasCustom[i] }).eq('id', parcelasPendentes![i].id);
+          }
+        }
+      } else if (input.dataPrimeiraParcela) {
+        // Recalcular datas de todas as parcelas pendentes a partir da nova 1ª parcela
+        const { data: parcelasPendentes } = await supabase.from('parcelas')
+          .select('id, numero_parcela')
+          .eq('contrato_id', input.id)
+          .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
+          .order('numero_parcela', { ascending: true });
+        if (parcelasPendentes && parcelasPendentes.length > 0) {
+          const baseDate = new Date(input.dataPrimeiraParcela + 'T00:00:00');
+          for (let i = 0; i < parcelasPendentes.length; i++) {
+            const novaData = new Date(baseDate);
+            if (input.tipoTaxa === 'diaria') novaData.setDate(novaData.getDate() + i);
+            else if (input.tipoTaxa === 'semanal') novaData.setDate(novaData.getDate() + i * 7);
+            else if (input.tipoTaxa === 'quinzenal') novaData.setDate(novaData.getDate() + i * 15);
+            else if (input.tipoTaxa === 'anual') novaData.setFullYear(novaData.getFullYear() + i);
+            else novaData.setMonth(novaData.getMonth() + i);
+            await supabase.from('parcelas').update({ data_vencimento: novaData.toISOString() }).eq('id', parcelasPendentes[i].id);
           }
         }
       }
