@@ -88,9 +88,16 @@ function EditarEmprestimoModal({
   const [tipo, setTipo] = useState(emprestimo.tipoTaxa);
   const [parcelas, setParcelas] = useState(emprestimo.numeroParcelas);
   const [jurosAplicado, setJurosAplicado] = useState("total");
-  const [dataContrato, setDataContrato] = useState(formatarData(emprestimo.dataInicio));
+  // Converte ISO/string para YYYY-MM-DD (formato nativo do input type="date")
+  const toInputDate = (d: string | Date | null | undefined): string => {
+    if (!d) return '';
+    const dt = typeof d === 'string' ? (d.includes('T') || d.includes('Z') ? new Date(d) : new Date(d + 'T00:00:00')) : d;
+    if (isNaN(dt.getTime())) return '';
+    return dt.toISOString().split('T')[0];
+  };
+  const [dataContrato, setDataContrato] = useState(toInputDate(emprestimo.dataInicio));
   const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(
-    emprestimo.proximaParcela ? formatarData(emprestimo.proximaParcela.data_vencimento) : ""
+    emprestimo.proximaParcela ? toInputDate(emprestimo.proximaParcela.data_vencimento) : ""
   );
   const [novaParcelaData, setNovaParcelaData] = useState("");
   const [novaParcelaValor, setNovaParcelaValor] = useState("");
@@ -168,9 +175,16 @@ function EditarEmprestimoModal({
 
   // ── Mutations ──
   const editarMutation = trpc.contratos.editar.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success(t('toast_success.empréstimo_atualizado_com_sucesso'));
-      invalidarTudo();
+      // Aguardar o refetch completar antes de fechar para garantir que o card exibe a data atualizada
+      await Promise.all([
+        utils.contratos.list.invalidate(),
+        utils.contratos.listComParcelas.invalidate(),
+        utils.dashboard.kpis.invalidate(),
+      ]);
+      refetchDetalhes();
+      onSuccess();
       onClose();
     },
     onError: (err) => toast.error('Erro ao atualizar: ' + err.message),
@@ -446,11 +460,11 @@ function EditarEmprestimoModal({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Data do Contrato</Label>
-                  <Input type="date" value={dataContrato.split('/').reverse().join('-')} onChange={e => setDataContrato(e.target.value)} className="mt-1" />
+                  <Input type="date" value={dataContrato} onChange={e => setDataContrato(e.target.value)} className="mt-1" />
                 </div>
                 <div>
                   <Label>1ª Parcela *</Label>
-                  <Input type="date" value={dataPrimeiraParcela.split('/').reverse().join('-')} onChange={e => setDataPrimeiraParcela(e.target.value)} className="mt-1" />
+                  <Input type="date" value={dataPrimeiraParcela} onChange={e => setDataPrimeiraParcela(e.target.value)} className="mt-1" />
                 </div>
               </div>
 
