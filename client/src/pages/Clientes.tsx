@@ -302,7 +302,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
       isReferral,
       observacoes: observacoes || undefined,
       fotoUrl: fotoUrl || undefined,
-      documentosUrls: documentos.length > 0 ? JSON.stringify(documentos) : undefined,
+      documentosUrls: JSON.stringify(documentos),
       cep: cep || undefined,
       endereco: endereco || undefined,
       numero: numero || undefined,
@@ -360,7 +360,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
         </div>
 
         {/* Conteúdo */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4 space-y-4">
 
           {/* ─── ABA DADOS PESSOAIS ─── */}
           {aba === "dados" && (
@@ -625,7 +625,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-border">
+        <div className="shrink-0 flex items-center justify-between px-6 py-4 border-t border-border">
           {aba !== "dados" ? (
             <Button variant="outline" onClick={() => setAba(aba === "documentos" ? "endereco" : "dados")}>
               ← Voltar
@@ -638,7 +638,7 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
               Próximo →
             </Button>
           ) : (
-            <Button className="bg-green-600 hover:bg-green-700" onClick={handleSalvar} disabled={isPending}>
+            <Button className="bg-green-600 hover:bg-green-700" onClick={handleSalvar} disabled={isPending || uploadingDoc}>
               {isPending ? t('common.saving') : t('clients.conclude')}
             </Button>
           )}

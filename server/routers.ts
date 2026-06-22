@@ -311,6 +311,29 @@ const dashboardRouter = router({
 });
 
 // ─── CLIENTES ────────────────────────────────────────────────────────────────
+// Normaliza campos snake_case do Supabase REST para camelCase esperado pelo frontend
+function mapClienteFromRest(row: any): any {
+  if (!row) return row;
+  return {
+    ...row,
+    cpfCnpj: row.cpfCnpj ?? row.cpf_cnpj,
+    fotoUrl: row.fotoUrl ?? row.foto_url,
+    documentosUrls: row.documentosUrls ?? row.documentos_urls,
+    tipoCliente: row.tipoCliente ?? row.tipo_cliente,
+    isReferral: row.isReferral ?? row.is_referral,
+    chavePix: row.chavePix ?? row.chave_pix,
+    tipoChavePix: row.tipoChavePix ?? row.tipo_chave_pix,
+    dataNascimento: row.dataNascimento ?? row.data_nascimento,
+    estadoCivil: row.estadoCivil ?? row.estado_civil,
+    nomeMae: row.nomeMae ?? row.nome_mae,
+    nomePai: row.nomePai ?? row.nome_pai,
+    numeroConta: row.numeroConta ?? row.numero_conta,
+    userId: row.userId ?? row.user_id,
+    createdAt: row.createdAt ?? row.created_at,
+    updatedAt: row.updatedAt ?? row.updated_at,
+  };
+}
+
 const clientesRouter = router({
   list: protectedProcedure
     .input(z.object({ busca: z.string().optional(), ativo: z.boolean().optional() }).optional())
@@ -340,11 +363,13 @@ const clientesRouter = router({
           if (!error && data) rows = data;
         }
       }
+      // Normalizar campos snake_case -> camelCase (Supabase REST retorna snake_case)
+      rows = rows.map(mapClienteFromRest);
       if (input?.busca) {
         const b = input.busca.toLowerCase();
         rows = rows.filter((c: any) =>
           (c.nome ?? '').toLowerCase().includes(b) ||
-          (c.cpfCnpj ?? c.cpf_cnpj ?? '').includes(b) ||
+          (c.cpfCnpj ?? '').includes(b) ||
           (c.telefone ?? '').includes(b)
         );
       }
@@ -367,7 +392,7 @@ const clientesRouter = router({
     if (!supabase) return null;
     const { data, error } = await supabase.from('clientes').select('*').eq('id', input.id).eq('user_id', ctx.user.id).single();
     if (error) return null;
-    return data;
+    return mapClienteFromRest(data);
   }),
 
   create: protectedProcedure

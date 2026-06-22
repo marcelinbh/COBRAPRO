@@ -394,7 +394,7 @@ function EditarEmprestimoModal({
         </div>
 
         {/* Conteúdo scrollável */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
+        <div className="flex-1 overflow-y-auto min-h-0 px-6 py-4">
 
           {/* ─── ABA EDITAR ─── */}
           {aba === 'editar' && (

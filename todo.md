@@ -1144,3 +1144,12 @@
 - [ ] Criar página AdminLoginLogs.tsx com tabela de logs visível só para admin
 - [ ] Adicionar rota /admin/login-logs no App.tsx e no menu lateral (só admin)
 
+
+## Fase 60: Correção de Bug - Documentos não salvando
+- [x] Corrigir mapeamento snake_case → camelCase no backend (mapClienteFromRest)
+- [x] Aplicar mapClienteFromRest nas procedures list e byId de clientes
+- [x] Corrigir layout do modal: adicionar min-h-0 ao conteúdo e shrink-0 ao footer
+- [x] Corrigir handleSalvar: sempre enviar documentosUrls (mesmo quando vazio)
+- [x] Desabilitar botão Concluir durante upload de documentos (uploadingDoc)
+- [x] Aplicar min-h-0 ao modal de Empréstimos também
+- [x] Testes vitest: 14 testes de clientes.documentos.test.ts passando
