@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation, useParams } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,10 @@ import {
   ArrowLeft, Phone, MessageCircle, CreditCard, MapPin, FileText, Plus,
   Edit, Star, AlertTriangle, CheckCircle, Clock, User,
   Instagram, Facebook, Briefcase, Mail, Calendar, Download,
-  ExternalLink, Eye, Hash, Heart
+  ExternalLink, Eye, Hash, Heart, Upload, Trash2, Loader2
 } from "lucide-react";
 import { formatarMoeda, formatarData, MODALIDADE_LABELS, STATUS_CONTRATO_LABELS } from "../../../shared/finance";
+import { toast } from "sonner";
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 function getInitials(nome: string) {
@@ -50,9 +51,67 @@ export default function ClienteDetalhe() {
   const clienteId = parseInt(params.id ?? "0");
   const [abaAtiva, setAbaAtiva] = useState("resumo");
 
+  const utils = trpc.useUtils();
   const { data: cliente, isLoading } = trpc.clientes.byId.useQuery({ id: clienteId });
   const { data: contratos } = trpc.clientes.contratosByCliente.useQuery({ clienteId });
   const { data: parcelas } = trpc.parcelas.list.useQuery({ clienteId });
+
+  // ─── Upload de documentos ─────────────────────────────────────────────────
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+
+  const updateDocumentosMutation = trpc.clientes.updateDocumentos.useMutation({
+    onSuccess: () => {
+      utils.clientes.byId.invalidate({ id: clienteId });
+      toast.success("Documentos atualizados!");
+    },
+    onError: (err) => toast.error("Erro ao salvar documentos: " + err.message),
+  });
+
+  async function uploadDocFile(file: File): Promise<{ url: string; nome: string; tamanho: number; data: string } | null> {
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64, contentType: file.type, filename: file.name, folder: "clientes/documentos" }),
+    });
+    if (!res.ok) return null;
+    const { url } = await res.json();
+    return { url, nome: file.name, tamanho: file.size, data: new Date().toISOString() };
+  }
+
+  async function handleAddDocumentos(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    setUploadingDoc(true);
+    try {
+      const novos: { url: string; nome: string; tamanho: number; data: string }[] = [];
+      for (const file of Array.from(files)) {
+        const doc = await uploadDocFile(file);
+        if (doc) novos.push(doc);
+      }
+      if (novos.length === 0) { toast.error("Falha no upload dos arquivos"); return; }
+      const atuais = documentos as { url: string; nome: string; tamanho?: number; data?: string }[];
+      const merged = [...atuais, ...novos];
+      await updateDocumentosMutation.mutateAsync({ id: clienteId, documentosUrls: JSON.stringify(merged) });
+      toast.success(`${novos.length} documento(s) adicionado(s)!`);
+    } catch {
+      toast.error("Erro ao fazer upload dos documentos");
+    } finally {
+      setUploadingDoc(false);
+      if (docInputRef.current) docInputRef.current.value = "";
+    }
+  }
+
+  async function handleRemoveDocumento(idx: number) {
+    const atuais = [...(documentos as any[])];
+    atuais.splice(idx, 1);
+    await updateDocumentosMutation.mutateAsync({ id: clienteId, documentosUrls: JSON.stringify(atuais) });
+  }
 
   // Métricas calculadas
   const metricas = useMemo(() => {
@@ -456,21 +515,48 @@ export default function ClienteDetalhe() {
 
         {/* ── ABA: DOCUMENTOS ── */}
         <TabsContent value="documentos" className="mt-4">
+          {/* Input oculto para seleção de arquivos */}
+          <input
+            ref={docInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.xls,.xlsx,.txt"
+            className="hidden"
+            onChange={(e) => handleAddDocumentos(e.target.files)}
+          />
+
           <Card className="border-border">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Documentos Salvos ({documentos.length})
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> Documentos ({documentos.length})
+                </CardTitle>
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={() => docInputRef.current?.click()}
+                  disabled={uploadingDoc}
+                >
+                  {uploadingDoc ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Enviando...</>
+                  ) : (
+                    <><Upload className="h-3.5 w-3.5" /> Adicionar Documento</>
+                  )}
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
-              {documentos.length === 0 && (
-                <div className="text-center py-12">
+              {documentos.length === 0 && !uploadingDoc && (
+                <div className="text-center py-10">
                   <FileText className="h-10 w-10 text-muted-foreground/30 mx-auto mb-3" />
                   <p className="text-sm text-muted-foreground">Nenhum documento salvo</p>
-                  <p className="text-xs text-muted-foreground mt-1">Edite o cliente para adicionar documentos na aba Documentos</p>
-                  <Button size="sm" variant="outline" className="mt-4 gap-1" onClick={() => setLocation("/clientes")}>
-                    <Edit className="h-3 w-3" /> Editar Cliente
-                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">Clique em “Adicionar Documento” para enviar arquivos</p>
+                </div>
+              )}
+              {uploadingDoc && (
+                <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Enviando arquivos...
                 </div>
               )}
               <div className="space-y-2">
@@ -478,10 +564,10 @@ export default function ClienteDetalhe() {
                   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(doc.url ?? "");
                   const ext = (doc.url ?? "").split(".").pop()?.toUpperCase() ?? "FILE";
                   return (
-                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:border-border transition-colors">
+                    <div key={i} className="flex items-center gap-3 p-3 rounded-lg border border-border/50 hover:border-border transition-colors group">
                       <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 overflow-hidden">
                         {isImage ? (
-                          <img src={doc.url} alt={doc.descricao} className="w-10 h-10 object-cover" />
+                          <img src={doc.url} alt={doc.nome} className="w-10 h-10 object-cover" />
                         ) : (
                           <span className="text-xs font-bold text-muted-foreground">{ext}</span>
                         )}
@@ -490,7 +576,7 @@ export default function ClienteDetalhe() {
                         <div className="text-sm text-foreground truncate">{doc.descricao || doc.nome || "Documento"}</div>
                         <div className="text-xs text-muted-foreground">
                           {doc.tamanho ? `${(doc.tamanho / 1024).toFixed(0)} KB` : ""}
-                          {doc.data ? ` · ${formatarData(doc.data)}` : ""}
+                          {doc.data ? ` · ${new Date(doc.data).toLocaleDateString('pt-BR')}` : ""}
                         </div>
                       </div>
                       <div className="flex gap-1">
@@ -516,6 +602,16 @@ export default function ClienteDetalhe() {
                           title="Baixar"
                         >
                           <Download className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-400 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => handleRemoveDocumento(i)}
+                          disabled={updateDocumentosMutation.isPending}
+                          title="Remover"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </div>

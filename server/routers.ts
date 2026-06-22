@@ -837,6 +837,34 @@ const clientesRouter = router({
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { success: true };
     }),
+
+  // Atualiza apenas os documentos de um cliente (sem precisar enviar todos os campos)
+  updateDocumentos: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      documentosUrls: z.string(), // JSON serializado de DocumentoSalvo[]
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (db) {
+        try {
+          await db.update(clientes).set({ documentosUrls: input.documentosUrls } as any).where(eq(clientes.id, input.id));
+          return { success: true };
+        } catch (err) {
+          console.warn('[clientes.updateDocumentos] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
+      }
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { error } = await supabase
+        .from('clientes')
+        .update({ documentos_urls: input.documentosUrls })
+        .eq('id', input.id)
+        .eq('user_id', ctx.user.id);
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return { success: true };
+    }),
 });
 // ─── CONTRATOS ────────────────────────────────────────────────────────────────
 const contratosRouter = router({

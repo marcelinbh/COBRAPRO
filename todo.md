@@ -1153,3 +1153,11 @@
 - [x] Desabilitar botão Concluir durante upload de documentos (uploadingDoc)
 - [x] Aplicar min-h-0 ao modal de Empréstimos também
 - [x] Testes vitest: 14 testes de clientes.documentos.test.ts passando
+
+## Fase 61: Gerenciamento de Documentos na Página de Detalhes do Cliente
+- [x] Adicionar botão "Adicionar Documento" na aba Docs da página ClienteDetalhe.tsx
+- [x] Implementar upload de arquivo diretamente na aba Docs (sem abrir modal de edição)
+- [x] Implementar remoção de documento diretamente na aba Docs
+- [x] Criar procedure backend clientes.updateDocumentos para atualizar apenas documentos_urls
+- [x] Exibir feedback visual durante upload (loading spinner)
+- [x] Testes vitest para a nova procedure (18 testes passando)

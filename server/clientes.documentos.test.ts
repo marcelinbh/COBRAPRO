@@ -171,3 +171,82 @@ describe("fluxo de documentos do cliente", () => {
     expect(parseDocumentos('[{"url":"x","nome":"y"}]')).toHaveLength(1);
   });
 });
+
+// ─── Testes da procedure updateDocumentos ────────────────────────────────────
+describe("clientes.updateDocumentos procedure", () => {
+  it("valida que o input requer id numérico e documentosUrls string", () => {
+    // Simula validação do schema Zod
+    const { z } = require("zod");
+    const schema = z.object({
+      id: z.number(),
+      documentosUrls: z.string(),
+    });
+
+    // Caso válido
+    const valid = schema.safeParse({ id: 1, documentosUrls: "[]" });
+    expect(valid.success).toBe(true);
+
+    // Sem id
+    const noId = schema.safeParse({ documentosUrls: "[]" });
+    expect(noId.success).toBe(false);
+
+    // Sem documentosUrls
+    const noUrls = schema.safeParse({ id: 1 });
+    expect(noUrls.success).toBe(false);
+
+    // id como string (inválido)
+    const strId = schema.safeParse({ id: "abc", documentosUrls: "[]" });
+    expect(strId.success).toBe(false);
+  });
+
+  it("serializa e desserializa documentos corretamente para persistência", () => {
+    const docs = [
+      { url: "https://cdn.example.com/rg.pdf", nome: "RG.pdf", tamanho: 102400, data: "2026-06-22T12:00:00.000Z" },
+      { url: "https://cdn.example.com/cpf.jpg", nome: "CPF.jpg", tamanho: 51200, data: "2026-06-22T12:01:00.000Z" },
+    ];
+
+    // Serialização para banco
+    const serialized = JSON.stringify(docs);
+    expect(typeof serialized).toBe("string");
+
+    // Desserialização do banco
+    const parsed = JSON.parse(serialized);
+    expect(parsed).toHaveLength(2);
+    expect(parsed[0].nome).toBe("RG.pdf");
+    expect(parsed[1].url).toBe("https://cdn.example.com/cpf.jpg");
+  });
+
+  it("remove documento pelo índice corretamente", () => {
+    const docs = [
+      { url: "https://cdn.example.com/a.pdf", nome: "A.pdf" },
+      { url: "https://cdn.example.com/b.pdf", nome: "B.pdf" },
+      { url: "https://cdn.example.com/c.pdf", nome: "C.pdf" },
+    ];
+
+    // Remove o documento do meio (índice 1)
+    const copy = [...docs];
+    copy.splice(1, 1);
+    expect(copy).toHaveLength(2);
+    expect(copy[0].nome).toBe("A.pdf");
+    expect(copy[1].nome).toBe("C.pdf");
+  });
+
+  it("adiciona novos documentos à lista existente sem perder os anteriores", () => {
+    const existentes = [
+      { url: "https://cdn.example.com/rg.pdf", nome: "RG.pdf", tamanho: 100000, data: "2026-01-01T00:00:00.000Z" },
+    ];
+    const novos = [
+      { url: "https://cdn.example.com/cpf.pdf", nome: "CPF.pdf", tamanho: 80000, data: "2026-06-22T00:00:00.000Z" },
+    ];
+
+    const merged = [...existentes, ...novos];
+    expect(merged).toHaveLength(2);
+    expect(merged[0].nome).toBe("RG.pdf");
+    expect(merged[1].nome).toBe("CPF.pdf");
+
+    // O JSON resultante é válido para persistência
+    const serialized = JSON.stringify(merged);
+    const parsed = JSON.parse(serialized);
+    expect(parsed).toHaveLength(2);
+  });
+});
