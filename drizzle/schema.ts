@@ -494,6 +494,59 @@ export type PagamentoAssinatura = typeof pagamentosAssinatura.$inferSelect;
 export type InsertPagamentoAssinatura = typeof pagamentosAssinatura.$inferInsert;
 
 // ─── HISTÓRICO DE ALTERAÇÕES DE CONTRATOS ────────────────────────────────────
+// ─── BLACKLIST COMPARTILHADA ─────────────────────────────────────────────────
+export const statusBlacklistEnum = pgEnum("status_blacklist", ["ativo", "resolvido", "em_negociacao"]);
+export const tipoDividaBlacklistEnum = pgEnum("tipo_divida_blacklist", [
+  "emprestimo", "servico", "produto", "aluguel", "cheque", "outros"
+]);
+
+export const blacklist = pgTable("blacklist", {
+  id: serial("id").primaryKey(),
+  // Quem cadastrou (referência ao usuário, mas o registro é GLOBAL)
+  cadastradoPorUserId: integer("cadastrado_por_user_id").notNull(),
+  cadastradoPorEmpresa: varchar("cadastrado_por_empresa", { length: 255 }),
+  // Dados do devedor
+  cpfCnpj: varchar("cpf_cnpj", { length: 20 }).notNull(),
+  nome: varchar("nome", { length: 255 }).notNull(),
+  telefone: varchar("telefone", { length: 20 }),
+  email: varchar("email", { length: 320 }),
+  // Endereço completo
+  endereco: varchar("endereco", { length: 300 }),
+  numero: varchar("numero", { length: 20 }),
+  complemento: varchar("complemento", { length: 100 }),
+  bairro: varchar("bairro", { length: 100 }),
+  cidade: varchar("cidade", { length: 100 }),
+  estado: varchar("estado", { length: 2 }),
+  cep: varchar("cep", { length: 9 }),
+  // Dados da dívida
+  motivo: text("motivo").notNull(),
+  tipoDivida: tipoDividaBlacklistEnum("tipo_divida").default("outros").notNull(),
+  valorDivida: decimal("valor_divida", { precision: 15, scale: 2 }),
+  dataOcorrencia: date("data_ocorrencia"),
+  // Status e observações
+  status: statusBlacklistEnum("status").default("ativo").notNull(),
+  observacoes: text("observacoes"),
+  // Foto principal
+  fotoUrl: varchar("foto_url", { length: 500 }),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type Blacklist = typeof blacklist.$inferSelect;
+export type InsertBlacklist = typeof blacklist.$inferInsert;
+
+export const blacklistFotos = pgTable("blacklist_fotos", {
+  id: serial("id").primaryKey(),
+  blacklistId: integer("blacklist_id").notNull(),
+  url: varchar("url", { length: 500 }).notNull(),
+  fileKey: varchar("file_key", { length: 500 }).notNull(),
+  createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export type BlacklistFoto = typeof blacklistFotos.$inferSelect;
+export type InsertBlacklistFoto = typeof blacklistFotos.$inferInsert;
+
+// ─── HISTÓRICO DE ALTERAÇÕES DE CONTRATOS ────────────────────────────────────
 export const tipoAlteracaoEnum = pgEnum("tipo_alteracao", [
   "edicao_juros", "aplicacao_multa", "edicao_parcela", "edicao_contrato",
   "pagamento", "pagamento_juros", "reparcelamento", "criacao"
