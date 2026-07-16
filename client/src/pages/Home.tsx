@@ -4,7 +4,7 @@ import { trackPageView, trackLead, trackMetaEvent } from "@/lib/metaEvents";
 import { useLocation } from "wouter";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Shield, Zap, TrendingUp, Star, CheckCircle2, Plus, Minus, Smartphone, FileText, MessageCircle, BarChart3 } from "lucide-react";
+import { Shield, Zap, TrendingUp, Star, CheckCircle2, Plus, Minus, Smartphone, FileText, MessageCircle, BarChart3, ShieldAlert, Eye, UserX, AlertTriangle, Lock } from "lucide-react";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 // ── Links dos planos (não mudam com idioma) ─────────────────────────────────
@@ -227,6 +227,139 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* ── BLACKLIST ──────────────────────────────────────────────────────── */}
+      <section className="py-24 px-4 bg-gradient-to-b from-transparent via-red-950/10 to-transparent">
+        <div className="max-w-6xl mx-auto">
+
+          {/* Badge + Título */}
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 border border-red-500/40 bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-full mb-6">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              EXCLUSIVO COBRAPRO
+            </div>
+            <h2 className="text-3xl md:text-5xl font-black uppercase leading-tight mb-4">
+              BLACKLIST{" "}
+              <span className="text-red-500">NACIONAL</span>
+              <br className="hidden md:block" />
+              DE INADIMPLENTES
+            </h2>
+            <p className="text-white/60 text-lg max-w-2xl mx-auto leading-relaxed">
+              A única ferramenta de cobrança do Brasil com{" "}
+              <strong className="text-white">banco de dados colaborativo de devedores</strong>{" "}
+              — alimentado pelos próprios usuários, em tempo real.
+            </p>
+          </div>
+
+          {/* 4 diferenciais */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
+            {[
+              { icon: <UserX className="w-6 h-6" />, title: "Consulte Antes de Emprestar", desc: "Verifique qualquer CPF ou CNPJ na base nacional antes de fechar qualquer negócio. Evite o prejuízo antes que aconteça." },
+              { icon: <Eye className="w-6 h-6" />, title: "Visível Para Todos os Assinantes", desc: "Cada devedor cadastrado fica visível para toda a rede CobraPro. Quanto mais usuários, mais poderosa a lista." },
+              { icon: <AlertTriangle className="w-6 h-6" />, title: "Cadastre Com Provas", desc: "Inclua fotos, endereço completo, valor da dívida e histórico. Registro completo, sem brechas." },
+              { icon: <Lock className="w-6 h-6" />, title: "Rede Fechada e Segura", desc: "Apenas assinantes ativos acessam a blacklist. Nenhum dado é público — é uma rede exclusiva de profissionais." },
+            ].map((f) => (
+              <div key={f.title} className="bg-red-950/20 border border-red-500/20 rounded-2xl p-6 hover:border-red-500/40 transition-colors">
+                <div className="w-12 h-12 rounded-xl bg-red-500/15 text-red-400 flex items-center justify-center mb-4">{f.icon}</div>
+                <h3 className="font-bold text-white mb-2 uppercase tracking-wide text-sm">{f.title}</h3>
+                <p className="text-white/50 text-sm leading-relaxed">{f.desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Bloco central de impacto */}
+          <div className="bg-gradient-to-br from-red-950/40 to-[#0A0A0A] border border-red-500/30 rounded-3xl p-8 md:p-12">
+            <div className="grid md:grid-cols-2 gap-10 items-center">
+
+              {/* Copy persuasiva */}
+              <div>
+                <p className="text-red-400 text-xs font-bold uppercase tracking-widest mb-4">Por que isso muda tudo</p>
+                <h3 className="text-2xl md:text-3xl font-black uppercase leading-tight mb-5">
+                  PARE DE SER{" "}
+                  <span className="text-red-500">ENGANADO</span>{" "}
+                  PELOS MESMOS DEVEDORES
+                </h3>
+                <p className="text-white/60 leading-relaxed mb-6">
+                  Caloteiros profissionais circulam entre credores diferentes, pegando dinheiro e sumindo.
+                  Com a Blacklist CobraPro, quando um devedor é cadastrado por qualquer assinante,{" "}
+                  <strong className="text-white">toda a rede é alertada imediatamente.</strong>
+                </p>
+                <ul className="space-y-3">
+                  {[
+                    "Consulta instantânea por CPF, CNPJ ou nome",
+                    "Histórico completo de ocorrências por devedor",
+                    "Fotos, endereço, cidade, estado e CEP",
+                    "Status: Inadimplente / Em Negociação / Resolvido",
+                    "Tipo de dívida: empréstimo, serviço, produto, cheque",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-3 text-white/80 text-sm">
+                      <span className="text-red-500 font-black flex-shrink-0 mt-0.5">✓</span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Mockup de cards */}
+              <div className="space-y-3">
+                <p className="text-white/30 text-xs uppercase tracking-widest mb-4">Exemplo de registro na blacklist</p>
+                <div className="bg-red-500/5 border border-red-500/30 rounded-2xl p-5">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-red-600 flex items-center justify-center text-white font-black text-lg flex-shrink-0">J</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-bold text-white text-sm">João da Silva Santos</span>
+                        <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">Inadimplente</span>
+                      </div>
+                      <p className="text-white/50 text-xs font-mono mb-2">CPF: 123.456.789-01</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/40">
+                        <span>📍 Belo Horizonte - MG</span>
+                        <span>💰 R$ 2.500,00</span>
+                        <span>📅 há 3 dias</span>
+                      </div>
+                      <p className="text-white/60 text-xs mt-2"><span className="font-medium">Motivo:</span> Empréstimo não pago — 3 parcelas em atraso</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5 opacity-60">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full bg-orange-700 flex items-center justify-center text-white font-black text-lg flex-shrink-0">M</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <span className="font-bold text-white text-sm">Maria Oliveira Costa</span>
+                        <span className="bg-orange-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">Em Negociação</span>
+                      </div>
+                      <p className="text-white/50 text-xs font-mono mb-2">CPF: 987.654.321-00</p>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/40">
+                        <span>📍 São Paulo - SP</span>
+                        <span>💰 R$ 1.200,00</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <p className="text-white/20 text-xs text-center pt-2">* Dados ilustrativos. Registros reais são visíveis apenas para assinantes.</p>
+              </div>
+            </div>
+
+            {/* CTA */}
+            <div className="mt-10 pt-8 border-t border-red-500/20 text-center">
+              <p className="text-white/50 text-sm mb-4">
+                A blacklist está incluída em <strong className="text-white">todos os planos</strong> — sem custo adicional.
+              </p>
+              <a
+                href={PLANO_LINKS.anual}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackMetaEvent("InitiateCheckout", { customData: { content_name: "blacklist_cta" } })}
+                className="inline-block bg-red-600 hover:bg-red-700 text-white font-black text-sm uppercase tracking-wide px-8 py-4 rounded-xl transition-all hover:scale-105 shadow-xl shadow-red-900/40"
+              >
+                🛡️ Quero Acesso à Blacklist Nacional
+              </a>
+            </div>
+          </div>
+
         </div>
       </section>
 
