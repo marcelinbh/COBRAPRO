@@ -8,6 +8,7 @@ import { whatsappEvolutionRouter } from "./routers/whatsappEvolution";
 import { perfilRouter } from "./routers/perfil";
 import { relatorioDiarioRouter } from "./routers/relatorioDiario";
 import { notificacoesRouter } from "./routers/notificacoes";
+import { blacklistRouter } from "./routers/blacklist";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
@@ -4536,8 +4537,8 @@ export const appRouter = router({
   perfil: perfilRouter,
   relatorioDiario: relatorioDiarioRouter,
   notificacoes: notificacoesRouter,
-  onboarding: onboardingRouter,
+    onboarding: onboardingRouter,
   admin: adminRouter,
+  blacklist: blacklistRouter,
 });
-
 export type AppRouter = typeof appRouter;

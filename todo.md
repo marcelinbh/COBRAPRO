@@ -1161,3 +1161,23 @@
 - [x] Criar procedure backend clientes.updateDocumentos para atualizar apenas documentos_urls
 - [x] Exibir feedback visual durante upload (loading spinner)
 - [x] Testes vitest para a nova procedure (18 testes passando)
+
+## Fase 50: Blacklist Compartilhada entre Assinantes
+- [x] Schema: tabela `blacklist` global (sem userId isolado) com campos completos
+- [x] Schema: tabela `blacklist_fotos` para múltiplas fotos por registro
+- [x] Migração SQL aplicada no Supabase
+- [x] Enum: `status_blacklist` (ativo, resolvido, em_negociacao)
+- [x] Enum: `tipo_divida_blacklist` (emprestimo, servico, produto, aluguel, cheque, outros)
+- [x] Procedure `blacklist.criar`: qualquer assinante autenticado pode cadastrar
+- [x] Procedure `blacklist.consultar`: busca por CPF/CNPJ ou nome (todos os assinantes)
+- [x] Procedure `blacklist.listarTodos`: paginação, filtros por status/tipo
+- [x] Procedure `blacklist.listarMeus`: apenas registros do usuário logado
+- [x] Procedure `blacklist.atualizar`: somente quem cadastrou pode editar
+- [x] Procedure `blacklist.deletar`: somente quem cadastrou pode deletar
+- [x] Procedure `blacklist.uploadFoto`: upload S3 e salva URL na blacklist_fotos
+- [x] Página /blacklist: consulta global com busca por CPF/CNPJ/nome
+- [x] Página /blacklist/nova: formulário completo de cadastro
+- [x] Página /blacklist/meus: meus registros com editar/deletar
+- [x] Menu lateral: item "Blacklist" com ícone
+- [x] Testes Vitest para procedures de blacklist (14 testes passando)
+- [x] Checkpoint e deploy

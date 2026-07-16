@@ -76,6 +76,9 @@ import NotificacoesAutomaticas from "./pages/NotificacoesAutomaticas";
 import Onboarding from "./pages/Onboarding";
 import Inadimplencia from "./pages/Inadimplencia";
 import AdminLoginLogs from "./pages/AdminLoginLogs";
+import Blacklist from "./pages/Blacklist";
+import BlacklistNova from "./pages/BlacklistNova";
+import BlacklistMeus from "./pages/BlacklistMeus";
 
 // ─── Stable wrapper components (avoid inline functions in Route) ──────────────
 const DashboardPage = () => <DashboardLayout><Dashboard /></DashboardLayout>;
@@ -110,6 +113,9 @@ const NotificacoesAutomaticasPage = () => <NotificacoesAutomaticas />;
 const OnboardingPage = () => <Onboarding />;
 const InadimplenciaPage = () => <Inadimplencia />;
 const AdminLoginLogsPage = () => <AdminLoginLogs />;
+const BlacklistPage = () => <DashboardLayout><Blacklist /></DashboardLayout>;
+const BlacklistNovaPage = () => <DashboardLayout><BlacklistNova /></DashboardLayout>;
+const BlacklistMeusPage = () => <DashboardLayout><BlacklistMeus /></DashboardLayout>;
 
 function Router() {
   return (
@@ -158,6 +164,9 @@ function Router() {
       <Route path="/notificacoes-automaticas" component={NotificacoesAutomaticasPage} />
       <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/admin/login-logs" component={AdminLoginLogsPage} />
+      <Route path="/blacklist" component={BlacklistPage} />
+      <Route path="/blacklist/nova" component={BlacklistNovaPage} />
+      <Route path="/blacklist/meus" component={BlacklistMeusPage} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

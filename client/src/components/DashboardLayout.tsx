@@ -52,6 +52,7 @@ import {
   ClipboardList,
   Bell,
   Shield,
+  ShieldAlert,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -101,6 +102,7 @@ export default function DashboardLayout({
     { icon: MessageCircle, label: t("menu.whatsapp_qr"), path: "/whatsapp" },
     { icon: ClipboardList, label: t("menu.daily_report"), path: "/relatorio-diario" },
     { icon: TrendingDown, label: t("menu.default"), path: "/inadimplencia" },
+    { icon: ShieldAlert, label: "Blacklist", path: "/blacklist" },
     { icon: Bell, label: t("menu.auto_messages"), path: "/notificacoes-automaticas" },
     { icon: Smartphone, label: t('menu.install_app'), path: "/install" },
     ...(isAdmin ? [{ icon: Shield, label: "Logs de Acesso", path: "/admin/login-logs" }] : []),
