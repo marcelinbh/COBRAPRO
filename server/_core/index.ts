@@ -271,6 +271,23 @@ async function startServer() {
     }
   });
 
+  // ─── Heartbeat: ping Supabase para evitar pause automático (a cada 3 dias) ───
+  app.post('/api/scheduled/supabase-keepalive', async (req, res) => {
+    try {
+      const { getSupabaseClientAsync } = await import('../db');
+      const sb = await getSupabaseClientAsync();
+      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
+      // Faz uma query leve só para manter o banco ativo
+      const { error } = await sb.from('users').select('id').limit(1);
+      if (error) throw error;
+      console.log('[heartbeat/supabase-keepalive] Supabase ping OK -', new Date().toISOString());
+      return res.json({ success: true, timestamp: new Date().toISOString() });
+    } catch (err: any) {
+      console.error('[heartbeat/supabase-keepalive] Erro:', err);
+      res.status(500).json({ error: String(err) });
+    }
+  });
+
   // ─── Endpoint temporário para migration da tabela contrato_historico ───
   app.post('/api/admin/migration-historico', async (req, res) => {
     try {
