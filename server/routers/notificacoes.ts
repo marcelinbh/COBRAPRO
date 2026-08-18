@@ -6,6 +6,8 @@ import { ENV } from "../_core/env";
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export type TipoNotificacao =
+  | "antes_vencimento_5"   // 5 dias antes
+  | "antes_vencimento_4"   // 4 dias antes
   | "antes_vencimento_3"   // 3 dias antes
   | "antes_vencimento_2"   // 2 dias antes
   | "antes_vencimento_1"   // 1 dia antes
@@ -16,6 +18,8 @@ export type TipoNotificacao =
   | "confirmacao_pagamento"; // ao registrar pagamento
 
 export const TIPOS_NOTIFICACAO: { tipo: TipoNotificacao; label: string; descricao: string; diasAntes: number }[] = [
+  { tipo: "antes_vencimento_5", label: "5 dias antes", descricao: "Lembrete 5 dias antes do vencimento", diasAntes: 5 },
+  { tipo: "antes_vencimento_4", label: "4 dias antes", descricao: "Lembrete 4 dias antes do vencimento", diasAntes: 4 },
   { tipo: "antes_vencimento_3", label: "3 dias antes", descricao: "Lembrete 3 dias antes do vencimento", diasAntes: 3 },
   { tipo: "antes_vencimento_2", label: "2 dias antes", descricao: "Lembrete 2 dias antes do vencimento", diasAntes: 2 },
   { tipo: "antes_vencimento_1", label: "1 dia antes", descricao: "Lembrete 1 dia antes do vencimento", diasAntes: 1 },
@@ -28,6 +32,8 @@ export const TIPOS_NOTIFICACAO: { tipo: TipoNotificacao; label: string; descrica
 
 // Mensagens padrão para cada tipo
 const MENSAGENS_PADRAO: Record<TipoNotificacao, string> = {
+  antes_vencimento_5: "Olá {nome}! 😊 Passando para lembrar que sua parcela de *R$ {valor}* vence em *5 dias* ({data_vencimento}). — {empresa}",
+  antes_vencimento_4: "Olá {nome}! Sua parcela de *R$ {valor}* vence em *4 dias* ({data_vencimento}). Programe-se para não esquecer. — {empresa}",
   antes_vencimento_3: "Olá {nome}! 😊 Sua parcela de *R$ {valor}* vence em *3 dias* ({data_vencimento}). Qualquer dúvida, estamos à disposição! — {empresa}",
   antes_vencimento_2: "Olá {nome}! Sua parcela de *R$ {valor}* vence em *2 dias* ({data_vencimento}). Não esqueça! 😉 — {empresa}",
   antes_vencimento_1: "Olá {nome}! ⚠️ Sua parcela de *R$ {valor}* vence *amanhã* ({data_vencimento}). Por favor, efetue o pagamento para evitar juros. — {empresa}",
@@ -37,6 +43,30 @@ const MENSAGENS_PADRAO: Record<TipoNotificacao, string> = {
   apos_vencimento_7: "Olá {nome}, sua parcela de *R$ {valor}* está em atraso há *7 dias*. Urgente: regularize sua situação. — {empresa}",
   confirmacao_pagamento: "Olá {nome}! ✅ Recebemos seu pagamento de *R$ {valor}* referente à parcela {parcela}/{total_parcelas}. Obrigado! — {empresa}",
 };
+
+export const FUSO_HORARIO_REGUA = "America/Sao_Paulo";
+
+/** Retorna a data e o horário de Brasília sem depender do fuso do servidor. */
+export function obterAgoraBrasil(referencia = new Date()): { data: string; horario: string } {
+  const partes = new Intl.DateTimeFormat("en-US", {
+    timeZone: FUSO_HORARIO_REGUA,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(referencia);
+  const obter = (tipo: Intl.DateTimeFormatPartTypes) => partes.find(p => p.type === tipo)?.value ?? "00";
+  return {
+    data: `${obter("year")}-${obter("month")}-${obter("day")}`,
+    horario: `${obter("hour")}:${obter("minute")}`,
+  };
+}
+
+export function deveProcessarReguaNoHorario(horarioConfigurado: string, referencia = new Date()): boolean {
+  return horarioConfigurado === obterAgoraBrasil(referencia).horario;
+}
 
 // ─── HELPER: substituir variáveis na mensagem ─────────────────────────────────
 export function substituirVariaveis(template: string, vars: {
@@ -102,6 +132,32 @@ async function enviarWhatsApp(userId: number, telefone: string, mensagem: string
 
 // ─── ROUTER ──────────────────────────────────────────────────────────────────
 export const notificacoesRouter = router({
+
+  // Preferências da régua: o horário é individual, enquanto o fuso permanece
+  // padronizado em Brasília para todos os assinantes brasileiros.
+  getReguaConfig: protectedProcedure.query(async ({ ctx }) => {
+    const sb = await getSupabaseClientAsync();
+    if (!sb) return { horario: "09:00", fusoHorario: FUSO_HORARIO_REGUA };
+    const { data } = await sb.from("configuracoes")
+      .select("valor")
+      .eq("chave", "notificacoes_auto_horario")
+      .eq("user_id", ctx.user.id)
+      .maybeSingle();
+    return { horario: data?.valor || "09:00", fusoHorario: FUSO_HORARIO_REGUA };
+  }),
+
+  setReguaConfig: protectedProcedure
+    .input(z.object({ horario: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Informe um horário válido") }))
+    .mutation(async ({ ctx, input }) => {
+      const sb = await getSupabaseClientAsync();
+      if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { error } = await sb.from("configuracoes").upsert(
+        { chave: "notificacoes_auto_horario", valor: input.horario, user_id: ctx.user.id },
+        { onConflict: "chave,user_id" }
+      );
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return { success: true, horario: input.horario, fusoHorario: FUSO_HORARIO_REGUA };
+    }),
 
   // Listar todas as regras do usuário (com defaults para tipos não configurados)
   listar: protectedProcedure.query(async ({ ctx }) => {

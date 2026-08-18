@@ -66,4 +66,6 @@ export interface GetUserInfoWithJwtResponse {
   email?: string | null;
   platform?: string | null;
   loginMethod?: string | null;
+  /** Identificador disponível apenas para chamadas autenticadas de tarefas agendadas. */
+  taskUid?: string | null;
 }

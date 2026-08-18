@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -45,11 +46,26 @@ export default function NotificacoesAutomaticas() {
   const utils = trpc.useUtils();
 
   const { data: globalAtivo, isLoading: loadingGlobal } = trpc.notificacoes.getGlobalAtivo.useQuery();
+  const { data: reguaConfig } = trpc.notificacoes.getReguaConfig.useQuery();
   const { data: regras, isLoading: loadingRegras } = trpc.notificacoes.listar.useQuery();
   const { data: historico, isLoading: loadingHistorico } = trpc.notificacoes.historico.useQuery({ limit: 50 });
+  const [horario, setHorario] = useState("09:00");
+
+  useEffect(() => {
+    if (reguaConfig?.horario) setHorario(reguaConfig.horario);
+  }, [reguaConfig?.horario]);
 
   const setGlobal = trpc.notificacoes.setGlobalAtivo.useMutation({
     onSuccess: () => utils.notificacoes.getGlobalAtivo.invalidate(),
+  });
+
+  const salvarHorario = trpc.notificacoes.setReguaConfig.useMutation({
+    onSuccess: (data) => {
+      setHorario(data.horario);
+      utils.notificacoes.getReguaConfig.invalidate();
+      toast.success(`Horário diário definido para ${data.horario} (Brasília)`);
+    },
+    onError: (e) => toast.error(e.message),
   });
 
   const toggle = trpc.notificacoes.toggle.useMutation({
@@ -169,6 +185,39 @@ export default function NotificacoesAutomaticas() {
                 disabled={loadingGlobal || setGlobal.isPending}
                 className="scale-125"
               />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Horário individual da régua */}
+        <Card className="border-primary/20 bg-primary/[0.03]">
+          <CardContent className="py-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  Horário diário dos alertas
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Escolha quando sua régua deve enviar os lembretes. Horário de Brasília.
+                </p>
+              </div>
+              <div className="flex w-full gap-2 sm:w-auto">
+                <Input
+                  type="time"
+                  value={horario}
+                  onChange={(e) => setHorario(e.target.value)}
+                  aria-label="Horário diário dos alertas"
+                  className="w-full sm:w-32"
+                />
+                <Button
+                  onClick={() => salvarHorario.mutate({ horario })}
+                  disabled={salvarHorario.isPending}
+                  className="shrink-0"
+                >
+                  {salvarHorario.isPending ? t('common.saving') : t('common.save')}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

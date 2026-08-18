@@ -10,6 +10,7 @@ import { registerWebhookRoutes } from "../webhookRoutes";
 import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { sdk } from "./sdk";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -107,21 +108,17 @@ async function startServer() {
   });
 
   // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
-  // Chamado pela scheduled task do Manus diariamente
-  // Autentica via cookie app_session_id (injetado automaticamente pela plataforma)
+  // Chamado a cada minuto pelo job de Heartbeat. Processa somente assinantes cujo
+  // horário configurado coincide com o minuto atual em Brasília.
   app.post('/api/scheduled/notificacoes', async (req, res) => {
     try {
-      const { parse: parseCookieHeader } = await import('cookie');
-      const { jwtVerify } = await import('jose');
       const { getSupabaseClientAsync } = await import('../db');
-      const { substituirVariaveis, TIPOS_NOTIFICACAO } = await import('../routers/notificacoes');
+      const { substituirVariaveis, obterAgoraBrasil } = await import('../routers/notificacoes');
       const { ENV } = await import('./env');
 
-      // Verificar autenticação via cookie
-      const cookies = parseCookieHeader(req.headers.cookie || '');
-      const sessionCookie = cookies['app_session_id'];
-      if (!sessionCookie) {
-        return res.status(401).json({ error: 'Não autenticado' });
+      const cronUser = await sdk.authenticateRequest(req);
+      if (!cronUser.isCron || !cronUser.taskUid) {
+        return res.status(403).json({ error: 'Apenas tarefas agendadas autenticadas podem disparar notificações' });
       }
 
       const sb = await getSupabaseClientAsync();
@@ -139,11 +136,25 @@ async function startServer() {
       }
 
       let totalEnviados = 0;
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
+      const agoraBrasil = obterAgoraBrasil();
+      const inicioDoDiaBrasil = new Date(`${agoraBrasil.data}T00:00:00-03:00`);
+      const adicionarDias = (dataIso: string, dias: number) => {
+        const [ano, mes, dia] = dataIso.split('-').map(Number);
+        const data = new Date(Date.UTC(ano, mes - 1, dia + dias));
+        return data.toISOString().slice(0, 10);
+      };
 
       for (const cfg of configsAtivos) {
         const userId = cfg.user_id;
+
+        const { data: horarioConfig } = await sb
+          .from('configuracoes')
+          .select('valor')
+          .eq('chave', 'notificacoes_auto_horario')
+          .eq('user_id', userId)
+          .maybeSingle();
+        const horario = horarioConfig?.valor || '09:00';
+        if (horario !== agoraBrasil.horario) continue;
 
         // Buscar regras ativas do usuário
         const { data: regras } = await sb
@@ -164,9 +175,7 @@ async function startServer() {
         const nomeEmpresa = empresaConfig?.valor || 'Empresa';
 
         for (const regra of regras as { tipo: string; dias_antes: number; mensagem_template: string }[]) {
-          const dataAlvo = new Date(hoje);
-          dataAlvo.setDate(dataAlvo.getDate() + regra.dias_antes);
-          const dataAlvoStr = dataAlvo.toISOString().split('T')[0];
+          const dataAlvoStr = adicionarDias(agoraBrasil.data, regra.dias_antes);
 
           const { data: parcelasData } = await sb
             .from('parcelas')
@@ -190,7 +199,7 @@ async function startServer() {
               .eq('user_id', userId)
               .eq('parcela_id', parcela.id)
               .eq('tipo', regra.tipo)
-              .gte('createdAt', hoje.toISOString())
+              .gte('createdAt', inicioDoDiaBrasil.toISOString())
               .maybeSingle();
             if (logExistente) continue;
 
@@ -239,10 +248,10 @@ async function startServer() {
         }
       }
 
-      res.json({ success: true, enviados: totalEnviados, processados: configsAtivos.length });
+      res.json({ success: true, enviados: totalEnviados, processados: configsAtivos.length, horario: agoraBrasil.horario });
     } catch (err) {
       console.error('[scheduled/notificacoes] Erro:', err);
-      res.status(500).json({ error: String(err) });
+      res.status(500).json({ error: String(err), timestamp: new Date().toISOString() });
     }
   });
 

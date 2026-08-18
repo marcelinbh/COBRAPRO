@@ -1189,3 +1189,12 @@
 - [x] Cobrir o cenário com testes Vitest e validar os totais exibidos
 - [x] Aplicar a correção global para que nenhuma conta some lançamentos em duplicidade
 - [x] Conciliar a conta Ultracredi com um lançamento auditável para saldo final de R$ 10.800,00
+
+## Fase 63: Régua Opcional de Alertas por WhatsApp
+- [x] Criar configuração opcional da régua por assinante, com horário local escolhido pelo usuário
+- [x] Adicionar alertas fixos para 5, 4, 3, 2 e 1 dia antes do vencimento e no dia do vencimento
+- [x] Permitir templates independentes e personalizados pelo assinante para cada etapa
+- [ ] Executar os alertas diariamente via Evolution API, respeitando o horário de cada assinante
+- [ ] Registrar o resultado de cada tentativa e impedir disparidade duplicada no mesmo dia
+- [x] Criar interface de configuração, pré-visualização e ativação/desativação da régua
+- [ ] Cobrir as regras com testes Vitest e validar um envio de teste
