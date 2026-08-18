@@ -1181,3 +1181,11 @@
 - [x] Menu lateral: item "Blacklist" com ícone
 - [x] Testes Vitest para procedures de blacklist (14 testes passando)
 - [x] Checkpoint e deploy
+
+## Fase 62: Correção de Inconsistência de Saldo no Caixa
+- [ ] Mapear os cálculos de saldo e as transações da conta Ultracredi
+- [ ] Identificar a origem da divergência entre as telas do Caixa
+- [ ] Corrigir a atualização e o cálculo de saldos sem alterar transações legítimas
+- [ ] Cobrir o cenário com testes Vitest e validar os totais exibidos
+- [ ] Aplicar a correção global para que nenhuma conta some lançamentos em duplicidade
+- [ ] Conciliar a conta Ultracredi com um lançamento auditável para saldo final de R$ 10.800,00

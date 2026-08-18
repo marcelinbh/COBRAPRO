@@ -20,6 +20,7 @@ import {
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
+import { calcularSaldoAtual } from "../shared/caixa";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -67,7 +68,10 @@ const dashboardRouter = router({
         const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
           .from(transacoesCaixa)
           .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
-        saldoTotal += parseFloat(conta.saldo) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
+        saldoTotal += calcularSaldoAtual(conta.saldo, [
+          { tipo: 'entrada', valor: entradas[0]?.total },
+          { tipo: 'saida', valor: saidas[0]?.total },
+        ]);
       }
 
       const capitalResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
@@ -136,9 +140,7 @@ const dashboardRouter = router({
     if (contasRes.data) {
       for (const conta of contasRes.data) {
         const transacoesConta = (transRes.data ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
-        const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-        const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-        saldoTotal += parseFloat(conta.saldo ?? '0') + totalEntradas - totalSaidas;
+        saldoTotal += calcularSaldoAtual(conta.saldo, transacoesConta);
       }
     }
 
@@ -2535,7 +2537,10 @@ const caixaRouter = router({
           const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
             .from(transacoesCaixa)
             .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
-          const saldo = parseFloat(conta.saldo) + parseFloat(entradas[0]?.total ?? '0') - parseFloat(saidas[0]?.total ?? '0');
+          const saldo = calcularSaldoAtual(conta.saldo, [
+            { tipo: 'entrada', valor: entradas[0]?.total },
+            { tipo: 'saida', valor: saidas[0]?.total },
+          ]);
           result.push({
             id: conta.id,
             nome: conta.nome,
@@ -2562,11 +2567,10 @@ const caixaRouter = router({
     const result2 = [];
     for (const conta of (contasData || [])) {
       const transacoesConta = (transData ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
-      const totalEntradas = transacoesConta.filter((t: any) => t.tipo === 'entrada').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-      const totalSaidas = transacoesConta.filter((t: any) => t.tipo === 'saida').reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-      // Campo real é 'saldo' (não 'saldo_inicial')
+      // Campo real é 'saldo' (não 'saldo_inicial'). O livro de transações
+      // é somado uma única vez pelo helper compartilhado.
       const saldoBase = parseFloat(conta.saldo ?? conta.saldo_inicial ?? '0');
-      const saldoAtual = saldoBase + totalEntradas - totalSaidas;
+      const saldoAtual = calcularSaldoAtual(saldoBase, transacoesConta);
       result2.push({
         id: conta.id,
         nome: conta.nome,
@@ -2699,9 +2703,8 @@ const caixaRouter = router({
             descricao: input.descricao,
             userId: ctx.user.id,
           });
-          // Atualizar saldo da conta
-          const delta = input.tipo === 'entrada' ? input.valor : -input.valor;
-          await db.execute(sql`UPDATE contas_caixa SET saldo_inicial = COALESCE(saldo_inicial::numeric, 0) + ${delta} WHERE id = ${input.contaCaixaId}`);
+          // O saldo-base não é alterado aqui: o saldo exibido é derivado do
+          // livro de transações, evitando contabilizar o mesmo movimento duas vezes.
           return { success: true };
         } catch (err) {
           console.warn('[caixa.registrarTransacao] Drizzle failed:', (err as Error).message);
@@ -2721,18 +2724,8 @@ const caixaRouter = router({
         user_id: ctx.user.id,
       });
       if (txErr) throw new Error(txErr.message);
-      // Atualizar saldo da conta via RPC ou update direto
-      const delta = input.tipo === 'entrada' ? input.valor : -input.valor;
-      // Atualizar saldo da conta: buscar saldo atual e somar delta
-      const { data: contaData } = await supabase
-        .from('contas_caixa')
-        .select('saldo')
-        .eq('id', input.contaCaixaId)
-        .single();
-      if (contaData) {
-        const novoSaldo = parseFloat(contaData.saldo ?? '0') + delta;
-        await supabase.from('contas_caixa').update({ saldo: novoSaldo }).eq('id', input.contaCaixaId);
-      }
+      // O saldo-base não é alterado aqui: o saldo exibido é derivado do
+      // livro de transações, evitando contabilizar o mesmo movimento duas vezes.
       return { success: true };
     }),
 });
