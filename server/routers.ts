@@ -25,6 +25,7 @@ import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembo
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
 import { idsDuplicadosParaRemocao } from "./caixaDuplicidades";
+import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar } from "./contasPagarStatus";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -3664,11 +3665,13 @@ const contasPagarRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       let q = supabase.from('contas_pagar').select('*').order('data_vencimento', { ascending: false }).eq('user_id', ctx.user.id);
-      if (input?.status && input.status !== 'todos') q = q.eq('status', input.status);
+      if (input?.status && input.status !== 'todos') {
+        q = input.status === 'paga' ? q.in('status', ['paga', 'pago']) : q.eq('status', input.status);
+      }
       if (input?.categoria) q = q.eq('categoria', input.categoria);
       const { data, error } = await q;
       if (error) { console.error('[contasPagar.listar] REST error:', error.message); return []; }
-      return (data ?? []).map((r: any) => ({ ...r, dataVencimento: r.data_vencimento, dataPagamento: r.data_pagamento, contaCaixaId: r.conta_caixa_id }));
+      return (data ?? []).map((r: any) => ({ ...r, status: normalizarStatusContaPagar(r.status), dataVencimento: r.data_vencimento, dataPagamento: r.data_pagamento, contaCaixaId: r.conta_caixa_id }));
     }),
 
   criar: protectedProcedure
@@ -3750,14 +3753,25 @@ const contasPagarRouter = router({
       if (!contaData) throw new Error('Conta não encontrada');
       if (!statusPodeSerPago(contaData.status)) throw new TRPCError({ code: 'CONFLICT', message: 'Esta conta já foi processada' });
 
-      const { data: contaAtualizada, error: updateError } = await supabase
+      const payloadPagamento = { data_pagamento: dataPagamentoBanco, conta_caixa_id: input.contaCaixaId ?? null };
+      let { data: contaAtualizada, error: updateError } = await supabase
         .from('contas_pagar')
-        .update({ status: 'paga', data_pagamento: dataPagamentoBanco, conta_caixa_id: input.contaCaixaId ?? null })
+        .update({ status: 'paga', ...payloadPagamento })
         .eq('id', input.id)
         .eq('user_id', ctx.user.id)
         .in('status', ['pendente', 'atrasada'])
         .select('id')
         .maybeSingle();
+      if (deveRepetirComStatusPagoLegado(updateError)) {
+        ({ data: contaAtualizada, error: updateError } = await supabase
+          .from('contas_pagar')
+          .update({ status: 'pago', ...payloadPagamento })
+          .eq('id', input.id)
+          .eq('user_id', ctx.user.id)
+          .in('status', ['pendente', 'atrasada'])
+          .select('id')
+          .maybeSingle());
+      }
       if (updateError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateError.message });
       if (!contaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta conta já foi processada' });
 
