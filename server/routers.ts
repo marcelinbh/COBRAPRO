@@ -24,6 +24,7 @@ import { calcularSaldoAtual } from "../shared/caixa";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
+import { idsDuplicadosParaRemocao } from "./caixaDuplicidades";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -2761,6 +2762,25 @@ const caixaRouter = router({
       // O saldo-base não é alterado aqui: o saldo exibido é derivado do
       // livro de transações, evitando contabilizar o mesmo movimento duas vezes.
       return { success: true };
+    }),
+
+  removerTransacoesDuplicadasDespesa: protectedProcedure
+    .input(z.object({ ids: z.array(z.number().int().positive()).min(1), manterId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const idsParaRemover = idsDuplicadosParaRemocao(input.ids, input.manterId);
+      if (idsParaRemover.length === 0) return { success: true, removidas: 0 };
+
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { data, error } = await supabase
+        .from('transacoes_caixa')
+        .delete()
+        .in('id', idsParaRemover)
+        .eq('user_id', ctx.user.id)
+        .eq('categoria', 'despesa_operacional')
+        .select('id');
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      return { success: true, removidas: data?.length ?? 0 };
     }),
 });
 

@@ -1217,3 +1217,4 @@
 - [x] Corrigir o lançamento de saída de Caixa ao marcar uma despesa como paga
 - [x] Atualizar os dados exibidos no Dashboard após o pagamento da despesa
 - [x] Cobrir os estados pendente e pago com testes sem duplicidade de movimento
+- [ ] Confirmar e remover saídas duplicadas da despesa Facebook, preservando um único pagamento de R$ 30,00
