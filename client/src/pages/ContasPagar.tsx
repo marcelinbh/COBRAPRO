@@ -87,6 +87,9 @@ export default function ContasPagar() {
     onSuccess: () => {
       utils.contasPagar.listar.invalidate();
       utils.contasPagar.resumo.invalidate();
+      utils.caixa.contas.invalidate();
+      utils.caixa.transacoes.invalidate();
+      utils.dashboard.kpis.invalidate();
       setDialogPagarId(null);
       toast.success(t('toast_success.conta_marcada_como_paga'));
     },

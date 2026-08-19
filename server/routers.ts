@@ -23,6 +23,7 @@ import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcul
 import { calcularSaldoAtual } from "../shared/caixa";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
+import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -3706,10 +3707,12 @@ const contasPagarRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       const dataPag = input.dataPagamento ? new Date(input.dataPagamento) : new Date();
+      const dataPagamentoBanco = dataPagamentoParaBanco(dataPag);
       if (db) {
         try {
           const conta = await db.select().from(contasPagar).where(eq(contasPagar.id, input.id)).limit(1);
           if (!conta[0]) throw new Error('Conta não encontrada');
+          if (!statusPodeSerPago(conta[0].status)) throw new Error('Esta conta já foi processada');
           await db.update(contasPagar).set({ status: 'paga', dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where(eq(contasPagar.id, input.id));
           if (input.contaCaixaId) {
             await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: conta[0].valor, descricao: `Pagamento: ${conta[0].descricao}`, dataTransacao: dataPag });
@@ -3722,11 +3725,47 @@ const contasPagarRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: contaData } = await supabase.from('contas_pagar').select('valor, descricao').eq('id', input.id).single();
+      const { data: contaData, error: contaError } = await supabase.from('contas_pagar').select('valor, descricao, status').eq('id', input.id).eq('user_id', ctx.user.id).single();
+      if (contaError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contaError.message });
       if (!contaData) throw new Error('Conta não encontrada');
-      await supabase.from('contas_pagar').update({ status: 'paga', data_pagamento: dataPag.toISOString(), conta_caixa_id: input.contaCaixaId ?? null }).eq('id', input.id);
+      if (!statusPodeSerPago(contaData.status)) throw new TRPCError({ code: 'CONFLICT', message: 'Esta conta já foi processada' });
+
+      const { data: contaAtualizada, error: updateError } = await supabase
+        .from('contas_pagar')
+        .update({ status: 'paga', data_pagamento: dataPagamentoBanco, conta_caixa_id: input.contaCaixaId ?? null })
+        .eq('id', input.id)
+        .eq('user_id', ctx.user.id)
+        .in('status', ['pendente', 'atrasada'])
+        .select('id')
+        .maybeSingle();
+      if (updateError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateError.message });
+      if (!contaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta conta já foi processada' });
+
       if (input.contaCaixaId) {
-        await supabase.from('transacoes_caixa').insert({ conta_caixa_id: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: contaData.valor, descricao: `Pagamento: ${contaData.descricao}`, data_transacao: dataPag.toISOString(), user_id: ctx.user.id });
+        const descricaoPagamento = `Pagamento: ${contaData.descricao}`;
+        const { data: lancamentoExistente, error: consultaErro } = await supabase
+          .from('transacoes_caixa')
+          .select('id')
+          .eq('conta_caixa_id', input.contaCaixaId)
+          .eq('user_id', ctx.user.id)
+          .eq('tipo', 'saida')
+          .eq('categoria', 'despesa_operacional')
+          .eq('descricao', descricaoPagamento)
+          .limit(1)
+          .maybeSingle();
+        if (consultaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: consultaErro.message });
+        if (!lancamentoExistente) {
+          const { error: transacaoErro } = await supabase.from('transacoes_caixa').insert({
+            conta_caixa_id: input.contaCaixaId,
+            tipo: 'saida',
+            categoria: 'despesa_operacional',
+            valor: contaData.valor,
+            descricao: descricaoPagamento,
+            data_transacao: dataPagamentoBanco,
+            user_id: ctx.user.id,
+          });
+          if (transacaoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: transacaoErro.message });
+        }
       }
       return { success: true };
     }),

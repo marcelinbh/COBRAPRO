@@ -1210,4 +1210,10 @@
 - [x] Mapear a divergência entre o schema `contas_pagar` e o formulário de despesas
 - [x] Adicionar a coluna ausente ou ajustar o payload de cadastro com compatibilidade de produção
 - [x] Criar teste Vitest para cadastro de despesa recorrente e não recorrente
-- [ ] Validar o registro de uma despesa sem criar dados de teste persistentes
+- [x] Validar o registro de uma despesa sem criar dados de teste persistentes
+
+## Fase 66: Reflexo de Despesas no Caixa e Dashboard
+- [x] Mapear o status pendente e o fluxo de pagamento de contas a pagar
+- [x] Corrigir o lançamento de saída de Caixa ao marcar uma despesa como paga
+- [x] Atualizar os dados exibidos no Dashboard após o pagamento da despesa
+- [x] Cobrir os estados pendente e pago com testes sem duplicidade de movimento
