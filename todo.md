@@ -1222,6 +1222,6 @@
 ## Fase 67: Auditoria dos Fluxos Financeiros
 - [x] Mapear todos os fluxos que registram entradas e saídas no Caixa
 - [x] Revisar proteção contra lançamentos duplicados e alterações de saldo-base
-- [ ] Validar empréstimos, pagamentos de parcelas e despesas contra o livro de transações
+- [x] Validar empréstimos, pagamentos de parcelas e despesas contra o livro de transações
 - [x] Padronizar a idempotência de pagamentos de parcelas, juros, cheques, assinaturas e vendas de telefone
-- [ ] Reportar o alcance confirmado e pendências da auditoria financeira
+- [x] Reportar o alcance confirmado e pendências da auditoria financeira
