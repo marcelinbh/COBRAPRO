@@ -1198,3 +1198,9 @@
 - [ ] Registrar o resultado de cada tentativa e impedir disparidade duplicada no mesmo dia
 - [x] Criar interface de configuração, pré-visualização e ativação/desativação da régua
 - [ ] Cobrir as regras com testes Vitest e validar um envio de teste
+
+## Fase 64: Desembolso de Empréstimos no Caixa
+- [x] Mapear o cadastro de empréstimo e os movimentos de Caixa gerados no fluxo
+- [x] Registrar uma saída automática do valor principal ao liberar cada empréstimo
+- [x] Impedir duplicidade de lançamento em reenvios ou falhas do cadastro
+- [x] Cobrir o desembolso e os pagamentos subsequentes com testes Vitest

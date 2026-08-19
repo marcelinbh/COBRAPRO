@@ -21,6 +21,7 @@ import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizz
 import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
 import { calcularSaldoAtual } from "../shared/caixa";
+import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -1477,6 +1478,37 @@ const contratosRouter = router({
       }
       const { error: parcelasErr } = await supabase.from('parcelas').insert(parcelasPayload);
       if (parcelasErr) console.error('[contratos.create] Erro ao criar parcelas via REST:', parcelasErr.message);
+
+      // O modo de produção usa o fallback REST (getDb() é nulo). Sem este
+      // lançamento, apenas os pagamentos entram no Caixa e o capital liberado
+      // nunca é descontado do saldo da conta selecionada.
+      if (input.contaCaixaId) {
+        const { data: desembolsoExistente, error: buscaDesembolsoError } = await supabase
+          .from('transacoes_caixa')
+          .select('id')
+          .eq('contrato_id', contratoId)
+          .eq('conta_caixa_id', input.contaCaixaId)
+          .eq('tipo', 'saida')
+          .eq('categoria', 'emprestimo_liberado')
+          .eq('user_id', ctx.user.id)
+          .limit(1);
+        if (buscaDesembolsoError) {
+          console.error('[contratos.create] Erro ao verificar desembolso:', buscaDesembolsoError.message);
+        } else if (deveRegistrarDesembolso((desembolsoExistente?.length ?? 0) > 0)) {
+          const { error: desembolsoError } = await supabase.from('transacoes_caixa').insert(
+            criarDesembolsoContrato({
+              contaCaixaId: input.contaCaixaId,
+              contratoId: contratoId!,
+              clienteId: input.clienteId,
+              userId: ctx.user.id,
+              valorPrincipal: input.valorPrincipal,
+            })
+          );
+          if (desembolsoError) {
+            console.error('[contratos.create] Erro ao registrar desembolso no caixa:', desembolsoError.message);
+          }
+        }
+      }
 
       return { id: contratoId, valorParcela };
     }),
