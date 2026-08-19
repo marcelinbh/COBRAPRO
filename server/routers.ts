@@ -2113,7 +2113,7 @@ const parcelasRouter = router({
       // Buscar parcela
       const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
       if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
-      if (!podeRegistrarMovimento(parcelaData.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])) {
+      if (!podeRegistrarMovimento(parcelaData.status, ['pendente', 'atrasada', 'vencendo_hoje'])) {
         throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
       }
 
@@ -2173,7 +2173,7 @@ const parcelasRouter = router({
         status: novoStatus,
         conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
-      }).eq('id', input.parcelaId).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']).select('id').maybeSingle();
+      }).eq('id', input.parcelaId).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje']).select('id').maybeSingle();
       if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message });
       if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
 
@@ -2269,7 +2269,7 @@ const parcelasRouter = router({
 
       const parcela = await fetchParcela();
       if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
-      if (!podeRegistrarMovimento(parcela.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])) {
+      if (!podeRegistrarMovimento(parcela.status, ['pendente', 'atrasada', 'vencendo_hoje'])) {
         throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
       }
 
@@ -2378,7 +2378,7 @@ const parcelasRouter = router({
           observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
           conta_caixa_id: input.contaCaixaId,
         }).eq('id', input.parcelaId).eq('user_id', ctx.user.id)
-          .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']).select('id').maybeSingle();
+          .in('status', ['pendente', 'atrasada', 'vencendo_hoje']).select('id').maybeSingle();
         if (atualizarJurosErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: atualizarJurosErro.message });
         if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
 
