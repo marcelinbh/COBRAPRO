@@ -1204,3 +1204,4 @@
 - [x] Registrar uma saída automática do valor principal ao liberar cada empréstimo
 - [x] Impedir duplicidade de lançamento em reenvios ou falhas do cadastro
 - [x] Cobrir o desembolso e os pagamentos subsequentes com testes Vitest
+- [x] Conciliar o contrato de R$ 1.500,00 criado antes da correção com uma saída retroativa auditável
