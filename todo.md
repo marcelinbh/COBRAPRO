@@ -1205,3 +1205,9 @@
 - [x] Impedir duplicidade de lançamento em reenvios ou falhas do cadastro
 - [x] Cobrir o desembolso e os pagamentos subsequentes com testes Vitest
 - [x] Conciliar o contrato de R$ 1.500,00 criado antes da correção com uma saída retroativa auditável
+
+## Fase 65: Correção do Cadastro de Despesas
+- [x] Mapear a divergência entre o schema `contas_pagar` e o formulário de despesas
+- [x] Adicionar a coluna ausente ou ajustar o payload de cadastro com compatibilidade de produção
+- [x] Criar teste Vitest para cadastro de despesa recorrente e não recorrente
+- [ ] Validar o registro de uma despesa sem criar dados de teste persistentes

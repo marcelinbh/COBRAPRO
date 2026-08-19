@@ -22,6 +22,7 @@ import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
 import { calcularSaldoAtual } from "../shared/caixa";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
+import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -3676,14 +3677,23 @@ const contasPagarRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data, error } = await supabase.from('contas_pagar').insert({
+      const payloadComPeriodicidade = {
         descricao: input.descricao, categoria: input.categoria, valor: input.valor,
         data_vencimento: input.dataVencimento, recorrente: input.recorrente ?? false,
         periodicidade: input.periodicidade ?? 'unica', observacoes: input.observacoes ?? null,
         conta_caixa_id: input.contaCaixaId ?? null, status: 'pendente',
         user_id: ctx.user.id,
-      }).select('id').single();
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      };
+      let { data, error } = await supabase.from('contas_pagar').insert(payloadComPeriodicidade).select('id').single();
+
+      // Compatibilidade temporária: algumas bases antigas ainda não possuem
+      // a coluna periodicidade. Não bloquear o cadastro de uma despesa avulsa.
+      if (deveRepetirSemPeriodicidade(error)) {
+        console.warn('[contasPagar.criar] Coluna periodicidade ausente; cadastrando sem recorrência persistida.');
+        const { periodicidade: _periodicidade, ...payloadLegado } = payloadComPeriodicidade;
+        ({ data, error } = await supabase.from('contas_pagar').insert(payloadLegado).select('id').single());
+      }
+      if (error || !data) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error?.message ?? 'Não foi possível criar a conta a pagar' });
       return { success: true, id: data.id };
     }),
 
