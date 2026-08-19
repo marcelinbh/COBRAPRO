@@ -160,7 +160,7 @@ export default function NovoContrato() {
   });
 
   const handleSubmit = () => {
-    if (!form.clienteId || !form.valorPrincipal || !form.dataVencimentoPrimeira) {
+    if (!form.clienteId || !form.valorPrincipal || !form.dataVencimentoPrimeira || !form.contaCaixaId) {
       toast.error(t('toast_error.preencha_todos_os_campos_obrigatórios'));
       return;
     }
@@ -203,7 +203,7 @@ export default function NovoContrato() {
       numeroParcelas: parseInt(form.numeroParcelas),
       dataInicio: form.dataInicio,
       dataVencimentoPrimeira: modoDataManual && datasManual[0] ? datasManual[0] : form.dataVencimentoPrimeira,
-      contaCaixaId: form.contaCaixaId ? parseInt(form.contaCaixaId) : undefined,
+      contaCaixaId: Number(form.contaCaixaId),
       descricao: form.descricao || undefined,
       observacoes: form.observacoes || undefined,
       multaAtraso: multaAtrasoFinal,
@@ -454,10 +454,10 @@ export default function NovoContrato() {
 
             {/* Conta de Caixa */}
             <div>
-              <Label>Conta de Caixa</Label>
+              <Label>Conta de Caixa *</Label>
               <Select value={form.contaCaixaId} onValueChange={v => setForm(f => ({ ...f, contaCaixaId: v }))}>
                 <SelectTrigger className="mt-1">
-                  <SelectValue placeholder="Selecione a conta (opcional)" />
+                  <SelectValue placeholder="Selecione a conta que liberará o empréstimo" />
                 </SelectTrigger>
                 <SelectContent>
                   {contas?.map(c => (

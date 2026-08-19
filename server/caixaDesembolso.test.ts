@@ -27,4 +27,17 @@ describe("desembolso de empréstimo no Caixa", () => {
     expect(deveRegistrarDesembolso(false)).toBe(true);
     expect(deveRegistrarDesembolso(true)).toBe(false);
   });
+
+  it("mantém o vínculo obrigatório entre o desembolso e a conta selecionada", () => {
+    const movimento = criarDesembolsoContrato({
+      contaCaixaId: 24,
+      contratoId: 322,
+      clienteId: 206,
+      userId: 1,
+      valorPrincipal: 1000,
+    });
+
+    expect(movimento.conta_caixa_id).toBe(24);
+    expect(movimento.valor).toBe(1000);
+  });
 });

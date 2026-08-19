@@ -1270,7 +1270,7 @@ const contratosRouter = router({
       diaVencimento: z.number().int().min(1).max(31).optional(),
       descricao: z.string().optional(),
       observacoes: z.string().optional(),
-      contaCaixaId: z.number().optional(),
+      contaCaixaId: z.number().int().positive(),
       multaAtraso: z.number().optional(),
       jurosMoraDiario: z.number().optional(),
     }))
@@ -1396,6 +1396,17 @@ const contratosRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
 
+      const { data: contaLiberacao, error: contaLiberacaoErro } = await supabase
+        .from('contas_caixa')
+        .select('id')
+        .eq('id', input.contaCaixaId)
+        .eq('user_id', ctx.user.id)
+        .maybeSingle();
+      if (contaLiberacaoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contaLiberacaoErro.message });
+      if (!contaLiberacao) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de Caixa válida para liberar o empréstimo' });
+      }
+
       const totalContratoRest = parseFloat((valorParcela * input.numeroParcelas).toFixed(2));
       // Calcular data_vencimento = data da ultima parcela
       const _primeiraDataRest = new Date(input.dataVencimentoPrimeira + 'T00:00:00');
@@ -1487,31 +1498,34 @@ const contratosRouter = router({
       // O modo de produção usa o fallback REST (getDb() é nulo). Sem este
       // lançamento, apenas os pagamentos entram no Caixa e o capital liberado
       // nunca é descontado do saldo da conta selecionada.
-      if (input.contaCaixaId) {
-        const { data: desembolsoExistente, error: buscaDesembolsoError } = await supabase
-          .from('transacoes_caixa')
-          .select('id')
-          .eq('contrato_id', contratoId)
-          .eq('conta_caixa_id', input.contaCaixaId)
-          .eq('tipo', 'saida')
-          .eq('categoria', 'emprestimo_liberado')
-          .eq('user_id', ctx.user.id)
-          .limit(1);
-        if (buscaDesembolsoError) {
-          console.error('[contratos.create] Erro ao verificar desembolso:', buscaDesembolsoError.message);
-        } else if (deveRegistrarDesembolso((desembolsoExistente?.length ?? 0) > 0)) {
-          const { error: desembolsoError } = await supabase.from('transacoes_caixa').insert(
-            criarDesembolsoContrato({
-              contaCaixaId: input.contaCaixaId,
-              contratoId: contratoId!,
-              clienteId: input.clienteId,
-              userId: ctx.user.id,
-              valorPrincipal: input.valorPrincipal,
-            })
-          );
-          if (desembolsoError) {
-            console.error('[contratos.create] Erro ao registrar desembolso no caixa:', desembolsoError.message);
-          }
+      const { data: desembolsoExistente, error: buscaDesembolsoError } = await supabase
+        .from('transacoes_caixa')
+        .select('id')
+        .eq('contrato_id', contratoId)
+        .eq('conta_caixa_id', input.contaCaixaId)
+        .eq('tipo', 'saida')
+        .eq('categoria', 'emprestimo_liberado')
+        .eq('user_id', ctx.user.id)
+        .limit(1);
+      if (buscaDesembolsoError) {
+        await supabase.from('parcelas').delete().eq('contrato_id', contratoId).eq('user_id', ctx.user.id);
+        await supabase.from('contratos').delete().eq('id', contratoId).eq('user_id', ctx.user.id);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Não foi possível confirmar o desembolso: ${buscaDesembolsoError.message}` });
+      }
+      if (deveRegistrarDesembolso((desembolsoExistente?.length ?? 0) > 0)) {
+        const { error: desembolsoError } = await supabase.from('transacoes_caixa').insert(
+          criarDesembolsoContrato({
+            contaCaixaId: input.contaCaixaId,
+            contratoId: contratoId!,
+            clienteId: input.clienteId,
+            userId: ctx.user.id,
+            valorPrincipal: input.valorPrincipal,
+          })
+        );
+        if (desembolsoError) {
+          await supabase.from('parcelas').delete().eq('contrato_id', contratoId).eq('user_id', ctx.user.id);
+          await supabase.from('contratos').delete().eq('id', contratoId).eq('user_id', ctx.user.id);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Empréstimo não criado: não foi possível registrar o desembolso no Caixa (${desembolsoError.message})` });
         }
       }
 

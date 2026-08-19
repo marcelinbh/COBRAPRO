@@ -1225,3 +1225,10 @@
 - [x] Validar empréstimos, pagamentos de parcelas e despesas contra o livro de transações
 - [x] Padronizar a idempotência de pagamentos de parcelas, juros, cheques, assinaturas e vendas de telefone
 - [x] Reportar o alcance confirmado e pendências da auditoria financeira
+
+## Fase 68: Conciliação de Novo Empréstimo sem Desembolso
+- [x] Localizar o contrato de R$ 1.000,00 e confirmar sua conta de Caixa
+- [x] Identificar a falha que impediu a saída automática na Ultracredi
+- [x] Corrigir o fluxo e registrar uma saída retroativa auditável se necessário
+- [x] Validar o saldo da Ultracredi após a conciliação
+- [x] Exigir seleção explícita de conta de Caixa ao criar empréstimos e bloquear falha silenciosa no desembolso
