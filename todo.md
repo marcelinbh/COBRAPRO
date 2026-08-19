@@ -1218,3 +1218,10 @@
 - [x] Atualizar os dados exibidos no Dashboard após o pagamento da despesa
 - [x] Cobrir os estados pendente e pago com testes sem duplicidade de movimento
 - [x] Confirmar e remover saídas duplicadas da despesa Facebook, preservando um único pagamento de R$ 30,00
+
+## Fase 67: Auditoria dos Fluxos Financeiros
+- [x] Mapear todos os fluxos que registram entradas e saídas no Caixa
+- [x] Revisar proteção contra lançamentos duplicados e alterações de saldo-base
+- [ ] Validar empréstimos, pagamentos de parcelas e despesas contra o livro de transações
+- [x] Padronizar a idempotência de pagamentos de parcelas, juros, cheques, assinaturas e vendas de telefone
+- [ ] Reportar o alcance confirmado e pendências da auditoria financeira

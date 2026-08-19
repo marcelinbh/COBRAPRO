@@ -26,6 +26,7 @@ import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
 import { idsDuplicadosParaRemocao } from "./caixaDuplicidades";
 import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar } from "./contasPagarStatus";
+import { podeRegistrarMovimento } from "./financeIdempotency";
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
@@ -2112,6 +2113,9 @@ const parcelasRouter = router({
       // Buscar parcela
       const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
       if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+      if (!podeRegistrarMovimento(parcelaData.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
+      }
 
       // Buscar configuração de multa diária do usuário
       let multaDiariaReais = 0;
@@ -2159,7 +2163,7 @@ const parcelasRouter = router({
       const saldoRestante = isPago ? 0 : calcularSaldoResidual(valorTotalComJuros, input.valorPago);
 
       // Atualizar parcela atual
-      const { error: updateErr } = await sb.from('parcelas').update({
+      const { data: parcelaAtualizada, error: updateErr } = await sb.from('parcelas').update({
         valor_pago: input.valorPago.toFixed(2),
         valor_juros: juros.toFixed(2),
         valor_multa: multa.toFixed(2),
@@ -2169,8 +2173,9 @@ const parcelasRouter = router({
         status: novoStatus,
         conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
-      }).eq('id', input.parcelaId);
-      if (updateErr) console.error('[registrarPagamento] Update parcela error:', updateErr.message);
+      }).eq('id', input.parcelaId).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']).select('id').maybeSingle();
+      if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message });
+      if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
 
       // ─── SALDO RESIDUAL AUTOMÁTICO ─────────────────────────────────────────
       // Se pagamento parcial E transferirSaldoResidual=true, adicionar saldo à próxima parcela
@@ -2192,18 +2197,20 @@ const parcelasRouter = router({
 
       // Registrar entrada no caixa (apenas se conta informada)
       if (input.contaCaixaId) {
-        const { error: txErr } = await sb.from('transacoes_caixa').insert({
-          conta_caixa_id: input.contaCaixaId,
-          tipo: 'entrada',
-          categoria: 'pagamento_parcela',
-          valor: input.valorPago.toFixed(2),
-          descricao: `Pagamento parcela #${parcelaData.numero_parcela} - Contrato #${parcelaData.contrato_id}${saldoRestante > 0 ? ` (parcial, falta R$ ${saldoRestante.toFixed(2)})` : ''}`,
-          parcela_id: input.parcelaId,
-          contrato_id: parcelaData.contrato_id,
-          data_transacao: dataPagamentoStr,
-          user_id: ctx.user.id,
-        });
-        if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
+        const { data: entradaExistente, error: buscaEntradaErr } = await sb.from('transacoes_caixa')
+          .select('id').eq('parcela_id', input.parcelaId).eq('conta_caixa_id', input.contaCaixaId)
+          .eq('tipo', 'entrada').eq('categoria', 'pagamento_parcela').eq('user_id', ctx.user.id).limit(1).maybeSingle();
+        if (buscaEntradaErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: buscaEntradaErr.message });
+        if (!entradaExistente) {
+          const { error: txErr } = await sb.from('transacoes_caixa').insert({
+            conta_caixa_id: input.contaCaixaId,
+            tipo: 'entrada', categoria: 'pagamento_parcela', valor: input.valorPago.toFixed(2),
+            descricao: `Pagamento parcela #${parcelaData.numero_parcela} - Contrato #${parcelaData.contrato_id}${saldoRestante > 0 ? ` (parcial, falta R$ ${saldoRestante.toFixed(2)})` : ''}`,
+            parcela_id: input.parcelaId, contrato_id: parcelaData.contrato_id,
+            data_transacao: dataPagamentoStr, user_id: ctx.user.id,
+          });
+          if (txErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
+        }
       }
 
       // Verificar se contrato foi quitado
@@ -2262,6 +2269,9 @@ const parcelasRouter = router({
 
       const parcela = await fetchParcela();
       if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+      if (!podeRegistrarMovimento(parcela.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
+      }
 
       // Buscar contrato para saber a modalidade e o intervalo
       const fetchContrato = async () => {
@@ -2361,25 +2371,33 @@ const parcelasRouter = router({
         const supabase = await getSupabaseClientAsync();
         if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
-        await supabase.from('parcelas').update({
+        const { data: parcelaAtualizada, error: atualizarJurosErro } = await supabase.from('parcelas').update({
           valor_pago: parseFloat(input.valorJurosPago.toFixed(2)),
           data_pagamento: hoje.toISOString(),
           status: 'paga',
           observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
           conta_caixa_id: input.contaCaixaId,
-        }).eq('id', input.parcelaId);
+        }).eq('id', input.parcelaId).eq('user_id', ctx.user.id)
+          .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']).select('id').maybeSingle();
+        if (atualizarJurosErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: atualizarJurosErro.message });
+        if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
 
-        await supabase.from('transacoes_caixa').insert({
-          conta_caixa_id: input.contaCaixaId,
-          tipo: 'entrada',
-          categoria: 'pagamento_parcela',
-          valor: parseFloat(input.valorJurosPago.toFixed(2)),
-          descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
-          parcela_id: input.parcelaId,
-          contrato_id: parcela.contratoId,
-          data_transacao: new Date().toISOString().split('T')[0],
-          user_id: ctx.user.id,
-        });
+        if (input.contaCaixaId) {
+          const { data: entradaJurosExistente, error: buscaJurosErro } = await supabase.from('transacoes_caixa')
+            .select('id').eq('parcela_id', input.parcelaId).eq('conta_caixa_id', input.contaCaixaId)
+            .eq('tipo', 'entrada').eq('categoria', 'pagamento_parcela').eq('user_id', ctx.user.id).limit(1).maybeSingle();
+          if (buscaJurosErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: buscaJurosErro.message });
+          if (!entradaJurosExistente) {
+            const { error: entradaJurosErro } = await supabase.from('transacoes_caixa').insert({
+              conta_caixa_id: input.contaCaixaId, tipo: 'entrada', categoria: 'pagamento_parcela',
+              valor: parseFloat(input.valorJurosPago.toFixed(2)),
+              descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
+              parcela_id: input.parcelaId, contrato_id: parcela.contratoId,
+              data_transacao: new Date().toISOString().split('T')[0], user_id: ctx.user.id,
+            });
+            if (entradaJurosErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: entradaJurosErro.message });
+          }
+        }
 
         // Buscar o maior numero_parcela existente para evitar duplicatas no fallback REST
         const { data: maxParcelaRest } = await supabase.from('parcelas')
@@ -4053,11 +4071,33 @@ const chequesRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: chqData } = await supabase.from('cheques').select('valor_nominal, emitente, conta_caixa_id').eq('id', input.id).single();
+      const { data: chqData, error: chequeBuscaErro } = await supabase.from('cheques')
+        .select('valor_nominal, emitente, conta_caixa_id, status').eq('id', input.id).eq('user_id', ctx.user.id).single();
+      if (chequeBuscaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: chequeBuscaErro.message });
       if (!chqData) throw new Error('Cheque não encontrado');
+      if (!podeRegistrarMovimento(chqData.status, ['aguardando'])) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Este cheque já foi processado' });
+      }
       const contaId = input.contaCaixaId ?? chqData.conta_caixa_id;
-      await supabase.from('cheques').update({ status: 'compensado', data_compensacao: new Date().toISOString(), conta_caixa_id: contaId }).eq('id', input.id);
-      if (contaId) await supabase.from('transacoes_caixa').insert({ conta_caixa_id: contaId, tipo: 'entrada', categoria: 'outros', valor: chqData.valor_nominal, descricao: `Cheque compensado - ${chqData.emitente}`, data_transacao: new Date().toISOString(), user_id: ctx.user.id });
+      const { data: chequeAtualizado, error: chequeAtualizarErro } = await supabase.from('cheques')
+        .update({ status: 'compensado', data_compensacao: new Date().toISOString(), conta_caixa_id: contaId })
+        .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'aguardando').select('id').maybeSingle();
+      if (chequeAtualizarErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: chequeAtualizarErro.message });
+      if (!chequeAtualizado) throw new TRPCError({ code: 'CONFLICT', message: 'Este cheque já foi processado' });
+      if (contaId) {
+        const descricaoCheque = `Cheque compensado - ${chqData.emitente}`;
+        const { data: entradaChequeExistente, error: buscaEntradaChequeErro } = await supabase.from('transacoes_caixa')
+          .select('id').eq('conta_caixa_id', contaId).eq('tipo', 'entrada').eq('descricao', descricaoCheque)
+          .eq('user_id', ctx.user.id).limit(1).maybeSingle();
+        if (buscaEntradaChequeErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: buscaEntradaChequeErro.message });
+        if (!entradaChequeExistente) {
+          const { error: entradaChequeErro } = await supabase.from('transacoes_caixa').insert({
+            conta_caixa_id: contaId, tipo: 'entrada', categoria: 'outros', valor: chqData.valor_nominal,
+            descricao: descricaoCheque, data_transacao: new Date().toISOString(), user_id: ctx.user.id,
+          });
+          if (entradaChequeErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: entradaChequeErro.message });
+        }
+      }
       return { success: true };
     }),
 
@@ -4299,6 +4339,7 @@ const vendasTelefoneRouter = router({
           const { data: contas } = await supabase
             .from('contas_caixa')
             .select('id, nome, saldo')
+            .eq('user_id', ctx.user.id)
             .order('id', { ascending: true })
             .limit(1);
           if (contas && contas.length > 0) {
@@ -4338,18 +4379,25 @@ const vendasTelefoneRouter = router({
         .from('parcelas_venda_telefone')
         .select('*, vendas_telefone(marca, modelo, comprador_nome)')
         .eq('id', input.parcelaId)
+        .eq('user_id', ctx.user.id)
         .maybeSingle();
-      const { error } = await supabase
+      if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+      if (!podeRegistrarMovimento((parcela as any).status, ['pendente', 'atrasada'])) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
+      }
+      const { data: parcelaAtualizada, error } = await supabase
         .from('parcelas_venda_telefone')
         .update({ status: 'paga', pago_em: new Date().toISOString(), valor_pago: input.valorPago })
-        .eq('id', input.parcelaId);
+        .eq('id', input.parcelaId).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada']).select('id').maybeSingle();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
       // ── Integração com Caixa: registrar pagamento da parcela ──
       try {
-        const { data: contas } = await supabase
-          .from('contas_caixa')
-          .select('id, saldo')
-          .order('id', { ascending: true })
+          const { data: contas } = await supabase
+            .from('contas_caixa')
+            .select('id, saldo')
+            .eq('user_id', ctx.user.id)
+            .order('id', { ascending: true })
           .limit(1);
         if (contas && contas.length > 0) {
           const conta = contas[0];
@@ -4357,15 +4405,17 @@ const vendasTelefoneRouter = router({
           const descricao = venda
             ? `Parcela ${(parcela as any)?.numero} - ${venda.marca} ${venda.modelo} - ${venda.comprador_nome}`
             : `Parcela venda telefone #${input.parcelaId}`;
-          await supabase.from('transacoes_caixa').insert({
-            conta_caixa_id: conta.id,
-            tipo: 'entrada',
-            categoria: 'pagamento_parcela',
-            valor: input.valorPago,
-            descricao,
-            data_transacao: new Date().toISOString(),
-            user_id: ctx.user.id,
-          });
+          const { data: entradaVendaExistente, error: buscaEntradaVendaErro } = await supabase.from('transacoes_caixa')
+            .select('id').eq('conta_caixa_id', conta.id).eq('tipo', 'entrada').eq('descricao', descricao)
+            .eq('user_id', ctx.user.id).limit(1).maybeSingle();
+          if (buscaEntradaVendaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: buscaEntradaVendaErro.message });
+          if (!entradaVendaExistente) {
+            const { error: entradaVendaErro } = await supabase.from('transacoes_caixa').insert({
+              conta_caixa_id: conta.id, tipo: 'entrada', categoria: 'pagamento_parcela', valor: input.valorPago,
+              descricao, data_transacao: new Date().toISOString(), user_id: ctx.user.id,
+            });
+            if (entradaVendaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: entradaVendaErro.message });
+          }
           // Registrar transação de entrada (saldo calculado via transações)
           // Não atualizar campo saldo diretamente (campo inexistente, saldo é calculado)
         }

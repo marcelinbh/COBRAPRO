@@ -157,9 +157,19 @@ export const assinaturasRouter = router({
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
+
+      const { data: pagamentoExistente, error: buscaPagamentoErro } = await supabase
+        .from("pagamentos_assinatura")
+        .select("id")
+        .eq("assinatura_id", input.assinaturaId)
+        .eq("mes_referencia", input.mesReferencia)
+        .limit(1)
+        .maybeSingle();
+      if (buscaPagamentoErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: buscaPagamentoErro.message });
+      if (pagamentoExistente) throw new TRPCError({ code: "CONFLICT", message: "O pagamento desta assinatura já foi registrado para o mês informado" });
 
       // Registrar pagamento
       const { data: pagamento, error: pagErr } = await supabase
@@ -188,14 +198,29 @@ export const assinaturasRouter = router({
         const clienteNome = (assinatura as any)?.clientes?.nome || "Cliente";
         const servico = (assinatura as any)?.servico || "Assinatura";
 
-        await supabase.from("transacoes_caixa").insert({
-          conta_caixa_id: input.contaCaixaId,
-          tipo: "entrada",
-          categoria: "outros",
-          descricao: `Assinatura ${servico} - ${clienteNome} (${input.mesReferencia})`,
-          valor: input.valorPago.toFixed(2),
-          data_transacao: new Date().toISOString().split("T")[0],
-        });
+        const descricaoCaixa = `Assinatura ${servico} - ${clienteNome} (${input.mesReferencia})`;
+        const { data: entradaExistente, error: buscaEntradaErro } = await supabase
+          .from("transacoes_caixa")
+          .select("id")
+          .eq("conta_caixa_id", input.contaCaixaId)
+          .eq("tipo", "entrada")
+          .eq("descricao", descricaoCaixa)
+          .eq("user_id", ctx.user.id)
+          .limit(1)
+          .maybeSingle();
+        if (buscaEntradaErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: buscaEntradaErro.message });
+        if (!entradaExistente) {
+          const { error: entradaErro } = await supabase.from("transacoes_caixa").insert({
+            conta_caixa_id: input.contaCaixaId,
+            tipo: "entrada",
+            categoria: "outros",
+            descricao: descricaoCaixa,
+            valor: input.valorPago.toFixed(2),
+            data_transacao: new Date().toISOString().split("T")[0],
+            user_id: ctx.user.id,
+          });
+          if (entradaErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: entradaErro.message });
+        }
       }
 
       // Atualizar status da assinatura para ativa se estava inadimplente
