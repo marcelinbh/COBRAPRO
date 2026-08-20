@@ -6,7 +6,6 @@ describe("desembolso de empréstimo no Caixa", () => {
     const movimento = criarDesembolsoContrato({
       contaCaixaId: 7,
       contratoId: 42,
-      clienteId: 11,
       userId: 3,
       valorPrincipal: 1500,
       dataTransacao: "2026-08-18T12:00:00.000Z",
@@ -18,7 +17,6 @@ describe("desembolso de empréstimo no Caixa", () => {
       categoria: "emprestimo_liberado",
       valor: 1500,
       contrato_id: 42,
-      cliente_id: 11,
       user_id: 3,
     });
   });
@@ -32,7 +30,6 @@ describe("desembolso de empréstimo no Caixa", () => {
     const movimento = criarDesembolsoContrato({
       contaCaixaId: 24,
       contratoId: 322,
-      clienteId: 206,
       userId: 1,
       valorPrincipal: 1000,
     });

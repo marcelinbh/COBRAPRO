@@ -1232,3 +1232,9 @@
 - [x] Corrigir o fluxo e registrar uma saída retroativa auditável se necessário
 - [x] Validar o saldo da Ultracredi após a conciliação
 - [x] Exigir seleção explícita de conta de Caixa ao criar empréstimos e bloquear falha silenciosa no desembolso
+
+## Fase 69: Compatibilidade do Schema de Desembolso
+- [x] Mapear as colunas disponíveis em `transacoes_caixa` no banco de produção
+- [x] Remover o campo incompatível `cliente_id` do payload de desembolso
+- [x] Testar a criação de contrato com saída de Caixa e sem erro de schema
+- [ ] Versionar e publicar a correção

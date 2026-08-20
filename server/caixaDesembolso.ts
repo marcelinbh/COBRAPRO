@@ -1,7 +1,6 @@
 export type DesembolsoContratoInput = {
   contaCaixaId: number;
   contratoId: number;
-  clienteId: number;
   userId: number;
   valorPrincipal: number;
   dataTransacao?: string;
@@ -19,7 +18,6 @@ export function criarDesembolsoContrato(input: DesembolsoContratoInput) {
     valor: Number(input.valorPrincipal.toFixed(2)),
     descricao: `Empréstimo liberado - Contrato #${input.contratoId}`,
     contrato_id: input.contratoId,
-    cliente_id: input.clienteId,
     data_transacao: input.dataTransacao ?? new Date().toISOString(),
     user_id: input.userId,
   };

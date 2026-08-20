@@ -1517,7 +1517,6 @@ const contratosRouter = router({
           criarDesembolsoContrato({
             contaCaixaId: input.contaCaixaId,
             contratoId: contratoId!,
-            clienteId: input.clienteId,
             userId: ctx.user.id,
             valorPrincipal: input.valorPrincipal,
           })
