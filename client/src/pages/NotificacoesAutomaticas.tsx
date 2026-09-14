@@ -42,30 +42,22 @@ export default function NotificacoesAutomaticas() {
   const { t, i18n } = useTranslation();
   const [editando, setEditando] = useState<{ tipo: string; mensagem: string } | null>(null);
   const [disparando, setDisparando] = useState(false);
+  const [horario, setHorario] = useState("09:00");
 
   const utils = trpc.useUtils();
 
   const { data: globalAtivo, isLoading: loadingGlobal } = trpc.notificacoes.getGlobalAtivo.useQuery();
-  const { data: reguaConfig } = trpc.notificacoes.getReguaConfig.useQuery();
+  const { data: automacao, isLoading: loadingAutomacao } = trpc.notificacoes.getAutomacao.useQuery();
   const { data: regras, isLoading: loadingRegras } = trpc.notificacoes.listar.useQuery();
   const { data: historico, isLoading: loadingHistorico } = trpc.notificacoes.historico.useQuery({ limit: 50 });
-  const [horario, setHorario] = useState("09:00");
 
-  useEffect(() => {
-    if (reguaConfig?.horario) setHorario(reguaConfig.horario);
-  }, [reguaConfig?.horario]);
-
-  const setGlobal = trpc.notificacoes.setGlobalAtivo.useMutation({
-    onSuccess: () => utils.notificacoes.getGlobalAtivo.invalidate(),
-  });
-
-  const salvarHorario = trpc.notificacoes.setReguaConfig.useMutation({
-    onSuccess: (data) => {
-      setHorario(data.horario);
-      utils.notificacoes.getReguaConfig.invalidate();
-      toast.success(`Horário diário definido para ${data.horario} (Brasília)`);
+  const salvarAutomacao = trpc.notificacoes.salvarAutomacao.useMutation({
+    onSuccess: () => {
+      utils.notificacoes.getGlobalAtivo.invalidate();
+      utils.notificacoes.getAutomacao.invalidate();
+      toast.success("Automação de WhatsApp atualizada.");
     },
-    onError: (e) => toast.error(e.message),
+    onError: (erro) => toast.error(erro.message),
   });
 
   const toggle = trpc.notificacoes.toggle.useMutation({
@@ -98,8 +90,16 @@ export default function NotificacoesAutomaticas() {
     },
   });
 
-  const handleToggleGlobal = (val: boolean) => {
-    setGlobal.mutate({ ativo: val });
+  useEffect(() => {
+    if (automacao?.horario) setHorario(automacao.horario);
+  }, [automacao?.horario]);
+
+  const handleToggleGlobal = (ativo: boolean) => {
+    salvarAutomacao.mutate({ ativo, horario });
+  };
+
+  const handleSalvarHorario = () => {
+    salvarAutomacao.mutate({ ativo: globalAtivo ?? false, horario });
   };
 
   const handleToggleRegra = (tipo: string, ativo: boolean) => {
@@ -182,40 +182,26 @@ export default function NotificacoesAutomaticas() {
               <Switch
                 checked={globalAtivo ?? false}
                 onCheckedChange={handleToggleGlobal}
-                disabled={loadingGlobal || setGlobal.isPending}
+                disabled={loadingGlobal || loadingAutomacao || salvarAutomacao.isPending}
                 className="scale-125"
               />
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Horário individual da régua */}
-        <Card className="border-primary/20 bg-primary/[0.03]">
-          <CardContent className="py-4">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="min-w-0">
-                <p className="font-semibold text-foreground flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-primary" />
-                  Horário diário dos alertas
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Escolha quando sua régua deve enviar os lembretes. Horário de Brasília.
-                </p>
+            <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <Label htmlFor="horario-automacao" className="text-sm font-medium">Horário do envio</Label>
+                <p className="mt-1 text-xs text-muted-foreground">Os lembretes ativos serão enviados diariamente neste horário de Brasília.</p>
               </div>
               <div className="flex w-full gap-2 sm:w-auto">
                 <Input
+                  id="horario-automacao"
                   type="time"
                   value={horario}
-                  onChange={(e) => setHorario(e.target.value)}
-                  aria-label="Horário diário dos alertas"
+                  onChange={(event) => setHorario(event.target.value)}
+                  disabled={loadingAutomacao || salvarAutomacao.isPending}
                   className="w-full sm:w-32"
                 />
-                <Button
-                  onClick={() => salvarHorario.mutate({ horario })}
-                  disabled={salvarHorario.isPending}
-                  className="shrink-0"
-                >
-                  {salvarHorario.isPending ? t('common.saving') : t('common.save')}
+                <Button variant="outline" size="sm" onClick={handleSalvarHorario} disabled={loadingAutomacao || salvarAutomacao.isPending}>
+                  Salvar horário
                 </Button>
               </div>
             </div>

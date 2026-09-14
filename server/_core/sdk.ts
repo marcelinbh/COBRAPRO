@@ -17,19 +17,35 @@ import type {
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
-
-export type SessionPayload = {
-  openId: string;
-  appId: string;
-  name: string;
-};
+const CRON_OPEN_ID_PREFIX = "cron_";
 
 export type AuthenticatedUser = User & {
   taskUid?: string;
   isCron?: boolean;
 };
 
-const CRON_OPEN_ID_PREFIX = "cron_";
+function buildCronUser(userInfo: GetUserInfoWithJwtResponse): AuthenticatedUser {
+  const now = new Date();
+  return {
+    id: -1,
+    openId: userInfo.openId,
+    name: userInfo.name || "Tarefa agendada",
+    email: null,
+    loginMethod: null,
+    role: "user",
+    createdAt: now,
+    updatedAt: now,
+    lastSignedIn: now,
+    taskUid: userInfo.taskUid ?? undefined,
+    isCron: true,
+  } as AuthenticatedUser;
+}
+
+export type SessionPayload = {
+  openId: string;
+  appId: string;
+  name: string;
+};
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
 const GET_USER_INFO_PATH = `/webdev.v1.WebDevAuthPublicService/GetUserInfo`;
@@ -273,27 +289,10 @@ class SDKServer {
       throw ForbiddenError("Invalid session cookie");
     }
 
-    // As tarefas periódicas autenticadas usam uma identidade cron própria. Elas
-    // não representam um assinante e jamais devem criar/sincronizar um usuário.
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
-      const cronInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-      if (!cronInfo.taskUid) {
-        throw ForbiddenError("Cron session missing task_uid");
-      }
-      const now = new Date();
-      return {
-        id: -1,
-        openId: cronInfo.openId,
-        name: cronInfo.name || "Tarefa agendada CobraPro",
-        email: null,
-        loginMethod: null,
-        role: "user",
-        createdAt: now,
-        updatedAt: now,
-        lastSignedIn: now,
-        taskUid: cronInfo.taskUid,
-        isCron: true,
-      } as AuthenticatedUser;
+      const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
+      if (!userInfo.taskUid) throw ForbiddenError("Cron session missing task UID");
+      return buildCronUser(userInfo);
     }
 
     const sessionUserId = session.openId;

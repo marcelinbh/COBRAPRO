@@ -108,18 +108,22 @@ async function startServer() {
   });
 
   // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
-  // Chamado a cada minuto pelo job de Heartbeat. Processa somente assinantes cujo
-  // horário configurado coincide com o minuto atual em Brasília.
+  // Chamado uma vez por minuto pelo agendamento da plataforma e filtrado pelo horário
+  // escolhido por cada assinante, no fuso horário de Brasília.
   app.post('/api/scheduled/notificacoes', async (req, res) => {
     try {
       const { getSupabaseClientAsync } = await import('../db');
-      const { substituirVariaveis, obterAgoraBrasil } = await import('../routers/notificacoes');
-      const { ENV } = await import('./env');
+      const { substituirVariaveis } = await import('../routers/notificacoes');
+        const {
+        calcularDataAlvoBrasilia,
+        deveExecutarNoHorario,
+        enviarWhatsAppAutomatico,
+        inicioDoDiaBrasilia,
+        obterDataBrasilia,
+      } = await import('../services/notificacoesAutomaticas');
 
       const cronUser = await sdk.authenticateRequest(req);
-      if (!cronUser.isCron || !cronUser.taskUid) {
-        return res.status(403).json({ error: 'Apenas tarefas agendadas autenticadas podem disparar notificações' });
-      }
+      if (!cronUser.isCron || !cronUser.taskUid) return res.status(403).json({ error: 'Acesso exclusivo para tarefa agendada' });
 
       const sb = await getSupabaseClientAsync();
       if (!sb) return res.status(500).json({ error: 'DB indisponível' });
@@ -136,25 +140,12 @@ async function startServer() {
       }
 
       let totalEnviados = 0;
-      const agoraBrasil = obterAgoraBrasil();
-      const inicioDoDiaBrasil = new Date(`${agoraBrasil.data}T00:00:00-03:00`);
-      const adicionarDias = (dataIso: string, dias: number) => {
-        const [ano, mes, dia] = dataIso.split('-').map(Number);
-        const data = new Date(Date.UTC(ano, mes - 1, dia + dias));
-        return data.toISOString().slice(0, 10);
-      };
+      let usuariosNoHorario = 0;
+      const agora = new Date();
+      const dataHoje = obterDataBrasilia(agora);
 
       for (const cfg of configsAtivos) {
         const userId = cfg.user_id;
-
-        const { data: horarioConfig } = await sb
-          .from('configuracoes')
-          .select('valor')
-          .eq('chave', 'notificacoes_auto_horario')
-          .eq('user_id', userId)
-          .maybeSingle();
-        const horario = horarioConfig?.valor || '09:00';
-        if (horario !== agoraBrasil.horario) continue;
 
         // Buscar regras ativas do usuário
         const { data: regras } = await sb
@@ -166,16 +157,19 @@ async function startServer() {
         if (!regras || regras.length === 0) continue;
 
         // Pegar nome da empresa
-        const { data: empresaConfig } = await sb
+        const { data: configuracoesUsuario } = await sb
           .from('configuracoes')
-          .select('valor')
-          .eq('chave', 'nomeEmpresa')
-          .eq('user_id', userId)
-          .maybeSingle();
-        const nomeEmpresa = empresaConfig?.valor || 'Empresa';
+          .select('chave, valor')
+          .in('chave', ['nomeEmpresa', 'notificacoes_auto_horario'])
+          .eq('user_id', userId);
+        const configuracoes = Object.fromEntries((configuracoesUsuario || []).map((item: { chave: string; valor: string }) => [item.chave, item.valor]));
+        const horario = configuracoes.notificacoes_auto_horario || '09:00';
+        if (!deveExecutarNoHorario(horario, agora)) continue;
+        usuariosNoHorario++;
+        const nomeEmpresa = configuracoes.nomeEmpresa || 'Empresa';
 
         for (const regra of regras as { tipo: string; dias_antes: number; mensagem_template: string }[]) {
-          const dataAlvoStr = adicionarDias(agoraBrasil.data, regra.dias_antes);
+          const dataAlvoStr = calcularDataAlvoBrasilia(regra.dias_antes, agora);
 
           const { data: parcelasData } = await sb
             .from('parcelas')
@@ -199,7 +193,7 @@ async function startServer() {
               .eq('user_id', userId)
               .eq('parcela_id', parcela.id)
               .eq('tipo', regra.tipo)
-              .gte('createdAt', inicioDoDiaBrasil.toISOString())
+              .gte('createdAt', inicioDoDiaBrasilia(dataHoje))
               .maybeSingle();
             if (logExistente) continue;
 
@@ -213,45 +207,27 @@ async function startServer() {
               total_parcelas: parcela.contratos?.numero_parcelas,
             });
 
-            // Enviar via Evolution API
-            const evoUrl = ENV.evolutionApiUrl.replace(/\/$/, '');
-            const evoKey = ENV.evolutionApiKey;
-            const instanceName = `user-${userId}`;
-            let phone = telefone.replace(/\D/g, '');
-            if (!phone.startsWith('55')) phone = '55' + phone;
-
-            try {
-              const sendRes = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', apikey: evoKey },
-                body: JSON.stringify({ number: phone + '@s.whatsapp.net', textMessage: { text: mensagem } }),
-                signal: AbortSignal.timeout(10000),
-              });
-              const ok = sendRes.ok;
-
-              await sb.from('notificacoes_log').insert({
-                user_id: userId,
-                parcela_id: parcela.id,
-                cliente_id: cliente.id,
-                tipo: regra.tipo,
-                telefone,
-                mensagem,
-                status: ok ? 'enviado' : 'erro',
-                erro: ok ? null : 'Falha no envio',
-              });
-
-              if (ok) totalEnviados++;
-            } catch (e) {
-              console.error('[scheduled/notificacoes] Erro ao enviar:', e);
-            }
+            const resultado = await enviarWhatsAppAutomatico(userId, telefone, mensagem);
+            const { error: logError } = await sb.from('notificacoes_log').insert({
+              user_id: userId,
+              parcela_id: parcela.id,
+              cliente_id: cliente.id,
+              tipo: regra.tipo,
+              telefone,
+              mensagem,
+              status: resultado.ok ? 'enviado' : 'erro',
+              erro: resultado.ok ? null : resultado.erro,
+            });
+            if (logError) console.error('[scheduled/notificacoes] Erro ao registrar envio:', logError.message);
+            if (resultado.ok) totalEnviados++;
           }
         }
       }
 
-      res.json({ success: true, enviados: totalEnviados, processados: configsAtivos.length, horario: agoraBrasil.horario });
+      res.json({ success: true, enviados: totalEnviados, processados: usuariosNoHorario, data: dataHoje });
     } catch (err) {
       console.error('[scheduled/notificacoes] Erro:', err);
-      res.status(500).json({ error: String(err), timestamp: new Date().toISOString() });
+      res.status(500).json({ error: String(err) });
     }
   });
 

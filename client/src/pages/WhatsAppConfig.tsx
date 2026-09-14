@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { Link } from "wouter";
 import {
   Smartphone, Wifi, WifiOff, RefreshCw, QrCode, CheckCircle2,
-  MessageSquare, Edit2, Save, X, AlertCircle, Clock, Info,
+  MessageSquare, Edit2, Save, X, AlertCircle, Clock, Info, Bell, Settings2,
 } from "lucide-react";
 
 const TEMPLATE_LABELS: Record<string, { label: string; desc: string; emoji: string }> = {
@@ -196,6 +197,8 @@ export default function WhatsAppConfig() {
     gcTime: 0,
   });
   const { data: templates, refetch: refetchTemplates } = trpc.configuracoes.templates.useQuery();
+  const { data: automacao } = trpc.notificacoes.getAutomacao.useQuery();
+  const { data: regras } = trpc.notificacoes.listar.useQuery();
   const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
     onSuccess: () => { setTimeout(() => { refetchQR(); refetchStatus(); }, 1500); },
     onError: (e) => toast.error(t("toast.errorConnect") + e.message),
@@ -209,6 +212,8 @@ export default function WhatsAppConfig() {
     onError: (e) => toast.error(t("toast.errorSave") + e.message),
   });
   const connected = status?.connected ?? false;
+  const lembreteTresDiasAtivo = regras?.find((regra) => regra.tipo === "antes_vencimento_3")?.ativo ?? false;
+  const lembreteVencimentoAtivo = regras?.find((regra) => regra.tipo === "no_vencimento")?.ativo ?? false;
   const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) { connectWpp.mutate(); setTimeout(() => refetchQR(), 2000); } };
   const handleRefreshQR = () => { connectWpp.mutate(); setTimeout(() => refetchQR(), 1500); };
 
@@ -269,6 +274,44 @@ export default function WhatsAppConfig() {
               </p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card className={`border-2 ${automacao?.ativo ? "border-green-500/35 bg-green-500/5" : "border-border"}`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Bell className="h-4 w-4 text-[#25D366]" />
+            Lembretes automáticos de vencimento
+          </CardTitle>
+          <CardDescription>
+            Programe avisos para seus clientes sem precisar enviar mensagem por mensagem.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <div className="rounded-lg border border-border bg-background/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground">3 dias antes</p>
+              <p className={`mt-1 text-sm font-semibold ${lembreteTresDiasAtivo && automacao?.ativo ? "text-green-500" : "text-muted-foreground"}`}>
+                {lembreteTresDiasAtivo && automacao?.ativo ? "Ativo" : "Desativado"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-background/40 p-3">
+              <p className="text-xs font-medium text-muted-foreground">No dia do vencimento</p>
+              <p className={`mt-1 text-sm font-semibold ${lembreteVencimentoAtivo && automacao?.ativo ? "text-green-500" : "text-muted-foreground"}`}>
+                {lembreteVencimentoAtivo && automacao?.ativo ? "Ativo" : "Desativado"}
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col gap-3 rounded-lg border border-[#25D366]/20 bg-[#25D366]/5 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {automacao?.ativo
+                ? `Envios programados diariamente às ${automacao.horario}, no horário de Brasília.`
+                : "Ative e personalize seus lembretes antes de iniciar os disparos."}
+            </p>
+            <Link href="/notificacoes-automaticas" className="inline-flex h-9 w-full shrink-0 items-center justify-center gap-2 rounded-md border border-[#25D366]/40 px-3 text-sm font-medium text-[#25D366] transition-colors hover:bg-[#25D366]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-auto">
+              <Settings2 className="h-3.5 w-3.5" /> Configurar lembretes
+            </Link>
+          </div>
         </CardContent>
       </Card>
 
