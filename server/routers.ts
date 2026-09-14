@@ -28,6 +28,14 @@ import { idsDuplicadosParaRemocao } from "./caixaDuplicidades";
 import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar } from "./contasPagarStatus";
 import { podeRegistrarMovimento } from "./financeIdempotency";
 
+function descricaoPagamentoConta(id: number, descricao: string): string {
+  return `Pagamento da conta #${id}: ${descricao}`;
+}
+
+function descricaoEstornoConta(id: number, descricao: string): string {
+  return `Estorno da conta #${id}: ${descricao}`;
+}
+
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
   contratoId: number;
@@ -3755,7 +3763,7 @@ const contasPagarRouter = router({
   pagar: protectedProcedure
     .input(z.object({
       id: z.number(),
-      contaCaixaId: z.number().optional(),
+      contaCaixaId: z.number().int().positive(),
       dataPagamento: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -3764,13 +3772,11 @@ const contasPagarRouter = router({
       const dataPagamentoBanco = dataPagamentoParaBanco(dataPag);
       if (db) {
         try {
-          const conta = await db.select().from(contasPagar).where(eq(contasPagar.id, input.id)).limit(1);
+          const conta = await db.select().from(contasPagar).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id))).limit(1);
           if (!conta[0]) throw new Error('Conta não encontrada');
           if (!statusPodeSerPago(conta[0].status)) throw new Error('Esta conta já foi processada');
-          await db.update(contasPagar).set({ status: 'paga', dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where(eq(contasPagar.id, input.id));
-          if (input.contaCaixaId) {
-            await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: conta[0].valor, descricao: `Pagamento: ${conta[0].descricao}`, dataTransacao: dataPag });
-          }
+          await db.update(contasPagar).set({ status: 'paga', dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id)));
+          await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: conta[0].valor, descricao: descricaoPagamentoConta(input.id, conta[0].descricao), dataTransacao: dataPag, userId: ctx.user.id });
           return { success: true };
         } catch (err: any) {
           if (err.message === 'Conta não encontrada') throw err;
@@ -3784,7 +3790,7 @@ const contasPagarRouter = router({
       if (!contaData) throw new Error('Conta não encontrada');
       if (!statusPodeSerPago(contaData.status)) throw new TRPCError({ code: 'CONFLICT', message: 'Esta conta já foi processada' });
 
-      const payloadPagamento = { data_pagamento: dataPagamentoBanco, conta_caixa_id: input.contaCaixaId ?? null };
+      const payloadPagamento = { data_pagamento: dataPagamentoBanco, conta_caixa_id: input.contaCaixaId };
       let { data: contaAtualizada, error: updateError } = await supabase
         .from('contas_pagar')
         .update({ status: 'paga', ...payloadPagamento })
@@ -3806,30 +3812,33 @@ const contasPagarRouter = router({
       if (updateError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateError.message });
       if (!contaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta conta já foi processada' });
 
-      if (input.contaCaixaId) {
-        const descricaoPagamento = `Pagamento: ${contaData.descricao}`;
-        const { data: lancamentoExistente, error: consultaErro } = await supabase
-          .from('transacoes_caixa')
-          .select('id')
-          .eq('conta_caixa_id', input.contaCaixaId)
-          .eq('user_id', ctx.user.id)
-          .eq('tipo', 'saida')
-          .eq('categoria', 'despesa_operacional')
-          .eq('descricao', descricaoPagamento)
-          .limit(1)
-          .maybeSingle();
-        if (consultaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: consultaErro.message });
-        if (!lancamentoExistente) {
-          const { error: transacaoErro } = await supabase.from('transacoes_caixa').insert({
-            conta_caixa_id: input.contaCaixaId,
-            tipo: 'saida',
-            categoria: 'despesa_operacional',
-            valor: contaData.valor,
-            descricao: descricaoPagamento,
-            data_transacao: dataPagamentoBanco,
-            user_id: ctx.user.id,
-          });
-          if (transacaoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: transacaoErro.message });
+      const descricaoPagamento = descricaoPagamentoConta(input.id, contaData.descricao);
+      const descricaoLegada = `Pagamento: ${contaData.descricao}`;
+      const { data: lancamentoExistente, error: consultaErro } = await supabase
+        .from('transacoes_caixa')
+        .select('id')
+        .eq('conta_caixa_id', input.contaCaixaId)
+        .eq('user_id', ctx.user.id)
+        .eq('tipo', 'saida')
+        .eq('categoria', 'despesa_operacional')
+        .in('descricao', [descricaoPagamento, descricaoLegada])
+        .limit(1)
+        .maybeSingle();
+      if (consultaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: consultaErro.message });
+      if (!lancamentoExistente) {
+        const { error: transacaoErro } = await supabase.from('transacoes_caixa').insert({
+          conta_caixa_id: input.contaCaixaId,
+          tipo: 'saida',
+          categoria: 'despesa_operacional',
+          valor: contaData.valor,
+          descricao: descricaoPagamento,
+          data_transacao: dataPagamentoBanco,
+          user_id: ctx.user.id,
+        });
+        if (transacaoErro) {
+          await supabase.from('contas_pagar').update({ status: contaData.status, data_pagamento: null, conta_caixa_id: null })
+            .eq('id', input.id).eq('user_id', ctx.user.id).in('status', ['paga', 'pago']);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: transacaoErro.message });
         }
       }
       return { success: true };
@@ -3840,26 +3849,86 @@ const contasPagarRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.update(contasPagar).set({ status: 'cancelada' }).where(eq(contasPagar.id, input.id)); return { success: true }; }
+        try { await db.update(contasPagar).set({ status: 'cancelada' }).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id), inArray(contasPagar.status, ['pendente', 'atrasada']))); return { success: true }; }
         catch (err) { console.warn('[contasPagar.cancelar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('contas_pagar').update({ status: 'cancelada' }).eq('id', input.id);
+      const { data, error } = await supabase.from('contas_pagar').update({ status: 'cancelada' })
+        .eq('id', input.id).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada']).select('id').maybeSingle();
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      if (!data) throw new TRPCError({ code: 'CONFLICT', message: 'Uma despesa paga deve ser estornada, não cancelada' });
       return { success: true };
     }),
+
+  estornar: protectedProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { data: conta, error: contaErro } = await supabase.from('contas_pagar')
+        .select('id, valor, descricao, status, conta_caixa_id')
+        .eq('id', input.id).eq('user_id', ctx.user.id).single();
+      if (contaErro || !conta) throw new TRPCError({ code: 'NOT_FOUND', message: 'Conta não encontrada' });
+      if (normalizarStatusContaPagar(conta.status) !== 'paga') throw new TRPCError({ code: 'CONFLICT', message: 'Apenas despesas pagas podem ser estornadas' });
+
+      const { data: contaEstornada, error: estornoErro } = await supabase.from('contas_pagar')
+        .update({ status: 'cancelada' }).eq('id', input.id).eq('user_id', ctx.user.id).in('status', ['paga', 'pago']).select('id').maybeSingle();
+      if (estornoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: estornoErro.message });
+      if (!contaEstornada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta despesa já foi estornada' });
+
+      if (conta.conta_caixa_id) {
+        const { error: transacaoErro } = await supabase.from('transacoes_caixa').insert({
+          conta_caixa_id: conta.conta_caixa_id, tipo: 'entrada', categoria: 'despesa_operacional', valor: conta.valor,
+          descricao: descricaoEstornoConta(input.id, conta.descricao), data_transacao: new Date().toISOString(), user_id: ctx.user.id,
+        });
+        if (transacaoErro) {
+          await supabase.from('contas_pagar').update({ status: 'paga' }).eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'cancelada');
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: transacaoErro.message });
+        }
+      }
+      return { success: true };
+    }),
+
+  sincronizarCaixa: protectedProcedure.mutation(async ({ ctx }) => {
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+    const { data: pagas, error: contasErro } = await supabase.from('contas_pagar')
+      .select('id, valor, descricao, conta_caixa_id, data_pagamento').eq('user_id', ctx.user.id).in('status', ['paga', 'pago']).not('conta_caixa_id', 'is', null);
+    if (contasErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contasErro.message });
+
+    let corrigidas = 0;
+    for (const conta of pagas ?? []) {
+      const descricao = descricaoPagamentoConta(conta.id, conta.descricao);
+      const descricaoLegada = `Pagamento: ${conta.descricao}`;
+      const { data: existente, error: existenteErro } = await supabase.from('transacoes_caixa')
+        .select('id').eq('user_id', ctx.user.id).eq('conta_caixa_id', conta.conta_caixa_id).eq('tipo', 'saida')
+        .eq('categoria', 'despesa_operacional').in('descricao', [descricao, descricaoLegada]).limit(1).maybeSingle();
+      if (existenteErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: existenteErro.message });
+      if (!existente) {
+        const { error: inserirErro } = await supabase.from('transacoes_caixa').insert({
+          conta_caixa_id: conta.conta_caixa_id, tipo: 'saida', categoria: 'despesa_operacional', valor: conta.valor,
+          descricao, data_transacao: conta.data_pagamento ?? new Date().toISOString(), user_id: ctx.user.id,
+        });
+        if (inserirErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: inserirErro.message });
+        corrigidas++;
+      }
+    }
+    return { success: true, corrigidas };
+  }),
 
   excluir: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.delete(contasPagar).where(eq(contasPagar.id, input.id)); return { success: true }; }
+        try { await db.delete(contasPagar).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id), eq(contasPagar.status, 'cancelada'), isNull(contasPagar.dataPagamento))); return { success: true }; }
         catch (err) { console.warn('[contasPagar.excluir] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('contas_pagar').delete().eq('id', input.id);
+      const { error } = await supabase.from('contas_pagar').delete().eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'cancelada').is('data_pagamento', null);
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { success: true };
     }),
 

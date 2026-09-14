@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { toast } from "sonner";
 import {
   Receipt, Plus, CheckCircle2, XCircle, AlertTriangle, Clock,
   Building2, Users, Zap, FileText, ShoppingCart, Megaphone, Monitor, MoreHorizontal,
-  Trash2, Check
+  Trash2, Check, Undo2
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 
@@ -52,6 +52,7 @@ export default function ContasPagar() {
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [dialogAberto, setDialogAberto] = useState(false);
   const [dialogPagarId, setDialogPagarId] = useState<number | null>(null);
+  const [dialogEstornarId, setDialogEstornarId] = useState<number | null>(null);
   const [contaCaixaIdPagar, setContaCaixaIdPagar] = useState<string>("");
 
   // Form state
@@ -71,6 +72,22 @@ export default function ContasPagar() {
     filtroStatus !== "todos" ? { status: filtroStatus as 'pendente' | 'paga' | 'atrasada' | 'cancelada' } : undefined
   );
   const { data: contasCaixa } = trpc.caixa.contas.useQuery();
+
+  const sincronizarMutation = trpc.contasPagar.sincronizarCaixa.useMutation({
+    onSuccess: (resultado) => {
+      if (resultado.corrigidas > 0) {
+        utils.caixa.contas.invalidate();
+        utils.caixa.transacoes.invalidate();
+        utils.dashboard.kpis.invalidate();
+      }
+    },
+  });
+
+  useEffect(() => {
+    sincronizarMutation.mutate();
+    // A procedure é idempotente e executa uma vez ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const criarMutation = trpc.contasPagar.criar.useMutation({
     onSuccess: () => {
@@ -92,6 +109,19 @@ export default function ContasPagar() {
       utils.dashboard.kpis.invalidate();
       setDialogPagarId(null);
       toast.success(t('toast_success.conta_marcada_como_paga'));
+    },
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
+  });
+
+  const estornarMutation = trpc.contasPagar.estornar.useMutation({
+    onSuccess: () => {
+      utils.contasPagar.listar.invalidate();
+      utils.contasPagar.resumo.invalidate();
+      utils.caixa.contas.invalidate();
+      utils.caixa.transacoes.invalidate();
+      utils.dashboard.kpis.invalidate();
+      setDialogEstornarId(null);
+      toast.success("Despesa estornada e valor devolvido ao Caixa");
     },
     onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
@@ -130,9 +160,13 @@ export default function ContasPagar() {
   }
 
   function handlePagar(id: number) {
+    if (!contaCaixaIdPagar) {
+      toast.error("Selecione a conta de Caixa que realizou o pagamento");
+      return;
+    }
     pagarMutation.mutate({
       id,
-      contaCaixaId: contaCaixaIdPagar ? parseInt(contaCaixaIdPagar) : undefined,
+      contaCaixaId: parseInt(contaCaixaIdPagar),
     });
   }
 
@@ -345,7 +379,10 @@ export default function ContasPagar() {
                   {/* Ações */}
                   {(conta.status === "pendente" || conta.status === "atrasada") && (
                     <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
-                      <Dialog open={dialogPagarId === conta.id} onOpenChange={(open) => { setDialogPagarId(open ? conta.id : null); setContaCaixaIdPagar(""); }}>
+                      <Dialog open={dialogPagarId === conta.id} onOpenChange={(open) => {
+                        setDialogPagarId(open ? conta.id : null);
+                        setContaCaixaIdPagar(open && contasCaixa?.length === 1 ? String(contasCaixa[0].id) : "");
+                      }}>
                         <DialogTrigger asChild>
                           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1">
                             <Check className="h-3.5 w-3.5 mr-1.5" />
@@ -360,7 +397,7 @@ export default function ContasPagar() {
                             <p className="text-sm text-muted-foreground">{conta.descricao}</p>
                             <p className="text-2xl font-bold">{formatarMoeda(parseFloat(conta.valor))}</p>
                             <div className="space-y-1.5">
-                              <Label>Conta de Caixa (opcional)</Label>
+                              <Label>Conta de Caixa *</Label>
                               <Select value={contaCaixaIdPagar} onValueChange={setContaCaixaIdPagar}>
                                 <SelectTrigger className="bg-background border-border">
                                   <SelectValue placeholder="Selecionar conta..." />
@@ -375,7 +412,7 @@ export default function ContasPagar() {
                             <Button
                               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                               onClick={() => handlePagar(conta.id)}
-                              disabled={pagarMutation.isPending}
+                              disabled={!contaCaixaIdPagar || pagarMutation.isPending}
                             >
                               Confirmar Pagamento
                             </Button>
@@ -392,7 +429,33 @@ export default function ContasPagar() {
                       </Button>
                     </div>
                   )}
-                  {conta.status === "cancelada" && (
+                  {conta.status === "paga" && (
+                    <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
+                      <Dialog open={dialogEstornarId === conta.id} onOpenChange={(open) => setDialogEstornarId(open ? conta.id : null)}>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
+                            <Undo2 className="h-3.5 w-3.5 mr-1.5" />
+                            Estornar Pagamento
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="bg-card border-border max-w-sm">
+                          <DialogHeader><DialogTitle>Estornar despesa paga?</DialogTitle></DialogHeader>
+                          <div className="space-y-4 py-2">
+                            <p className="text-sm text-muted-foreground">
+                              O sistema criará uma entrada de {formatarMoeda(parseFloat(conta.valor))} na mesma conta de Caixa e manterá o histórico financeiro.
+                            </p>
+                            <div className="flex gap-2">
+                              <Button variant="outline" className="flex-1" onClick={() => setDialogEstornarId(null)}>Voltar</Button>
+                              <Button className="flex-1 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => estornarMutation.mutate({ id: conta.id })} disabled={estornarMutation.isPending}>
+                                {estornarMutation.isPending ? "Estornando..." : "Confirmar Estorno"}
+                              </Button>
+                            </div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  )}
+                  {conta.status === "cancelada" && !conta.dataPagamento && (
                     <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
                       <Button
                         size="sm"
