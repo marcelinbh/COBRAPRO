@@ -113,6 +113,22 @@ export default function DashboardLayout({
   });
   const { loading, user } = useAuth();
   const isMobile = useIsMobile();
+  const utils = trpc.useUtils();
+  const sincronizarCaixa = trpc.contasPagar.sincronizarCaixa.useMutation({
+    onSuccess: (resultado) => {
+      if (resultado.corrigidas > 0) {
+        utils.caixa.contas.invalidate();
+        utils.caixa.transacoes.invalidate();
+        utils.dashboard.kpis.invalidate();
+      }
+    },
+  });
+
+  useEffect(() => {
+    if (!loading && user) sincronizarCaixa.mutate();
+    // A rotina é idempotente; a execução ocorre uma vez por login/sessão.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, user?.id]);
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
