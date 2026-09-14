@@ -127,7 +127,7 @@ async function startServer() {
   });
 
   // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
-  // Chamado uma vez por minuto pelo agendamento da plataforma e filtrado pelo horário
+  // Chamado a cada cinco minutos pelo agendamento externo e filtrado pelo horário
   // escolhido por cada assinante, no fuso horário de Brasília.
   app.post('/api/scheduled/notificacoes', async (req, res) => {
     try {
@@ -145,6 +145,8 @@ async function startServer() {
         return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
       }
 
+      const dryRun = req.body?.dryRun === true;
+
       const sb = await getSupabaseClientAsync();
       if (!sb) return res.status(500).json({ error: 'DB indisponível' });
 
@@ -160,6 +162,7 @@ async function startServer() {
       }
 
       let totalEnviados = 0;
+      let totalElegiveis = 0;
       let usuariosNoHorario = 0;
       const agora = new Date();
       const dataHoje = obterDataBrasilia(agora);
@@ -227,6 +230,9 @@ async function startServer() {
               total_parcelas: parcela.contratos?.numero_parcelas,
             });
 
+            totalElegiveis++;
+            if (dryRun) continue;
+
             const resultado = await enviarWhatsAppAutomatico(userId, telefone, mensagem);
             const { error: logError } = await sb.from('notificacoes_log').insert({
               user_id: userId,
@@ -244,7 +250,7 @@ async function startServer() {
         }
       }
 
-      res.json({ success: true, enviados: totalEnviados, processados: usuariosNoHorario, data: dataHoje });
+      res.json({ success: true, dryRun, enviados: totalEnviados, elegiveis: totalElegiveis, processados: usuariosNoHorario, data: dataHoje });
     } catch (err) {
       console.error('[scheduled/notificacoes] Erro:', err);
       res.status(500).json({ error: String(err) });
