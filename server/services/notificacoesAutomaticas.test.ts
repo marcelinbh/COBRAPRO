@@ -16,7 +16,9 @@ describe("notificacoesAutomaticas", () => {
     expect(obterDataBrasilia(noveHorasEmBrasilia)).toBe("2026-09-14");
     expect(obterHorarioBrasilia(noveHorasEmBrasilia)).toBe("09:00");
     expect(deveExecutarNoHorario("09:00", noveHorasEmBrasilia)).toBe(true);
-    expect(deveExecutarNoHorario("08:59", noveHorasEmBrasilia)).toBe(false);
+    expect(deveExecutarNoHorario("08:55", noveHorasEmBrasilia)).toBe(false);
+    expect(deveExecutarNoHorario("09:00", new Date("2026-09-14T12:04:59.000Z"))).toBe(true);
+    expect(deveExecutarNoHorario("09:00", new Date("2026-09-14T12:05:00.000Z"))).toBe(false);
   });
 
   it("calcula corretamente lembretes de três dias antes e do próprio vencimento", () => {

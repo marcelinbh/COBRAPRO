@@ -195,6 +195,7 @@ export default function NotificacoesAutomaticas() {
                 <Input
                   id="horario-automacao"
                   type="time"
+                  step="300"
                   value={horario}
                   onChange={(event) => setHorario(event.target.value)}
                   disabled={loadingAutomacao || salvarAutomacao.isPending}

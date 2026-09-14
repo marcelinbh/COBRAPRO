@@ -160,7 +160,12 @@ export const notificacoesRouter = router({
   }),
 
   salvarAutomacao: protectedProcedure
-    .input(z.object({ ativo: z.boolean(), horario: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Formato HH:MM") }))
+    .input(z.object({
+      ativo: z.boolean(),
+      horario: z.string()
+        .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Formato HH:MM")
+        .refine((horario) => Number(horario.slice(3)) % 5 === 0, "Escolha um horário em intervalos de 5 minutos"),
+    }))
     .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });

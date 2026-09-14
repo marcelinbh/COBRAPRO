@@ -11,6 +11,7 @@ import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
+import { possuiSegredoDeAutomacaoValido, possuiTokenGithubActionsValido } from "../services/cronAuth";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -107,6 +108,24 @@ async function startServer() {
     res.json(results);
   });
 
+  async function autenticarDisparadorDeAutomacao(req: express.Request): Promise<boolean> {
+    if (possuiSegredoDeAutomacaoValido(req)) return true;
+    if (await possuiTokenGithubActionsValido(req)) return true;
+    try {
+      const cronUser = await sdk.authenticateRequest(req);
+      return Boolean(cronUser.isCron && cronUser.taskUid);
+    } catch {
+      return false;
+    }
+  }
+
+  app.post('/api/scheduled/notificacoes/health', async (req, res) => {
+    if (!(await autenticarDisparadorDeAutomacao(req))) {
+      return res.status(403).json({ ok: false, error: 'Acesso exclusivo para automação autorizada' });
+    }
+    return res.json({ ok: true, service: 'notificacoes-automaticas' });
+  });
+
   // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
   // Chamado uma vez por minuto pelo agendamento da plataforma e filtrado pelo horário
   // escolhido por cada assinante, no fuso horário de Brasília.
@@ -122,8 +141,9 @@ async function startServer() {
         obterDataBrasilia,
       } = await import('../services/notificacoesAutomaticas');
 
-      const cronUser = await sdk.authenticateRequest(req);
-      if (!cronUser.isCron || !cronUser.taskUid) return res.status(403).json({ error: 'Acesso exclusivo para tarefa agendada' });
+      if (!(await autenticarDisparadorDeAutomacao(req))) {
+        return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
+      }
 
       const sb = await getSupabaseClientAsync();
       if (!sb) return res.status(500).json({ error: 'DB indisponível' });

@@ -57,7 +57,12 @@ export function obterHorarioBrasilia(now: Date = new Date()): string {
 }
 
 export function deveExecutarNoHorario(horario: string, now: Date = new Date()): boolean {
-  return obterHorarioBrasilia(now) === horario;
+  const [horaProgramada, minutoProgramado] = horario.split(":").map(Number);
+  if (!Number.isInteger(horaProgramada) || !Number.isInteger(minutoProgramado)) return false;
+  const parts = partesEmBrasilia(now);
+  const minutoAtual = Number(parts.hour) * 60 + Number(parts.minute);
+  const minutoAlvo = horaProgramada * 60 + minutoProgramado;
+  return minutoAtual >= minutoAlvo && minutoAtual < minutoAlvo + 5;
 }
 
 export function calcularDataAlvoBrasilia(diasAntes: number, now: Date = new Date()): string {
