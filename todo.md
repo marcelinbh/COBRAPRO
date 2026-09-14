@@ -1196,3 +1196,13 @@
 ## Fase 64: Recuperação de Hospedagem
 - [x] Reativar os recursos de hospedagem do CobraPro após a regularização do saldo no DigitalOcean
 - [x] Confirmar o retorno de cobrapro.online antes de publicar a correção de Caixa
+
+## Fase 65: Automação de WhatsApp para Vencimentos
+- [x] Comparar Evolution API com a API oficial do WhatsApp e definir a integração do CobraPro
+- [x] Mapear a conexão atual do WhatsApp e as regras de parcelas elegíveis
+- [x] Criar configurações por assinante para ativar, desativar e personalizar os lembretes
+- [x] Registrar cada envio e bloquear mensagens duplicadas por parcela e tipo de lembrete
+- [x] Implementar lembrete automático três dias antes do vencimento
+- [x] Implementar lembrete automático no dia do vencimento
+- [ ] Programar execução diária confiável e criar testes de regressão
+- [ ] Configurar gatilho autenticado que execute a rotina no cobrapro.online, e não apenas no ambiente de desenvolvimento

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
 import { ENV } from "../_core/env";
+import { calcularDataAlvoBrasilia, inicioDoDiaBrasilia, obterDataBrasilia } from "../services/notificacoesAutomaticas";
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export type TipoNotificacao =
@@ -143,6 +144,39 @@ export const notificacoesRouter = router({
       return { success: true };
     }),
 
+  getAutomacao: protectedProcedure.query(async ({ ctx }) => {
+    const sb = await getSupabaseClientAsync();
+    if (!sb) return { ativo: false, horario: "09:00" };
+    const { data } = await sb
+      .from("configuracoes")
+      .select("chave, valor")
+      .eq("user_id", ctx.user.id)
+      .in("chave", ["notificacoes_auto_ativo", "notificacoes_auto_horario"]);
+    const configuracoes = Object.fromEntries((data ?? []).map((row: { chave: string; valor: string }) => [row.chave, row.valor]));
+    return {
+      ativo: configuracoes.notificacoes_auto_ativo === "true",
+      horario: configuracoes.notificacoes_auto_horario || "09:00",
+    };
+  }),
+
+  salvarAutomacao: protectedProcedure
+    .input(z.object({
+      ativo: z.boolean(),
+      horario: z.string()
+        .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Formato HH:MM")
+        .refine((horario) => Number(horario.slice(3)) % 5 === 0, "Escolha um horário em intervalos de 5 minutos"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const sb = await getSupabaseClientAsync();
+      if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
+      const { error } = await sb.from("configuracoes").upsert([
+        { chave: "notificacoes_auto_ativo", valor: String(input.ativo), user_id: ctx.user.id },
+        { chave: "notificacoes_auto_horario", valor: input.horario, user_id: ctx.user.id },
+      ], { onConflict: "chave,user_id" });
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+      return { success: true };
+    }),
+
   // Salvar/atualizar uma regra (mensagem + ativo)
   salvar: protectedProcedure
     .input(z.object({
@@ -272,16 +306,12 @@ export const notificacoesRouter = router({
       .eq("chave", "nomeEmpresa").eq("user_id", ctx.user.id).maybeSingle();
     const nomeEmpresa = empresaConfig?.valor || "Empresa";
 
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    const agora = new Date();
     let enviados = 0;
 
     for (const regra of regras as { tipo: string; dias_antes: number; mensagem_template: string }[]) {
-      // Calcular a data alvo
-      const dataAlvo = new Date(hoje);
-      dataAlvo.setDate(dataAlvo.getDate() + regra.dias_antes); // dias_antes positivo = antes, negativo = depois
-
-      const dataAlvoStr = dataAlvo.toISOString().split("T")[0];
+      // Usa o calendário de Brasília, independentemente de onde o servidor esteja hospedado.
+      const dataAlvoStr = calcularDataAlvoBrasilia(regra.dias_antes, agora);
 
       // Buscar parcelas com vencimento na data alvo, não pagas
       const { data: parcelas } = await sb.from("parcelas")
@@ -310,7 +340,7 @@ export const notificacoesRouter = router({
           .eq("user_id", ctx.user.id)
           .eq("parcela_id", parcela.id)
           .eq("tipo", regra.tipo)
-          .gte("createdAt", hoje.toISOString())
+          .gte("createdAt", inicioDoDiaBrasilia(obterDataBrasilia(agora)))
           .maybeSingle();
 
         if (logExistente) continue; // Já enviado hoje

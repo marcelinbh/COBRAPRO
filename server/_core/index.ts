@@ -10,6 +10,8 @@ import { registerWebhookRoutes } from "../webhookRoutes";
 import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import { sdk } from "./sdk";
+import { possuiSegredoDeAutomacaoValido, possuiTokenGithubActionsValido } from "../services/cronAuth";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -106,23 +108,44 @@ async function startServer() {
     res.json(results);
   });
 
+  async function autenticarDisparadorDeAutomacao(req: express.Request): Promise<boolean> {
+    if (possuiSegredoDeAutomacaoValido(req)) return true;
+    if (await possuiTokenGithubActionsValido(req)) return true;
+    try {
+      const cronUser = await sdk.authenticateRequest(req);
+      return Boolean(cronUser.isCron && cronUser.taskUid);
+    } catch {
+      return false;
+    }
+  }
+
+  app.post('/api/scheduled/notificacoes/health', async (req, res) => {
+    if (!(await autenticarDisparadorDeAutomacao(req))) {
+      return res.status(403).json({ ok: false, error: 'Acesso exclusivo para automação autorizada' });
+    }
+    return res.json({ ok: true, service: 'notificacoes-automaticas' });
+  });
+
   // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
-  // Chamado pela scheduled task do Manus diariamente
-  // Autentica via cookie app_session_id (injetado automaticamente pela plataforma)
+  // Chamado a cada cinco minutos pelo agendamento externo e filtrado pelo horário
+  // escolhido por cada assinante, no fuso horário de Brasília.
   app.post('/api/scheduled/notificacoes', async (req, res) => {
     try {
-      const { parse: parseCookieHeader } = await import('cookie');
-      const { jwtVerify } = await import('jose');
       const { getSupabaseClientAsync } = await import('../db');
-      const { substituirVariaveis, TIPOS_NOTIFICACAO } = await import('../routers/notificacoes');
-      const { ENV } = await import('./env');
+      const { substituirVariaveis } = await import('../routers/notificacoes');
+        const {
+        calcularDataAlvoBrasilia,
+        deveExecutarNoHorario,
+        enviarWhatsAppAutomatico,
+        inicioDoDiaBrasilia,
+        obterDataBrasilia,
+      } = await import('../services/notificacoesAutomaticas');
 
-      // Verificar autenticação via cookie
-      const cookies = parseCookieHeader(req.headers.cookie || '');
-      const sessionCookie = cookies['app_session_id'];
-      if (!sessionCookie) {
-        return res.status(401).json({ error: 'Não autenticado' });
+      if (!(await autenticarDisparadorDeAutomacao(req))) {
+        return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
       }
+
+      const dryRun = req.body?.dryRun === true;
 
       const sb = await getSupabaseClientAsync();
       if (!sb) return res.status(500).json({ error: 'DB indisponível' });
@@ -139,8 +162,10 @@ async function startServer() {
       }
 
       let totalEnviados = 0;
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
+      let totalElegiveis = 0;
+      let usuariosNoHorario = 0;
+      const agora = new Date();
+      const dataHoje = obterDataBrasilia(agora);
 
       for (const cfg of configsAtivos) {
         const userId = cfg.user_id;
@@ -155,18 +180,19 @@ async function startServer() {
         if (!regras || regras.length === 0) continue;
 
         // Pegar nome da empresa
-        const { data: empresaConfig } = await sb
+        const { data: configuracoesUsuario } = await sb
           .from('configuracoes')
-          .select('valor')
-          .eq('chave', 'nomeEmpresa')
-          .eq('user_id', userId)
-          .maybeSingle();
-        const nomeEmpresa = empresaConfig?.valor || 'Empresa';
+          .select('chave, valor')
+          .in('chave', ['nomeEmpresa', 'notificacoes_auto_horario'])
+          .eq('user_id', userId);
+        const configuracoes = Object.fromEntries((configuracoesUsuario || []).map((item: { chave: string; valor: string }) => [item.chave, item.valor]));
+        const horario = configuracoes.notificacoes_auto_horario || '09:00';
+        if (!deveExecutarNoHorario(horario, agora)) continue;
+        usuariosNoHorario++;
+        const nomeEmpresa = configuracoes.nomeEmpresa || 'Empresa';
 
         for (const regra of regras as { tipo: string; dias_antes: number; mensagem_template: string }[]) {
-          const dataAlvo = new Date(hoje);
-          dataAlvo.setDate(dataAlvo.getDate() + regra.dias_antes);
-          const dataAlvoStr = dataAlvo.toISOString().split('T')[0];
+          const dataAlvoStr = calcularDataAlvoBrasilia(regra.dias_antes, agora);
 
           const { data: parcelasData } = await sb
             .from('parcelas')
@@ -190,7 +216,7 @@ async function startServer() {
               .eq('user_id', userId)
               .eq('parcela_id', parcela.id)
               .eq('tipo', regra.tipo)
-              .gte('createdAt', hoje.toISOString())
+              .gte('createdAt', inicioDoDiaBrasilia(dataHoje))
               .maybeSingle();
             if (logExistente) continue;
 
@@ -204,42 +230,27 @@ async function startServer() {
               total_parcelas: parcela.contratos?.numero_parcelas,
             });
 
-            // Enviar via Evolution API
-            const evoUrl = ENV.evolutionApiUrl.replace(/\/$/, '');
-            const evoKey = ENV.evolutionApiKey;
-            const instanceName = `user-${userId}`;
-            let phone = telefone.replace(/\D/g, '');
-            if (!phone.startsWith('55')) phone = '55' + phone;
+            totalElegiveis++;
+            if (dryRun) continue;
 
-            try {
-              const sendRes = await fetch(`${evoUrl}/message/sendText/${instanceName}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', apikey: evoKey },
-                body: JSON.stringify({ number: phone + '@s.whatsapp.net', textMessage: { text: mensagem } }),
-                signal: AbortSignal.timeout(10000),
-              });
-              const ok = sendRes.ok;
-
-              await sb.from('notificacoes_log').insert({
-                user_id: userId,
-                parcela_id: parcela.id,
-                cliente_id: cliente.id,
-                tipo: regra.tipo,
-                telefone,
-                mensagem,
-                status: ok ? 'enviado' : 'erro',
-                erro: ok ? null : 'Falha no envio',
-              });
-
-              if (ok) totalEnviados++;
-            } catch (e) {
-              console.error('[scheduled/notificacoes] Erro ao enviar:', e);
-            }
+            const resultado = await enviarWhatsAppAutomatico(userId, telefone, mensagem);
+            const { error: logError } = await sb.from('notificacoes_log').insert({
+              user_id: userId,
+              parcela_id: parcela.id,
+              cliente_id: cliente.id,
+              tipo: regra.tipo,
+              telefone,
+              mensagem,
+              status: resultado.ok ? 'enviado' : 'erro',
+              erro: resultado.ok ? null : resultado.erro,
+            });
+            if (logError) console.error('[scheduled/notificacoes] Erro ao registrar envio:', logError.message);
+            if (resultado.ok) totalEnviados++;
           }
         }
       }
 
-      res.json({ success: true, enviados: totalEnviados, processados: configsAtivos.length });
+      res.json({ success: true, dryRun, enviados: totalEnviados, elegiveis: totalElegiveis, processados: usuariosNoHorario, data: dataHoje });
     } catch (err) {
       console.error('[scheduled/notificacoes] Erro:', err);
       res.status(500).json({ error: String(err) });

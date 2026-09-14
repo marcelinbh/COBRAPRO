@@ -1,12 +1,13 @@
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -41,15 +42,22 @@ export default function NotificacoesAutomaticas() {
   const { t, i18n } = useTranslation();
   const [editando, setEditando] = useState<{ tipo: string; mensagem: string } | null>(null);
   const [disparando, setDisparando] = useState(false);
+  const [horario, setHorario] = useState("09:00");
 
   const utils = trpc.useUtils();
 
   const { data: globalAtivo, isLoading: loadingGlobal } = trpc.notificacoes.getGlobalAtivo.useQuery();
+  const { data: automacao, isLoading: loadingAutomacao } = trpc.notificacoes.getAutomacao.useQuery();
   const { data: regras, isLoading: loadingRegras } = trpc.notificacoes.listar.useQuery();
   const { data: historico, isLoading: loadingHistorico } = trpc.notificacoes.historico.useQuery({ limit: 50 });
 
-  const setGlobal = trpc.notificacoes.setGlobalAtivo.useMutation({
-    onSuccess: () => utils.notificacoes.getGlobalAtivo.invalidate(),
+  const salvarAutomacao = trpc.notificacoes.salvarAutomacao.useMutation({
+    onSuccess: () => {
+      utils.notificacoes.getGlobalAtivo.invalidate();
+      utils.notificacoes.getAutomacao.invalidate();
+      toast.success("Automação de WhatsApp atualizada.");
+    },
+    onError: (erro) => toast.error(erro.message),
   });
 
   const toggle = trpc.notificacoes.toggle.useMutation({
@@ -82,8 +90,16 @@ export default function NotificacoesAutomaticas() {
     },
   });
 
-  const handleToggleGlobal = (val: boolean) => {
-    setGlobal.mutate({ ativo: val });
+  useEffect(() => {
+    if (automacao?.horario) setHorario(automacao.horario);
+  }, [automacao?.horario]);
+
+  const handleToggleGlobal = (ativo: boolean) => {
+    salvarAutomacao.mutate({ ativo, horario });
+  };
+
+  const handleSalvarHorario = () => {
+    salvarAutomacao.mutate({ ativo: globalAtivo ?? false, horario });
   };
 
   const handleToggleRegra = (tipo: string, ativo: boolean) => {
@@ -166,9 +182,29 @@ export default function NotificacoesAutomaticas() {
               <Switch
                 checked={globalAtivo ?? false}
                 onCheckedChange={handleToggleGlobal}
-                disabled={loadingGlobal || setGlobal.isPending}
+                disabled={loadingGlobal || loadingAutomacao || salvarAutomacao.isPending}
                 className="scale-125"
               />
+            </div>
+            <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <Label htmlFor="horario-automacao" className="text-sm font-medium">Horário do envio</Label>
+                <p className="mt-1 text-xs text-muted-foreground">Os lembretes ativos serão enviados diariamente neste horário de Brasília.</p>
+              </div>
+              <div className="flex w-full gap-2 sm:w-auto">
+                <Input
+                  id="horario-automacao"
+                  type="time"
+                  step="300"
+                  value={horario}
+                  onChange={(event) => setHorario(event.target.value)}
+                  disabled={loadingAutomacao || salvarAutomacao.isPending}
+                  className="w-full sm:w-32"
+                />
+                <Button variant="outline" size="sm" onClick={handleSalvarHorario} disabled={loadingAutomacao || salvarAutomacao.isPending}>
+                  Salvar horário
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
