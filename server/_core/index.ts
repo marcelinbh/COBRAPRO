@@ -159,10 +159,6 @@ async function startServer() {
         .eq('chave', 'notificacoes_auto_ativo')
         .eq('valor', 'true');
 
-      if (!configsAtivos || configsAtivos.length === 0) {
-        return res.json({ processados: 0, mensagem: 'Nenhum usuário com notificações ativas' });
-      }
-
       let totalEnviados = 0;
       let totalElegiveis = 0;
       let usuariosNoHorario = 0;
@@ -172,7 +168,7 @@ async function startServer() {
       const agora = new Date();
       const dataHoje = obterDataBrasilia(agora);
 
-      for (const cfg of configsAtivos) {
+      for (const cfg of configsAtivos || []) {
         const userId = cfg.user_id;
 
         // Buscar regras ativas do usuário
