@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Validar sem enviar mensagens"
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -15,6 +21,8 @@ jobs:
     timeout-minutes: 2
     steps:
       - name: Acionar lembretes elegíveis
+        env:
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
         run: |
           OIDC_TOKEN="$(curl --fail --silent --show-error \
             -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
@@ -25,4 +33,4 @@ jobs:
             --request POST "https://cobrapro.online/api/scheduled/notificacoes" \
             --header "Authorization: Bearer ${OIDC_TOKEN}" \
             --header "Content-Type: application/json" \
-            --data '{}'
+            --data "{\"dryRun\": ${DRY_RUN}}"
