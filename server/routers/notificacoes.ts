@@ -3,7 +3,12 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
 import { ENV } from "../_core/env";
-import { calcularDataAlvoBrasilia, inicioDoDiaBrasilia, obterDataBrasilia } from "../services/notificacoesAutomaticas";
+import {
+  calcularDataAlvoBrasilia,
+  criarPayloadTextoEvolution,
+  inicioDoDiaBrasilia,
+  obterDataBrasilia,
+} from "../services/notificacoesAutomaticas";
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────────
 export type TipoNotificacao =
@@ -90,7 +95,7 @@ async function enviarWhatsApp(userId: number, telefone: string, mensagem: string
       {
         method: "POST",
         headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
-        body: JSON.stringify({ number: phone + "@s.whatsapp.net", textMessage: { text: mensagem } }),
+        body: JSON.stringify(criarPayloadTextoEvolution(phone, mensagem)),
       }
     );
     const data = await res.json() as { error?: string; message?: string };
@@ -308,6 +313,8 @@ export const notificacoesRouter = router({
 
     const agora = new Date();
     let enviados = 0;
+    let elegiveis = 0;
+    let erros = 0;
 
     for (const regra of regras as { tipo: string; dias_antes: number; mensagem_template: string }[]) {
       // Usa o calendário de Brasília, independentemente de onde o servidor esteja hospedado.
@@ -340,10 +347,13 @@ export const notificacoesRouter = router({
           .eq("user_id", ctx.user.id)
           .eq("parcela_id", parcela.id)
           .eq("tipo", regra.tipo)
+          .eq("status", "enviado")
           .gte("createdAt", inicioDoDiaBrasilia(obterDataBrasilia(agora)))
           .maybeSingle();
 
         if (logExistente) continue; // Já enviado hoje
+
+        elegiveis++;
 
         const mensagem = substituirVariaveis(regra.mensagem_template, {
           nome: cliente.nome,
@@ -370,9 +380,17 @@ export const notificacoesRouter = router({
         });
 
         if (resultado.ok) enviados++;
+        else erros++;
       }
     }
 
-    return { enviados, mensagem: `${enviados} mensagem(ns) enviada(s)` };
+    return {
+      enviados,
+      elegiveis,
+      erros,
+      mensagem: erros > 0
+        ? `${enviados} enviada(s), ${erros} falha(s). Consulte o Histórico para ver o motivo.`
+        : `${enviados} mensagem(ns) enviada(s)`,
+    };
   }),
 });

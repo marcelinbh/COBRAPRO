@@ -160,9 +160,7 @@ export const whatsappEvolutionRouter = router({
       // Format phone number: remove non-digits, add 55 if needed
       let phone = input.phone.replace(/\D/g, '');
       if (!phone.startsWith('55')) phone = '55' + phone;
-      if (!phone.endsWith('@s.whatsapp.net')) phone = phone + '@s.whatsapp.net';
-
-      // v1.8.x format: textMessage wrapper
+      // A Evolution API recebe o número em formato internacional, somente dígitos.
       const result = await evolutionRequest(config, 'POST', '/message/sendText/{instance}', {
         number: phone,
         textMessage: { text: input.message },

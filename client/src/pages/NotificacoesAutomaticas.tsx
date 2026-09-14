@@ -80,7 +80,8 @@ export default function NotificacoesAutomaticas() {
 
   const disparar = trpc.notificacoes.dispararDoDia.useMutation({
     onSuccess: (data) => {
-      toast.success(data.mensagem);
+      if ((data.erros ?? 0) > 0) toast.error(data.mensagem);
+      else toast.success(data.mensagem);
       utils.notificacoes.historico.invalidate();
       setDisparando(false);
     },

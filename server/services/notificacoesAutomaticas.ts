@@ -81,6 +81,14 @@ export function normalizarTelefoneWhatsApp(telefone: string): string {
   return digits;
 }
 
+/** A Evolution API recebe somente dígitos no campo `number`, sem o sufixo JID. */
+export function criarPayloadTextoEvolution(telefone: string, mensagem: string) {
+  return {
+    number: normalizarTelefoneWhatsApp(telefone),
+    textMessage: { text: mensagem },
+  };
+}
+
 export async function enviarWhatsAppAutomatico(
   userId: number,
   telefone: string,
@@ -103,10 +111,7 @@ export async function enviarWhatsAppAutomatico(
     const response = await fetch(`${evolutionUrl}/message/sendText/${instanceName}`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: evolutionApiKey },
-      body: JSON.stringify({
-        number: `${normalizarTelefoneWhatsApp(telefone)}@s.whatsapp.net`,
-        textMessage: { text: mensagem },
-      }),
+      body: JSON.stringify(criarPayloadTextoEvolution(telefone, mensagem)),
       signal: AbortSignal.timeout(12_000),
     });
     const body = (await response.json().catch(() => ({}))) as { error?: string; message?: string };

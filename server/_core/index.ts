@@ -217,6 +217,7 @@ async function startServer() {
               .eq('user_id', userId)
               .eq('parcela_id', parcela.id)
               .eq('tipo', regra.tipo)
+              .eq('status', 'enviado')
               .gte('createdAt', inicioDoDiaBrasilia(dataHoje))
               .maybeSingle();
             if (logExistente) continue;

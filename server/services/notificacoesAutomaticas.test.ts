@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calcularDataAlvoBrasilia,
+  criarPayloadTextoEvolution,
   deveExecutarNoHorario,
   inicioDoDiaBrasilia,
   normalizarTelefoneWhatsApp,
@@ -46,5 +47,12 @@ describe("notificacoesAutomaticas", () => {
   it("normaliza telefones brasileiros para a Evolution API", () => {
     expect(normalizarTelefoneWhatsApp("(31) 99746-6817")).toBe("5531997466817");
     expect(normalizarTelefoneWhatsApp("5531997466817")).toBe("5531997466817");
+  });
+
+  it("monta o payload da Evolution API com número internacional sem sufixo JID", () => {
+    expect(criarPayloadTextoEvolution("(31) 99746-6817", "Olá!")).toEqual({
+      number: "5531997466817",
+      textMessage: { text: "Olá!" },
+    });
   });
 });
