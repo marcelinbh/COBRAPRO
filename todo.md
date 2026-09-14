@@ -1181,3 +1181,18 @@
 - [x] Menu lateral: item "Blacklist" com ícone
 - [x] Testes Vitest para procedures de blacklist (14 testes passando)
 - [x] Checkpoint e deploy
+
+## Fase 62: Criação Manual de Conta
+- [x] Criar conta limpa para solucoesunicredi@gmail.com e validar o login
+
+## Fase 63: Integridade do Caixa e Despesas
+- [x] Auditar divergências entre saldo das contas e movimentações financeiras da Ultra Credi
+- [x] Garantir atualização automática do Caixa, sem depender de ajustes manuais recorrentes
+- [x] Corrigir o lançamento de despesas para refletir o débito exatamente uma vez no Caixa
+- [x] Implementar estorno/exclusão segura de despesa com reversão financeira auditável
+- [x] Adicionar testes de regressão para entradas, saídas, ajustes e estornos de Caixa
+- [ ] Validar saldos existentes e corrigir inconsistências identificadas com trilha de auditoria
+
+## Fase 64: Recuperação de Hospedagem
+- [x] Reativar os recursos de hospedagem do CobraPro após a regularização do saldo no DigitalOcean
+- [x] Confirmar o retorno de cobrapro.online antes de publicar a correção de Caixa
