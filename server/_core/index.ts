@@ -133,6 +133,7 @@ async function startServer() {
     try {
       const { getSupabaseClientAsync } = await import('../db');
       const { substituirVariaveis } = await import('../routers/notificacoes');
+      const { gerarMensagemRelatorio } = await import('../routers/relatorioDiario');
         const {
         calcularDataAlvoBrasilia,
         deveExecutarNoHorario,
@@ -140,6 +141,7 @@ async function startServer() {
         inicioDoDiaBrasilia,
         obterDataBrasilia,
       } = await import('../services/notificacoesAutomaticas');
+      const { deveEnviarRelatorioDiario } = await import('../services/relatorioDiarioAutomatico');
 
       if (!(await autenticarDisparadorDeAutomacao(req))) {
         return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
@@ -164,6 +166,9 @@ async function startServer() {
       let totalEnviados = 0;
       let totalElegiveis = 0;
       let usuariosNoHorario = 0;
+      let relatoriosEnviados = 0;
+      let relatoriosElegiveis = 0;
+      let relatoriosComErro = 0;
       const agora = new Date();
       const dataHoje = obterDataBrasilia(agora);
 
@@ -250,7 +255,85 @@ async function startServer() {
         }
       }
 
-      res.json({ success: true, dryRun, enviados: totalEnviados, elegiveis: totalElegiveis, processados: usuariosNoHorario, data: dataHoje });
+      // Relatório diário do gestor: utiliza uma configuração própria e não depende
+      // de as mensagens automáticas para clientes estarem habilitadas.
+      const { data: configuracoesRelatorio } = await sb
+        .from('configuracoes')
+        .select('user_id, chave, valor')
+        .in('chave', [
+          'relatorio_diario_ativo',
+          'relatorio_diario_horario',
+          'relatorio_diario_telefone',
+          'relatorio_diario_ultimo_envio',
+        ]);
+
+      const relatoriosPorUsuario = new Map<number, Record<string, string>>();
+      for (const item of configuracoesRelatorio || []) {
+        const configuracao = relatoriosPorUsuario.get(item.user_id) || {};
+        configuracao[item.chave] = item.valor;
+        relatoriosPorUsuario.set(item.user_id, configuracao);
+      }
+
+      for (const [userId, configuracao] of Array.from(relatoriosPorUsuario.entries())) {
+        const deveEnviar = deveEnviarRelatorioDiario({
+          ativo: configuracao.relatorio_diario_ativo,
+          horario: configuracao.relatorio_diario_horario,
+          telefone: configuracao.relatorio_diario_telefone,
+          ultimoEnvio: configuracao.relatorio_diario_ultimo_envio,
+        }, agora);
+        if (!deveEnviar) continue;
+
+        relatoriosElegiveis++;
+        if (dryRun) continue;
+
+        const mensagem = await gerarMensagemRelatorio(userId);
+        if (!mensagem) {
+          relatoriosComErro++;
+          continue;
+        }
+
+        const resultado = await enviarWhatsAppAutomatico(
+          userId,
+          configuracao.relatorio_diario_telefone,
+          mensagem
+        );
+
+        if (!resultado.ok) {
+          relatoriosComErro++;
+          console.error(`[scheduled/notificacoes] Relatório diário não enviado para usuário ${userId}: ${resultado.erro}`);
+          continue;
+        }
+
+        const { error: marcadorError } = await sb.from('configuracoes').upsert(
+          {
+            chave: 'relatorio_diario_ultimo_envio',
+            valor: dataHoje,
+            user_id: userId,
+          },
+          { onConflict: 'chave,user_id' }
+        );
+        if (marcadorError) {
+          relatoriosComErro++;
+          console.error(`[scheduled/notificacoes] Relatório enviado sem marcador para usuário ${userId}: ${marcadorError.message}`);
+          continue;
+        }
+
+        relatoriosEnviados++;
+      }
+
+      res.json({
+        success: true,
+        dryRun,
+        enviados: totalEnviados,
+        elegiveis: totalElegiveis,
+        processados: usuariosNoHorario,
+        relatorios: {
+          enviados: relatoriosEnviados,
+          elegiveis: relatoriosElegiveis,
+          erros: relatoriosComErro,
+        },
+        data: dataHoje,
+      });
     } catch (err) {
       console.error('[scheduled/notificacoes] Erro:', err);
       res.status(500).json({ error: String(err) });

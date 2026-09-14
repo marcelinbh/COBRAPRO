@@ -1206,3 +1206,9 @@
 - [x] Implementar lembrete automático no dia do vencimento
 - [x] Programar execução confiável a cada cinco minutos e criar testes de regressão
 - [x] Configurar gatilho autenticado que execute a rotina no cobrapro.online, e não apenas no ambiente de desenvolvimento
+
+## Fase 66: Relatório Diário Automático do Gestor
+- [x] Enviar automaticamente o relatório diário para o próprio WhatsApp do assinante no horário configurado
+- [x] Registrar o envio diário e impedir duplicidade por conta e data
+- [x] Incluir o relatório diário na rotina autenticada de produção sem afetar os lembretes dos clientes
+- [x] Validar o envio em modo seguro e publicar a automação
