@@ -26,7 +26,7 @@ async function sendWhatsAppMessage(phone: string, text: string, userId: number):
 }
 
 // ─── HELPER: Gerar mensagem no formato CobraFácil ─────────────────────────────
-async function gerarMensagemRelatorio(userId: number): Promise<string> {
+export async function gerarMensagemRelatorio(userId: number): Promise<string> {
   const sb = await getSupabaseClientAsync();
   if (!sb) return "";
 
