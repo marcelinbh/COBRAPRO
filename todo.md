@@ -1204,5 +1204,5 @@
 - [x] Registrar cada envio e bloquear mensagens duplicadas por parcela e tipo de lembrete
 - [x] Implementar lembrete automático três dias antes do vencimento
 - [x] Implementar lembrete automático no dia do vencimento
-- [ ] Programar execução diária confiável e criar testes de regressão
-- [ ] Configurar gatilho autenticado que execute a rotina no cobrapro.online, e não apenas no ambiente de desenvolvimento
+- [x] Programar execução confiável a cada cinco minutos e criar testes de regressão
+- [x] Configurar gatilho autenticado que execute a rotina no cobrapro.online, e não apenas no ambiente de desenvolvimento
