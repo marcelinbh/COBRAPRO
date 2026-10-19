@@ -2,35 +2,15 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
-import { ENV } from "../_core/env";
-
-// ─── HELPER: Enviar via Evolution API (config global) ─────────────────────────
-function getEvolutionConfig(userId: number) {
-  return {
-    url: ENV.evolutionApiUrl.replace(/\/$/, ""),
-    apiKey: ENV.evolutionApiKey,
-    instanceName: `user-${userId}`,
-  };
-}
-
-async function sendWhatsAppMessage(phone: string, text: string, userId: number): Promise<boolean> {
-  const config = getEvolutionConfig(userId);
-  let p = phone.replace(/\D/g, "");
-  if (!p.startsWith("55")) p = "55" + p;
-  const res = await fetch(`${config.url}/message/sendText/${config.instanceName}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: config.apiKey },
-    body: JSON.stringify({ number: p + "@s.whatsapp.net", textMessage: { text } }),
-  });
-  return res.ok;
-}
+import { enviarMensagemEvolution } from "../services/evolutionClient";
+import { dataHojeBrasilia } from "../services/businessDate";
 
 // ─── HELPER: Gerar mensagem no formato CobraFácil ─────────────────────────────
 export async function gerarMensagemRelatorio(userId: number): Promise<string> {
   const sb = await getSupabaseClientAsync();
   if (!sb) return "";
 
-  const hoje = new Date().toISOString().split("T")[0];
+  const hoje = dataHojeBrasilia();
 
   // Configurações da empresa
   const { data: cfgData } = await sb.from("configuracoes").select("chave, valor").eq("user_id", userId);
@@ -81,7 +61,7 @@ export async function gerarMensagemRelatorio(userId: number): Promise<string> {
   );
 
   // Data formatada
-  const dataObj = new Date();
+  const dataObj = new Date(`${hoje}T12:00:00-03:00`);
   const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
   const diaSemana = diasSemana[dataObj.getDay()];
   const dataFormatada = `${String(dataObj.getDate()).padStart(2, "0")}/${String(dataObj.getMonth() + 1).padStart(2, "0")}/${dataObj.getFullYear()}`;
@@ -169,11 +149,12 @@ export const relatorioDiarioRouter = router({
     .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
-      await sb.from("configuracoes").upsert([
+      const { error } = await sb.from("configuracoes").upsert([
         { chave: "relatorio_diario_ativo", valor: String(input.ativo), user_id: ctx.user.id },
         { chave: "relatorio_diario_horario", valor: input.horario, user_id: ctx.user.id },
         { chave: "relatorio_diario_telefone", valor: input.telefone, user_id: ctx.user.id },
       ], { onConflict: "chave,user_id" });
+      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
       return { success: true };
     }),
 
@@ -200,12 +181,12 @@ export const relatorioDiarioRouter = router({
       const mensagem = await gerarMensagemRelatorio(ctx.user.id);
       if (!mensagem) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao gerar relatório" });
 
-      const enviado = await sendWhatsAppMessage(telefone, mensagem, ctx.user.id);
-      if (!enviado) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Erro ao enviar mensagem. Verifique se o WhatsApp está conectado." });
+      const resultado = await enviarMensagemEvolution(ctx.user.id, telefone, mensagem);
+      if (!resultado.ok) {
+        throw new TRPCError({ code: "BAD_GATEWAY", message: resultado.erro || "Erro ao enviar mensagem. Verifique se o WhatsApp está conectado." });
       }
 
-      return { success: true, mensagem };
+      return { success: true, mensagem, providerMessageId: resultado.providerMessageId };
     }),
 
   // Preview da mensagem (sem enviar)

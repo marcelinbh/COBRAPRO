@@ -8,22 +8,17 @@ function paraNumero(valor: number | string | null | undefined): number {
   return Number.isFinite(numero) ? numero : 0;
 }
 
-function arredondarCentavos(valor: number): number {
-  return Math.round((valor + Number.EPSILON) * 100) / 100;
-}
-
 /**
- * Calcula o saldo de uma conta a partir do saldo-base e do livro de movimentos.
- * Cada lançamento deve ser contado uma única vez.
+ * Calcula o saldo da conta a partir do saldo-base e do livro de movimentos.
+ * Cada lançamento é considerado uma única vez, inclusive ajustes e estornos.
  */
 export function calcularSaldoAtual(
   saldoBase: number | string | null | undefined,
   movimentos: readonly MovimentoCaixa[],
 ): number {
-  const delta = movimentos.reduce((total, movimento) => {
+  const saldo = movimentos.reduce((total, movimento) => {
     const valor = paraNumero(movimento.valor);
     return total + (movimento.tipo === "entrada" ? valor : -valor);
-  }, 0);
-
-  return arredondarCentavos(paraNumero(saldoBase) + delta);
+  }, paraNumero(saldoBase));
+  return Math.round((saldo + Number.EPSILON) * 100) / 100;
 }

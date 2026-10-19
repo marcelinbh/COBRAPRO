@@ -133,6 +133,7 @@ function EditarEmprestimoModal({
   const [valorCustomPagarParcela, setValorCustomPagarParcela] = useState('');
   const [pagamentoParcelaRealizado, setPagamentoParcelaRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
   const [confirmDeleteParcelaId, setConfirmDeleteParcelaId] = useState<number | null>(null);
+  const [idempotencyKeyDetalhes, setIdempotencyKeyDetalhes] = useState('');
 
   const jurosTotal = valor * (juros / 100);
   const valorParcela = (valor + jurosTotal) / parcelas;
@@ -293,16 +294,20 @@ function EditarEmprestimoModal({
   const handlePagar = () => {
     if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
     if (!parcela) { toast.error(t('toast_error.nenhuma_parcela_pendente')); return; }
+    const idempotencyKey = idempotencyKeyDetalhes || crypto.randomUUID();
+    if (!idempotencyKeyDetalhes) setIdempotencyKeyDetalhes(idempotencyKey);
     const v = valorCustomPagar ? parseFloat(valorCustomPagar) : (diasAtraso > 0 ? totalComAtraso : valorOriginalParcela);
     const jurosVal = jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : undefined;
-    pagarTotalMutation.mutate({ parcelaId: parcela.id, valorPago: v, contaCaixaId: parseInt(contaCaixaId), valorJurosCustom: jurosVal, dataPagamento: dataPagamentoCustom || undefined });
+    pagarTotalMutation.mutate({ parcelaId: parcela.id, valorPago: v, contaCaixaId: parseInt(contaCaixaId), valorJurosCustom: jurosVal, dataPagamento: dataPagamentoCustom || undefined, idempotencyKey });
   };
 
   const handlePagarJuros = () => {
     if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
     if (!parcela) { toast.error(t('toast_error.nenhuma_parcela_pendente')); return; }
+    const idempotencyKey = idempotencyKeyDetalhes || crypto.randomUUID();
+    if (!idempotencyKeyDetalhes) setIdempotencyKeyDetalhes(idempotencyKey);
     const v = valorCustomJuros ? parseFloat(valorCustomJuros) : valorJurosParcela;
-    pagarJurosMutation.mutate({ parcelaId: parcela.id, valorJurosPago: v, contaCaixaId: parseInt(contaCaixaId), novaDataVencimento: novaDataVencJuros || undefined, novoValorParcela: novoValorParcelaJuros ? parseFloat(novoValorParcelaJuros) : undefined });
+    pagarJurosMutation.mutate({ parcelaId: parcela.id, valorJurosPago: v, contaCaixaId: parseInt(contaCaixaId), novaDataVencimento: novaDataVencJuros || undefined, novoValorParcela: novoValorParcelaJuros ? parseFloat(novoValorParcelaJuros) : undefined, idempotencyKey });
   };
 
   const handleWhatsApp = async () => {
@@ -674,6 +679,7 @@ function EditarEmprestimoModal({
                                         });
                                         setValorCustomPagarParcela('');
                                         setPagamentoParcelaRealizado(null);
+                                        setIdempotencyKeyDetalhes(crypto.randomUUID());
                                         setModalPagarParcela(true);
                                       }}
                                       className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300 transition-colors"
@@ -1117,6 +1123,7 @@ function EditarEmprestimoModal({
                     parcelaId: parcelaSelecionadaPagamento.id,
                     valorPago: valor,
                     contaCaixaId: parseInt(contaCaixaId),
+                    idempotencyKey: idempotencyKeyDetalhes || crypto.randomUUID(),
                   });
                 }}
               >
@@ -1169,6 +1176,7 @@ function PagamentoModal({
   const [novaDataVencJuros, setNovaDataVencJuros] = useState(""); // data do próximo vencimento (só juros)
   const [novoValorParcelaJuros, setNovoValorParcelaJuros] = useState(""); // valor do próximo vencimento (só juros)
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
+  const [idempotencyKey, setIdempotencyKey] = useState("");
 
   // TODOS os hooks devem vir ANTES de qualquer early return (Regra dos Hooks do React)
   const utils = trpc.useUtils();
@@ -1225,6 +1233,8 @@ function PagamentoModal({
     if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
     const contaId = parseInt(contaCaixaId);
     const dataManual = dataPagamentoCustom || undefined;
+    const chaveOperacao = idempotencyKey || crypto.randomUUID();
+    if (!idempotencyKey) setIdempotencyKey(chaveOperacao);
 
     if (tipo === 'total') {
       const valor = valorCustom ? parseFloat(valorCustom) : (diasAtraso > 0 ? totalComAtraso : valorTotal);
@@ -1236,6 +1246,7 @@ function PagamentoModal({
         valorJurosCustom: jurosVal,
         dataPagamento: dataManual,
         transferirSaldoResidual: transferirSaldo,
+        idempotencyKey: chaveOperacao,
       });
     } else {
       const valor = valorCustom ? parseFloat(valorCustom) : (jurosCustom ? parseFloat(jurosCustom) : valorSoJuros);
@@ -1245,6 +1256,7 @@ function PagamentoModal({
         contaCaixaId: contaId,
         novaDataVencimento: novaDataVencJuros || undefined,
         novoValorParcela: novoValorParcelaJuros ? parseFloat(novoValorParcelaJuros) : undefined,
+        idempotencyKey: chaveOperacao,
       });
     }
   };
@@ -1258,6 +1270,7 @@ function PagamentoModal({
     setTransferirSaldo(true);
     setNovaDataVencJuros("");
     setNovoValorParcelaJuros("");
+    setIdempotencyKey(crypto.randomUUID());
     setOpen(true);
   };
 

@@ -58,6 +58,10 @@ function QRCodeModal({ open, onClose, qrCode, loading, onRefresh, onDisconnect, 
     return () => clearInterval(timerRef.current!);
   }, [open, qrCode]);
 
+  useEffect(() => {
+    if (open && !connected && seconds === 0) onRefresh();
+  }, [open, connected, seconds, onRefresh]);
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-sm p-0 overflow-hidden">
@@ -199,8 +203,8 @@ export default function WhatsAppConfig() {
   const { data: templates, refetch: refetchTemplates } = trpc.configuracoes.templates.useQuery();
   const { data: automacao } = trpc.notificacoes.getAutomacao.useQuery();
   const { data: regras } = trpc.notificacoes.listar.useQuery();
-  const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
-    onSuccess: () => { setTimeout(() => { refetchQR(); refetchStatus(); }, 1500); },
+  const connectWpp = trpc.whatsappEvolution.ensureConnection.useMutation({
+    onSuccess: () => { refetchQR(); refetchStatus(); },
     onError: (e) => toast.error(t("toast.errorConnect") + e.message),
   });
   const disconnect = trpc.whatsappEvolution.disconnect.useMutation({
@@ -214,8 +218,8 @@ export default function WhatsAppConfig() {
   const connected = status?.connected ?? false;
   const lembreteTresDiasAtivo = regras?.find((regra) => regra.tipo === "antes_vencimento_3")?.ativo ?? false;
   const lembreteVencimentoAtivo = regras?.find((regra) => regra.tipo === "no_vencimento")?.ativo ?? false;
-  const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) { connectWpp.mutate(); setTimeout(() => refetchQR(), 2000); } };
-  const handleRefreshQR = () => { connectWpp.mutate(); setTimeout(() => refetchQR(), 1500); };
+  const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) connectWpp.mutate(); };
+  const handleRefreshQR = () => connectWpp.mutate();
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -358,7 +362,7 @@ export default function WhatsAppConfig() {
       <QRCodeModal
         open={qrModalOpen}
         onClose={() => setQrModalOpen(false)}
-        qrCode={qrData?.qrcode}
+        qrCode={qrData?.qrCode || connectWpp.data?.qrCode}
         loading={qrLoading || connectWpp.isPending}
         onRefresh={handleRefreshQR}
         onDisconnect={() => disconnect.mutate()}

@@ -1,4 +1,22 @@
 // Helpers financeiros compartilhados entre frontend e backend
+const TIME_ZONE_BRASILIA = "America/Sao_Paulo";
+
+function dataCivilBrasilia(value: Date | string): string {
+  if (typeof value === "string") return value.slice(0, 10);
+  // Datas de vencimento históricas chegam como YYYY-MM-DDT00:00:00.
+  // Nesse caso preservamos a data civil original, sem deslocá-la para o dia anterior no fuso BRT.
+  if (value.getUTCHours() === 0 && value.getUTCMinutes() === 0 && value.getUTCSeconds() === 0) {
+    return value.toISOString().slice(0, 10);
+  }
+  const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: TIME_ZONE_BRASILIA, year: "numeric", month: "2-digit", day: "2-digit",
+  }).formatToParts(value).filter(p => p.type !== "literal").map(p => [p.type, p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function diferencaDiasCivis(inicio: string, fim: string): number {
+  return Math.round((new Date(`${fim}T12:00:00Z`).getTime() - new Date(`${inicio}T12:00:00Z`).getTime()) / 86_400_000);
+}
 
 /**
  * Calcula juros de mora e multa por atraso.
@@ -21,12 +39,11 @@ export function calcularJurosMora(
   multaDiariaReais: number = 0,
   multaAtrasoPercentual: number = 0
 ): { juros: number; multa: number; total: number; diasAtraso: number } {
-  const hoje = new Date(dataPagamento);
-  const venc = new Date(dataVencimento);
-  venc.setHours(0, 0, 0, 0);
-  hoje.setHours(0, 0, 0, 0);
-
-  const diasAtraso = Math.max(0, Math.floor((hoje.getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
+  // A multa só nasce à 00:00 do dia seguinte ao vencimento em Brasília.
+  // Comparar DATEs civis evita que UTC/servidor antecipe a cobrança às 21h BRT.
+  const vencimento = dataCivilBrasilia(dataVencimento);
+  const pagamento = dataCivilBrasilia(dataPagamento);
+  const diasAtraso = Math.max(0, diferencaDiasCivis(vencimento, pagamento));
 
   if (diasAtraso === 0) {
     return { juros: 0, multa: 0, total: valorOriginal, diasAtraso: 0 };
@@ -131,8 +148,9 @@ export function formatarMoeda(valor: number | string | null | undefined): string
 
 export function formatarData(data: Date | string | null | undefined): string {
   if (!data) return '-';
-  const d = typeof data === 'string' ? (data.includes('T') || data.includes('Z') ? new Date(data) : new Date(data + 'T00:00:00')) : data;
-  return d.toLocaleDateString('pt-BR');
+  if (typeof data === "string" && /^\d{4}-\d{2}-\d{2}$/.test(data)) return data.split("-").reverse().join("/");
+  const d = typeof data === 'string' ? new Date(data) : data;
+  return d.toLocaleDateString('pt-BR', { timeZone: TIME_ZONE_BRASILIA });
 }
 
 export function getStatusParcela(
@@ -142,15 +160,10 @@ export function getStatusParcela(
   if (status === 'paga') return 'paga';
   if (status === 'parcial') return 'parcial';
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-  const venc = typeof dataVencimento === 'string'
-    ? new Date(dataVencimento + 'T00:00:00')
-    : new Date(dataVencimento);
-  venc.setHours(0, 0, 0, 0);
-
-  if (venc.getTime() < hoje.getTime()) return 'atrasada';
-  if (venc.getTime() === hoje.getTime()) return 'vencendo_hoje';
+  const hoje = dataCivilBrasilia(new Date());
+  const vencimento = dataCivilBrasilia(dataVencimento);
+  if (vencimento < hoje) return 'atrasada';
+  if (vencimento === hoje) return 'vencendo_hoje';
   return 'pendente';
 }
 
@@ -181,6 +194,7 @@ export function getDiasModalidade(modalidade: string): number {
     case 'semanal': return 7;
     case 'quinzenal': return 15;
     case 'mensal': return 30;
+    case 'anual': return 365;
     default: return 30;
   }
 }

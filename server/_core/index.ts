@@ -50,64 +50,6 @@ async function startServer() {
   // Webhook da Kiwify (vendas → criação de usuário + e-mail)
   registerKiwifyWebhookRoutes(app);
 
-  // Diagnostic endpoint to test Supabase connectivity
-  app.get('/api/diag', async (req, res) => {
-    const results: Record<string, string> = {};
-    const supabaseUrl = process.env.SUPABASE_URL || '';
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-    
-    // Test 1: DNS resolution
-    try {
-      const dns = await import('dns').then(m => m.promises);
-      const addresses = await dns.lookup(new URL(supabaseUrl).hostname, { all: true });
-      results.dns = addresses.map((a: {address: string}) => a.address).join(', ');
-    } catch (e) { results.dns = 'FAILED: ' + (e as Error).message; }
-    
-    // Test 2: fetch with IPv4
-    try {
-      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
-        headers: { 'apikey': supabaseKey },
-        signal: AbortSignal.timeout(5000)
-      });
-      results.fetch = `${response.status} ${response.statusText}`;
-    } catch (e) { results.fetch = 'FAILED: ' + (e as Error).message; }
-    
-    // Test 3: NODE_OPTIONS and dns order
-    results.nodeVersion = process.version;
-    results.nodeOptions = process.env.NODE_OPTIONS || 'not set';
-    results.platform = process.platform;
-    results.version = 'e7614a81-modal-clientes-v3';
-    
-    // Test 4: Evolution API connectivity
-    try {
-      const evoUrl = (process.env.EVOLUTION_API_URL || 'http://147.182.191.118:8080').replace(/\/$/, '');
-      const evoKey = process.env.EVOLUTION_API_KEY || 'cobrapro_evo_key_2024';
-      results.evoUrl = evoUrl;
-      const evoResp = await fetch(`${evoUrl}/instance/fetchInstances`, {
-        headers: { apikey: evoKey },
-        signal: AbortSignal.timeout(8000)
-      });
-      const evoBody = await evoResp.text();
-      results.evolutionApi = `${evoResp.status} - ${evoBody.substring(0, 200)}`;
-    } catch (e) { results.evolutionApi = 'FAILED: ' + (e as Error).message; }
-    
-    // Test 5: Evolution API send test
-    try {
-      const evoUrl = (process.env.EVOLUTION_API_URL || 'http://147.182.191.118:8080').replace(/\/$/, '');
-      const evoKey = process.env.EVOLUTION_API_KEY || 'cobrapro_evo_key_2024';
-      const sendResp = await fetch(`${evoUrl}/message/sendText/user-4682`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', apikey: evoKey },
-        body: JSON.stringify({ number: '5511911145280@s.whatsapp.net', textMessage: { text: 'Teste diagnostico producao' } }),
-        signal: AbortSignal.timeout(10000)
-      });
-      const sendBody = await sendResp.text();
-      results.evolutionSend = `${sendResp.status} - ${sendBody.substring(0, 300)}`;
-    } catch (e) { results.evolutionSend = 'FAILED: ' + (e as Error).message; }
-    
-    res.json(results);
-  });
-
   async function autenticarDisparadorDeAutomacao(req: express.Request): Promise<boolean> {
     if (possuiSegredoDeAutomacaoValido(req)) return true;
     if (await possuiTokenGithubActionsValido(req)) return true;
@@ -123,8 +65,13 @@ async function startServer() {
     if (!(await autenticarDisparadorDeAutomacao(req))) {
       return res.status(403).json({ ok: false, error: 'Acesso exclusivo para automação autorizada' });
     }
-    return res.json({ ok: true, service: 'notificacoes-automaticas' });
+    const { getSupabaseClientAsync } = await import('../db');
+    const sb = await getSupabaseClientAsync();
+    if (!sb) return res.status(503).json({ ok: false, service: 'notificacoes-automaticas', database: 'indisponivel' });
+    const { error } = await sb.from('whatsapp_outbox').select('id').limit(1);
+    return res.status(error ? 503 : 200).json({ ok: !error, service: 'notificacoes-automaticas', database: error ? 'erro' : 'ok' });
   });
+
 
   // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
   // Chamado a cada cinco minutos pelo agendamento externo e filtrado pelo horário
@@ -132,15 +79,9 @@ async function startServer() {
   app.post('/api/scheduled/notificacoes', async (req, res) => {
     try {
       const { getSupabaseClientAsync } = await import('../db');
-      const { substituirVariaveis } = await import('../routers/notificacoes');
       const { gerarMensagemRelatorio } = await import('../routers/relatorioDiario');
-        const {
-        calcularDataAlvoBrasilia,
-        deveExecutarNoHorario,
-        enviarWhatsAppAutomatico,
-        inicioDoDiaBrasilia,
-        obterDataBrasilia,
-      } = await import('../services/notificacoesAutomaticas');
+      const { dataHojeBrasilia } = await import('../services/businessDate');
+      const { enfileirarLembretesAutomaticos, enfileirarMensagemWhatsApp, processarFilaWhatsApp } = await import('../services/notificacoesAutomaticas');
       const { deveEnviarRelatorioDiario } = await import('../services/relatorioDiarioAutomatico');
 
       if (!(await autenticarDisparadorDeAutomacao(req))) {
@@ -152,105 +93,11 @@ async function startServer() {
       const sb = await getSupabaseClientAsync();
       if (!sb) return res.status(500).json({ error: 'DB indisponível' });
 
-      // Buscar todos os usuários com notificações ativas globalmente
-      const { data: configsAtivos } = await sb
-        .from('configuracoes')
-        .select('user_id')
-        .eq('chave', 'notificacoes_auto_ativo')
-        .eq('valor', 'true');
-
-      let totalEnviados = 0;
-      let totalElegiveis = 0;
-      let usuariosNoHorario = 0;
-      let relatoriosEnviados = 0;
+      const producaoLembretes = await enfileirarLembretesAutomaticos(new Date(), dryRun);
       let relatoriosElegiveis = 0;
       let relatoriosComErro = 0;
       const agora = new Date();
-      const dataHoje = obterDataBrasilia(agora);
-
-      for (const cfg of configsAtivos || []) {
-        const userId = cfg.user_id;
-
-        // Buscar regras ativas do usuário
-        const { data: regras } = await sb
-          .from('notificacoes_automaticas')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('ativo', true);
-
-        if (!regras || regras.length === 0) continue;
-
-        // Pegar nome da empresa
-        const { data: configuracoesUsuario } = await sb
-          .from('configuracoes')
-          .select('chave, valor')
-          .in('chave', ['nomeEmpresa', 'notificacoes_auto_horario'])
-          .eq('user_id', userId);
-        const configuracoes = Object.fromEntries((configuracoesUsuario || []).map((item: { chave: string; valor: string }) => [item.chave, item.valor]));
-        const horario = configuracoes.notificacoes_auto_horario || '09:00';
-        if (!deveExecutarNoHorario(horario, agora)) continue;
-        usuariosNoHorario++;
-        const nomeEmpresa = configuracoes.nomeEmpresa || 'Empresa';
-
-        for (const regra of regras as { tipo: string; dias_antes: number; mensagem_template: string }[]) {
-          const dataAlvoStr = calcularDataAlvoBrasilia(regra.dias_antes, agora);
-
-          const { data: parcelasData } = await sb
-            .from('parcelas')
-            .select('id, valor, numero_parcela, contrato_id, contratos!inner(numero_parcelas, cliente_id, clientes!inner(id, nome, whatsapp, telefone))')
-            .eq('user_id', userId)
-            .eq('data_vencimento', dataAlvoStr)
-            .in('status', ['pendente', 'atrasada']);
-
-          if (!parcelasData || parcelasData.length === 0) continue;
-
-          for (const parcela of (parcelasData as any[])) {
-            const cliente = parcela.contratos?.clientes;
-            if (!cliente) continue;
-            const telefone = cliente.whatsapp || cliente.telefone;
-            if (!telefone) continue;
-
-            // Verificar se já enviamos hoje
-            const { data: logExistente } = await sb
-              .from('notificacoes_log')
-              .select('id')
-              .eq('user_id', userId)
-              .eq('parcela_id', parcela.id)
-              .eq('tipo', regra.tipo)
-              .eq('status', 'enviado')
-              .gte('createdAt', inicioDoDiaBrasilia(dataHoje))
-              .maybeSingle();
-            if (logExistente) continue;
-
-            const mensagem = substituirVariaveis(regra.mensagem_template, {
-              nome: cliente.nome,
-              valor: parcela.valor,
-              data_vencimento: dataAlvoStr.split('-').reverse().join('/'),
-              dias_atraso: regra.dias_antes < 0 ? Math.abs(regra.dias_antes) : 0,
-              empresa: nomeEmpresa,
-              parcela: parcela.numero_parcela,
-              total_parcelas: parcela.contratos?.numero_parcelas,
-            });
-
-            totalElegiveis++;
-            if (dryRun) continue;
-
-            const resultado = await enviarWhatsAppAutomatico(userId, telefone, mensagem);
-            const { error: logError } = await sb.from('notificacoes_log').insert({
-              user_id: userId,
-              parcela_id: parcela.id,
-              cliente_id: cliente.id,
-              tipo: regra.tipo,
-              telefone,
-              mensagem,
-              status: resultado.ok ? 'enviado' : 'erro',
-              erro: resultado.ok ? null : resultado.erro,
-            });
-            if (logError) console.error('[scheduled/notificacoes] Erro ao registrar envio:', logError.message);
-            if (resultado.ok) totalEnviados++;
-          }
-        }
-      }
+      const dataHoje = dataHojeBrasilia(agora);
 
       // Relatório diário do gestor: utiliza uma configuração própria e não depende
       // de as mensagens automáticas para clientes estarem habilitadas.
@@ -281,27 +128,19 @@ async function startServer() {
         if (!deveEnviar) continue;
 
         relatoriosElegiveis++;
-        if (dryRun) continue;
-
         const mensagem = await gerarMensagemRelatorio(userId);
         if (!mensagem) {
           relatoriosComErro++;
           continue;
         }
 
-        const resultado = await enviarWhatsAppAutomatico(
-          userId,
-          configuracao.relatorio_diario_telefone,
-          mensagem
-        );
-
-        if (!resultado.ok) {
-          relatoriosComErro++;
-          console.error(`[scheduled/notificacoes] Relatório diário não enviado para usuário ${userId}: ${resultado.erro}`);
-          continue;
-        }
-
-        const { error: marcadorError } = await sb.from('configuracoes').upsert(
+        await enfileirarMensagemWhatsApp({
+          userId, tipo: 'relatorio_diario', telefone: configuracao.relatorio_diario_telefone,
+          mensagem, dataReferencia: dataHoje,
+          chaveDeduplicacao: `relatorio:${userId}:${dataHoje}`,
+        }, dryRun);
+        if (!dryRun) {
+          const { error: marcadorError } = await sb.from('configuracoes').upsert(
           {
             chave: 'relatorio_diario_ultimo_envio',
             valor: dataHoje,
@@ -311,21 +150,24 @@ async function startServer() {
         );
         if (marcadorError) {
           relatoriosComErro++;
-          console.error(`[scheduled/notificacoes] Relatório enviado sem marcador para usuário ${userId}: ${marcadorError.message}`);
+          console.error(`[scheduled/notificacoes] Relatório enfileirado sem marcador para usuário ${userId}: ${marcadorError.message}`);
           continue;
         }
-
-        relatoriosEnviados++;
+        }
       }
+
+      const processamento = await processarFilaWhatsApp(25, dryRun);
 
       res.json({
         success: true,
         dryRun,
-        enviados: totalEnviados,
-        elegiveis: totalElegiveis,
-        processados: usuariosNoHorario,
+        enviados: processamento.enviadas,
+        elegiveis: producaoLembretes.elegiveis,
+        processados: producaoLembretes.usuariosNoHorario,
+        enfileiradas: producaoLembretes.enfileiradas,
+        fila: processamento,
         relatorios: {
-          enviados: relatoriosEnviados,
+          enviados: 0,
           elegiveis: relatoriosElegiveis,
           erros: relatoriosComErro,
         },
@@ -342,9 +184,10 @@ async function startServer() {
   app.post('/api/scheduled/atualizar-parcelas', async (req, res) => {
     try {
       const { getSupabaseClientAsync } = await import('../db');
+      const { dataHojeBrasilia } = await import('../services/businessDate');
       const sb = await getSupabaseClientAsync();
       if (!sb) return res.status(500).json({ error: 'DB indisponível' });
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
       // Atualizar pendentes/vencendo_hoje com data < hoje → atrasada
       const { data: updated, error } = await sb
         .from('parcelas')

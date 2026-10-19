@@ -1182,59 +1182,33 @@
 - [x] Testes Vitest para procedures de blacklist (14 testes passando)
 - [x] Checkpoint e deploy
 
-## Fase 62: Correção de Inconsistência de Saldo no Caixa
-- [x] Mapear os cálculos de saldo e as transações da conta Ultracredi
-- [x] Identificar a origem da divergência entre as telas do Caixa
-- [x] Corrigir a atualização e o cálculo de saldos sem alterar transações legítimas
-- [x] Cobrir o cenário com testes Vitest e validar os totais exibidos
-- [x] Aplicar a correção global para que nenhuma conta some lançamentos em duplicidade
-- [x] Conciliar a conta Ultracredi com um lançamento auditável para saldo final de R$ 10.800,00
+## Fase 62: Criação Manual de Conta
+- [x] Criar conta limpa para solucoesunicredi@gmail.com e validar o login
 
-## Fase 63: Régua Opcional de Alertas por WhatsApp
-- [x] Criar configuração opcional da régua por assinante, com horário local escolhido pelo usuário
-- [x] Adicionar alertas fixos para 5, 4, 3, 2 e 1 dia antes do vencimento e no dia do vencimento
-- [x] Permitir templates independentes e personalizados pelo assinante para cada etapa
-- [ ] Executar os alertas diariamente via Evolution API, respeitando o horário de cada assinante
-- [ ] Registrar o resultado de cada tentativa e impedir disparidade duplicada no mesmo dia
-- [x] Criar interface de configuração, pré-visualização e ativação/desativação da régua
-- [ ] Cobrir as regras com testes Vitest e validar um envio de teste
+## Fase 63: Integridade do Caixa e Despesas
+- [x] Auditar divergências entre saldo das contas e movimentações financeiras da Ultra Credi
+- [x] Garantir atualização automática do Caixa, sem depender de ajustes manuais recorrentes
+- [x] Corrigir o lançamento de despesas para refletir o débito exatamente uma vez no Caixa
+- [x] Implementar estorno/exclusão segura de despesa com reversão financeira auditável
+- [x] Adicionar testes de regressão para entradas, saídas, ajustes e estornos de Caixa
+- [ ] Validar saldos existentes e corrigir inconsistências identificadas com trilha de auditoria
 
-## Fase 64: Desembolso de Empréstimos no Caixa
-- [x] Mapear o cadastro de empréstimo e os movimentos de Caixa gerados no fluxo
-- [x] Registrar uma saída automática do valor principal ao liberar cada empréstimo
-- [x] Impedir duplicidade de lançamento em reenvios ou falhas do cadastro
-- [x] Cobrir o desembolso e os pagamentos subsequentes com testes Vitest
-- [x] Conciliar o contrato de R$ 1.500,00 criado antes da correção com uma saída retroativa auditável
+## Fase 64: Recuperação de Hospedagem
+- [x] Reativar os recursos de hospedagem do CobraPro após a regularização do saldo no DigitalOcean
+- [x] Confirmar o retorno de cobrapro.online antes de publicar a correção de Caixa
 
-## Fase 65: Correção do Cadastro de Despesas
-- [x] Mapear a divergência entre o schema `contas_pagar` e o formulário de despesas
-- [x] Adicionar a coluna ausente ou ajustar o payload de cadastro com compatibilidade de produção
-- [x] Criar teste Vitest para cadastro de despesa recorrente e não recorrente
-- [x] Validar o registro de uma despesa sem criar dados de teste persistentes
+## Fase 65: Automação de WhatsApp para Vencimentos
+- [x] Comparar Evolution API com a API oficial do WhatsApp e definir a integração do CobraPro
+- [x] Mapear a conexão atual do WhatsApp e as regras de parcelas elegíveis
+- [x] Criar configurações por assinante para ativar, desativar e personalizar os lembretes
+- [x] Registrar cada envio e bloquear mensagens duplicadas por parcela e tipo de lembrete
+- [x] Implementar lembrete automático três dias antes do vencimento
+- [x] Implementar lembrete automático no dia do vencimento
+- [x] Programar execução confiável a cada cinco minutos e criar testes de regressão
+- [x] Configurar gatilho autenticado que execute a rotina no cobrapro.online, e não apenas no ambiente de desenvolvimento
 
-## Fase 66: Reflexo de Despesas no Caixa e Dashboard
-- [x] Mapear o status pendente e o fluxo de pagamento de contas a pagar
-- [x] Corrigir o lançamento de saída de Caixa ao marcar uma despesa como paga
-- [x] Atualizar os dados exibidos no Dashboard após o pagamento da despesa
-- [x] Cobrir os estados pendente e pago com testes sem duplicidade de movimento
-- [x] Confirmar e remover saídas duplicadas da despesa Facebook, preservando um único pagamento de R$ 30,00
-
-## Fase 67: Auditoria dos Fluxos Financeiros
-- [x] Mapear todos os fluxos que registram entradas e saídas no Caixa
-- [x] Revisar proteção contra lançamentos duplicados e alterações de saldo-base
-- [x] Validar empréstimos, pagamentos de parcelas e despesas contra o livro de transações
-- [x] Padronizar a idempotência de pagamentos de parcelas, juros, cheques, assinaturas e vendas de telefone
-- [x] Reportar o alcance confirmado e pendências da auditoria financeira
-
-## Fase 68: Conciliação de Novo Empréstimo sem Desembolso
-- [x] Localizar o contrato de R$ 1.000,00 e confirmar sua conta de Caixa
-- [x] Identificar a falha que impediu a saída automática na Ultracredi
-- [x] Corrigir o fluxo e registrar uma saída retroativa auditável se necessário
-- [x] Validar o saldo da Ultracredi após a conciliação
-- [x] Exigir seleção explícita de conta de Caixa ao criar empréstimos e bloquear falha silenciosa no desembolso
-
-## Fase 69: Compatibilidade do Schema de Desembolso
-- [x] Mapear as colunas disponíveis em `transacoes_caixa` no banco de produção
-- [x] Remover o campo incompatível `cliente_id` do payload de desembolso
-- [x] Testar a criação de contrato com saída de Caixa e sem erro de schema
-- [ ] Versionar e publicar a correção
+## Fase 66: Relatório Diário Automático do Gestor
+- [x] Enviar automaticamente o relatório diário para o próprio WhatsApp do assinante no horário configurado
+- [x] Registrar o envio diário e impedir duplicidade por conta e data
+- [x] Incluir o relatório diário na rotina autenticada de produção sem afetar os lembretes dos clientes
+- [x] Validar o envio em modo seguro e publicar a automação

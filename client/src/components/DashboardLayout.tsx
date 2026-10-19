@@ -126,7 +126,7 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!loading && user) sincronizarCaixa.mutate();
-    // A rotina é idempotente; a execução ocorre uma vez por login/sessão.
+    // A rotina é idempotente e executa uma vez ao entrar na plataforma.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, user?.id]);
 
