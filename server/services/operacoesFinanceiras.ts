@@ -22,6 +22,25 @@ function hashRequest(payload: unknown): string {
   return createHash("sha256").update(JSON.stringify(payload)).digest("hex");
 }
 
+/**
+ * A migration de confiabilidade é aditiva. Enquanto uma base legada ainda não
+ * a recebeu, não devemos impedir o recebimento ou a baixa de uma despesa. Os
+ * fluxos usam atualizações condicionais da própria entidade como trava mínima
+ * até que o livro de operações persistente esteja disponível.
+ */
+export function tabelaOperacionalAusente(error: unknown, tabela: string): boolean {
+  const mensagem = String(
+    typeof error === "object" && error && "message" in error
+      ? (error as { message?: unknown }).message
+      : error ?? ""
+  ).toLowerCase();
+  const tabelaNormalizada = tabela.toLowerCase();
+  return (
+    (mensagem.includes("could not find the table") && mensagem.includes(tabelaNormalizada)) ||
+    (mensagem.includes("relation") && mensagem.includes(tabelaNormalizada) && mensagem.includes("does not exist"))
+  );
+}
+
 export async function reservarOperacaoFinanceira(params: {
   userId: number;
   tipo: TipoOperacaoFinanceira;
@@ -32,8 +51,9 @@ export async function reservarOperacaoFinanceira(params: {
   if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
 
   const hash = hashRequest(params.payload);
+  const operationId = randomUUID();
   const { data: criada, error: insertError } = await sb.from("operacoes_financeiras").insert({
-    id: randomUUID(),
+    id: operationId,
     user_id: params.userId,
     tipo: params.tipo,
     chave_idempotencia: params.chaveIdempotencia,
@@ -42,6 +62,10 @@ export async function reservarOperacaoFinanceira(params: {
   }).select("id").maybeSingle();
 
   if (criada) return { id: criada.id, repetida: false };
+  if (tabelaOperacionalAusente(insertError, "operacoes_financeiras")) {
+    console.warn("[Operações financeiras] Tabela de idempotência ausente; usando a trava condicional da entidade até a migration ser aplicada.");
+    return { id: operationId, repetida: false };
+  }
   if (insertError && !String(insertError.message).toLowerCase().includes("duplicate")) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: insertError.message });
   }
@@ -69,17 +93,21 @@ export async function concluirOperacaoFinanceira(id: string, resultado: Record<s
     resultado,
     concluida_em: new Date().toISOString(),
   }).eq("id", id).eq("status", "processando");
+  if (tabelaOperacionalAusente(error, "operacoes_financeiras")) return;
   if (error) throw new Error(error.message);
 }
 
 export async function falharOperacaoFinanceira(id: string, erro: unknown): Promise<void> {
   const sb = await getSupabaseClientAsync();
   if (!sb) return;
-  await sb.from("operacoes_financeiras").update({
+  const { error } = await sb.from("operacoes_financeiras").update({
     status: "falha",
     erro: erro instanceof Error ? erro.message.slice(0, 500) : String(erro).slice(0, 500),
     concluida_em: new Date().toISOString(),
   }).eq("id", id).eq("status", "processando");
+  if (error && !tabelaOperacionalAusente(error, "operacoes_financeiras")) {
+    console.warn("[Operações financeiras] Não foi possível registrar a falha da operação:", error.message);
+  }
 }
 
 export async function validarContaDoUsuario(userId: number, contaCaixaId: number): Promise<void> {
@@ -110,5 +138,6 @@ export async function registrarAuditoriaFinanceira(params: {
     entidade_id: String(params.entidadeId),
     detalhes: params.detalhes,
   });
+  if (tabelaOperacionalAusente(error, "auditoria_financeira")) return;
   if (error) throw new Error(error.message);
 }

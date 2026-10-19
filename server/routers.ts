@@ -2231,6 +2231,9 @@ const parcelasRouter = router({
       const saldoRestante = isPago ? 0 : calcularSaldoResidual(valorTotalComJuros, input.valorPago);
 
       // Atualizar parcela atual
+      // A condição de status torna a baixa atômica: uma segunda solicitação
+      // concorrente não consegue registrar outro recebimento após a primeira
+      // mudar a parcela para paga/parcial.
       const { data: parcelaAtualizada, error: updateErr } = await sb.from('parcelas').update({
         valor_pago: input.valorPago.toFixed(2),
         valor_juros: juros.toFixed(2),
@@ -2241,8 +2244,11 @@ const parcelasRouter = router({
         status: novoStatus,
         conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
-      }).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
+      }).eq('id', input.parcelaId).eq('user_id', ctx.user.id)
+        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
+        .select('id').maybeSingle();
       if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message });
+      if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada ou não pertence a esta empresa' });
 
       // ─── SALDO RESIDUAL AUTOMÁTICO ─────────────────────────────────────────
       // Se pagamento parcial E transferirSaldoResidual=true, adicionar saldo à próxima parcela
