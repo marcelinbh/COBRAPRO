@@ -36,6 +36,23 @@ function descricaoEstornoConta(id: number, descricao: string): string {
   return `Estorno da conta #${id}: ${descricao}`;
 }
 
+async function listarTransacoesCaixaDoUsuario(supabase: any, userId: number): Promise<any[]> {
+  const todas: any[] = [];
+  const tamanhoPagina = 1000;
+  for (let pagina = 0; pagina < 100; pagina++) {
+    const inicio = pagina * tamanhoPagina;
+    const { data, error } = await supabase.from('transacoes_caixa')
+      .select('conta_caixa_id, tipo, valor')
+      .eq('user_id', userId)
+      .range(inicio, inicio + tamanhoPagina - 1);
+    if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+    const lote = data ?? [];
+    todas.push(...lote);
+    if (lote.length < tamanhoPagina) break;
+  }
+  return todas;
+}
+
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
 async function registrarHistorico(params: {
   contratoId: number;
@@ -1283,6 +1300,7 @@ const contratosRouter = router({
       jurosMoraDiario: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.contaCaixaId) await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       // Calcular valor da parcela
       let valorParcela: number;
       if (input.modalidade === 'tabela_price') {
@@ -1490,7 +1508,29 @@ const contratosRouter = router({
         });
       }
       const { error: parcelasErr } = await supabase.from('parcelas').insert(parcelasPayload);
-      if (parcelasErr) console.error('[contratos.create] Erro ao criar parcelas via REST:', parcelasErr.message);
+      if (parcelasErr) {
+        await supabase.from('contratos').delete().eq('id', contratoId).eq('user_id', ctx.user.id);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Erro ao criar parcelas: ${parcelasErr.message}` });
+      }
+
+      if (input.contaCaixaId) {
+        const { error: saidaErr } = await supabase.from('transacoes_caixa').insert({
+          conta_caixa_id: input.contaCaixaId,
+          tipo: 'saida',
+          categoria: 'emprestimo_liberado',
+          valor: parseFloat(input.valorPrincipal.toFixed(2)),
+          descricao: `Empréstimo liberado - Contrato #${contratoId}`,
+          contrato_id: contratoId,
+          cliente_id: input.clienteId,
+          data_transacao: new Date().toISOString(),
+          user_id: ctx.user.id,
+        });
+        if (saidaErr) {
+          await supabase.from('parcelas').delete().eq('contrato_id', contratoId).eq('user_id', ctx.user.id);
+          await supabase.from('contratos').delete().eq('id', contratoId).eq('user_id', ctx.user.id);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Erro ao debitar o caixa: ${saidaErr.message}` });
+        }
+      }
 
       return { id: contratoId, valorParcela };
     }),
@@ -2117,6 +2157,17 @@ const parcelasRouter = router({
 
       const valorOriginal = parseFloat(parcelaData.valor_original);
       const saldoResidualAnterior = parseFloat(parcelaData.saldo_residual ?? '0');
+      const estadoParcelaAnterior = {
+        valor_pago: parcelaData.valor_pago,
+        valor_juros: parcelaData.valor_juros,
+        valor_multa: parcelaData.valor_multa,
+        valor_desconto: parcelaData.valor_desconto,
+        multa_diaria_usada: parcelaData.multa_diaria_usada,
+        data_pagamento: parcelaData.data_pagamento,
+        status: parcelaData.status,
+        conta_caixa_id: parcelaData.conta_caixa_id,
+        observacoes: parcelaData.observacoes,
+      };
       // Valor total que o cliente deve nesta parcela (original + saldo residual de parcelas anteriores)
       const valorTotalDevido = valorOriginal + saldoResidualAnterior;
 
@@ -2157,7 +2208,7 @@ const parcelasRouter = router({
         status: novoStatus,
         conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
-      }).eq('id', input.parcelaId);
+      }).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
       if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message });
 
       // ─── SALDO RESIDUAL AUTOMÁTICO ─────────────────────────────────────────
@@ -2173,7 +2224,8 @@ const parcelasRouter = router({
         if (proximaParcela) {
           const saldoAtualProxima = parseFloat(proximaParcela.saldo_residual ?? '0');
           const novoSaldo = Math.round((saldoAtualProxima + saldoRestante) * 100) / 100;
-          await sb.from('parcelas').update({ saldo_residual: novoSaldo.toFixed(2) }).eq('id', proximaParcela.id);
+          const { error: residualErr } = await sb.from('parcelas').update({ saldo_residual: novoSaldo.toFixed(2) }).eq('id', proximaParcela.id).eq('user_id', ctx.user.id);
+          if (residualErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: residualErr.message });
           console.log(`[registrarPagamento] Saldo residual R$ ${saldoRestante.toFixed(2)} transferido para parcela #${proximaParcela.id}`);
         }
       }
@@ -2191,7 +2243,10 @@ const parcelasRouter = router({
           data_transacao: dataPagamentoStr,
           user_id: ctx.user.id,
         });
-        if (txErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
+        if (txErr) {
+          await sb.from('parcelas').update(estadoParcelaAnterior).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
+        }
       }
 
       // Verificar se contrato foi quitado
@@ -2200,7 +2255,8 @@ const parcelasRouter = router({
         .eq('contrato_id', parcelaData.contrato_id)
         .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
       if ((pendentes?.length ?? 0) === 0) {
-        await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcelaData.contrato_id);
+        const { error: contratoStatusErr } = await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcelaData.contrato_id).eq('user_id', ctx.user.id);
+        if (contratoStatusErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoStatusErr.message });
       }
 
       // Registrar histórico
@@ -2255,7 +2311,7 @@ const parcelasRouter = router({
       // Buscar parcela
       const fetchParcela = async () => {
         if (db) {
-          const rows = await db.select().from(parcelas).where(eq(parcelas.id, input.parcelaId)).limit(1);
+          const rows = await db.select().from(parcelas).where(and(eq(parcelas.id, input.parcelaId), eq(parcelas.userId, ctx.user.id))).limit(1);
           return rows[0] ?? null;
         }
         const supabase = await getSupabaseClientAsync();
@@ -2266,6 +2322,8 @@ const parcelasRouter = router({
           numeroParcela: data.numero_parcela, valorOriginal: data.valor_original,
           dataVencimento: data.data_vencimento, status: data.status,
           contaCaixaId: data.conta_caixa_id, koletorId: data.koletor_id,
+          contagemRenovacoes: data.contagem_renovacoes,
+          valorPago: data.valor_pago, dataPagamento: data.data_pagamento, observacoes: data.observacoes,
         } : null;
       };
 
@@ -2275,12 +2333,12 @@ const parcelasRouter = router({
       // Buscar contrato para saber a modalidade e o intervalo
       const fetchContrato = async () => {
         if (db) {
-          const rows = await db.select().from(contratos).where(eq(contratos.id, parcela.contratoId)).limit(1);
+          const rows = await db.select().from(contratos).where(and(eq(contratos.id, parcela.contratoId), eq(contratos.userId, ctx.user.id))).limit(1);
           return rows[0] ?? null;
         }
         const supabase = await getSupabaseClientAsync();
         if (!supabase) return null;
-        const { data } = await supabase.from('contratos').select('*').eq('id', parcela.contratoId).single();
+        const { data } = await supabase.from('contratos').select('*').eq('id', parcela.contratoId).eq('user_id', ctx.user.id).single();
         return data ? {
           id: data.id, modalidade: data.modalidade, tipoTaxa: data.tipo_taxa,
           taxaJuros: data.taxa_juros, valorPrincipal: data.valor_principal,
@@ -2313,13 +2371,14 @@ const parcelasRouter = router({
       // Marcar parcela atual como "paga" (juros pagos = renovação)
       const hoje = new Date();
       if (db) {
-        await db.update(parcelas).set({
+        const parcelaPaga = await db.update(parcelas).set({
           valorPago: input.valorJurosPago.toFixed(2),
           dataPagamento: hoje,
           status: 'paga' as const,
           observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
           contaCaixaId: input.contaCaixaId ?? null,
-        }).where(eq(parcelas.id, input.parcelaId));
+        }).where(and(eq(parcelas.id, input.parcelaId), eq(parcelas.userId, ctx.user.id))).returning({ id: parcelas.id });
+        if (parcelaPaga.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'A parcela não pôde ser marcada como paga' });
 
         // Registrar entrada no caixa (apenas se conta informada)
         if (input.contaCaixaId) {
@@ -2354,7 +2413,7 @@ const parcelasRouter = router({
           dataVencimento: novaDataVencStr,
           status: 'pendente' as const,
           contaCaixaId: input.contaCaixaId ?? null,
-          contagemRenovacoes: ((parcela as any).contagemRenovacoes as number) + 1 || 1,
+          contagemRenovacoes: (Number((parcela as any).contagemRenovacoes) || 0) + 1,
         });
 
         // Atualizar numeroParcelas do contrato
@@ -2367,15 +2426,17 @@ const parcelasRouter = router({
         const supabase = await getSupabaseClientAsync();
         if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
-        await supabase.from('parcelas').update({
+        const { data: parcelaAtualizada, error: parcelaUpdateErr } = await supabase.from('parcelas').update({
           valor_pago: parseFloat(input.valorJurosPago.toFixed(2)),
           data_pagamento: hoje.toISOString(),
           status: 'paga',
           observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
           conta_caixa_id: input.contaCaixaId,
-        }).eq('id', input.parcelaId);
+        }).eq('id', input.parcelaId).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']).select('id').maybeSingle();
+        if (parcelaUpdateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: parcelaUpdateErr.message });
+        if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'A parcela já foi processada ou não pertence a esta empresa' });
 
-        await supabase.from('transacoes_caixa').insert({
+        const { error: jurosTxErr } = await supabase.from('transacoes_caixa').insert({
           conta_caixa_id: input.contaCaixaId,
           tipo: 'entrada',
           categoria: 'pagamento_parcela',
@@ -2386,11 +2447,17 @@ const parcelasRouter = router({
           data_transacao: new Date().toISOString().split('T')[0],
           user_id: ctx.user.id,
         });
+        if (jurosTxErr) {
+          await supabase.from('parcelas').update({ valor_pago: parcela.valorPago ?? null, data_pagamento: parcela.dataPagamento ?? null, status: parcela.status, observacoes: parcela.observacoes ?? null, conta_caixa_id: parcela.contaCaixaId ?? null })
+            .eq('id', input.parcelaId).eq('user_id', ctx.user.id).eq('status', 'paga');
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: jurosTxErr.message });
+        }
 
         // Buscar o maior numero_parcela existente para evitar duplicatas no fallback REST
         const { data: maxParcelaRest } = await supabase.from('parcelas')
           .select('numero_parcela')
           .eq('contrato_id', parcela.contratoId)
+          .eq('user_id', ctx.user.id)
           .order('numero_parcela', { ascending: false })
           .limit(1)
           .single();
@@ -2401,11 +2468,10 @@ const parcelasRouter = router({
           cliente_id: parcela.clienteId,
           contrato_id: parcela.contratoId,
           koletor_id: parcela.koletorId ?? null,
-          numero: novoNumero,
           numero_parcela: novoNumero,
-          valor: novoValorRest,
           valor_original: novoValorRest,
           valor_juros: parseFloat(input.valorJurosPago.toFixed(2)),
+          contagem_renovacoes: (Number(parcela.contagemRenovacoes) || 0) + 1,
           data_vencimento: novaDataVencStr,
           status: 'pendente',
           conta_caixa_id: input.contaCaixaId ?? null,
@@ -2415,9 +2481,10 @@ const parcelasRouter = router({
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Erro ao criar nova parcela: ${insertParcelaErr.message}` });
         }
 
-        await supabase.from('contratos')
+        const { error: contratoUpdateErr } = await supabase.from('contratos')
           .update({ numero_parcelas: (contrato.numeroParcelas as number) + 1 })
-          .eq('id', parcela.contratoId);
+          .eq('id', parcela.contratoId).eq('user_id', ctx.user.id);
+        if (contratoUpdateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoUpdateErr.message });
       }
 
       // Registrar histórico
@@ -2585,10 +2652,10 @@ const caixaRouter = router({
         for (const conta of contas) {
           const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
             .from(transacoesCaixa)
-            .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada')));
+            .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada'), eq(transacoesCaixa.userId, ctx.user.id)));
           const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
             .from(transacoesCaixa)
-            .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
+            .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida'), eq(transacoesCaixa.userId, ctx.user.id)));
           const saldo = calcularSaldoAtual(conta.saldo, [
             { tipo: 'entrada', valor: entradas[0]?.total },
             { tipo: 'saida', valor: saidas[0]?.total },
@@ -2615,10 +2682,10 @@ const caixaRouter = router({
     // Tabela usa 'ativo' (não 'ativa') e 'saldo' (não 'saldo_inicial')
     const { data: contasData, error: contasErr } = await supabase.from('contas_caixa').select('*').eq('ativo', true).eq('user_id', ctx.user.id);
     if (contasErr) { console.error('[caixa.contas] REST error:', contasErr.message); return []; }
-    const { data: transData } = await supabase.from('transacoes_caixa').select('conta_caixa_id, tipo, valor').eq('user_id', ctx.user.id);
+    const transData = await listarTransacoesCaixaDoUsuario(supabase, ctx.user.id);
     const result2 = [];
     for (const conta of (contasData || [])) {
-      const transacoesConta = (transData ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
+      const transacoesConta = transData.filter((t: any) => t.conta_caixa_id === conta.id);
       // Campo real é 'saldo' (não 'saldo_inicial')
       const saldoBase = parseFloat(conta.saldo ?? conta.saldo_inicial ?? '0');
       const saldoAtual = calcularSaldoAtual(saldoBase, transacoesConta);
@@ -2743,6 +2810,7 @@ const caixaRouter = router({
       descricao: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       const db = await getDb();
       if (db) {
         try {
@@ -3062,6 +3130,7 @@ const whatsappRouter = router({
         .select('*, contas_caixa(nome)')
         .eq('tipo', 'entrada')
         .in('categoria', ['pagamento_parcela', 'pagamento_juros', 'pagamento_total'])
+        .eq('user_id', ctx.user.id)
         .order('data_transacao', { ascending: false })
         .limit(100);
       if (dataInicio) query = (query as any).gte('data_transacao', dataInicio);
@@ -3164,13 +3233,13 @@ const relatoriosRouter = router({
       supabase.from('clientes').select('*', { count: 'exact', head: true }).eq('user_id', ctx.user.id),
     ]);
 
-    const { data: entradas } = await supabase.from('transacoes_caixa').select('valor').eq('tipo', 'entrada');
+    const { data: entradas } = await supabase.from('transacoes_caixa').select('valor').eq('tipo', 'entrada').eq('user_id', ctx.user.id);
     const totalRecebido = (entradas ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor ?? '0'), 0);
 
-    const { data: liberados } = await supabase.from('transacoes_caixa').select('valor').eq('tipo', 'saida').eq('categoria', 'emprestimo_liberado');
+    const { data: liberados } = await supabase.from('transacoes_caixa').select('valor').eq('tipo', 'saida').eq('categoria', 'emprestimo_liberado').eq('user_id', ctx.user.id);
     const totalLiberado = (liberados ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor ?? '0'), 0);
 
-    const { data: inadimplentesData } = await supabase.from('parcelas').select('valor_original').eq('status', 'atrasada');
+    const { data: inadimplentesData } = await supabase.from('parcelas').select('valor_original').eq('status', 'atrasada').eq('user_id', ctx.user.id);
     const totalInadimplente = (inadimplentesData ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor_original ?? '0'), 0);
 
     return {
@@ -3725,15 +3794,27 @@ const contasPagarRouter = router({
       const dataPag = new Date(dataCivilBrasiliaParaIso(dataReferencia));
       try {
       if (db) {
+        let mutacaoIniciada = false;
         try {
           const conta = await db.select().from(contasPagar).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id))).limit(1);
           if (!conta[0]) throw new Error('Conta não encontrada');
           if (!contaPagarPodeSerProcessada(conta[0].status)) throw new TRPCError({ code: 'CONFLICT', message: 'Esta despesa já foi processada' });
-          await db.update(contasPagar).set({ status: 'paga', dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id)));
-          await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: conta[0].valor, descricao: descricaoPagamentoConta(input.id, conta[0].descricao), dataTransacao: dataPag, userId: ctx.user.id });
-          return { success: true };
+          mutacaoIniciada = true;
+          const atualizada = await db.update(contasPagar).set({ status: 'paga', dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id))).returning({ id: contasPagar.id });
+          if (atualizada.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'A despesa não pôde ser marcada como paga' });
+          try {
+            await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: conta[0].valor, descricao: descricaoPagamentoConta(input.id, conta[0].descricao), dataTransacao: dataPag, userId: ctx.user.id });
+          } catch (txError) {
+            await db.update(contasPagar).set({ status: conta[0].status, dataPagamento: null, contaCaixaId: conta[0].contaCaixaId }).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id)));
+            throw txError;
+          }
+          const resultado = { contaId: input.id, dataPagamento: dataReferencia };
+          await concluirOperacaoFinanceira(reserva.id, resultado);
+          await registrarAuditoriaFinanceira({ userId: ctx.user.id, operacaoId: reserva.id, acao: 'pagar_conta', entidade: 'contas_pagar', entidadeId: input.id, detalhes: { contaCaixaId: input.contaCaixaId, dataPagamento: dataReferencia, valor: conta[0].valor } });
+          return { success: true, repetida: false, operationId: reserva.id, ...resultado };
         } catch (err: any) {
           if (err?.code === 'CONFLICT' || err.message === 'Conta não encontrada') throw err;
+          if (mutacaoIniciada) throw err;
           console.warn('[contasPagar.pagar] Drizzle failed, trying REST:', err.message); resetDb();
         }
       }

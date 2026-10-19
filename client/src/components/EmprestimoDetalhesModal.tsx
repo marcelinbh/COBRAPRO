@@ -59,6 +59,7 @@ export function EmprestimoDetalhesModal({
   const [modalPagarParcela, setModalPagarParcela] = useState(false);
   const [valorCustomPagarParcela, setValorCustomPagarParcela] = useState('');
   const [pagamentoParcelaRealizado, setPagamentoParcelaRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
+  const [idempotencyKeyJuros, setIdempotencyKeyJuros] = useState('');
 
   const { data: config } = trpc.configuracoes.get.useQuery();
   const utils = trpc.useUtils();
@@ -159,10 +160,13 @@ export function EmprestimoDetalhesModal({
     if (!contaCaixaId) { toast.error('Selecione uma conta'); return; }
     if (!parcela) { toast.error('Nenhuma parcela pendente'); return; }
     const valor = valorCustomJuros ? parseFloat(valorCustomJuros) : valorJurosParcela;
+    const idempotencyKey = idempotencyKeyJuros || crypto.randomUUID();
+    if (!idempotencyKeyJuros) setIdempotencyKeyJuros(idempotencyKey);
     pagarJurosMutation.mutate({
       parcelaId: parcela.id,
       valorJurosPago: valor,
       contaCaixaId: parseInt(contaCaixaId),
+      idempotencyKey,
     });
   };
 
@@ -653,7 +657,7 @@ export function EmprestimoDetalhesModal({
       </Dialog>
 
       {/* ── SUB-MODAL PAGAR JUROS ── */}
-      <Dialog open={modalPagarJuros} onOpenChange={setModalPagarJuros}>
+      <Dialog open={modalPagarJuros} onOpenChange={(v) => { setModalPagarJuros(v); if (!v) setIdempotencyKeyJuros(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>PAGAR SÓ JUROS</DialogTitle>
