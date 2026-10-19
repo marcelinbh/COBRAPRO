@@ -50,6 +50,7 @@ export default function NotificacoesAutomaticas() {
   const { data: automacao, isLoading: loadingAutomacao } = trpc.notificacoes.getAutomacao.useQuery();
   const { data: regras, isLoading: loadingRegras } = trpc.notificacoes.listar.useQuery();
   const { data: historico, isLoading: loadingHistorico } = trpc.notificacoes.historico.useQuery({ limit: 50 });
+  const { data: saude } = trpc.notificacoes.saude.useQuery(undefined, { refetchInterval: 30_000 });
 
   const salvarAutomacao = trpc.notificacoes.salvarAutomacao.useMutation({
     onSuccess: () => {
@@ -76,18 +77,6 @@ export default function NotificacoesAutomaticas() {
   const testar = trpc.notificacoes.testar.useMutation({
     onSuccess: (data) => toast.success(`Mensagem de teste enviada! "${data.mensagem.substring(0, 60)}..."`),
     onError: (e) => toast.error(`Erro ao testar: ${e.message}`),
-  });
-
-  const disparar = trpc.notificacoes.dispararDoDia.useMutation({
-    onSuccess: (data) => {
-      toast.success(data.mensagem);
-      utils.notificacoes.historico.invalidate();
-      setDisparando(false);
-    },
-    onError: (e) => {
-      toast.error(`Erro: ${e.message}`);
-      setDisparando(false);
-    },
   });
 
   useEffect(() => {
@@ -127,11 +116,6 @@ export default function NotificacoesAutomaticas() {
     setEditando(prev => prev ? { ...prev, mensagem: prev.mensagem + variavel } : null);
   };
 
-  const handleDisparar = () => {
-    setDisparando(true);
-    disparar.mutate();
-  };
-
   const regraEditando = regras?.find(r => r.tipo === editando?.tipo);
 
   return (
@@ -148,15 +132,9 @@ export default function NotificacoesAutomaticas() {
               {t('notifications.subtitle')}
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDisparar}
-            disabled={disparando || !globalAtivo}
-            className="gap-2"
-          >
+          <Button variant="outline" size="sm" disabled className="gap-2" title="Os envios são processados pela automação em fila, com prevenção de duplicidade.">
             <Zap className="w-4 h-4" />
-            {disparando ? t('common.sending') : t('notifications.fireNow')}
+            Fila automática
           </Button>
         </div>
 
@@ -205,6 +183,28 @@ export default function NotificacoesAutomaticas() {
                   Salvar horário
                 </Button>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border bg-muted/20">
+          <CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-5">
+            {[
+              ["Pendentes", saude?.pendentes ?? 0, "text-amber-400"],
+              ["Enviando", saude?.enviando ?? 0, "text-blue-400"],
+              ["Falhas", saude?.falhas ?? 0, "text-red-400"],
+              ["Revisar", saude?.ambiguas ?? 0, "text-orange-400"],
+            ].map(([label, valor, cor]) => (
+              <div key={String(label)} className="rounded-lg border border-border bg-background/40 p-3">
+                <p className="text-xs text-muted-foreground">{label}</p>
+                <p className={`mt-1 text-lg font-semibold ${cor}`}>{valor}</p>
+              </div>
+            ))}
+            <div className="col-span-2 rounded-lg border border-border bg-background/40 p-3 sm:col-span-1">
+              <p className="text-xs text-muted-foreground">Último envio</p>
+              <p className="mt-1 truncate text-xs font-medium text-foreground">
+                {saude?.ultimoEnvioEm ? new Date(saude.ultimoEnvioEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Sem envio"}
+              </p>
             </div>
           </CardContent>
         </Card>

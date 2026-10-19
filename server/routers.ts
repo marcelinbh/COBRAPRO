@@ -21,6 +21,8 @@ import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizz
 import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
 import { calcularSaldoAtual } from "../shared/caixa";
+import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia } from "./services/businessDate";
+import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarContaDoUsuario } from "./services/operacoesFinanceiras";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -2080,14 +2082,27 @@ const parcelasRouter = router({
       valorJurosCustom: z.number().optional(),   // juros de atraso editado manualmente
       dataPagamento: z.string().optional(),       // data manual no formato YYYY-MM-DD
       transferirSaldoResidual: z.boolean().default(true), // transferir saldo para próxima parcela
+      idempotencyKey: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
+      if (!input.contaCaixaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de caixa para registrar o recebimento' });
+      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
+      const chaveIdempotencia = input.idempotencyKey ?? criarChaveIdempotencia();
+      const reserva = await reservarOperacaoFinanceira({
+        userId: ctx.user.id,
+        tipo: 'recebimento_parcela',
+        chaveIdempotencia,
+        payload: { parcelaId: input.parcelaId, valorPago: input.valorPago, contaCaixaId: input.contaCaixaId, desconto: input.desconto, dataPagamento: input.dataPagamento ?? dataHojeBrasilia() },
+      });
+      if (reserva.repetida) return { success: true, repetida: true, ...(reserva.resultado ?? {}) } as any;
 
+      try {
       // Buscar parcela
       const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
       if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
+      if (parcelaData.status === 'paga') throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi quitada' });
 
       // Buscar configuração de multa diária do usuário
       let multaDiariaReais = 0;
@@ -2106,12 +2121,11 @@ const parcelasRouter = router({
       const valorTotalDevido = valorOriginal + saldoResidualAnterior;
 
       // Calcular juros de atraso usando multaDiaria em R$/dia (modelo CobraFácil)
-      const dataPagamentoDate = input.dataPagamento
-        ? new Date(input.dataPagamento + 'T12:00:00')
-        : new Date();
+      const dataReferencia = input.dataPagamento ?? dataHojeBrasilia();
+      const dataPagamentoDate = new Date(`${dataReferencia}T12:00:00-03:00`);
       const { juros: jurosCalculado, multa } = calcularJurosMora(
         valorTotalDevido,
-        new Date(parcelaData.data_vencimento + 'T00:00:00'),
+        new Date(parcelaData.data_vencimento + 'T12:00:00-03:00'),
         dataPagamentoDate,
         multaDiariaReais,
         0 // multa percentual não usada no modelo CobraFácil
@@ -2121,10 +2135,8 @@ const parcelasRouter = router({
       const juros = input.valorJurosCustom !== undefined ? input.valorJurosCustom : jurosCalculado;
 
       // Data de pagamento
-      const dataPagamentoISO = input.dataPagamento
-        ? new Date(input.dataPagamento + 'T12:00:00').toISOString()
-        : new Date().toISOString();
-      const dataPagamentoStr = input.dataPagamento ?? new Date().toISOString().split('T')[0];
+      const dataPagamentoISO = dataCivilBrasiliaParaIso(dataReferencia);
+      const dataPagamentoStr = dataReferencia;
 
       // Determinar status e saldo residual
       const valorTotalComJuros = valorTotalDevido + juros + multa - input.desconto;
@@ -2146,7 +2158,7 @@ const parcelasRouter = router({
         conta_caixa_id: input.contaCaixaId ?? null,
         observacoes: input.observacoes ?? null,
       }).eq('id', input.parcelaId);
-      if (updateErr) console.error('[registrarPagamento] Update parcela error:', updateErr.message);
+      if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message });
 
       // ─── SALDO RESIDUAL AUTOMÁTICO ─────────────────────────────────────────
       // Se pagamento parcial E transferirSaldoResidual=true, adicionar saldo à próxima parcela
@@ -2166,8 +2178,8 @@ const parcelasRouter = router({
         }
       }
 
-      // Registrar entrada no caixa (apenas se conta informada)
-      if (input.contaCaixaId) {
+      // Registrar uma única entrada no caixa, vinculada à operação idempotente.
+      {
         const { error: txErr } = await sb.from('transacoes_caixa').insert({
           conta_caixa_id: input.contaCaixaId,
           tipo: 'entrada',
@@ -2179,7 +2191,7 @@ const parcelasRouter = router({
           data_transacao: dataPagamentoStr,
           user_id: ctx.user.id,
         });
-        if (txErr) console.error('[registrarPagamento] Insert transacao error:', txErr.message);
+        if (txErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
       }
 
       // Verificar se contrato foi quitado
@@ -2203,7 +2215,17 @@ const parcelasRouter = router({
         valorNovo: input.valorPago.toFixed(2),
       });
 
-      return { success: true, status: novoStatus, saldoResidual: saldoRestante };
+      const resultado = { status: novoStatus, saldoResidual: saldoRestante, parcelaId: input.parcelaId };
+      await concluirOperacaoFinanceira(reserva.id, resultado);
+      await registrarAuditoriaFinanceira({
+        userId: ctx.user.id, operacaoId: reserva.id, acao: 'registrar_pagamento_parcela', entidade: 'parcelas', entidadeId: input.parcelaId,
+        detalhes: { valorPago: input.valorPago, contaCaixaId: input.contaCaixaId, status: novoStatus, saldoResidual: saldoRestante, dataPagamento: dataReferencia },
+      });
+      return { success: true, repetida: false, operationId: reserva.id, ...resultado };
+      } catch (error) {
+        await falharOperacaoFinanceira(reserva.id, error);
+        throw error;
+      }
     }),
 
   // Pagar apenas os juros do período e renovar a parcela por mais um período
@@ -2215,8 +2237,19 @@ const parcelasRouter = router({
       observacoes: z.string().optional(),
       novaDataVencimento: z.string().optional(), // YYYY-MM-DD — sobrescreve o cálculo automático
       novoValorParcela: z.number().positive().optional(), // sobrescreve o valor original da nova parcela
+      idempotencyKey: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (!input.contaCaixaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de caixa para registrar o recebimento' });
+      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
+      const reserva = await reservarOperacaoFinanceira({
+        userId: ctx.user.id,
+        tipo: 'renovacao_juros',
+        chaveIdempotencia: input.idempotencyKey ?? criarChaveIdempotencia(),
+        payload: { parcelaId: input.parcelaId, valorJurosPago: input.valorJurosPago, contaCaixaId: input.contaCaixaId, novaDataVencimento: input.novaDataVencimento, novoValorParcela: input.novoValorParcela },
+      });
+      if (reserva.repetida) return { success: true, repetida: true, ...(reserva.resultado ?? {}) } as any;
+      try {
       const db = await getDb();
 
       // Buscar parcela
@@ -2268,10 +2301,7 @@ const parcelasRouter = router({
         novaDataVencStr = input.novaDataVencimento;
       } else {
         const diasIntervalo = getDiasModalidade(contrato.tipoTaxa ?? contrato.modalidade);
-        const dataVencAtual = new Date(String(parcela.dataVencimento) + 'T00:00:00');
-        const novaDataVenc = new Date(dataVencAtual);
-        novaDataVenc.setDate(novaDataVenc.getDate() + diasIntervalo);
-        novaDataVencStr = novaDataVenc.toISOString().split('T')[0];
+        novaDataVencStr = adicionarDiasData(String(parcela.dataVencimento).slice(0, 10), diasIntervalo);
       }
       // Valor da nova parcela: usar o valor informado pelo usuário, ou o valor_parcela do contrato
       // (capital + juros), nunca o valor_original da parcela atual (que pode ser só juros)
@@ -2399,7 +2429,17 @@ const parcelasRouter = router({
         valorNovo: input.valorJurosPago.toFixed(2),
       });
 
-      return { success: true, novaDataVencimento: novaDataVencStr };
+      const resultado = { parcelaId: input.parcelaId, novaDataVencimento: novaDataVencStr };
+      await concluirOperacaoFinanceira(reserva.id, resultado);
+      await registrarAuditoriaFinanceira({
+        userId: ctx.user.id, operacaoId: reserva.id, acao: 'renovar_pagando_juros', entidade: 'parcelas', entidadeId: input.parcelaId,
+        detalhes: { valorJurosPago: input.valorJurosPago, contaCaixaId: input.contaCaixaId, novaDataVencimento: novaDataVencStr },
+      });
+      return { success: true, repetida: false, operationId: reserva.id, ...resultado };
+      } catch (error) {
+        await falharOperacaoFinanceira(reserva.id, error);
+        throw error;
+      }
     }),
 
   editarParcela: protectedProcedure
@@ -3669,10 +3709,21 @@ const contasPagarRouter = router({
       id: z.number(),
       contaCaixaId: z.number().int().positive(),
       dataPagamento: z.string().optional(),
+      idempotencyKey: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      const dataPag = input.dataPagamento ? new Date(input.dataPagamento) : new Date();
+      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
+      const dataReferencia = input.dataPagamento ?? dataHojeBrasilia();
+      const reserva = await reservarOperacaoFinanceira({
+        userId: ctx.user.id,
+        tipo: 'pagamento_conta',
+        chaveIdempotencia: input.idempotencyKey ?? criarChaveIdempotencia(),
+        payload: { id: input.id, contaCaixaId: input.contaCaixaId, dataPagamento: dataReferencia },
+      });
+      if (reserva.repetida) return { success: true, repetida: true, ...(reserva.resultado ?? {}) } as any;
+      const dataPag = new Date(dataCivilBrasiliaParaIso(dataReferencia));
+      try {
       if (db) {
         try {
           const conta = await db.select().from(contasPagar).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id))).limit(1);
@@ -3712,7 +3763,17 @@ const contasPagarRouter = router({
           .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'paga');
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: transacaoErro.message });
       }
-      return { success: true };
+      const resultado = { contaId: input.id, dataPagamento: dataReferencia };
+      await concluirOperacaoFinanceira(reserva.id, resultado);
+      await registrarAuditoriaFinanceira({
+        userId: ctx.user.id, operacaoId: reserva.id, acao: 'pagar_conta', entidade: 'contas_pagar', entidadeId: input.id,
+        detalhes: { contaCaixaId: input.contaCaixaId, dataPagamento: dataReferencia, valor: contaData.valor },
+      });
+      return { success: true, repetida: false, operationId: reserva.id, ...resultado };
+      } catch (error) {
+        await falharOperacaoFinanceira(reserva.id, error);
+        throw error;
+      }
     }),
 
   cancelar: protectedProcedure

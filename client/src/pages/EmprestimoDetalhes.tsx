@@ -60,6 +60,7 @@ export default function EmprestimoDetalhes() {
   // Estado para pagamento com data/juros customizados
   const [dataPagamentoCustom, setDataPagamentoCustom] = useState('');
   const [jurosCustomDetalhes, setJurosCustomDetalhes] = useState('');
+  const [idempotencyKeyPagamento, setIdempotencyKeyPagamento] = useState('');
 
   const utils = trpc.useUtils();
   const { data: contas } = trpc.caixa.contas.useQuery();
@@ -171,6 +172,8 @@ export default function EmprestimoDetalhes() {
   const handlePagar = () => {
     if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
     if (!parcela) { toast.error(t('toast_error.nenhuma_parcela_pendente')); return; }
+    const idempotencyKey = idempotencyKeyPagamento || crypto.randomUUID();
+    if (!idempotencyKeyPagamento) setIdempotencyKeyPagamento(idempotencyKey);
     const valor = valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela);
     const jurosVal = jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : undefined;
     const dataManual = dataPagamentoCustom || undefined;
@@ -180,6 +183,7 @@ export default function EmprestimoDetalhes() {
       contaCaixaId: parseInt(contaCaixaId),
       valorJurosCustom: jurosVal,
       dataPagamento: dataManual,
+      idempotencyKey,
     });
   };
 

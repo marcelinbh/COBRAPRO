@@ -54,6 +54,7 @@ export default function ContasPagar() {
   const [dialogPagarId, setDialogPagarId] = useState<number | null>(null);
   const [dialogEstornarId, setDialogEstornarId] = useState<number | null>(null);
   const [contaCaixaIdPagar, setContaCaixaIdPagar] = useState<string>("");
+  const [idempotencyKeyPagar, setIdempotencyKeyPagar] = useState("");
 
   // Form state
   const [form, setForm] = useState({
@@ -164,9 +165,12 @@ export default function ContasPagar() {
       toast.error("Selecione a conta de Caixa que realizou o pagamento");
       return;
     }
+    const idempotencyKey = idempotencyKeyPagar || crypto.randomUUID();
+    if (!idempotencyKeyPagar) setIdempotencyKeyPagar(idempotencyKey);
     pagarMutation.mutate({
       id,
       contaCaixaId: parseInt(contaCaixaIdPagar),
+      idempotencyKey,
     });
   }
 
@@ -382,6 +386,7 @@ export default function ContasPagar() {
                       <Dialog open={dialogPagarId === conta.id} onOpenChange={(open) => {
                         setDialogPagarId(open ? conta.id : null);
                         setContaCaixaIdPagar(open && contasCaixa?.length === 1 ? String(contasCaixa[0].id) : "");
+                        if (open) setIdempotencyKeyPagar(crypto.randomUUID());
                       }}>
                         <DialogTrigger asChild>
                           <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1">

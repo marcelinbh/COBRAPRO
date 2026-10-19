@@ -1,196 +1,93 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { ENV } from "../_core/env";
+import {
+  deleteInstance,
+  disconnectInstance,
+  ensureConnection,
+  enviarMensagemEvolution,
+  getConnectionSnapshot,
+  instanceNameForUser,
+  normalizarTelefoneWhatsApp,
+} from "../services/evolutionClient";
 
-// ─── EVOLUTION API GLOBAL CONFIG ─────────────────────────────────────────────
-// A URL e API Key são globais do sistema (shared). Cada usuário tem sua própria
-// instância nomeada como "user-{userId}" criada automaticamente.
-
-function getGlobalConfig(userId: number): { url: string; apiKey: string; instanceName: string } {
-  return {
-    url: ENV.evolutionApiUrl.replace(/\/$/, ''),
-    apiKey: ENV.evolutionApiKey,
-    instanceName: `user-${userId}`,
-  };
+function throwEvolutionError(message?: string): never {
+  throw new TRPCError({ code: "BAD_GATEWAY", message: message ?? "A Evolution API não respondeu corretamente" });
 }
 
-async function evolutionRequest(
-  config: { url: string; apiKey: string; instanceName: string },
-  method: string,
-  path: string,
-  body?: unknown
-) {
-  const fullPath = path.replace('{instance}', config.instanceName);
-  const res = await fetch(`${config.url}${fullPath}`, {
-    method,
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': config.apiKey,
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-
-  const text = await res.text();
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { raw: text, status: res.status };
-  }
-}
-
-// ─── ROUTER ──────────────────────────────────────────────────────────────────
 export const whatsappEvolutionRouter = router({
+  /** Não expõe URL ou chave da infraestrutura ao navegador. */
+  getConfig: protectedProcedure.query(({ ctx }) => ({
+    instanceName: instanceNameForUser(ctx.user.id),
+  })),
 
-  // Obter configurações (apenas retorna instanceName para o frontend)
-  getConfig: protectedProcedure.query(async ({ ctx }) => {
-    const config = getGlobalConfig(ctx.user.id);
-    return {
-      url: config.url,
-      instanceName: config.instanceName,
-      configured: true,
-    };
-  }),
+  /** Consulta somente leitura, apropriada para polling da tela. */
+  getStatus: protectedProcedure.query(async ({ ctx }) => getConnectionSnapshot(ctx.user.id)),
 
-  // Criar instância na Evolution API
-  // Se já está conectado (open), retorna sem recriar.
-  // Se está em estado inválido (close/connecting), deleta e recria para garantir QR fresco.
+  /** Consulta somente leitura: não cria nem apaga sessão. */
+  getQRCode: protectedProcedure.query(async ({ ctx }) => getConnectionSnapshot(ctx.user.id)),
+
+  /** Garante uma sessão por usuário e jamais remove uma sessão connecting. */
   createInstance: protectedProcedure.mutation(async ({ ctx }) => {
-    const config = getGlobalConfig(ctx.user.id);
-
-    // Verificar se já está conectado — não recriar
-    const existing = await evolutionRequest(config, 'GET', '/instance/connectionState/{instance}');
-    if (existing?.instance?.state === 'open') {
-      return { success: true, alreadyExists: true, state: 'open' };
+    const snapshot = await ensureConnection(ctx.user.id);
+    if (snapshot.state === "unavailable" || snapshot.state === "unauthorized" || snapshot.state === "error") {
+      throwEvolutionError(snapshot.errorMessage);
     }
-
-    // Se existe mas não está conectado, deletar para garantir QR fresco
-    if (existing?.instance?.state) {
-      await evolutionRequest(config, 'DELETE', '/instance/delete/{instance}');
-      await new Promise(resolve => setTimeout(resolve, 1500));
-    }
-
-    // Criar nova instância
-    const result = await evolutionRequest(config, 'POST', '/instance/create', {
-      instanceName: config.instanceName,
-      qrcode: true,
-      integration: 'WHATSAPP-BAILEYS',
-    });
-
-    return result;
+    return { success: true, ...snapshot };
   }),
 
-  // Obter QR Code da instância (cria automaticamente se não existir)
-  getQRCode: protectedProcedure.query(async ({ ctx }) => {
-    const config = getGlobalConfig(ctx.user.id);
-
-    try {
-      // Verificar status da conexão
-      const status = await evolutionRequest(config, 'GET', '/instance/connectionState/{instance}');
-
-      if (status?.instance?.state === 'open') {
-        return { connected: true, qrcode: null, state: 'open', instanceName: config.instanceName };
-      }
-
-      // Se instância não existe (404 ou erro), criar automaticamente
-      if (!status?.instance?.state || status?.status === 404 || status?.error) {
-        await evolutionRequest(config, 'POST', '/instance/create', {
-          instanceName: config.instanceName,
-          qrcode: true,
-          integration: 'WHATSAPP-BAILEYS',
-        });
-        // Aguardar a instância ser criada
-        await new Promise(resolve => setTimeout(resolve, 2000));
-      }
-
-      // Obter QR Code
-      const qrResult = await evolutionRequest(config, 'GET', '/instance/connect/{instance}');
-
-      return {
-        connected: false,
-        qrcode: qrResult?.base64 || qrResult?.qrcode?.base64 || null,
-        state: status?.instance?.state || 'disconnected',
-        instanceName: config.instanceName,
-      };
-    } catch (e) {
-      return { connected: false, qrcode: null, error: String(e), state: 'error' };
+  /** Alias explícito para o fluxo seguro de provisionar/conectar. */
+  ensureConnection: protectedProcedure.mutation(async ({ ctx }) => {
+    const snapshot = await ensureConnection(ctx.user.id);
+    if (snapshot.state === "unavailable" || snapshot.state === "unauthorized" || snapshot.state === "error") {
+      throwEvolutionError(snapshot.errorMessage);
     }
+    return { success: true, ...snapshot };
   }),
 
-  // Verificar status da conexão
-  getStatus: protectedProcedure.query(async ({ ctx }) => {
-    const config = getGlobalConfig(ctx.user.id);
-
-    try {
-      const status = await evolutionRequest(config, 'GET', '/instance/connectionState/{instance}');
-      return {
-        connected: status?.instance?.state === 'open',
-        configured: true,
-        state: status?.instance?.state || 'disconnected',
-        instanceName: config.instanceName,
-      };
-    } catch {
-      return { connected: false, configured: true, state: 'error' };
-    }
-  }),
-
-  // Desconectar instância
   disconnect: protectedProcedure.mutation(async ({ ctx }) => {
-    const config = getGlobalConfig(ctx.user.id);
-    const result = await evolutionRequest(config, 'DELETE', '/instance/logout/{instance}');
-    return result;
+    const result = await disconnectInstance(ctx.user.id);
+    if (!result.ok && result.state !== "missing") throwEvolutionError(result.errorMessage);
+    return { success: true };
   }),
 
-  // Deletar instância
-  deleteInstance: protectedProcedure.mutation(async ({ ctx }) => {
-    const config = getGlobalConfig(ctx.user.id);
-    const result = await evolutionRequest(config, 'DELETE', '/instance/delete/{instance}');
-    return result;
-  }),
-
-  // Enviar mensagem de texto via Evolution API
-  sendMessage: protectedProcedure
-    .input(z.object({
-      phone: z.string(),
-      message: z.string(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const config = getGlobalConfig(ctx.user.id);
-
-      // Format phone number: remove non-digits, add 55 if needed
-      let phone = input.phone.replace(/\D/g, '');
-      if (!phone.startsWith('55')) phone = '55' + phone;
-      if (!phone.endsWith('@s.whatsapp.net')) phone = phone + '@s.whatsapp.net';
-
-      // v1.8.x format: textMessage wrapper
-      const result = await evolutionRequest(config, 'POST', '/message/sendText/{instance}', {
-        number: phone,
-        textMessage: { text: input.message },
-      });
-
-      if (result?.error || result?.status === 400) {
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: result?.message || 'Erro ao enviar mensagem' });
+  /** A recriação é propositalmente separada e exige confirmação do operador. */
+  resetConnection: protectedProcedure
+    .input(z.object({ confirmar: z.literal(true) }))
+    .mutation(async ({ ctx }) => {
+      const logout = await disconnectInstance(ctx.user.id);
+      if (!logout.ok && logout.state !== "missing") throwEvolutionError(logout.errorMessage);
+      const removed = await deleteInstance(ctx.user.id);
+      if (!removed.ok && removed.state !== "missing") throwEvolutionError(removed.errorMessage);
+      const snapshot = await ensureConnection(ctx.user.id);
+      if (snapshot.state === "unavailable" || snapshot.state === "unauthorized" || snapshot.state === "error") {
+        throwEvolutionError(snapshot.errorMessage);
       }
-
-      return { success: true, result };
+      return { success: true, ...snapshot };
     }),
 
-  // Verificar se um número está no WhatsApp
+  /** Mantido por compatibilidade; não permite remoção sem a confirmação explícita. */
+  deleteInstance: protectedProcedure
+    .input(z.object({ confirmar: z.literal(true) }))
+    .mutation(async ({ ctx }) => {
+      const result = await deleteInstance(ctx.user.id);
+      if (!result.ok && result.state !== "missing") throwEvolutionError(result.errorMessage);
+      return { success: true };
+    }),
+
+  sendMessage: protectedProcedure
+    .input(z.object({ phone: z.string().min(8), message: z.string().min(1).max(4000) }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await enviarMensagemEvolution(ctx.user.id, input.phone, input.message);
+      if (!result.ok) throwEvolutionError(result.erro);
+      return { success: true, providerMessageId: result.providerMessageId };
+    }),
+
   checkNumber: protectedProcedure
-    .input(z.object({ phone: z.string() }))
-    .query(async ({ ctx, input }) => {
-      const config = getGlobalConfig(ctx.user.id);
-
-      let phone = input.phone.replace(/\D/g, '');
-      if (!phone.startsWith('55')) phone = '55' + phone;
-
+    .input(z.object({ phone: z.string().min(8) }))
+    .query(async ({ input }) => {
       try {
-        const result = await evolutionRequest(config, 'POST', '/chat/whatsappNumbers/{instance}', {
-          numbers: [phone],
-        });
-
-        const numberInfo = Array.isArray(result) ? result[0] : result;
-        return { exists: numberInfo?.exists || false, jid: numberInfo?.jid };
+        return { exists: true, number: normalizarTelefoneWhatsApp(input.phone) };
       } catch {
         return { exists: false };
       }

@@ -150,6 +150,7 @@ function PagamentoDialog({
   const [valorPago, setValorPago] = useState("");
   const [contaCaixaId, setContaCaixaId] = useState("");
   const [desconto, setDesconto] = useState("0");
+  const [idempotencyKey, setIdempotencyKey] = useState("");
 
   // Usar parâmetros de multa/juros das configurações quando jurosMultaAutomatico estiver ativo
   const multaDiariaConfig = configData?.jurosMultaAutomatico ? (configData?.multaDiaria ?? 0) : 0;
@@ -203,7 +204,7 @@ function PagamentoDialog({
       <Button
         size="sm"
         className="gap-1 h-7 text-xs"
-        onClick={(e) => { e.stopPropagation(); setValorPago(total.toFixed(2)); setOpen(true); }}
+        onClick={(e) => { e.stopPropagation(); setValorPago(total.toFixed(2)); setIdempotencyKey(crypto.randomUUID()); setOpen(true); }}
       >
         <CheckCircle className="h-3 w-3" />
         {t('emprestimos.pay')}
@@ -299,7 +300,7 @@ function PagamentoDialog({
             </div>
 
             <div>
-              <Label>{t('emprestimos.cashAccount')} <span className="text-muted-foreground text-xs">(opcional)</span></Label>
+              <Label>{t('emprestimos.cashAccount')} *</Label>
               <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
                 <SelectTrigger className="mt-1">
                   <SelectValue placeholder={t('emprestimos.cashAccount')} />
@@ -323,13 +324,14 @@ function PagamentoDialog({
               <Button variant="outline" className="flex-1" onClick={() => { setOpen(false); setModoSoJuros(false); }}>{t('common.cancel')}</Button>
               <Button
                 className={`flex-1 ${modoSoJuros ? 'bg-amber-600 hover:bg-amber-700 text-white' : ''}`}
-                disabled={!valorPago || pagarMutation.isPending || pagarJurosMutation.isPending}
+                disabled={!valorPago || !contaCaixaId || pagarMutation.isPending || pagarJurosMutation.isPending}
                 onClick={() => {
                   if (modoSoJuros) {
                     pagarJurosMutation.mutate({
                       parcelaId: parcela.id,
                       valorJurosPago: parseFloat(valorPago),
                       contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
+                      idempotencyKey: idempotencyKey || crypto.randomUUID(),
                     });
                   } else {
                     pagarMutation.mutate({
@@ -337,6 +339,7 @@ function PagamentoDialog({
                       valorPago: parseFloat(valorPago),
                       contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
                       desconto: parseFloat(desconto),
+                      idempotencyKey: idempotencyKey || crypto.randomUUID(),
                     });
                   }
                 }}

@@ -139,15 +139,14 @@ export default function MeuPerfil() {
     onError: (e) => toast.error(e.message),
   });
 
-  const connectWpp = trpc.whatsappEvolution.createInstance.useMutation({
-    onSuccess: () => { setTimeout(() => { refetchQR(); refetchWpp(); }, 2000); },
+  const connectWpp = trpc.whatsappEvolution.ensureConnection.useMutation({
+    onSuccess: () => { refetchQR(); refetchWpp(); },
     onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const handleAbrirQRModal = useCallback(() => {
     setShowQRModal(true);
     connectWpp.mutate();
-    setTimeout(() => { refetchQR(); refetchWpp(); }, 2000);
   }, [connectWpp, refetchQR, refetchWpp]);
 
   const disconnectWpp = trpc.whatsappEvolution.disconnect.useMutation({
@@ -705,9 +704,9 @@ export default function MeuPerfil() {
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
                   <span className="text-xs text-gray-500">Gerando QR Code...</span>
                 </div>
-              ) : qrData?.qrcode ? (
+              ) : (qrData?.qrCode || connectWpp.data?.qrCode) ? (
                 <div className="p-3 bg-white rounded-xl shadow-lg">
-                  <img src={qrData.qrcode} alt="QR Code WhatsApp" className="h-48 w-48 object-contain" />
+                  <img src={qrData?.qrCode || connectWpp.data?.qrCode || ''} alt="QR Code WhatsApp" className="h-48 w-48 object-contain" />
                 </div>
               ) : (
                 <div className="h-52 w-52 flex flex-col items-center justify-center bg-white rounded-xl gap-3">
