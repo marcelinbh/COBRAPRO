@@ -19,6 +19,8 @@ describe("desembolso de empréstimo no Caixa", () => {
       contrato_id: 42,
       user_id: 3,
     });
+    // A tabela produtiva legada não possui cliente_id em transacoes_caixa.
+    expect(movimento).not.toHaveProperty("cliente_id");
   });
 
   it("não cria outro desembolso quando o contrato já possui o lançamento", () => {
