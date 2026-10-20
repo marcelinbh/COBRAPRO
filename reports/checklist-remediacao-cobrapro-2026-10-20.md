@@ -16,6 +16,7 @@
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Remover a chave padrão da Evolution do código e exigir variável criptografada na DigitalOcean.
+- [x] Remover artefatos compilados versionados e impedir que `dist/` volte ao repositório.
 - [ ] Rotacionar credenciais administrativas e segredos expostos em histórico. **Depende de configuração segura de variáveis na DigitalOcean; não será exposto em chat.**
 - [ ] Remover chave padrão da Evolution API do código depois de confirmar a variável de ambiente de produção.
 
