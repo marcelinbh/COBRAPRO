@@ -30,6 +30,27 @@ function getConfig() {
   return { url, apiKey };
 }
 
+/**
+ * Vincula uma instância ao webhook autenticado do CobraPro. Só é acionado em
+ * produção quando o token está configurado: a prévia local nunca registra
+ * callbacks em produção e o token não é retornado ao navegador.
+ */
+async function configurarWebhookDeEntrega(instanceName: string): Promise<EvolutionResult | null> {
+  if (!ENV.isProduction || !ENV.evolutionWebhookToken) return null;
+
+  const baseUrl = (process.env.PUBLIC_APP_URL ?? "https://cobrapro.online").replace(/\/$/, "");
+  if (!/^https:\/\//i.test(baseUrl)) {
+    return { ok: false, errorCode: "WEBHOOK_URL", errorMessage: "A URL pública do webhook deve usar HTTPS" };
+  }
+
+  return request("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
+    url: `${baseUrl}/api/webhook/evolution?token=${encodeURIComponent(ENV.evolutionWebhookToken)}`,
+    webhook_by_events: false,
+    webhook_base64: false,
+    events: ["MESSAGES_UPDATE", "CONNECTION_UPDATE"],
+  });
+}
+
 export function instanceNameForUser(userId: number): string {
   return `user-${userId}`;
 }
@@ -123,7 +144,13 @@ export async function getConnectionSnapshot(userId: number): Promise<EvolutionCo
 /** Cria somente a instância inexistente; nunca apaga uma sessão em conexão. */
 export async function ensureConnection(userId: number): Promise<EvolutionConnectionSnapshot> {
   const existing = await getConnectionSnapshot(userId);
-  if (existing.state === "open" || existing.state === "unavailable" || existing.state === "unauthorized") return existing;
+  if (existing.state === "open") {
+    const webhook = await configurarWebhookDeEntrega(existing.instanceName);
+    return webhook?.ok === false
+      ? { ...existing, errorCode: webhook.errorCode, errorMessage: `WhatsApp conectado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}` }
+      : existing;
+  }
+  if (existing.state === "unavailable" || existing.state === "unauthorized") return existing;
   // A sessão de pareamento já existe: solicitar apenas um QR renovado, sem recriá-la.
   if (existing.state === "connecting") {
     const refreshed = await request<any>("GET", `/instance/connect/${encodeURIComponent(existing.instanceName)}`);
@@ -141,11 +168,21 @@ export async function ensureConnection(userId: number): Promise<EvolutionConnect
   }
 
   const qrCode = created.ok ? qrFrom(created.data) : null;
-  if (qrCode) return { ...existing, state: "connecting", qrCode, configured: true };
+  if (qrCode) {
+    const webhook = await configurarWebhookDeEntrega(existing.instanceName);
+    if (webhook?.ok === false) {
+      return { ...existing, state: "connecting", qrCode, configured: true, errorCode: webhook.errorCode, errorMessage: `QR Code gerado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}` };
+    }
+    return { ...existing, state: "connecting", qrCode, configured: true };
+  }
 
   const connected = await request<any>("GET", `/instance/connect/${encodeURIComponent(existing.instanceName)}`);
   if (!connected.ok) {
     return { ...existing, state: connected.state ?? "error", errorCode: connected.errorCode, errorMessage: connected.errorMessage };
+  }
+  const webhook = await configurarWebhookDeEntrega(existing.instanceName);
+  if (webhook?.ok === false) {
+    return { ...existing, state: "connecting", qrCode: qrFrom(connected.data), configured: true, errorCode: webhook.errorCode, errorMessage: `QR Code gerado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}` };
   }
   return { ...existing, state: "connecting", qrCode: qrFrom(connected.data), configured: true };
 }
