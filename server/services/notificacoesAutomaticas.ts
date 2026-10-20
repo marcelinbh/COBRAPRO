@@ -240,7 +240,7 @@ export async function processarFilaWhatsApp(limite = 25, dryRun = false): Promis
       const { error: logErro } = await sb.from("notificacoes_log").upsert({
         outbox_id: item.id, user_id: item.user_id, parcela_id: item.parcela_id, cliente_id: item.cliente_id,
         tipo: item.tipo, telefone: item.telefone, mensagem: item.mensagem,
-        status: status === "enviado" ? "enviado" : "erro", erro: result.erro ?? null,
+        status: status === "enviado" ? "enviado" : status === "desconhecido" ? "desconhecido" : "erro", erro: result.erro ?? null,
       }, { onConflict: "outbox_id" });
       if (logErro) throw new Error(logErro.message);
     }

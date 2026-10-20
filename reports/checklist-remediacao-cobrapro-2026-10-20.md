@@ -46,11 +46,11 @@
 ## Prioridade P3 — WhatsApp e controle operacional
 
 - [x] Recuperar mensagens presas em `enviando` com lease vencido.
-- [ ] Persistir e mostrar ID da mensagem da Evolution em outbox e histórico.
+- [x] Persistir e mostrar ID da mensagem da Evolution em outbox e histórico.
 - [x] Autenticar webhook Evolution e vincular evento à instância/empresa correta.
-- [ ] Mostrar na tela: aceita pela API, enviada, entregue, lida, falhou ou estado desconhecido.
+- [x] Mostrar na tela: aceita pela API, enviada, entregue, lida, falhou ou estado desconhecido.
 - [x] Registrar relatório diário como concluído somente após aceite técnico confirmado pelo worker.
-- [ ] Limitar tentativas, alertar sobre instância desconectada e evitar reenvio indevido.
+- [x] Limitar tentativas, alertar sobre instância desconectada e evitar reenvio indevido.
 
 ## Prioridade P4 — Kiwify (por último, conforme solicitado)
 

@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   Bell, BellOff, MessageSquare, Clock, CheckCircle2, XCircle,
-  Send, Info, History, Settings2, Zap, Loader2, Phone, ShieldCheck, CheckCheck
+  Send, Info, History, Settings2, Zap, Loader2, Phone, ShieldCheck, CheckCheck, AlertTriangle
 } from "lucide-react";
 
 // ─── VARIÁVEIS DISPONÍVEIS ────────────────────────────────────────────────────
@@ -41,6 +41,9 @@ function getCategoria(tipo: string) {
 function getStatusEnvio(status: string) {
   if (status === "aceito_evolution") return { label: "Aceito pela Evolution", cor: "bg-blue-500/10 text-blue-400 border-blue-500/30", icone: Send };
   if (status === "enviado") return { label: "Enviado", cor: "bg-green-500/10 text-green-400 border-green-500/30", icone: CheckCircle2 };
+  if (status === "entregue") return { label: "Entregue", cor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30", icone: CheckCheck };
+  if (status === "lido") return { label: "Lido", cor: "bg-violet-500/10 text-violet-400 border-violet-500/30", icone: CheckCheck };
+  if (status === "desconhecido") return { label: "Revisar confirmação", cor: "bg-orange-500/10 text-orange-400 border-orange-500/30", icone: AlertTriangle };
   if (status === "erro" || status === "falhou") return { label: "Falhou", cor: "bg-red-500/10 text-red-400 border-red-500/30", icone: XCircle };
   return { label: status || "Aguardando", cor: "bg-amber-500/10 text-amber-400 border-amber-500/30", icone: Clock };
 }

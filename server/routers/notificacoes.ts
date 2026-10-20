@@ -139,13 +139,44 @@ export const notificacoesRouter = router({
     if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     const config = Object.fromEntries((configs ?? []).map((r: any) => [r.chave, r.valor])) as Record<string, string>;
     const mensagem = substituirVariaveis(input.mensagem_template, { nome: "João Silva (teste)", valor: 250, data_vencimento: dataHojeBrasilia().split("-").reverse().join("/"), dias_atraso: 2, empresa: config.nomeEmpresa || "Sua Empresa", parcela: 3, total_parcelas: 12 });
+    const agora = new Date().toISOString();
+    const { data: outbox, error: outboxError } = await sb.from("whatsapp_outbox").insert({
+      user_id: ctx.user.id,
+      tipo: "teste_envio",
+      telefone,
+      mensagem,
+      chave_deduplicacao: `teste:${ctx.user.id}:${crypto.randomUUID()}`,
+      data_referencia: dataHojeBrasilia(),
+      status: "enviando",
+      proxima_tentativa_em: agora,
+      lease_expira_em: null,
+      tentativas: 1,
+    }).select("id").maybeSingle();
+    if (outboxError || !outbox) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível preparar o rastreio do teste" });
+    }
+
     const resultado = await enviarMensagemEvolution(ctx.user.id, telefone, mensagem);
-    if (!resultado.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: resultado.erro || "Erro ao enviar" });
+    if (!resultado.ok) {
+      await sb.from("whatsapp_outbox").update({
+        status: "falhou", ultimo_erro: resultado.erro ?? "Erro ao enviar", lease_expira_em: null, updated_at: new Date().toISOString(),
+      }).eq("id", outbox.id).eq("user_id", ctx.user.id);
+      throw new TRPCError({ code: "BAD_GATEWAY", message: resultado.erro || "Erro ao enviar" });
+    }
 
     const aceitoEm = new Date().toISOString();
-    // O histórico de testes não bloqueia uma mensagem que a Evolution já aceitou.
-    // Assim, uma base legada sem a tabela de log continua permitindo validar a conexão.
-    const { data: registro, error: logError } = await sb.from("notificacoes_log").insert({
+    const { error: updateOutboxError } = await sb.from("whatsapp_outbox").update({
+      status: "enviado",
+      provider_message_id: resultado.providerMessageId ?? null,
+      ultimo_erro: null,
+      enviado_em: aceitoEm,
+      lease_expira_em: null,
+      updated_at: aceitoEm,
+    }).eq("id", outbox.id).eq("user_id", ctx.user.id).eq("status", "enviando");
+    if (updateOutboxError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Mensagem aceita, mas falhou ao registrar o rastreio" });
+
+    const { data: registro, error: logError } = await sb.from("notificacoes_log").upsert({
+      outbox_id: outbox.id,
       user_id: ctx.user.id,
       tipo: "teste_envio",
       telefone,
@@ -154,7 +185,7 @@ export const notificacoesRouter = router({
       erro: null,
       createdAt: aceitoEm,
     }).select("id, createdAt").maybeSingle();
-    if (logError) console.warn("[notificacoes.testar] Mensagem aceita, mas não foi possível gravar o histórico:", logError.message);
+    if (logError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Mensagem aceita, mas falhou ao gravar o histórico do teste" });
 
     return {
       success: true,
