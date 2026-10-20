@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calcularDataAlvoBrasilia,
   deveExecutarNoHorario,
+  deveMarcarRelatorioDiarioComoConcluido,
   inicioDoDiaBrasilia,
   normalizarTelefoneWhatsApp,
   obterDataBrasilia,
@@ -46,5 +47,12 @@ describe("notificacoesAutomaticas", () => {
   it("normaliza telefones brasileiros para a Evolution API", () => {
     expect(normalizarTelefoneWhatsApp("(31) 99746-6817")).toBe("5531997466817");
     expect(normalizarTelefoneWhatsApp("5531997466817")).toBe("5531997466817");
+  });
+
+  it("só confirma relatório diário depois do aceite técnico da Evolution", () => {
+    expect(deveMarcarRelatorioDiarioComoConcluido("relatorio_diario", "pendente", "2026-09-14")).toBe(false);
+    expect(deveMarcarRelatorioDiarioComoConcluido("relatorio_diario", "falhou", "2026-09-14")).toBe(false);
+    expect(deveMarcarRelatorioDiarioComoConcluido("relatorio_diario", "enviado", "2026-09-14")).toBe(true);
+    expect(deveMarcarRelatorioDiarioComoConcluido("antes_3", "enviado", "2026-09-14")).toBe(false);
   });
 });

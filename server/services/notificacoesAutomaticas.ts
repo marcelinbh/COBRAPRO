@@ -134,6 +134,10 @@ function proximaTentativa(tentativas: number): string {
 
 const MAX_TENTATIVAS_ENVIO = 5;
 
+export function deveMarcarRelatorioDiarioComoConcluido(tipo: string, status: string, dataReferencia: unknown): boolean {
+  return tipo === "relatorio_diario" && status === "enviado" && typeof dataReferencia === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dataReferencia);
+}
+
 /**
  * Um processo pode morrer após reservar uma mensagem. Antes de buscar novos
  * itens, devolvemos essas reservas vencidas à fila; assim a mensagem não fica
@@ -150,18 +154,47 @@ export async function recuperarLeasesExpiradosWhatsApp(): Promise<number> {
   return data?.length ?? 0;
 }
 
-export async function processarFilaWhatsApp(limite = 25, dryRun = false): Promise<{ processadas: number; enviadas: number; falhas: number; aguardandoReconexao: number; ambiguas: number }> {
+/**
+ * Repara o marcador diário se o processo tiver parado depois de a Evolution
+ * aceitar uma mensagem, mas antes de gravar a configuração. A fonte de verdade
+ * é sempre a outbox no estado "enviado", nunca o simples enfileiramento.
+ */
+export async function sincronizarMarcadoresDeRelatorioDiario(dataReferencia = dataHojeBrasilia(), limite = 200): Promise<number> {
   const sb = await getSupabaseClientAsync();
   if (!sb) throw new Error("Banco de dados indisponível");
-  if (dryRun) return { processadas: 0, enviadas: 0, falhas: 0, aguardandoReconexao: 0, ambiguas: 0 };
+  const { data, error } = await sb.from("whatsapp_outbox")
+    .select("user_id, data_referencia")
+    .eq("tipo", "relatorio_diario").eq("status", "enviado").eq("data_referencia", dataReferencia)
+    .order("data_referencia", { ascending: true }).limit(limite);
+  if (error) throw new Error(error.message);
+
+  let atualizados = 0;
+  for (const item of data ?? []) {
+    if (!item.user_id || !item.data_referencia) continue;
+    const { error: marcadorError } = await sb.from("configuracoes").upsert({
+      chave: "relatorio_diario_ultimo_envio",
+      valor: item.data_referencia,
+      user_id: item.user_id,
+    }, { onConflict: "chave,user_id" });
+    if (marcadorError) throw new Error(marcadorError.message);
+    atualizados++;
+  }
+  return atualizados;
+}
+
+export async function processarFilaWhatsApp(limite = 25, dryRun = false): Promise<{ processadas: number; enviadas: number; falhas: number; aguardandoReconexao: number; ambiguas: number; relatoriosConcluidos: number }> {
+  const sb = await getSupabaseClientAsync();
+  if (!sb) throw new Error("Banco de dados indisponível");
+  if (dryRun) return { processadas: 0, enviadas: 0, falhas: 0, aguardandoReconexao: 0, ambiguas: 0, relatoriosConcluidos: 0 };
   await recuperarLeasesExpiradosWhatsApp();
+  await sincronizarMarcadoresDeRelatorioDiario();
   const { data: candidatas, error } = await sb.from("whatsapp_outbox")
-    .select("id, user_id, tipo, telefone, mensagem, parcela_id, cliente_id, tentativas")
+    .select("id, user_id, tipo, telefone, mensagem, parcela_id, cliente_id, data_referencia, tentativas")
     .eq("status", "pendente").lte("proxima_tentativa_em", new Date().toISOString())
     .order("created_at", { ascending: true }).limit(limite);
   if (error) throw new Error(error.message);
 
-  let processadas = 0, enviadas = 0, falhas = 0, aguardandoReconexao = 0, ambiguas = 0;
+  let processadas = 0, enviadas = 0, falhas = 0, aguardandoReconexao = 0, ambiguas = 0, relatoriosConcluidos = 0;
   for (const item of candidatas ?? []) {
     const { data: reservada, error: reservaErro } = await sb.from("whatsapp_outbox").update({
       status: "enviando", lease_expira_em: new Date(Date.now() + 90_000).toISOString(), updated_at: new Date().toISOString(),
@@ -187,6 +220,15 @@ export async function processarFilaWhatsApp(limite = 25, dryRun = false): Promis
       updated_at: new Date().toISOString(), enviado_em: result.ok ? new Date().toISOString() : null,
     }).eq("id", item.id).eq("status", "enviando");
     if (updateErro) throw new Error(updateErro.message);
+    if (deveMarcarRelatorioDiarioComoConcluido(item.tipo, status, item.data_referencia)) {
+      const { error: marcadorError } = await sb.from("configuracoes").upsert({
+        chave: "relatorio_diario_ultimo_envio",
+        valor: item.data_referencia,
+        user_id: item.user_id,
+      }, { onConflict: "chave,user_id" });
+      if (marcadorError) throw new Error(marcadorError.message);
+      relatoriosConcluidos++;
+    }
     const { error: attemptError } = await sb.from("whatsapp_tentativas").insert({
       outbox_id: item.id, iniciou_em: inicio, terminou_em: new Date().toISOString(),
       sucesso: result.ok, provider_message_id: result.providerMessageId ?? null,
@@ -203,7 +245,7 @@ export async function processarFilaWhatsApp(limite = 25, dryRun = false): Promis
       if (logErro) throw new Error(logErro.message);
     }
   }
-  return { processadas, enviadas, falhas, aguardandoReconexao, ambiguas };
+  return { processadas, enviadas, falhas, aguardandoReconexao, ambiguas, relatoriosConcluidos };
 }
 
 export async function obterSaudeNotificacoes(userId: number) {

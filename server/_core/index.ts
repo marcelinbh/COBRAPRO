@@ -142,21 +142,6 @@ async function startServer() {
           mensagem, dataReferencia: dataHoje,
           chaveDeduplicacao: `relatorio:${userId}:${dataHoje}`,
         }, dryRun);
-        if (!dryRun) {
-          const { error: marcadorError } = await sb.from('configuracoes').upsert(
-          {
-            chave: 'relatorio_diario_ultimo_envio',
-            valor: dataHoje,
-            user_id: userId,
-          },
-          { onConflict: 'chave,user_id' }
-        );
-        if (marcadorError) {
-          relatoriosComErro++;
-          console.error(`[scheduled/notificacoes] Relatório enfileirado sem marcador para usuário ${userId}: ${marcadorError.message}`);
-          continue;
-        }
-        }
       }
 
       const processamento = await processarFilaWhatsApp(25, dryRun);
@@ -170,7 +155,7 @@ async function startServer() {
         enfileiradas: producaoLembretes.enfileiradas,
         fila: processamento,
         relatorios: {
-          enviados: 0,
+          enviados: processamento.relatoriosConcluidos,
           elegiveis: relatoriosElegiveis,
           erros: relatoriosComErro,
         },
