@@ -132,10 +132,29 @@ function proximaTentativa(tentativas: number): string {
   return new Date(Date.now() + minutos * 60_000).toISOString();
 }
 
+const MAX_TENTATIVAS_ENVIO = 5;
+
+/**
+ * Um processo pode morrer após reservar uma mensagem. Antes de buscar novos
+ * itens, devolvemos essas reservas vencidas à fila; assim a mensagem não fica
+ * eternamente em "Enviando" e nenhum worker toma lease ainda válido.
+ */
+export async function recuperarLeasesExpiradosWhatsApp(): Promise<number> {
+  const sb = await getSupabaseClientAsync();
+  if (!sb) throw new Error("Banco de dados indisponível");
+  const agora = new Date().toISOString();
+  const { data, error } = await sb.from("whatsapp_outbox")
+    .update({ status: "pendente", lease_expira_em: null, proxima_tentativa_em: agora, updated_at: agora })
+    .eq("status", "enviando").lt("lease_expira_em", agora).select("id");
+  if (error) throw new Error(error.message);
+  return data?.length ?? 0;
+}
+
 export async function processarFilaWhatsApp(limite = 25, dryRun = false): Promise<{ processadas: number; enviadas: number; falhas: number; aguardandoReconexao: number; ambiguas: number }> {
   const sb = await getSupabaseClientAsync();
   if (!sb) throw new Error("Banco de dados indisponível");
   if (dryRun) return { processadas: 0, enviadas: 0, falhas: 0, aguardandoReconexao: 0, ambiguas: 0 };
+  await recuperarLeasesExpiradosWhatsApp();
   const { data: candidatas, error } = await sb.from("whatsapp_outbox")
     .select("id, user_id, tipo, telefone, mensagem, parcela_id, cliente_id, tentativas")
     .eq("status", "pendente").lte("proxima_tentativa_em", new Date().toISOString())
@@ -158,6 +177,7 @@ export async function processarFilaWhatsApp(limite = 25, dryRun = false): Promis
     if (!result.ok) {
       if (result.erroCodigo === "TIMEOUT") { status = "desconhecido"; ambiguas++; }
       else if (result.erroCodigo === "INVALID_PHONE") { status = "falhou"; falhas++; }
+      else if (tentativas >= MAX_TENTATIVAS_ENVIO) { status = "falhou"; falhas++; }
       else { status = "pendente"; proxima = proximaTentativa(tentativas); aguardandoReconexao++; }
     } else enviadas++;
 
