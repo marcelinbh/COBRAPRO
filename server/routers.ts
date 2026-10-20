@@ -1885,23 +1885,11 @@ const contratosRouter = router({
 
   pagarTotal: protectedProcedure
     .input(z.object({ id: z.number(), valor: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (db) {
-        try {
-          await db.update(contratos).set({ status: 'quitado' }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
-          await db.update(parcelas).set({ status: 'paga', dataPagamento: new Date() }).where(eq(parcelas.contratoId, input.id));
-          return { success: true };
-        } catch (err) {
-          console.warn('[contratos.pagarTotal] Drizzle failed, trying REST:', (err as Error).message);
-          resetDb();
-        }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.id).eq('user_id', ctx.user.id);
-      await supabase.from('parcelas').update({ status: 'paga', data_pagamento: new Date().toISOString() }).eq('contrato_id', input.id).eq('user_id', ctx.user.id);
-      return { success: true };
+    .mutation(async () => {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'A quitação total legada foi desativada por segurança. Registre cada parcela pelo fluxo de recebimento, que garante o lançamento no Caixa.',
+      });
     }),
 
   editarJuros: protectedProcedure
@@ -2573,7 +2561,7 @@ const parcelasRouter = router({
       const db = await getDb();
       if (db) {
         // Verificar que a parcela pertence ao usuário
-        const rows = await db.select().from(parcelas).where(eq(parcelas.id, input.parcelaId)).limit(1);
+        const rows = await db.select().from(parcelas).where(and(eq(parcelas.id, input.parcelaId), eq(parcelas.userId, ctx.user.id))).limit(1);
         const parcela = rows[0];
         if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
 
@@ -2581,7 +2569,7 @@ const parcelasRouter = router({
         if (input.novoValor) updateData.valorOriginal = input.novoValor.toFixed(2);
         if (input.novaDataVencimento) updateData.dataVencimento = input.novaDataVencimento;
 
-        await db.update(parcelas).set(updateData).where(eq(parcelas.id, input.parcelaId));
+        await db.update(parcelas).set(updateData).where(and(eq(parcelas.id, input.parcelaId), eq(parcelas.userId, ctx.user.id)));
       } else {
         const supabase = await getSupabaseClientAsync();
         if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
@@ -2590,7 +2578,7 @@ const parcelasRouter = router({
         if (input.novoValor) updateData.valor_original = input.novoValor;
         if (input.novaDataVencimento) updateData.data_vencimento = input.novaDataVencimento;
 
-        const { error } = await supabase.from('parcelas').update(updateData).eq('id', input.parcelaId);
+        const { error } = await supabase.from('parcelas').update(updateData).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
         if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       }
 
@@ -2635,6 +2623,7 @@ const parcelasRouter = router({
         .from('parcelas')
         .select('id')
         .eq('contrato_id', parcela.contrato_id)
+        .eq('user_id', ctx.user.id)
         .neq('status', 'paga')
         .limit(1);
 
@@ -2662,7 +2651,7 @@ const parcelasRouter = router({
       if (cErr || !contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
 
       // Descobrir o próximo número de parcela
-      const { data: existentes } = await sb.from('parcelas').select('numero_parcela').eq('contrato_id', input.contratoId).order('numero_parcela', { ascending: false }).limit(1);
+      const { data: existentes } = await sb.from('parcelas').select('numero_parcela').eq('contrato_id', input.contratoId).eq('user_id', ctx.user.id).order('numero_parcela', { ascending: false }).limit(1);
       const ultimoNum = existentes?.[0]?.numero_parcela ?? 0;
       const novaNumeroParcela = ultimoNum + 1;
 
@@ -3016,7 +3005,7 @@ const whatsappRouter = router({
   templates: protectedProcedure.query(async ({ ctx }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const { data } = await supabase.from('templates_whatsapp').select('*').eq('ativo', true);
+    const { data } = await supabase.from('templates_whatsapp').select('*').eq('ativo', true).eq('user_id', ctx.user.id);
     return (data ?? []).map((r: any) => ({ ...r, ativo: r.ativo }));
   }),
 
@@ -3037,17 +3026,19 @@ const whatsappRouter = router({
       const fechamento = cfg['fechamentoWhatsapp'] ?? cfg['fechamento_whatsapp'] ?? '';
       const linkPagamento = cfg['linkPagamento'] ?? cfg['link_pagamento'] ?? '';
       const tipoTemplate = input.tipo === 'atraso' ? 'cobranca' : 'lembrete';
-      const { data: templates } = await supabase.from('templates_whatsapp').select('*').eq('ativo', true).eq('tipo', tipoTemplate).limit(1);
+      const { data: templates } = await supabase.from('templates_whatsapp').select('*').eq('ativo', true).eq('tipo', tipoTemplate).eq('user_id', ctx.user.id).limit(1);
       const { data: contrato } = await supabase
         .from('contratos')
         .select('*, clientes(nome, whatsapp, telefone, chave_pix)')
         .eq('id', input.contratoId)
+        .eq('user_id', ctx.user.id)
         .single();
       if (!contrato) throw new Error('Contrato não encontrado');
       const { data: parcelasArr } = await supabase
         .from('parcelas')
         .select('*')
         .eq('contrato_id', input.contratoId)
+        .eq('user_id', ctx.user.id)
         .order('numero_parcela', { ascending: true });
       const hoje = new Date();
       const parcelasAtraso = (parcelasArr ?? []).filter((p: any) => {
@@ -3118,12 +3109,12 @@ const whatsappRouter = router({
       templateId: z.number(),
       parcelaId: z.number(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
-      const { data: templateData } = await supabase.from('templates_whatsapp').select('*').eq('id', input.templateId).single();
+      const { data: templateData } = await supabase.from('templates_whatsapp').select('*').eq('id', input.templateId).eq('user_id', ctx.user.id).single();
       if (!templateData) throw new Error('Template não encontrado');
-      const { data: parcelaData } = await supabase.from('parcelas').select('*, clientes(nome, whatsapp, chave_pix), contratos(numero_parcelas)').eq('id', input.parcelaId).single();
+      const { data: parcelaData } = await supabase.from('parcelas').select('*, clientes(nome, whatsapp, chave_pix), contratos(numero_parcelas)').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
       if (!parcelaData) throw new Error('Parcela não encontrada');
       const { total, juros, multa } = calcularJurosMora(
         parseFloat(parcelaData.valor_original),
@@ -3175,6 +3166,7 @@ const whatsappRouter = router({
             .from('contratos')
             .select('*, clientes(nome, whatsapp, telefone, chave_pix)')
             .eq('id', contratoId)
+            .eq('user_id', ctx.user.id)
             .single();
           if (!contrato) { resultados.push({ contratoId, clienteNome: '', whatsappUrl: null, sucesso: false }); continue; }
           const clienteNome = contrato.clientes?.nome ?? '';
@@ -3481,7 +3473,7 @@ const configuracoesRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const { data } = await supabase.from('templates_whatsapp').select('*');
+    const { data } = await supabase.from('templates_whatsapp').select('*').eq('user_id', ctx.user.id);
     return data ?? [];
   }),
 
@@ -3497,13 +3489,13 @@ const configuracoesRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(templatesWhatsapp).set(data).where(eq(templatesWhatsapp.id, id));
+          await db.update(templatesWhatsapp).set(data).where(and(eq(templatesWhatsapp.id, id), eq(templatesWhatsapp.userId, ctx.user.id)));
           return { success: true };
         } catch (err) { console.warn('[configuracoes.updateTemplate] Drizzle failed:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('templates_whatsapp').update(data).eq('id', id);
+      await supabase.from('templates_whatsapp').update(data).eq('id', id).eq('user_id', ctx.user.id);
       return { success: true };
     }),
 
@@ -3645,7 +3637,7 @@ const reparcelamentoRouter = router({
       dataInicio: z.string(),
       incluirMultas: z.boolean().default(true),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       // Use Supabase REST to fetch open parcelas
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
@@ -3654,6 +3646,7 @@ const reparcelamentoRouter = router({
         .from('parcelas')
         .select('*')
         .eq('contrato_id', input.contratoId)
+        .eq('user_id', ctx.user.id)
         .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
       if (parcelasErr) throw new Error(parcelasErr.message);
 
@@ -3716,6 +3709,7 @@ const reparcelamentoRouter = router({
       const { data: parcelasAbertas } = await supabase
         .from('parcelas').select('*')
         .eq('contrato_id', input.contratoId)
+        .eq('user_id', ctx.user.id)
         .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
 
       const hoje = new Date();
@@ -3735,11 +3729,11 @@ const reparcelamentoRouter = router({
 
       // Cancelar parcelas abertas do contrato original
       for (const p of (parcelasAbertas ?? [])) {
-        await supabase.from('parcelas').update({ status: 'paga', observacoes: 'Reparcelado' }).eq('id', p.id);
+        await supabase.from('parcelas').update({ status: 'paga', observacoes: 'Reparcelado' }).eq('id', p.id).eq('user_id', ctx.user.id);
       }
 
       // Cancelar contrato original
-      await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.contratoId);
+      await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.contratoId).eq('user_id', ctx.user.id);
 
       // Criar novo contrato de reparcelamento
       const valorNovaParcela2 = calcularParcelaPadrao(saldoDevedor, input.taxaJuros, input.numeroParcelas);
@@ -4430,14 +4424,18 @@ const vendasTelefoneRouter = router({
 
   parcelas: protectedProcedure
     .input(z.object({ vendaId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       try {
+        const { data: venda } = await supabase.from('vendas_telefone').select('id')
+          .eq('id', input.vendaId).eq('user_id', ctx.user.id).maybeSingle();
+        if (!venda) return [];
         const { data, error } = await supabase
           .from('parcelas_venda_telefone')
           .select('*')
           .eq('venda_id', input.vendaId)
+          .eq('user_id', ctx.user.id)
           .order('numero', { ascending: true });
         if (error) return [];
         return data ?? [];
@@ -4516,6 +4514,7 @@ const vendasTelefoneRouter = router({
           comprador_endereco: input.compradorEndereco ?? null,
           comprador_local_trabalho: input.compradorLocalTrabalho ?? null,
           status: 'ativo',
+          user_id: ctx.user.id,
         })
         .select()
         .single();
@@ -4533,6 +4532,7 @@ const vendasTelefoneRouter = router({
           valor: input.valorParcela,
           vencimento: venc.toISOString(),
           status: 'pendente',
+          user_id: ctx.user.id,
         };
       });
 
@@ -4635,7 +4635,8 @@ const vendasTelefoneRouter = router({
           const { data: todasParcelas } = await supabase
             .from('parcelas_venda_telefone')
             .select('id, status')
-            .eq('venda_id', vendaId);
+            .eq('venda_id', vendaId)
+            .eq('user_id', ctx.user.id);
           if (todasParcelas && todasParcelas.length > 0) {
             const todasPagas = todasParcelas.every((p: any) =>
               p.id === input.parcelaId ? true : p.status === 'paga'
@@ -4644,7 +4645,8 @@ const vendasTelefoneRouter = router({
               await supabase
                 .from('vendas_telefone')
                 .update({ status: 'quitado' })
-                .eq('id', vendaId);
+                .eq('id', vendaId)
+                .eq('user_id', ctx.user.id);
               console.log(`[vendasTelefone] Venda #${vendaId} marcada como QUITADA automaticamente`);
             }
           }
@@ -4657,14 +4659,15 @@ const vendasTelefoneRouter = router({
 
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
       const { error } = await supabase
         .from('vendas_telefone')
         .delete()
-        .eq('id', input.id);
+        .eq('id', input.id)
+        .eq('user_id', ctx.user.id);
 
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { success: true };
@@ -4716,8 +4719,10 @@ const etiquetasRouter = router({
     .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { error } = await sb.from('contratos').update({ etiquetas: JSON.stringify(input.etiquetas) }).eq('id', input.contratoId);
+      const { data, error } = await sb.from('contratos').update({ etiquetas: JSON.stringify(input.etiquetas) })
+        .eq('id', input.contratoId).eq('user_id', ctx.user.id).select('id').maybeSingle();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      if (!data) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
       return { success: true };
     }),
 });
