@@ -2,6 +2,7 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getSupabaseClientAsync } from "../db";
 import { TRPCError } from "@trpc/server";
+import { dataHojeBrasilia } from "../services/businessDate";
 
 async function obterAssinaturaDoUsuario(supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseClientAsync>>>, userId: number, assinaturaId: number) {
   const { data, error } = await supabase
@@ -173,7 +174,7 @@ export const assinaturasRouter = router({
       if (input.status !== undefined) {
         updates.status = input.status;
         if (input.status === "cancelada") {
-          updates.data_cancelamento = new Date().toISOString().split("T")[0];
+          updates.data_cancelamento = dataHojeBrasilia();
         }
       }
       if (input.contaCaixaId !== undefined) updates.conta_caixa_id = input.contaCaixaId;
@@ -268,7 +269,7 @@ export const assinaturasRouter = router({
             categoria: "outros",
             descricao: descricaoCaixa,
             valor: input.valorPago.toFixed(2),
-            data_transacao: new Date().toISOString().split("T")[0],
+            data_transacao: dataHojeBrasilia(),
             user_id: ctx.user.id,
           });
           if (entradaErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: entradaErro.message });

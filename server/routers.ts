@@ -21,7 +21,7 @@ import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizz
 import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
 import { calcularSaldoAtual } from "../shared/caixa";
-import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia } from "./services/businessDate";
+import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia, diferencaDiasData } from "./services/businessDate";
 import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarContaDoUsuario } from "./services/operacoesFinanceiras";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
@@ -92,9 +92,9 @@ const dashboardRouter = router({
     
     if (db) {
       // Use Drizzle ORM if available
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      const hojeStr = hoje.toISOString().split('T')[0];
+      const hojeStr = dataHojeBrasilia();
+      const inicioHoje = new Date(dataCivilBrasiliaParaIso(hojeStr));
+      const inicioAmanha = new Date(dataCivilBrasiliaParaIso(adicionarDiasData(hojeStr, 1)));
 
       const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativo, true), eq(contasCaixa.userId, ctx.user.id)));
       let saldoTotal = 0;
@@ -141,7 +141,8 @@ const dashboardRouter = router({
         .from(transacoesCaixa).where(and(
           eq(transacoesCaixa.tipo, 'entrada'),
           eq(transacoesCaixa.categoria, 'pagamento_parcela'),
-          gte(transacoesCaixa.dataTransacao, hoje),
+          gte(transacoesCaixa.dataTransacao, inicioHoje),
+          lt(transacoesCaixa.dataTransacao, inicioAmanha),
           eq(transacoesCaixa.userId, ctx.user.id)
         ));
       const recebidoHoje = parseFloat(recebidoResult[0]?.total ?? '0');
@@ -160,9 +161,7 @@ const dashboardRouter = router({
     // Fallback to Supabase REST API
     if (!supabase) return { saldoTotal: 0, capitalCirculacao: 0, totalReceber: 0, totalInadimplente: 0, qtdInadimplentes: 0, jurosPendentes: 0, qtdVenceHoje: 0, valorVenceHoje: 0, recebidoHoje: 0, contratosAtivos: 0 };
     
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    const hojeStr = hoje.toISOString().split('T')[0];
+    const hojeStr = dataHojeBrasilia();
 
     // Fetch data via Supabase REST (filtrado por user_id para isolamento entre contas)
     const userId = ctx.user.id;
@@ -212,7 +211,7 @@ const dashboardRouter = router({
     const db = await getDb();
     if (db) {
       try {
-        const hoje = new Date().toISOString().split('T')[0];
+        const hoje = dataHojeBrasilia();
         const rows = await db.select({
           id: parcelas.id, clienteId: parcelas.clienteId, clienteNome: clientes.nome,
           numeroParcela: parcelas.numeroParcela, valorOriginal: parcelas.valorOriginal,
@@ -226,7 +225,7 @@ const dashboardRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const hoje = new Date().toISOString().split('T')[0];
+    const hoje = dataHojeBrasilia();
     const { data } = await supabase.from('parcelas').select('*, clientes(nome)').eq('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']).eq('user_id', ctx.user.id).order('data_vencimento').limit(20);
     return (data ?? []).map((r: any) => ({ id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero, valorOriginal: r.valor_original, dataVencimento: r.data_vencimento, status: r.status, totalParcelas: 0 }));
   }),
@@ -1961,7 +1960,7 @@ const contratosRouter = router({
     .input(z.object({ id: z.number(), multa: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
       if (db) {
         try {
           const parcelasAtraso = await db.select().from(parcelas).where(and(
@@ -2005,7 +2004,7 @@ const parcelasRouter = router({
     }).optional())
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
 
       if (db) {
         try {
@@ -2278,15 +2277,18 @@ const parcelasRouter = router({
 
       // ─── SALDO RESIDUAL AUTOMÁTICO ─────────────────────────────────────────
       // Se pagamento parcial E transferirSaldoResidual=true, adicionar saldo à próxima parcela
+      let saldoProximaParcelaAnterior: { id: number; saldoResidual: string | null } | null = null;
       if (novoStatus === 'parcial' && saldoRestante > 0 && input.transferirSaldoResidual) {
         const { data: proximaParcela } = await sb.from('parcelas')
           .select('id, saldo_residual, valor_original')
           .eq('contrato_id', parcelaData.contrato_id)
+          .eq('user_id', ctx.user.id)
           .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
           .order('numero_parcela', { ascending: true })
           .limit(1)
           .single();
         if (proximaParcela) {
+          saldoProximaParcelaAnterior = { id: proximaParcela.id, saldoResidual: proximaParcela.saldo_residual ?? null };
           const saldoAtualProxima = parseFloat(proximaParcela.saldo_residual ?? '0');
           const novoSaldo = Math.round((saldoAtualProxima + saldoRestante) * 100) / 100;
           const { error: residualErr } = await sb.from('parcelas').update({ saldo_residual: novoSaldo.toFixed(2) }).eq('id', proximaParcela.id).eq('user_id', ctx.user.id);
@@ -2309,6 +2311,10 @@ const parcelasRouter = router({
           user_id: ctx.user.id,
         });
         if (txErr) {
+          if (saldoProximaParcelaAnterior) {
+            await sb.from('parcelas').update({ saldo_residual: saldoProximaParcelaAnterior.saldoResidual })
+              .eq('id', saldoProximaParcelaAnterior.id).eq('user_id', ctx.user.id);
+          }
           await sb.from('parcelas').update(estadoParcelaAnterior).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
         }
@@ -2318,6 +2324,7 @@ const parcelasRouter = router({
       const { data: pendentes } = await sb.from('parcelas')
         .select('id')
         .eq('contrato_id', parcelaData.contrato_id)
+        .eq('user_id', ctx.user.id)
         .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
       if ((pendentes?.length ?? 0) === 0) {
         const { error: contratoStatusErr } = await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcelaData.contrato_id).eq('user_id', ctx.user.id);
@@ -2445,7 +2452,11 @@ const parcelasRouter = router({
           status: 'paga' as const,
           observacoes: input.observacoes ?? 'Pagamento de juros - renovado',
           contaCaixaId: input.contaCaixaId ?? null,
-        }).where(and(eq(parcelas.id, input.parcelaId), eq(parcelas.userId, ctx.user.id))).returning({ id: parcelas.id });
+        }).where(and(
+          eq(parcelas.id, input.parcelaId),
+          eq(parcelas.userId, ctx.user.id),
+          inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']),
+        )).returning({ id: parcelas.id });
         if (parcelaPaga.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'A parcela não pôde ser marcada como paga' });
 
         // Registrar entrada no caixa (apenas se conta informada)
@@ -2459,6 +2470,7 @@ const parcelasRouter = router({
             parcelaId: input.parcelaId,
             contratoId: parcela.contratoId as number,
             clienteId: parcela.clienteId as number,
+            userId: ctx.user.id,
           });
         }
 
@@ -2466,7 +2478,7 @@ const parcelasRouter = router({
         const valorJurosNovaParcela = input.valorJurosPago.toFixed(2);
         // Buscar o maior numero_parcela existente para evitar duplicatas
         const maxParcelaRows = await db.select({ maxNum: sql<number>`MAX(numero_parcela)` })
-          .from(parcelas).where(eq(parcelas.contratoId, parcela.contratoId as number));
+          .from(parcelas).where(and(eq(parcelas.contratoId, parcela.contratoId as number), eq(parcelas.userId, ctx.user.id)));
         const maxNumeroParcela = maxParcelaRows[0]?.maxNum ?? (parcela.numeroParcela as number);
         // Criar nova parcela com o valor (possivelmente customizado) e nova data
         // Nota: não incluir campos que não existem no schema (ex: contagemRenovacoes)
@@ -2487,7 +2499,7 @@ const parcelasRouter = router({
         // Atualizar numeroParcelas do contrato
         await db.update(contratos)
           .set({ numeroParcelas: sql`numero_parcelas + 1` })
-          .where(eq(contratos.id, parcela.contratoId));
+          .where(and(eq(contratos.id, parcela.contratoId as number), eq(contratos.userId, ctx.user.id)));
 
       } else {
         // Fallback REST
@@ -2512,7 +2524,7 @@ const parcelasRouter = router({
           descricao: `Juros pagos - Parcela #${parcela.numeroParcela} renovada - Contrato #${parcela.contratoId}`,
           parcela_id: input.parcelaId,
           contrato_id: parcela.contratoId,
-          data_transacao: new Date().toISOString().split('T')[0],
+          data_transacao: dataHojeBrasilia(),
           user_id: ctx.user.id,
         });
         if (jurosTxErr) {
@@ -2685,7 +2697,7 @@ const parcelasRouter = router({
       const ultimoNum = existentes?.[0]?.numero_parcela ?? 0;
       const novaNumeroParcela = ultimoNum + 1;
 
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
       const dataVenc = input.dataVencimento;
       let status = 'pendente';
       if (dataVenc < hoje) status = 'atrasada';
@@ -3262,7 +3274,9 @@ const whatsappRouter = router({
     .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
+      const inicioHoje = dataCivilBrasiliaParaIso(hoje);
+      const inicioAmanha = dataCivilBrasiliaParaIso(adicionarDiasData(hoje, 1));
       const { data: parcelasHoje } = await supabase
         .from('parcelas')
         .select('id, valor, valor_pago, status, data_vencimento, contratos(clientes(nome))')
@@ -3271,7 +3285,8 @@ const whatsappRouter = router({
       const { data: pagamentosHoje } = await supabase
         .from('parcelas')
         .select('id, valor_pago, data_pagamento, contratos(clientes(nome))')
-        .eq('data_pagamento', hoje)
+        .gte('data_pagamento', inicioHoje)
+        .lt('data_pagamento', inicioAmanha)
         .eq('status', 'paga')
         .eq('user_id', ctx.user.id);
       const { data: atrasadas } = await supabase
@@ -3371,7 +3386,7 @@ const relatoriosRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) return [];
       const userId = ctx.user.id;
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
       // Buscar parcelas com status atrasada OU pendente com vencimento anterior a hoje
       const { data: parcelasAtrasadas } = await supabase
         .from('parcelas')
@@ -3385,8 +3400,7 @@ const relatoriosRouter = router({
       const clienteMap = new Map<number, any>();
       for (const p of parcelasAtrasadas) {
         const cliente = p.clientes as any;
-        const venc = new Date(p.data_vencimento + 'T00:00:00');
-        const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
+        const diasAtraso = Math.max(0, diferencaDiasData(String(p.data_vencimento).slice(0, 10), hoje));
         const valorOriginal = parseFloat(p.valor_original ?? '0');
         const valorMulta = parseFloat(p.valor_multa ?? '0');
         const totalParcela = valorOriginal + valorMulta;

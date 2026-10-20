@@ -35,13 +35,13 @@
 
 ## Prioridade P2 — Caixa, parcelas e renovação
 
-- [ ] Desabilitar/corrigir a quitação total que marca parcelas sem lançar entrada de caixa.
+- [x] Desabilitar/corrigir a quitação total que marca parcelas sem lançar entrada de caixa.
 - [ ] Implementar transação/RPC única para pagamento de parcela e saldo residual.
 - [ ] Implementar transação/RPC única para renovação de juros.
 - [ ] Implementar transação/RPC única para despesas, cheques, reparcelamento e vendas de telefone.
-- [ ] Criar restrição única por empresa, contrato e número de parcela.
+- [ ] Criar restrição única por empresa, contrato e número de parcela. **Migration `0013_integridade_parcelas.sql` pronta; aguarda auditoria de duplicidades e execução no Supabase, que está recusando autenticação do conector.**
 - [ ] Implantar relatório de reconciliação entre parcelas, operações e livro-caixa.
-- [ ] Padronizar todos os fluxos financeiros pelo calendário `America/Sao_Paulo`.
+- [x] Padronizar todos os fluxos financeiros pelo calendário `America/Sao_Paulo`.
 
 ## Prioridade P3 — WhatsApp e controle operacional
 

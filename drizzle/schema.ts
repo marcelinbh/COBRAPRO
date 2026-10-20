@@ -9,6 +9,7 @@ import {
   date,
   timestamp,
   pgEnum,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ─── ENUMS ───────────────────────────────────────────────────────────────────
@@ -209,7 +210,9 @@ export const parcelas = pgTable("parcelas", {
   contagemRenovacoes: integer("contagem_renovacoes").default(0).notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex("parcelas_user_contrato_numero_uk").on(table.userId, table.contratoId, table.numeroParcela),
+]);
 
 export type Parcela = typeof parcelas.$inferSelect;
 export type InsertParcela = typeof parcelas.$inferInsert;
