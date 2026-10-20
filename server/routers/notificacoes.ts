@@ -7,11 +7,13 @@ import { dataHojeBrasilia } from "../services/businessDate";
 import { obterSaudeNotificacoes, substituirVariaveis } from "../services/notificacoesAutomaticas";
 
 export type TipoNotificacao =
-  | "antes_vencimento_3" | "antes_vencimento_2" | "antes_vencimento_1"
+  | "antes_vencimento_5" | "antes_vencimento_4" | "antes_vencimento_3" | "antes_vencimento_2" | "antes_vencimento_1"
   | "no_vencimento" | "apos_vencimento_1" | "apos_vencimento_3"
   | "apos_vencimento_7" | "confirmacao_pagamento";
 
 export const TIPOS_NOTIFICACAO: { tipo: TipoNotificacao; label: string; descricao: string; diasAntes: number }[] = [
+  { tipo: "antes_vencimento_5", label: "5 dias antes", descricao: "Lembrete 5 dias antes do vencimento", diasAntes: 5 },
+  { tipo: "antes_vencimento_4", label: "4 dias antes", descricao: "Lembrete 4 dias antes do vencimento", diasAntes: 4 },
   { tipo: "antes_vencimento_3", label: "3 dias antes", descricao: "Lembrete 3 dias antes do vencimento", diasAntes: 3 },
   { tipo: "antes_vencimento_2", label: "2 dias antes", descricao: "Lembrete 2 dias antes do vencimento", diasAntes: 2 },
   { tipo: "antes_vencimento_1", label: "1 dia antes", descricao: "Lembrete 1 dia antes do vencimento", diasAntes: 1 },
@@ -23,6 +25,8 @@ export const TIPOS_NOTIFICACAO: { tipo: TipoNotificacao; label: string; descrica
 ];
 
 const MENSAGENS_PADRAO: Record<TipoNotificacao, string> = {
+  antes_vencimento_5: "Olá {nome}! 😊 Sua parcela de *R$ {valor}* vence em *5 dias* ({data_vencimento}). Programe-se para não perder o vencimento. — {empresa}",
+  antes_vencimento_4: "Olá {nome}! 😊 Sua parcela de *R$ {valor}* vence em *4 dias* ({data_vencimento}). Conte conosco em caso de dúvidas. — {empresa}",
   antes_vencimento_3: "Olá {nome}! 😊 Sua parcela de *R$ {valor}* vence em *3 dias* ({data_vencimento}). Qualquer dúvida, estamos à disposição! — {empresa}",
   antes_vencimento_2: "Olá {nome}! Sua parcela de *R$ {valor}* vence em *2 dias* ({data_vencimento}). Não esqueça! 😉 — {empresa}",
   antes_vencimento_1: "Olá {nome}! ⚠️ Sua parcela de *R$ {valor}* vence *amanhã* ({data_vencimento}). Por favor, efetue o pagamento para evitar juros. — {empresa}",

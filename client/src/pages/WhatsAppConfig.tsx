@@ -216,7 +216,7 @@ export default function WhatsAppConfig() {
     onError: (e) => toast.error(t("toast.errorSave") + e.message),
   });
   const connected = status?.connected ?? false;
-  const lembreteTresDiasAtivo = regras?.find((regra) => regra.tipo === "antes_vencimento_3")?.ativo ?? false;
+  const quantidadeLembretesAntesAtivos = regras?.filter((regra) => ["antes_vencimento_5", "antes_vencimento_4", "antes_vencimento_3", "antes_vencimento_2", "antes_vencimento_1"].includes(regra.tipo) && regra.ativo).length ?? 0;
   const lembreteVencimentoAtivo = regras?.find((regra) => regra.tipo === "no_vencimento")?.ativo ?? false;
   const handleAbrirQRModal = () => { setQrModalOpen(true); if (!connected) connectWpp.mutate(); };
   const handleRefreshQR = () => connectWpp.mutate();
@@ -294,9 +294,9 @@ export default function WhatsAppConfig() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             <div className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="text-xs font-medium text-muted-foreground">3 dias antes</p>
-              <p className={`mt-1 text-sm font-semibold ${lembreteTresDiasAtivo && automacao?.ativo ? "text-green-500" : "text-muted-foreground"}`}>
-                {lembreteTresDiasAtivo && automacao?.ativo ? "Ativo" : "Desativado"}
+              <p className="text-xs font-medium text-muted-foreground">De 5 a 1 dias antes</p>
+              <p className={`mt-1 text-sm font-semibold ${quantidadeLembretesAntesAtivos > 0 && automacao?.ativo ? "text-green-500" : "text-muted-foreground"}`}>
+                {quantidadeLembretesAntesAtivos > 0 && automacao?.ativo ? `${quantidadeLembretesAntesAtivos} de 5 ativos` : "Desativado"}
               </p>
             </div>
             <div className="rounded-lg border border-border bg-background/40 p-3">
