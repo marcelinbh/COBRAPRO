@@ -10,8 +10,12 @@ import { registrarLoginLog } from "./loginLogger";
 import { sdk } from "./_core/sdk";
 import { storagePut } from "./storage";
 import { validarUploadCliente } from "./uploadSecurity";
+import { chaveDeLimitacao, LimitadorDeTentativas } from "./authRateLimit";
 
 const ORIGEM_PUBLICA_PADRAO = "https://cobrapro.online";
+const limiteDeAutenticacao = new LimitadorDeTentativas();
+const JANELA_LOGIN_MS = 15 * 60 * 1000;
+const JANELA_RESET_MS = 60 * 60 * 1000;
 
 /**
  * O cabeçalho Origin é controlado pela requisição. Nunca o reflita em e-mails
@@ -32,6 +36,22 @@ export function obterOrigemSeguraParaReset(origin: unknown): string {
   } catch {
     return ORIGEM_PUBLICA_PADRAO;
   }
+}
+
+function limitarTentativaPublica(
+  req: Request,
+  res: Response,
+  finalidade: "login" | "reset",
+  email: string,
+): string | null {
+  const limite = finalidade === "login" ? 8 : 4;
+  const janelaMs = finalidade === "login" ? JANELA_LOGIN_MS : JANELA_RESET_MS;
+  const chave = chaveDeLimitacao(req, finalidade, email);
+  const resultado = limiteDeAutenticacao.consumir(chave, limite, janelaMs);
+  if (resultado.permitido) return chave;
+  res.setHeader("Retry-After", String(resultado.aguardarSegundos));
+  res.status(429).json({ error: "Muitas tentativas. Aguarde alguns minutos antes de tentar novamente." });
+  return null;
 }
 
 // Helper: buscar usuário por email (Drizzle ou Supabase REST)
@@ -127,6 +147,12 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Email e senha são obrigatórios" });
         return;
       }
+      if (email.length > 320 || password.length > 128) {
+        res.status(400).json({ error: "Credenciais inválidas" });
+        return;
+      }
+      const chaveLimite = limitarTentativaPublica(req, res, "login", email);
+      if (!chaveLimite) return;
 
       const user = await findUserByEmail(email);
 
@@ -155,6 +181,7 @@ export function registerAuthRoutes(app: Express) {
       } catch (_) { /* non-critical */ }
 
       await createSessionForUser(user, req, res);
+      limiteDeAutenticacao.remover(chaveLimite);
 
       // Registrar log de login (não-bloqueante)
       registrarLoginLog(user.id, req, true).catch(() => {});
@@ -181,8 +208,8 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Nome, email e senha são obrigatórios" });
         return;
       }
-      if (password.length < 6) {
-        res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+      if (password.length < 8 || password.length > 128) {
+        res.status(400).json({ error: "A senha deve ter entre 8 e 128 caracteres" });
         return;
       }
 
@@ -265,6 +292,11 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Email é obrigatório" });
         return;
       }
+      if (email.length > 320) {
+        res.status(400).json({ error: "E-mail inválido" });
+        return;
+      }
+      if (!limitarTentativaPublica(req, res, "reset", email)) return;
 
       const user = await findUserByEmail(email);
 
@@ -369,8 +401,8 @@ export function registerAuthRoutes(app: Express) {
         res.status(400).json({ error: "Token e nova senha são obrigatórios" });
         return;
       }
-      if (password.length < 6) {
-        res.status(400).json({ error: "A senha deve ter pelo menos 6 caracteres" });
+      if (password.length < 8 || password.length > 128) {
+        res.status(400).json({ error: "A senha deve ter entre 8 e 128 caracteres" });
         return;
       }
 
