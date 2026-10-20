@@ -1583,8 +1583,9 @@ const contratosRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { error } = await supabase.from('contratos').update({ status: input.status }).eq('id', input.id);
+      const { data, error } = await supabase.from('contratos').update({ status: input.status }).eq('id', input.id).eq('user_id', ctx.user.id).select('id').maybeSingle();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      if (!data) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
       return { success: true };
     }),
   gerarPDF: protectedProcedure
@@ -1600,9 +1601,10 @@ const contratosRouter = router({
           .from('contratos')
           .select('*, clientes!inner(nome, cpf_cnpj, telefone, whatsapp, chave_pix, endereco, cidade, estado)')
           .eq('id', input.id)
+          .eq('user_id', ctx.user.id)
           .single();
         if (ctErr || !ctData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
-        const { data: parcelasData2 } = await supabase.from('parcelas').select('*').eq('contrato_id', input.id).order('numero_parcela');
+        const { data: parcelasData2 } = await supabase.from('parcelas').select('*').eq('contrato_id', input.id).eq('user_id', ctx.user.id).order('numero_parcela');
         const { data: configRows2 } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
         const configMap2: Record<string, string> = {};
         (configRows2 ?? []).forEach((r: any) => { if (r.chave && r.valor) configMap2[r.chave] = r.valor; });
@@ -1635,16 +1637,16 @@ const contratosRouter = router({
         clienteEstado: clientes.estado,
       }).from(contratos)
         .innerJoin(clientes, eq(contratos.clienteId, clientes.id))
-        .where(eq(contratos.id, input.id)).limit(1);
+        .where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id))).limit(1);
       const row = rows[0];
       if (!row) throw new Error("Contrato não encontrado");
       // Buscar parcelas
       const parcelasData = await db.select().from(parcelas)
-        .where(eq(parcelas.contratoId, input.id))
+        .where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id)))
         .orderBy(parcelas.numeroParcela);
       // Buscar configurações da empresa
       // Buscar configurações como mapa chave->valor
-      const configRows = await db.select().from(configuracoes);
+      const configRows = await db.select().from(configuracoes).where(eq(configuracoes.userId, ctx.user.id));
       const configMap: Record<string, string> = {};
       configRows.forEach(r => { if (r.chave && r.valor) configMap[r.chave] = r.valor; });
       const c = row.contrato;
@@ -1755,7 +1757,7 @@ const contratosRouter = router({
           // 1. transacoes_caixa (referencia parcelas)
           // 2. parcelas (referencia contratos)
           // 3. contratos
-          await db.delete(transacoesCaixa).where(eq(transacoesCaixa.contratoId, input.id));
+          await db.delete(transacoesCaixa).where(and(eq(transacoesCaixa.contratoId, input.id), eq(transacoesCaixa.userId, ctx.user.id)));
           await db.delete(parcelas).where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id)));
           await db.delete(contratos).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
           return { success: true };
@@ -1769,9 +1771,9 @@ const contratosRouter = router({
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       // IMPORTANTE: deletar na ordem correta para evitar FK constraints
       // 1. transacoes_caixa que referenciam parcelas deste contrato
-      await supabase.from('transacoes_caixa').delete().eq('contrato_id', input.id);
+      await supabase.from('transacoes_caixa').delete().eq('contrato_id', input.id).eq('user_id', ctx.user.id);
       // 2. parcelas do contrato
-      await supabase.from('parcelas').delete().eq('contrato_id', input.id);
+      await supabase.from('parcelas').delete().eq('contrato_id', input.id).eq('user_id', ctx.user.id);
       // 3. contrato
       const { error } = await supabase.from('contratos').delete().eq('id', input.id).eq('user_id', ctx.user.id);
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -1849,11 +1851,12 @@ const contratosRouter = router({
         const { data: parcelasPendentes } = await supabase.from('parcelas')
           .select('id, numero_parcela')
           .eq('contrato_id', input.id)
+          .eq('user_id', ctx.user.id)
           .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
           .order('numero_parcela', { ascending: true });
         for (let i = 0; i < (parcelasPendentes ?? []).length; i++) {
           if (input.datasParcelasCustom[i]) {
-            await supabase.from('parcelas').update({ data_vencimento: input.datasParcelasCustom[i] }).eq('id', parcelasPendentes![i].id);
+            await supabase.from('parcelas').update({ data_vencimento: input.datasParcelasCustom[i] }).eq('id', parcelasPendentes![i].id).eq('user_id', ctx.user.id);
           }
         }
       } else if (input.dataPrimeiraParcela) {
@@ -1861,6 +1864,7 @@ const contratosRouter = router({
         const { data: parcelasPendentes } = await supabase.from('parcelas')
           .select('id, numero_parcela')
           .eq('contrato_id', input.id)
+          .eq('user_id', ctx.user.id)
           .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
           .order('numero_parcela', { ascending: true });
         if (parcelasPendentes && parcelasPendentes.length > 0) {
@@ -1872,7 +1876,7 @@ const contratosRouter = router({
             else if (input.tipoTaxa === 'quinzenal') novaData.setDate(novaData.getDate() + i * 15);
             else if (input.tipoTaxa === 'anual') novaData.setFullYear(novaData.getFullYear() + i);
             else novaData.setMonth(novaData.getMonth() + i);
-            await supabase.from('parcelas').update({ data_vencimento: novaData.toISOString() }).eq('id', parcelasPendentes[i].id);
+            await supabase.from('parcelas').update({ data_vencimento: novaData.toISOString() }).eq('id', parcelasPendentes[i].id).eq('user_id', ctx.user.id);
           }
         }
       }
@@ -1896,7 +1900,7 @@ const contratosRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.id).eq('user_id', ctx.user.id);
-      await supabase.from('parcelas').update({ status: 'paga', data_pagamento: new Date().toISOString() }).eq('contrato_id', input.id);
+      await supabase.from('parcelas').update({ status: 'paga', data_pagamento: new Date().toISOString() }).eq('contrato_id', input.id).eq('user_id', ctx.user.id);
       return { success: true };
     }),
 
@@ -1929,6 +1933,7 @@ const contratosRouter = router({
         .from('contrato_historico')
         .select('*')
         .eq('contrato_id', input.contratoId)
+        .eq('user_id', ctx.user.id)
         .order('created_at', { ascending: false })
         .limit(100);
       if (error) return [];
@@ -1951,12 +1956,13 @@ const contratosRouter = router({
         try {
           const parcelasAtraso = await db.select().from(parcelas).where(and(
             eq(parcelas.contratoId, input.id),
+            eq(parcelas.userId, ctx.user.id),
             inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje']),
             lt(sql`DATE(${parcelas.dataVencimento})`, hoje)
           ));
           for (const parcela of parcelasAtraso) {
             const multaAtual = parcela.valorMulta ? parseFloat(parcela.valorMulta) : 0;
-            await db.update(parcelas).set({ valorMulta: (multaAtual + parseFloat(input.multa)).toString() }).where(eq(parcelas.id, parcela.id));
+            await db.update(parcelas).set({ valorMulta: (multaAtual + parseFloat(input.multa)).toString() }).where(and(eq(parcelas.id, parcela.id), eq(parcelas.userId, ctx.user.id)));
           }
           return { success: true };
         } catch (err) {
@@ -1967,10 +1973,10 @@ const contratosRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       // Verificar que o contrato pertence ao usuário antes de aplicar multa
-      const { data: pAtraso } = await supabase.from('parcelas').select('id, valor_multa').eq('contrato_id', input.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje']).lt('data_vencimento', hoje);
+      const { data: pAtraso } = await supabase.from('parcelas').select('id, valor_multa').eq('contrato_id', input.id).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje']).lt('data_vencimento', hoje);
       for (const parcela of (pAtraso ?? [])) {
         const multaAtual = parcela.valor_multa ? parseFloat(parcela.valor_multa) : 0;
-        await supabase.from('parcelas').update({ valor_multa: (multaAtual + parseFloat(input.multa)).toString() }).eq('id', parcela.id);
+        await supabase.from('parcelas').update({ valor_multa: (multaAtual + parseFloat(input.multa)).toString() }).eq('id', parcela.id).eq('user_id', ctx.user.id);
       }
       await registrarHistorico({ contratoId: input.id, userId: String(ctx.user.id), tipo: 'aplicacao_multa', descricao: `Multa de R$ ${input.multa} aplicada nas parcelas em atraso`, valorNovo: input.multa });
       return { success: true };
@@ -1998,12 +2004,14 @@ const parcelasRouter = router({
             .set({ status: 'atrasada' })
             .where(and(
               lt(sql`DATE(data_vencimento)`, hoje),
+              eq(parcelas.userId, ctx.user.id),
               inArray(parcelas.status, ['pendente', 'vencendo_hoje'])
             ));
           await db.update(parcelas)
             .set({ status: 'vencendo_hoje' })
             .where(and(
               eq(sql`DATE(data_vencimento)`, hoje),
+              eq(parcelas.userId, ctx.user.id),
               eq(parcelas.status, 'pendente')
             ));
 
@@ -2071,9 +2079,9 @@ const parcelasRouter = router({
       } catch (_) { /* não é cobrador */ }
       // Atualizar status via REST
       await supabase.from('parcelas').update({ status: 'atrasada' })
-        .lt('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']);
+        .lt('data_vencimento', hoje).eq('user_id', ctx.user.id).in('status', ['pendente', 'vencendo_hoje']);
       await supabase.from('parcelas').update({ status: 'vencendo_hoje' })
-        .eq('data_vencimento', hoje).eq('status', 'pendente');
+        .eq('data_vencimento', hoje).eq('user_id', ctx.user.id).eq('status', 'pendente');
       let pQuery = supabase.from('parcelas')
         .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, data_vencimento, data_pagamento, status, contratos(koletor_id)')
         .order('data_vencimento')
@@ -2100,11 +2108,11 @@ const parcelasRouter = router({
       const contratosMap: Record<number, any> = {};
 
       if (clienteIds.length > 0) {
-        const { data: cData } = await supabase.from('clientes').select('id, nome, whatsapp, chave_pix').in('id', clienteIds);
+        const { data: cData } = await supabase.from('clientes').select('id, nome, whatsapp, chave_pix').in('id', clienteIds).eq('user_id', ctx.user.id);
         (cData || []).forEach((c: any) => { clientesMap[c.id] = c; });
       }
       if (contratoIds.length > 0) {
-        const { data: ctData } = await supabase.from('contratos').select('id, modalidade, numero_parcelas, taxa_juros, tipo_taxa, valor_principal').in('id', contratoIds);
+        const { data: ctData } = await supabase.from('contratos').select('id, modalidade, numero_parcelas, taxa_juros, tipo_taxa, valor_principal').in('id', contratoIds).eq('user_id', ctx.user.id);
         (ctData || []).forEach((c: any) => { contratosMap[c.id] = c; });
       }
 
@@ -2913,14 +2921,29 @@ const portalRouter = router({
   gerarLink: protectedProcedure
     .input(z.object({ clienteId: z.number(), origin: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      let originSeguro: string;
+      try {
+        const url = new URL(input.origin);
+        const hostPermitido = url.hostname === 'cobrapro.online'
+          || url.hostname === 'www.cobrapro.online'
+          || url.hostname.endsWith('.manus.space')
+          || url.hostname.endsWith('.manus.computer');
+        if (url.protocol !== 'https:' || !hostPermitido) throw new Error('origin inválida');
+        originSeguro = url.origin;
+      } catch {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Origem inválida para o link do portal' });
+      }
       const db = await getDb();
       const token = nanoid(48);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
       if (db) {
         try {
+          const cliente = await db.select({ id: clientes.id }).from(clientes)
+            .where(and(eq(clientes.id, input.clienteId), eq(clientes.userId, ctx.user.id))).limit(1);
+          if (!cliente[0]) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
           await db.insert(magicLinks).values({ clienteId: input.clienteId, token, expiresAt });
-          return { url: `${input.origin}/portal/${token}`, token };
+          return { url: `${originSeguro}/portal/${token}`, token };
         } catch (err) {
           console.warn('[portal.gerarLink] Drizzle failed, trying REST:', (err as Error).message);
           resetDb();
@@ -2928,13 +2951,17 @@ const portalRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { data: cliente, error: clienteErro } = await supabase.from('clientes').select('id')
+        .eq('id', input.clienteId).eq('user_id', ctx.user.id).maybeSingle();
+      if (clienteErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: clienteErro.message });
+      if (!cliente) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
       const { error } = await supabase.from('magic_links').insert({
         cliente_id: input.clienteId,
         token,
         expires_at: expiresAt.toISOString(),
       });
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      return { url: `${input.origin}/portal/${token}`, token };
+      return { url: `${originSeguro}/portal/${token}`, token };
     }),
 
   acessar: publicProcedure
@@ -4074,7 +4101,7 @@ const vendasRouter = router({
     }
     const supabase = await getSupabaseClientAsync();
     if (!supabase) return [];
-    const { data } = await supabase.from('produtos').select('*').eq('ativo', true).order('createdAt', { ascending: false });
+    const { data } = await supabase.from('produtos').select('*').eq('ativo', true).eq('user_id', ctx.user.id).order('createdAt', { ascending: false });
     return data ?? [];
   }),
 
@@ -4100,12 +4127,12 @@ const vendasRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.update(produtos).set({ estoque: input.estoque }).where(eq(produtos.id, input.id)); return { success: true }; }
+        try { await db.update(produtos).set({ estoque: input.estoque }).where(and(eq(produtos.id, input.id), eq(produtos.userId, ctx.user.id))); return { success: true }; }
         catch (err) { console.warn('[vendas.atualizarEstoque] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('produtos').update({ estoque: input.estoque }).eq('id', input.id);
+      await supabase.from('produtos').update({ estoque: input.estoque }).eq('id', input.id).eq('user_id', ctx.user.id);
       return { success: true };
     }),
 
@@ -4114,12 +4141,12 @@ const vendasRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.update(produtos).set({ ativo: false }).where(eq(produtos.id, input.id)); return { success: true }; }
+        try { await db.update(produtos).set({ ativo: false }).where(and(eq(produtos.id, input.id), eq(produtos.userId, ctx.user.id))); return { success: true }; }
         catch (err) { console.warn('[vendas.desativarProduto] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('produtos').update({ ativo: false }).eq('id', input.id);
+      await supabase.from('produtos').update({ ativo: false }).eq('id', input.id).eq('user_id', ctx.user.id);
       return { success: true };
     }),
 });
@@ -4285,12 +4312,12 @@ const chequesRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.update(cheques).set({ status: 'devolvido', motivoDevolucao: input.motivo }).where(eq(cheques.id, input.id)); return { success: true }; }
+        try { await db.update(cheques).set({ status: 'devolvido', motivoDevolucao: input.motivo }).where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id))); return { success: true }; }
         catch (err) { console.warn('[cheques.devolver] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('cheques').update({ status: 'devolvido', motivo_devolucao: input.motivo }).eq('id', input.id);
+      await supabase.from('cheques').update({ status: 'devolvido', motivo_devolucao: input.motivo }).eq('id', input.id).eq('user_id', ctx.user.id);
       return { success: true };
     }),
 
@@ -4299,12 +4326,12 @@ const chequesRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.update(cheques).set({ status: 'cancelado' }).where(eq(cheques.id, input.id)); return { success: true }; }
+        try { await db.update(cheques).set({ status: 'cancelado' }).where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id))); return { success: true }; }
         catch (err) { console.warn('[cheques.cancelar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('cheques').update({ status: 'cancelado' }).eq('id', input.id);
+      await supabase.from('cheques').update({ status: 'cancelado' }).eq('id', input.id).eq('user_id', ctx.user.id);
       return { success: true };
     }),
 
@@ -4313,7 +4340,7 @@ const chequesRouter = router({
     if (!db) {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) return { totalAguardando: 0, qtdAguardando: 0, totalCompensado: 0, qtdCompensado: 0, totalDevolvido: 0, qtdDevolvido: 0 };
-      const { data: all } = await supabase.from('cheques').select('status, valor_nominal');
+      const { data: all } = await supabase.from('cheques').select('status, valor_nominal').eq('user_id', ctx.user.id);
       const ag = (all ?? []).filter((r: any) => r.status === 'aguardando');
       const co = (all ?? []).filter((r: any) => r.status === 'compensado');
       const de = (all ?? []).filter((r: any) => r.status === 'devolvido');
@@ -4323,9 +4350,9 @@ const chequesRouter = router({
         totalDevolvido: de.reduce((s: number, r: any) => s + parseFloat(r.valor_nominal ?? 0), 0), qtdDevolvido: de.length,
       };
     }
-    const aguardando = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(eq(cheques.status, 'aguardando'));
-    const compensados = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(eq(cheques.status, 'compensado'));
-    const devolvidos = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(eq(cheques.status, 'devolvido'));
+    const aguardando = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(and(eq(cheques.status, 'aguardando'), eq(cheques.userId, ctx.user.id)));
+    const compensados = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(and(eq(cheques.status, 'compensado'), eq(cheques.userId, ctx.user.id)));
+    const devolvidos = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(and(eq(cheques.status, 'devolvido'), eq(cheques.userId, ctx.user.id)));
     return {
       totalAguardando: parseFloat(aguardando[0]?.total ?? '0'),
       qtdAguardando: aguardando[0]?.qtd ?? 0,

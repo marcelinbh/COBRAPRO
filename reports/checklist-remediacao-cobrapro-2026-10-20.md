@@ -18,6 +18,9 @@
 ## Prioridade P1 — Proteção entre assinantes (isolamento multiempresa)
 
 - [ ] Criar inventário de todas as procedures sem filtro de proprietário.
+- [x] Restringir contratos, PDFs, histórico, multas e atualização diária de parcelas à empresa proprietária.
+- [x] Restringir assinaturas, clientes vinculados, pagamentos recorrentes e contas de caixa à empresa proprietária.
+- [x] Restringir produtos, cheques, resumos e links do portal de cliente à empresa proprietária.
 - [ ] Corrigir mutações de contratos, parcelas, caixa, produtos, cheques, templates, etiquetas, vendas, assinaturas e portal para filtrar `user_id`.
 - [ ] Validar o recurso de origem antes de qualquer escrita encadeada.
 - [ ] Criar testes de autorização: conta A não pode ler, editar ou apagar recurso da conta B.

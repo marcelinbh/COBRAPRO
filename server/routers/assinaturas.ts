@@ -3,6 +3,41 @@ import { router, protectedProcedure } from "../_core/trpc";
 import { getSupabaseClientAsync } from "../db";
 import { TRPCError } from "@trpc/server";
 
+async function obterAssinaturaDoUsuario(supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseClientAsync>>>, userId: number, assinaturaId: number) {
+  const { data, error } = await supabase
+    .from("assinaturas")
+    .select("id, cliente_id, servico, conta_caixa_id")
+    .eq("id", assinaturaId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+  if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Assinatura não encontrada" });
+  return data;
+}
+
+async function validarClienteDoUsuario(supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseClientAsync>>>, userId: number, clienteId: number) {
+  const { data, error } = await supabase
+    .from("clientes")
+    .select("id")
+    .eq("id", clienteId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+  if (!data) throw new TRPCError({ code: "FORBIDDEN", message: "Cliente não pertence à sua empresa" });
+}
+
+async function validarContaDoUsuario(supabase: NonNullable<Awaited<ReturnType<typeof getSupabaseClientAsync>>>, userId: number, contaCaixaId: number) {
+  const { data, error } = await supabase
+    .from("contas_caixa")
+    .select("id")
+    .eq("id", contaCaixaId)
+    .eq("user_id", userId)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+  if (!data) throw new TRPCError({ code: "FORBIDDEN", message: "Conta de caixa inválida para sua empresa" });
+}
+
 export const assinaturasRouter = router({
   // Listar assinaturas com dados do cliente
   list: protectedProcedure
@@ -84,6 +119,10 @@ export const assinaturasRouter = router({
     .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
+      await validarClienteDoUsuario(supabase, ctx.user.id, input.clienteId);
+      if (input.contaCaixaId) {
+        await validarContaDoUsuario(supabase, ctx.user.id, input.contaCaixaId);
+      }
 
       const { data, error } = await supabase
         .from("assinaturas")
@@ -118,9 +157,13 @@ export const assinaturasRouter = router({
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
+      await obterAssinaturaDoUsuario(supabase, ctx.user.id, input.id);
+      if (input.contaCaixaId !== undefined && input.contaCaixaId !== null) {
+        await validarContaDoUsuario(supabase, ctx.user.id, input.contaCaixaId);
+      }
 
       const updates: Record<string, any> = { updatedAt: new Date().toISOString() };
       if (input.servico !== undefined) updates.servico = input.servico;
@@ -140,6 +183,7 @@ export const assinaturasRouter = router({
         .from("assinaturas")
         .update(updates)
         .eq("id", input.id)
+        .eq("user_id", ctx.user.id)
         .select()
         .single();
 
@@ -160,6 +204,13 @@ export const assinaturasRouter = router({
     .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
+      const assinatura = await obterAssinaturaDoUsuario(supabase, ctx.user.id, input.assinaturaId);
+      if (assinatura.cliente_id !== input.clienteId) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "O cliente informado não pertence a esta assinatura" });
+      }
+      if (input.contaCaixaId) {
+        await validarContaDoUsuario(supabase, ctx.user.id, input.contaCaixaId);
+      }
 
       const { data: pagamentoExistente, error: buscaPagamentoErro } = await supabase
         .from("pagamentos_assinatura")
@@ -176,7 +227,7 @@ export const assinaturasRouter = router({
         .from("pagamentos_assinatura")
         .insert({
           assinatura_id: input.assinaturaId,
-          cliente_id: input.clienteId,
+          cliente_id: assinatura.cliente_id,
           valor_pago: input.valorPago.toFixed(2),
           mes_referencia: input.mesReferencia,
           conta_caixa_id: input.contaCaixaId || null,
@@ -193,6 +244,7 @@ export const assinaturasRouter = router({
           .from("assinaturas")
           .select("servico, clientes!inner(nome)")
           .eq("id", input.assinaturaId)
+          .eq("user_id", ctx.user.id)
           .single();
 
         const clienteNome = (assinatura as any)?.clientes?.nome || "Cliente";
@@ -228,6 +280,7 @@ export const assinaturasRouter = router({
         .from("assinaturas")
         .update({ status: "ativa", updatedAt: new Date().toISOString() })
         .eq("id", input.assinaturaId)
+        .eq("user_id", ctx.user.id)
         .eq("status", "inadimplente");
 
       return pagamento;
@@ -236,9 +289,10 @@ export const assinaturasRouter = router({
   // Listar pagamentos de uma assinatura
   pagamentos: protectedProcedure
     .input(z.object({ assinaturaId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
+      await obterAssinaturaDoUsuario(supabase, ctx.user.id, input.assinaturaId);
 
       const { data, error } = await supabase
         .from("pagamentos_assinatura")
@@ -253,14 +307,16 @@ export const assinaturasRouter = router({
   // Deletar assinatura
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
+      await obterAssinaturaDoUsuario(supabase, ctx.user.id, input.id);
 
       const { error } = await supabase
         .from("assinaturas")
         .delete()
-        .eq("id", input.id);
+        .eq("id", input.id)
+        .eq("user_id", ctx.user.id);
 
       if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
       return { success: true };
