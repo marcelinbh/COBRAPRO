@@ -698,6 +698,7 @@ const clientesRouter = router({
               cidade: reg.cidade?.trim() || null,
               estado: reg.estado?.trim() || null,
               observacoes: reg.observacoes?.trim() || null,
+              user_id: ctx.user.id,
             });
             if (impErr) throw new Error(impErr.message);
           }
@@ -749,7 +750,7 @@ const clientesRouter = router({
         if (parcelas_data.length === 0) {
           const supabase = await getSupabaseClientAsync();
           if (supabase) {
-            const { data } = await supabase.from('parcelas').select('*').eq('cliente_id', cliente.id);
+            const { data } = await supabase.from('parcelas').select('*').eq('cliente_id', cliente.id).eq('user_id', ctx.user.id);
             if (data) parcelas_data = data;
           }
         }
@@ -957,6 +958,7 @@ const contratosRouter = router({
         .from('parcelas')
         .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, data_vencimento, data_pagamento, status')
         .in('contrato_id', contratoIds)
+        .eq('user_id', ctx.user.id)
         .order('data_vencimento');
 
       const hoje = dataHojeBrasilia();
@@ -1102,6 +1104,7 @@ const contratosRouter = router({
         .from('parcelas')
         .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, data_vencimento, data_pagamento, status')
         .eq('contrato_id', input.id)
+        .eq('user_id', ctx.user.id)
         .order('data_vencimento');
 
       const hoje = dataHojeBrasilia();
@@ -2812,7 +2815,7 @@ const caixaRouter = router({
       const contaIdsSet = new Set<number>((txData ?? []).map((t: any) => t.conta_caixa_id).filter(Boolean));
       const contaIds = Array.from(contaIdsSet);
       const { data: contasData } = contaIds.length > 0
-        ? await supabase.from('contas_caixa').select('id, nome').in('id', contaIds)
+        ? await supabase.from('contas_caixa').select('id, nome').in('id', contaIds).eq('user_id', ctx.user.id)
         : { data: [] };
       const contasMap = Object.fromEntries((contasData ?? []).map((c: any) => [c.id, c.nome]));
       return (txData ?? []).map((t: any) => ({
@@ -3568,7 +3571,7 @@ const cobradoresRouter = router({
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data, error } = await supabase.from('koletores').insert({ nome: input.nome, email: input.email || null, telefone: input.telefone || null, whatsapp: input.whatsapp || null, perfil: input.perfil, limite_emprestimo: input.limiteEmprestimo, comissao_percentual: input.comissaoPercentual, observacoes: input.observacoes || null }).select('id').single();
+      const { data, error } = await supabase.from('koletores').insert({ nome: input.nome, email: input.email || null, telefone: input.telefone || null, whatsapp: input.whatsapp || null, perfil: input.perfil, limite_emprestimo: input.limiteEmprestimo, comissao_percentual: input.comissaoPercentual, observacoes: input.observacoes || null, user_id: ctx.user.id }).select('id').single();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       return { id: data.id, success: true };
     }),
@@ -3583,16 +3586,25 @@ const cobradoresRouter = router({
           const updateData: any = { ...rest };
           if (limiteEmprestimo !== undefined) updateData.limiteEmprestimo = limiteEmprestimo.toString();
           if (comissaoPercentual !== undefined) updateData.comissaoPercentual = comissaoPercentual.toString();
-          await db.update(koletores).set(updateData).where(eq(koletores.id, id));
+          const atualizados = await db.update(koletores).set(updateData)
+            .where(and(eq(koletores.id, id), eq(koletores.userId, ctx.user.id)))
+            .returning({ id: koletores.id });
+          if (atualizados.length !== 1) throw new TRPCError({ code: 'NOT_FOUND', message: 'Koletor não encontrado' });
           return { success: true };
-        } catch (err) { console.warn('[koletores.update] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
+        } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          console.warn('[koletores.update] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const updateData: any = { ...rest };
       if (limiteEmprestimo !== undefined) updateData.limite_emprestimo = limiteEmprestimo;
       if (comissaoPercentual !== undefined) updateData.comissao_percentual = comissaoPercentual;
-      await supabase.from('koletores').update(updateData).eq('id', id);
+      const { data: atualizado, error: updateError } = await supabase.from('koletores').update(updateData).eq('id', id).eq('user_id', ctx.user.id).select('id').maybeSingle();
+      if (updateError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateError.message });
+      if (!atualizado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Koletor não encontrado' });
       return { success: true };
     }),
 
@@ -3601,12 +3613,24 @@ const cobradoresRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.update(koletores).set({ ativo: false }).where(eq(koletores.id, input.id)); return { success: true }; }
-        catch (err) { console.warn('[koletores.delete] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
+        try {
+          const removidos = await db.update(koletores).set({ ativo: false })
+            .where(and(eq(koletores.id, input.id), eq(koletores.userId, ctx.user.id)))
+            .returning({ id: koletores.id });
+          if (removidos.length !== 1) throw new TRPCError({ code: 'NOT_FOUND', message: 'Koletor não encontrado' });
+          return { success: true };
+        }
+        catch (err) {
+          if (err instanceof TRPCError) throw err;
+          console.warn('[koletores.delete] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('koletores').update({ ativo: false }).eq('id', input.id);
+      const { data: removido, error: deleteError } = await supabase.from('koletores').update({ ativo: false }).eq('id', input.id).eq('user_id', ctx.user.id).select('id').maybeSingle();
+      if (deleteError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: deleteError.message });
+      if (!removido) throw new TRPCError({ code: 'NOT_FOUND', message: 'Koletor não encontrado' });
       return { success: true };
     }),
 
@@ -3620,17 +3644,17 @@ const cobradoresRouter = router({
       const inicioMes = new Date(ano, mes - 1, 1).toISOString();
       const fimMes = new Date(ano, mes, 0, 23, 59, 59).toISOString();
 
-      const { data: todosKoletores } = await supabase.from('koletores').select('*').eq('ativo', true);
+      const { data: todosKoletores } = await supabase.from('koletores').select('*').eq('ativo', true).eq('user_id', ctx.user.id);
 
       const resultado = await Promise.all((todosKoletores ?? []).map(async (k: any) => {
         const { data: contratosKoletor } = await supabase.from('contratos').select('valor_principal')
-          .eq('koletor_id', k.id).gte('createdAt', inicioMes).lte('createdAt', fimMes);
+          .eq('koletor_id', k.id).eq('user_id', ctx.user.id).gte('createdAt', inicioMes).lte('createdAt', fimMes);
 
         const { data: recebidoKoletor } = await supabase.from('parcelas').select('valor_pago')
-          .eq('koletor_id', k.id).eq('status', 'paga').gte('data_pagamento', inicioMes).lte('data_pagamento', fimMes);
+          .eq('koletor_id', k.id).eq('user_id', ctx.user.id).eq('status', 'paga').gte('data_pagamento', inicioMes).lte('data_pagamento', fimMes);
 
         const { data: inadimplentesKoletor } = await supabase.from('parcelas').select('valor_original')
-          .eq('koletor_id', k.id).eq('status', 'atrasada');
+          .eq('koletor_id', k.id).eq('user_id', ctx.user.id).eq('status', 'atrasada');
 
         const totalEmprestado = (contratosKoletor ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor_principal ?? '0'), 0);
         const totalRecebido = (recebidoKoletor ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor_pago ?? '0'), 0);

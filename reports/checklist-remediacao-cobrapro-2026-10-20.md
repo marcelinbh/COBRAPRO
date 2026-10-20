@@ -20,15 +20,15 @@
 - [x] Restringir uploads de logo a PNG/JPG/WEBP de até 2 MB, verificar assinatura do arquivo e eliminar a rota de upload inexistente.
 - [x] Separar o limite de 15 MB do upload autenticado dos corpos das rotas comuns (3 MB) e formulários (256 KB).
 - [ ] Rotacionar credenciais administrativas e segredos expostos em histórico. **Depende de configuração segura de variáveis na DigitalOcean; não será exposto em chat.**
-- [ ] Remover chave padrão da Evolution API do código depois de confirmar a variável de ambiente de produção.
+- [x] Remover chave padrão da Evolution API do código depois de confirmar a variável de ambiente de produção.
 
 ## Prioridade P1 — Proteção entre assinantes (isolamento multiempresa)
 
-- [ ] Criar inventário de todas as procedures sem filtro de proprietário.
+- [x] Criar inventário de todas as procedures sem filtro de proprietário.
 - [x] Restringir contratos, PDFs, histórico, multas e atualização diária de parcelas à empresa proprietária.
 - [x] Restringir assinaturas, clientes vinculados, pagamentos recorrentes e contas de caixa à empresa proprietária.
 - [x] Restringir produtos, cheques, resumos e links do portal de cliente à empresa proprietária.
-- [ ] Corrigir mutações de contratos, parcelas, caixa, produtos, cheques, templates, etiquetas, vendas, assinaturas e portal para filtrar `user_id`.
+- [x] Corrigir mutações de contratos, parcelas, caixa, produtos, cheques, templates, etiquetas, vendas, assinaturas e portal para filtrar `user_id`; importação de clientes e coletores incluídos.
 - [ ] Validar o recurso de origem antes de qualquer escrita encadeada.
 - [ ] Criar testes de autorização: conta A não pode ler, editar ou apagar recurso da conta B.
 - [ ] Criar migration aditiva de índices e constraints por tenant; aplicar somente após verificar dados legados.
