@@ -54,6 +54,11 @@ function limitarTentativaPublica(
   return null;
 }
 
+/** O token bruto só existe no e-mail do usuário; o banco recebe a hash. */
+export function hashTokenDeRecuperacao(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 // Helper: buscar usuário por email (Drizzle ou Supabase REST)
 async function findUserByEmail(email: string): Promise<typeof users.$inferSelect | null> {
   const db = await getDb();
@@ -308,6 +313,7 @@ export function registerAuthRoutes(app: Express) {
 
       // Gerar token seguro
       const token = crypto.randomBytes(32).toString("hex");
+      const tokenHash = hashTokenDeRecuperacao(token);
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
       const db = await getDb();
@@ -315,7 +321,7 @@ export function registerAuthRoutes(app: Express) {
         // Invalidar tokens anteriores do mesmo usuário
         await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.userId, user.id));
         // Inserir novo token
-        await db.insert(passwordResets).values({ userId: user.id, token, expiresAt });
+        await db.insert(passwordResets).values({ userId: user.id, token: tokenHash, expiresAt });
       } else {
         // Fallback: Supabase REST (usa snake_case conforme o banco)
         const supabase = await getSupabaseClientAsync();
@@ -324,7 +330,7 @@ export function registerAuthRoutes(app: Express) {
           // Omitir 'usado' no insert pois tem DEFAULT false no banco (evita erro de schema cache)
           const { error: insertErr } = await supabase.from("password_resets").insert({
             user_id: user.id,
-            token,
+            token: tokenHash,
             expires_at: expiresAt.toISOString(),
           });
           if (insertErr) {
@@ -407,6 +413,7 @@ export function registerAuthRoutes(app: Express) {
       }
 
       const passwordHash = await bcrypt.hash(password, 12);
+      const tokenHash = hashTokenDeRecuperacao(token);
       const now = new Date();
 
       const db = await getDb();
@@ -416,7 +423,7 @@ export function registerAuthRoutes(app: Express) {
           .from(passwordResets)
           .where(
             and(
-              eq(passwordResets.token, token),
+              eq(passwordResets.token, tokenHash),
               eq(passwordResets.usado, false),
               gt(passwordResets.expiresAt, now)
             )
@@ -441,7 +448,7 @@ export function registerAuthRoutes(app: Express) {
         const { data: resetData, error: resetError } = await supabase
           .from("password_resets")
           .select("*")
-          .eq("token", token)
+          .eq("token", tokenHash)
           .eq("usado", false)
           .gt("expires_at", now.toISOString())
           .limit(1)
