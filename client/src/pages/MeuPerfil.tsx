@@ -163,10 +163,16 @@ export default function MeuPerfil() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { toast.error(t('toast_error.arquivo_muito_grande_máximo_2mb')); return; }
+    const tiposAceitos = ["image/png", "image/jpeg", "image/webp"] as const;
+    if (!tiposAceitos.includes(file.type as typeof tiposAceitos[number])) {
+      toast.error("Use uma imagem PNG, JPG ou WEBP.");
+      e.target.value = "";
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const base64 = ev.target?.result as string;
-      uploadLogo.mutate({ base64, mimeType: file.type });
+      uploadLogo.mutate({ base64, mimeType: file.type as typeof tiposAceitos[number] });
     };
     reader.readAsDataURL(file);
   };

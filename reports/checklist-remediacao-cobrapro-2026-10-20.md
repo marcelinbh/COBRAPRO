@@ -17,6 +17,8 @@
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Remover a chave padrão da Evolution do código e exigir variável criptografada na DigitalOcean.
 - [x] Remover artefatos compilados versionados e impedir que `dist/` volte ao repositório.
+- [x] Restringir uploads de logo a PNG/JPG/WEBP de até 2 MB, verificar assinatura do arquivo e eliminar a rota de upload inexistente.
+- [x] Separar o limite de 15 MB do upload autenticado dos corpos das rotas comuns (3 MB) e formulários (256 KB).
 - [ ] Rotacionar credenciais administrativas e segredos expostos em histórico. **Depende de configuração segura de variáveis na DigitalOcean; não será exposto em chat.**
 - [ ] Remover chave padrão da Evolution API do código depois de confirmar a variável de ambiente de produção.
 

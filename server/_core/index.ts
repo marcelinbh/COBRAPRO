@@ -12,6 +12,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
 import { possuiSegredoDeAutomacaoValido, possuiTokenGithubActionsValido } from "../services/cronAuth";
+import { LIMITE_CORPO_PADRAO, LIMITE_CORPO_UPLOAD, LIMITE_FORMULARIO } from "../requestLimits";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -38,10 +39,11 @@ async function startServer() {
   const server = createServer(app);
   // Compressão gzip/brotli para reduzir tamanho das respostas
   app.use(compression());
-  // Uploads de clientes são limitados a 10 MB e validados na rota. Manter um
-  // teto global abaixo evita que uma requisição anônima ocupe memória excessiva.
-  app.use(express.json({ limit: "15mb" }));
-  app.use(express.urlencoded({ limit: "1mb", extended: true }));
+  // Somente o endpoint autenticado de documentos recebe o teto maior. O
+  // restante da API (login, webhooks e tRPC) não deve aceitar corpos de upload.
+  app.use("/api/upload", express.json({ limit: LIMITE_CORPO_UPLOAD }));
+  app.use(express.json({ limit: LIMITE_CORPO_PADRAO }));
+  app.use(express.urlencoded({ limit: LIMITE_FORMULARIO, extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // Auth própria (email/senha)

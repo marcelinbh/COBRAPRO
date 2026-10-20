@@ -78,6 +78,12 @@ export default function Configuracoes() {
     },
     onError: (e: { message: string }) => toast.error(t("toast.errorPrefix") + e.message),
   });
+  const uploadLogoMutation = trpc.perfil.uploadLogo.useMutation({
+    onSuccess: () => {
+      utils.configuracoes.get.invalidate();
+      utils.perfil.get.invalidate();
+    },
+  });
 
   // Templates de mensagem - carrega do backend se existir, senão usa padrão
   const [templateAtraso, setTemplateAtraso] = useState(() => (config as any)?.templateAtraso || TEMPLATES_PADRAO.atraso);
@@ -205,26 +211,28 @@ export default function Configuracoes() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 2 * 1024 * 1024) { toast.error(t('toast_error.logo_deve_ter_no_máximo_2mb')); return; }
+    const tiposAceitos = ["image/png", "image/jpeg", "image/webp"] as const;
+    if (!tiposAceitos.includes(file.type as typeof tiposAceitos[number])) {
+      toast.error("Use uma imagem PNG, JPG ou WEBP.");
+      e.target.value = "";
+      return;
+    }
     setUploadingLogo(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const res = await fetch('/api/upload-logo', { method: 'POST', body: formData });
-      if (!res.ok) throw new Error('Falha no upload');
-      const { url } = await res.json();
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Não foi possível ler o arquivo"));
+        reader.onload = () => resolve(String(reader.result ?? ""));
+        reader.readAsDataURL(file);
+      });
+      const { url } = await uploadLogoMutation.mutateAsync({
+        base64,
+        mimeType: file.type as typeof tiposAceitos[number],
+      });
       setLogoUrl(url);
-      await saveConfigMutation.mutateAsync({ logoUrl: url } as any);
       toast.success(t('toast_success.logo_salva_com_sucesso'));
-    } catch {
-      // Fallback: usar base64 local
-      const reader = new FileReader();
-      reader.onload = async (ev) => {
-        const b64 = ev.target?.result as string;
-        setLogoUrl(b64);
-        await saveConfigMutation.mutateAsync({ logoUrl: b64 } as any);
-        toast.success(t('toast_success.logo_salva_com_sucesso'));
-      };
-      reader.readAsDataURL(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Falha no upload do logo");
     } finally {
       setUploadingLogo(false);
     }

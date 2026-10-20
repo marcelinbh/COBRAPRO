@@ -4,6 +4,29 @@ import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
 import bcrypt from "bcryptjs";
 
+const MAX_LOGO_BYTES = 2 * 1024 * 1024;
+const MAX_LOGO_BASE64_CHARS = Math.ceil(MAX_LOGO_BYTES * 4 / 3) + 16;
+
+const formatosDeLogo = {
+  "image/png": { ext: "png", assinatura: (buffer: Buffer) => buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) },
+  "image/jpeg": { ext: "jpg", assinatura: (buffer: Buffer) => buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff },
+  "image/webp": { ext: "webp", assinatura: (buffer: Buffer) => buffer.length >= 12 && buffer.subarray(0, 4).equals(Buffer.from("RIFF")) && buffer.subarray(8, 12).equals(Buffer.from("WEBP")) },
+} as const;
+
+export function validarLogoBase64(base64: string, mimeType: string): { buffer: Buffer; ext: string } {
+  const formato = formatosDeLogo[mimeType as keyof typeof formatosDeLogo];
+  if (!formato) throw new TRPCError({ code: "BAD_REQUEST", message: "Formato de logo não permitido. Use PNG, JPG ou WEBP." });
+  const dados = base64.replace(/^data:[^;]+;base64,/, "");
+  if (!dados || dados.length > MAX_LOGO_BASE64_CHARS || !/^[A-Za-z0-9+/]*={0,2}$/.test(dados)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "Conteúdo do logo inválido ou excede 2 MB." });
+  }
+  const buffer = Buffer.from(dados, "base64");
+  if (!buffer.length || buffer.length > MAX_LOGO_BYTES || !formato.assinatura(buffer)) {
+    throw new TRPCError({ code: "BAD_REQUEST", message: "O conteúdo do logo não corresponde ao formato informado ou excede 2 MB." });
+  }
+  return { buffer, ext: formato.ext };
+}
+
 // ─── PERFIL ROUTER ────────────────────────────────────────────────────────────
 export const perfilRouter = router({
 
@@ -111,17 +134,14 @@ export const perfilRouter = router({
   // Upload de logo da empresa
   uploadLogo: protectedProcedure
     .input(z.object({
-      base64: z.string(),
-      mimeType: z.string().default("image/png"),
+      base64: z.string().max(MAX_LOGO_BASE64_CHARS),
+      mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]).default("image/png"),
     }))
     .mutation(async ({ ctx, input }) => {
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB unavailable" });
 
-      // Converter base64 para buffer
-      const base64Data = input.base64.replace(/^data:[^;]+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const ext = input.mimeType.split("/")[1]?.replace("jpeg", "jpg") ?? "png";
+      const { buffer, ext } = validarLogoBase64(input.base64, input.mimeType);
       const fileKey = `${ctx.user.id}-logo-${Date.now()}.${ext}`;
 
       // Upload para Supabase Storage (bucket 'logos' público)
