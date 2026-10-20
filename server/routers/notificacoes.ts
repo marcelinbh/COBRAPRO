@@ -2,7 +2,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
-import { enviarMensagemEvolution } from "../services/evolutionClient";
+import { enviarMensagemEvolution, normalizarTelefoneWhatsApp } from "../services/evolutionClient";
 import { dataHojeBrasilia } from "../services/businessDate";
 import { obterSaudeNotificacoes, substituirVariaveis } from "../services/notificacoesAutomaticas";
 
@@ -111,17 +111,57 @@ export const notificacoesRouter = router({
 
   saude: protectedProcedure.query(async ({ ctx }) => obterSaudeNotificacoes(ctx.user.id)),
 
-  /** Envio manual deliberado para o WhatsApp do próprio operador. */
-  testar: protectedProcedure.input(z.object({ tipo: z.string(), mensagem_template: z.string().min(1).max(4000) })).mutation(async ({ ctx, input }) => {
+  /**
+   * Envio manual, deliberado e rastreável. O retorno síncrono confirma apenas
+   * que a Evolution aceitou a solicitação; entrega/leitura dependem do recibo
+   * assíncrono do WhatsApp e nunca são inferidas deste endpoint.
+   */
+  testar: protectedProcedure.input(z.object({
+    tipo: z.string(),
+    mensagem_template: z.string().min(1).max(4000),
+    telefone: z.string().min(8).max(24),
+  })).mutation(async ({ ctx, input }) => {
+    const tipo = TIPOS_NOTIFICACAO.find(item => item.tipo === input.tipo);
+    if (!tipo) throw new TRPCError({ code: "BAD_REQUEST", message: "Tipo de mensagem inválido" });
     const sb = await requireDb();
-    const { data: configs, error } = await sb.from("configuracoes").select("chave, valor").eq("user_id", ctx.user.id).in("chave", ["whatsappEmpresa", "nomeEmpresa"]);
+    let telefone: string;
+    try {
+      telefone = normalizarTelefoneWhatsApp(input.telefone);
+    } catch (error) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Número de WhatsApp inválido" });
+    }
+
+    const { data: configs, error } = await sb.from("configuracoes").select("chave, valor").eq("user_id", ctx.user.id).eq("chave", "nomeEmpresa");
     if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
     const config = Object.fromEntries((configs ?? []).map((r: any) => [r.chave, r.valor])) as Record<string, string>;
-    if (!config.whatsappEmpresa) throw new TRPCError({ code: "BAD_REQUEST", message: "Configure o WhatsApp da empresa no Meu Perfil primeiro" });
     const mensagem = substituirVariaveis(input.mensagem_template, { nome: "João Silva (teste)", valor: 250, data_vencimento: dataHojeBrasilia().split("-").reverse().join("/"), dias_atraso: 2, empresa: config.nomeEmpresa || "Sua Empresa", parcela: 3, total_parcelas: 12 });
-    const resultado = await enviarMensagemEvolution(ctx.user.id, config.whatsappEmpresa, mensagem);
+    const resultado = await enviarMensagemEvolution(ctx.user.id, telefone, mensagem);
     if (!resultado.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: resultado.erro || "Erro ao enviar" });
-    return { success: true, mensagem, providerMessageId: resultado.providerMessageId };
+
+    const aceitoEm = new Date().toISOString();
+    // O histórico de testes não bloqueia uma mensagem que a Evolution já aceitou.
+    // Assim, uma base legada sem a tabela de log continua permitindo validar a conexão.
+    const { data: registro, error: logError } = await sb.from("notificacoes_log").insert({
+      user_id: ctx.user.id,
+      tipo: "teste_envio",
+      telefone,
+      mensagem,
+      status: "aceito_evolution",
+      erro: null,
+      createdAt: aceitoEm,
+    }).select("id, createdAt").maybeSingle();
+    if (logError) console.warn("[notificacoes.testar] Mensagem aceita, mas não foi possível gravar o histórico:", logError.message);
+
+    return {
+      success: true,
+      mensagem,
+      telefone,
+      providerMessageId: resultado.providerMessageId ?? null,
+      etapa: "aceito_evolution" as const,
+      aceitoEm,
+      registroId: registro?.id ?? null,
+      historicoRegistrado: Boolean(registro),
+    };
   }),
 
   /** Legado: o agendador oficial produz e processa a outbox; não há mais disparo direto por tRPC. */

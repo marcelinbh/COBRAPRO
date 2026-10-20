@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
   Bell, BellOff, MessageSquare, Clock, CheckCircle2, XCircle,
-  Send, Info, History, Settings2, Zap
+  Send, Info, History, Settings2, Zap, Loader2, Phone, ShieldCheck, CheckCheck
 } from "lucide-react";
 
 // ─── VARIÁVEIS DISPONÍVEIS ────────────────────────────────────────────────────
@@ -31,18 +31,35 @@ const VARIAVEIS = [
 
 // ─── CORES POR CATEGORIA ─────────────────────────────────────────────────────
 function getCategoria(tipo: string) {
+  if (tipo === "teste_envio") return { cor: "bg-violet-500/10 text-violet-400 border-violet-500/30", icone: Send, label: "Teste" };
   if (tipo.startsWith("antes_")) return { cor: "bg-blue-500/10 text-blue-400 border-blue-500/30", icone: Clock, label: "Lembrete" };
   if (tipo === "no_vencimento") return { cor: "bg-yellow-500/10 text-yellow-400 border-yellow-500/30", icone: Bell, label: "Vencimento" };
   if (tipo.startsWith("apos_")) return { cor: "bg-red-500/10 text-red-400 border-red-500/30", icone: BellOff, label: i18n.t('whatsapp.chargeType') };
   return { cor: "bg-green-500/10 text-green-400 border-green-500/30", icone: CheckCircle2, label: i18n.t('whatsapp.confirmationType') };
 }
 
+function getStatusEnvio(status: string) {
+  if (status === "aceito_evolution") return { label: "Aceito pela Evolution", cor: "bg-blue-500/10 text-blue-400 border-blue-500/30", icone: Send };
+  if (status === "enviado") return { label: "Enviado", cor: "bg-green-500/10 text-green-400 border-green-500/30", icone: CheckCircle2 };
+  if (status === "erro" || status === "falhou") return { label: "Falhou", cor: "bg-red-500/10 text-red-400 border-red-500/30", icone: XCircle };
+  return { label: status || "Aguardando", cor: "bg-amber-500/10 text-amber-400 border-amber-500/30", icone: Clock };
+}
+
 // ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function NotificacoesAutomaticas() {
   const { t, i18n } = useTranslation();
   const [editando, setEditando] = useState<{ tipo: string; mensagem: string } | null>(null);
-  const [disparando, setDisparando] = useState(false);
   const [horario, setHorario] = useState("09:00");
+  const [abaAtiva, setAbaAtiva] = useState("regras");
+  const [testeAberto, setTesteAberto] = useState(false);
+  const [testeConfigurado, setTesteConfigurado] = useState<{ tipo: string; mensagem: string } | null>(null);
+  const [telefoneTeste, setTelefoneTeste] = useState("");
+  const [resultadoTeste, setResultadoTeste] = useState<{
+    telefone: string;
+    providerMessageId: string | null;
+    aceitoEm: string;
+    historicoRegistrado: boolean;
+  } | null>(null);
 
   const utils = trpc.useUtils();
 
@@ -51,6 +68,7 @@ export default function NotificacoesAutomaticas() {
   const { data: regras, isLoading: loadingRegras } = trpc.notificacoes.listar.useQuery();
   const { data: historico, isLoading: loadingHistorico } = trpc.notificacoes.historico.useQuery({ limit: 50 });
   const { data: saude } = trpc.notificacoes.saude.useQuery(undefined, { refetchInterval: 30_000 });
+  const { data: conexao, isLoading: loadingConexao } = trpc.whatsappEvolution.getStatus.useQuery(undefined, { refetchInterval: testeAberto ? 10_000 : 60_000 });
 
   const salvarAutomacao = trpc.notificacoes.salvarAutomacao.useMutation({
     onSuccess: () => {
@@ -75,7 +93,17 @@ export default function NotificacoesAutomaticas() {
   });
 
   const testar = trpc.notificacoes.testar.useMutation({
-    onSuccess: (data) => toast.success(`Mensagem de teste enviada! "${data.mensagem.substring(0, 60)}..."`),
+    onSuccess: (data) => {
+      setResultadoTeste({
+        telefone: data.telefone,
+        providerMessageId: data.providerMessageId,
+        aceitoEm: data.aceitoEm,
+        historicoRegistrado: data.historicoRegistrado,
+      });
+      utils.notificacoes.historico.invalidate();
+      utils.notificacoes.saude.invalidate();
+      toast.success("A Evolution aceitou a mensagem de teste.");
+    },
     onError: (e) => toast.error(`Erro ao testar: ${e.message}`),
   });
 
@@ -106,9 +134,35 @@ export default function NotificacoesAutomaticas() {
     salvar.mutate({ tipo: editando.tipo, ativo: regra.ativo, mensagem_template: editando.mensagem });
   };
 
+  const abrirTeste = (tipo?: string, mensagem?: string) => {
+    const regraPadrao = regras?.[0];
+    const configuracao = tipo && mensagem
+      ? { tipo, mensagem }
+      : regraPadrao
+        ? { tipo: regraPadrao.tipo, mensagem: regraPadrao.mensagem_template }
+        : null;
+    if (!configuracao) {
+      toast.error("Crie ou selecione uma regra antes de enviar o teste.");
+      return;
+    }
+    setTesteConfigurado(configuracao);
+    setTelefoneTeste("");
+    setResultadoTeste(null);
+    setEditando(null);
+    setTesteAberto(true);
+  };
+
   const handleTestar = () => {
-    if (!editando) return;
-    testar.mutate({ tipo: editando.tipo, mensagem_template: editando.mensagem });
+    if (!testeConfigurado) return;
+    if (!telefoneTeste.replace(/\D/g, "").match(/^\d{10,13}$/)) {
+      toast.error("Informe um número brasileiro com DDD para receber o teste.");
+      return;
+    }
+    testar.mutate({
+      tipo: testeConfigurado.tipo,
+      mensagem_template: testeConfigurado.mensagem,
+      telefone: telefoneTeste,
+    });
   };
 
   const inserirVariavel = (variavel: string) => {
@@ -122,7 +176,7 @@ export default function NotificacoesAutomaticas() {
     <DashboardLayout>
       <div className="p-6 max-w-4xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
               <Bell className="w-6 h-6 text-primary" />
@@ -132,11 +186,27 @@ export default function NotificacoesAutomaticas() {
               {t('notifications.subtitle')}
             </p>
           </div>
-          <Button variant="outline" size="sm" disabled className="gap-2" title="Os envios são processados pela automação em fila, com prevenção de duplicidade.">
-            <Zap className="w-4 h-4" />
-            Fila automática
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className={conexao?.connected ? "border-green-500/30 bg-green-500/10 text-green-400" : "border-amber-500/30 bg-amber-500/10 text-amber-400"}>
+              {loadingConexao ? <Loader2 className="mr-1 size-3 animate-spin" /> : conexao?.connected ? <CheckCheck className="mr-1 size-3" /> : <Phone className="mr-1 size-3" />}
+              {loadingConexao ? "Verificando WhatsApp" : conexao?.connected ? "WhatsApp conectado" : "WhatsApp desconectado"}
+            </Badge>
+            <Button size="sm" onClick={() => abrirTeste()} disabled={loadingRegras || !conexao?.connected} className="w-full gap-2 sm:w-auto">
+              <Send className="w-4 h-4" />
+              Enviar teste
+            </Button>
+            <Button variant="outline" size="sm" disabled className="hidden gap-2 sm:flex" title="Os envios são processados pela automação em fila, com prevenção de duplicidade.">
+              <Zap className="w-4 h-4" />
+              Fila automática
+            </Button>
+          </div>
         </div>
+
+        {!loadingConexao && !conexao?.connected && (
+          <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
+            Conecte o WhatsApp da empresa antes de enviar um teste. O teste não depende de as automações estarem ativadas.
+          </p>
+        )}
 
         {/* Toggle Global */}
         <Card className={`border-2 transition-colors ${globalAtivo ? "border-green-500/40 bg-green-500/5" : "border-border"}`}>
@@ -209,7 +279,7 @@ export default function NotificacoesAutomaticas() {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="regras">
+        <Tabs value={abaAtiva} onValueChange={setAbaAtiva}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="regras" className="gap-2">
               <Settings2 className="w-4 h-4" />
@@ -330,19 +400,23 @@ export default function NotificacoesAutomaticas() {
                       clientes?: { nome: string };
                     }[]).map((log) => (
                       <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/20 border border-border/50">
-                        {log.status === "enviado" ? (
-                          <CheckCircle2 className="w-4 h-4 text-green-400 mt-0.5 shrink-0" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-red-400 mt-0.5 shrink-0" />
-                        )}
+                        {(() => {
+                          const statusEnvio = getStatusEnvio(log.status);
+                          const StatusIcon = statusEnvio.icone;
+                          return <StatusIcon className={`w-4 h-4 mt-0.5 shrink-0 ${statusEnvio.cor.split(" ")[1]}`} />;
+                        })()}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-medium text-foreground">
-                              {(log.clientes as { nome: string } | null)?.nome ?? "—"}
+                              {log.tipo === "teste_envio" ? "Teste de envio" : (log.clientes as { nome: string } | null)?.nome ?? "—"}
                             </span>
                             <Badge variant="outline" className={`text-xs ${getCategoria(log.tipo).cor}`}>
                               {getCategoria(log.tipo).label}
                             </Badge>
+                            {(() => {
+                              const statusEnvio = getStatusEnvio(log.status);
+                              return <Badge variant="outline" className={`text-xs ${statusEnvio.cor}`}>{statusEnvio.label}</Badge>;
+                            })()}
                             <span className="text-xs text-muted-foreground">{log.telefone}</span>
                           </div>
                           <p className="text-xs text-muted-foreground truncate mt-0.5">
@@ -429,14 +503,124 @@ placeholder={t('notifications.messagePlaceholder')}
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => testar.mutate({ tipo: editando?.tipo ?? "", mensagem_template: editando?.mensagem ?? "" })} disabled={testar.isPending} className="gap-2">
+            <Button variant="outline" onClick={() => editando && abrirTeste(editando.tipo, editando.mensagem)} disabled={!conexao?.connected} className="gap-2">
               <Send className="w-4 h-4" />
-              {testar.isPending ? t('common.sending') : t('common.test')}
+              Testar em um número
             </Button>
             <Button onClick={handleSalvar} disabled={salvar.isPending} className="gap-2">
               <CheckCircle2 className="w-4 h-4" />
               {salvar.isPending ? t('common.saving') : t('common.save')}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── DIALOG TESTE DE ENVIO ───────────────────────────────────────────── */}
+      <Dialog open={testeAberto} onOpenChange={(open) => !open && !testar.isPending && setTesteAberto(false)}>
+        <DialogContent className="max-h-[calc(100vh-2rem)] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-primary" />
+              Testar envio pelo WhatsApp
+            </DialogTitle>
+          </DialogHeader>
+
+          {!resultadoTeste ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-3 text-sm text-blue-200">
+                <div className="flex items-start gap-2">
+                  <Info className="mt-0.5 size-4 shrink-0 text-blue-400" />
+                  <p>O teste envia uma cópia apenas para o número informado. Nenhum cliente é selecionado nem recebe mensagem automática.</p>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="telefone-teste">Número que receberá o teste</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                  <Input
+                    id="telefone-teste"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="(11) 99999-9999"
+                    value={telefoneTeste}
+                    onChange={(event) => setTelefoneTeste(event.target.value)}
+                    disabled={testar.isPending}
+                    className="pl-9"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Use um número brasileiro com DDD. O sistema adiciona o código +55 quando necessário.</p>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/20 p-3">
+                <p className="text-xs font-medium text-muted-foreground">Mensagem que será testada</p>
+                <p className="mt-1 text-sm font-medium text-foreground">{regras?.find((regra) => regra.tipo === testeConfigurado?.tipo)?.label ?? "Mensagem selecionada"}</p>
+                <p className="mt-2 whitespace-pre-wrap text-sm text-foreground">
+                  {(testeConfigurado?.mensagem ?? "")
+                    .replace(/{nome}/g, "João Silva (teste)")
+                    .replace(/{valor}/g, "250,00")
+                    .replace(/{data_vencimento}/g, new Date().toLocaleDateString("pt-BR"))
+                    .replace(/{dias_atraso}/g, "2")
+                    .replace(/{empresa}/g, "Sua Empresa")
+                    .replace(/{parcela}/g, "3")
+                    .replace(/{total_parcelas}/g, "12")}
+                </p>
+              </div>
+
+              {!conexao?.connected && (
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-300">
+                  O WhatsApp da empresa está desconectado. Conecte-o antes de enviar o teste.
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4" aria-live="polite">
+              <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-green-500/15 p-2">
+                    <ShieldCheck className="size-5 text-green-400" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-300">Aceito pela Evolution</p>
+                    <p className="mt-1 text-sm text-muted-foreground">A API aceitou a solicitação de envio para {resultadoTeste.telefone} às {new Date(resultadoTeste.aceitoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-200">
+                <p className="font-medium">O que este teste confirma</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Ele confirma que a Evolution API aceitou o envio. “Entregue” e “Lido” dependem do retorno assíncrono do WhatsApp; a ausência desse recibo não prova que a mensagem não chegou.</p>
+              </div>
+
+              {resultadoTeste.providerMessageId && (
+                <div className="rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-xs text-muted-foreground">Identificador do envio</p>
+                  <p className="mt-1 break-all font-mono text-xs text-foreground">{resultadoTeste.providerMessageId}</p>
+                </div>
+              )}
+              {!resultadoTeste.historicoRegistrado && (
+                <p className="text-xs text-amber-300">A mensagem foi aceita, mas este ambiente não conseguiu registrar a linha no histórico.</p>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            {resultadoTeste ? (
+              <>
+                <Button variant="outline" onClick={() => { setResultadoTeste(null); setTelefoneTeste(""); }}>
+                  Novo teste
+                </Button>
+                <Button onClick={() => { setTesteAberto(false); setAbaAtiva("historico"); }} className="gap-2">
+                  <History className="size-4" />
+                  Ver no histórico
+                </Button>
+              </>
+            ) : (
+              <Button onClick={handleTestar} disabled={testar.isPending || !conexao?.connected || !telefoneTeste.trim()} className="w-full gap-2 sm:w-auto">
+                {testar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                {testar.isPending ? "Enviando teste…" : "Enviar mensagem de teste"}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
