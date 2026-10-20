@@ -42,7 +42,7 @@ describe("Evolution API Config", () => {
   it("deve retornar configuração completa quando todas as chaves existem", async () => {
     const configData = [
       { chave: "evolution_url", valor: "http://147.182.191.118:8080" },
-      { chave: "evolution_api_key", valor: "cobrapro_evo_key_2024" },
+      { chave: "evolution_api_key", valor: "chave-de-teste" },
       { chave: "evolution_instance", valor: "cobrapro" },
     ];
 
@@ -60,7 +60,7 @@ describe("Evolution API Config", () => {
     });
 
     expect(config.evolution_url).toBe("http://147.182.191.118:8080");
-    expect(config.evolution_api_key).toBe("cobrapro_evo_key_2024");
+    expect(config.evolution_api_key).toBe("chave-de-teste");
     expect(config.evolution_instance).toBe("cobrapro");
   });
 

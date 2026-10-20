@@ -10,7 +10,8 @@ export const ENV = {
   supabaseUrl: process.env.SUPABASE_URL ?? "",
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   evolutionApiUrl: process.env.EVOLUTION_API_URL ?? "http://147.182.191.118:8080",
-  evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "cobrapro_evo_key_2024",
+  // Nunca manter chave de provedor no código: a produção exige variável criptografada.
+  evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "",
   evolutionWebhookToken: process.env.EVOLUTION_WEBHOOK_TOKEN ?? "",
   facebookCapiToken: process.env.FACEBOOK_CAPI_TOKEN ?? "",
   facebookPixelId: "2748566625524880",
