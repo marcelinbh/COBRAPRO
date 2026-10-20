@@ -11,6 +11,29 @@ import { sdk } from "./_core/sdk";
 import { storagePut } from "./storage";
 import { validarUploadCliente } from "./uploadSecurity";
 
+const ORIGEM_PUBLICA_PADRAO = "https://cobrapro.online";
+
+/**
+ * O cabeçalho Origin é controlado pela requisição. Nunca o reflita em e-mails
+ * de segurança sem validar o domínio, ou um atacante pode solicitar um reset
+ * para um usuário e receber no e-mail dele um link apontando para seu domínio.
+ */
+export function obterOrigemSeguraParaReset(origin: unknown): string {
+  if (typeof origin !== "string") return ORIGEM_PUBLICA_PADRAO;
+  try {
+    const url = new URL(origin);
+    const permitida = url.protocol === "https:" && (
+      url.hostname === "cobrapro.online" ||
+      url.hostname === "www.cobrapro.online" ||
+      url.hostname.endsWith(".manus.space") ||
+      url.hostname.endsWith(".manus.computer")
+    );
+    return permitida ? url.origin : ORIGEM_PUBLICA_PADRAO;
+  } catch {
+    return ORIGEM_PUBLICA_PADRAO;
+  }
+}
+
 // Helper: buscar usuário por email (Drizzle ou Supabase REST)
 async function findUserByEmail(email: string): Promise<typeof users.$inferSelect | null> {
   const db = await getDb();
@@ -281,7 +304,7 @@ export function registerAuthRoutes(app: Express) {
       }
 
       // Montar URL de reset
-      const origin = (req.headers.origin as string) || `https://cobrapro.online`;
+      const origin = obterOrigemSeguraParaReset(req.headers.origin);
       const resetUrl = `${origin}/reset-senha?token=${token}`;
 
       // Enviar e-mail via Brevo
