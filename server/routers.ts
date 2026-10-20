@@ -959,7 +959,7 @@ const contratosRouter = router({
         .in('contrato_id', contratoIds)
         .order('data_vencimento');
 
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
 
       // Agrupar parcelas por contrato
       const parcelasPorContrato: Record<number, any[]> = {};
@@ -974,20 +974,26 @@ const contratosRouter = router({
         parcelasPorContrato[p.contrato_id].push({ ...p, status: statusAtual });
       }
 
-      // Buscar configuração de multa por dia de atraso
-      let multaDiaria = 100; // padrão R$100/dia
+      // Uma configuração ausente ou cobrança automática desligada jamais pode
+      // virar R$100/dia implicitamente. O cartão e o pagamento usam a mesma
+      // regra: somente a taxa que o assinante ativou é exibida/cobrada.
+      let multaDiaria = 0;
+      let multaPercentual = 0;
+      let jurosMultaAutomatico = false;
       try {
         const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
         if (configRows) {
           const configMap: Record<string, string> = {};
           for (const r of configRows) configMap[r.chave] = r.valor ?? '';
-          if (configMap['multaDiaria']) multaDiaria = parseFloat(configMap['multaDiaria']) || 100;
-          else if (configMap['jurosMoraDiario']) {
-            // jurosMoraDiario é % ao dia, converter para R$/dia baseado no valor médio
-            // mas mantemos multaDiaria como R$/dia absoluto
+          jurosMultaAutomatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
+          if (jurosMultaAutomatico) {
+            const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
+            const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
+            multaDiaria = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
+            multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
           }
         }
-      } catch (_) { /* usa padrão */ }
+      } catch (_) { /* sem configuração, não há cobrança automática */ }
 
       return filtrados.map((c: any) => {
         const cliente = c.clientes as any;
@@ -1025,17 +1031,20 @@ const contratosRouter = router({
 
         // Calcular juros por atraso para parcelas atrasadas
         const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
-          const venc = new Date(p.data_vencimento + 'T00:00:00');
-          const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
-          const jurosDiarios = multaDiaria; // R$/dia configurável em Configurações
-          const jurosAtraso = diasAtraso * jurosDiarios;
+          const calculoMora = calcularJurosMora(
+            parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0'),
+            new Date(`${p.data_vencimento}T12:00:00-03:00`),
+            new Date(),
+            multaDiaria,
+            multaPercentual,
+          );
           const multaAplicada = parseFloat(p.valor_multa ?? '0');
           return {
             ...p,
-            diasAtraso,
-            jurosAtraso,
+            diasAtraso: calculoMora.diasAtraso,
+            jurosAtraso: calculoMora.juros + calculoMora.multa,
             multaAplicada,
-            totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso + multaAplicada,
+            totalComAtraso: parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0') + calculoMora.juros + calculoMora.multa + multaAplicada,
           };
         });
 
@@ -1095,7 +1104,7 @@ const contratosRouter = router({
         .eq('contrato_id', input.id)
         .order('data_vencimento');
 
-      const hoje = new Date().toISOString().split('T')[0];
+      const hoje = dataHojeBrasilia();
       const cliente = contratoData.clientes as any;
       const parcelas = (parcelasData ?? []).map((p: any) => {
         let statusAtual = p.status;
@@ -1106,16 +1115,23 @@ const contratosRouter = router({
         return { ...p, status: statusAtual };
       });
 
-      // Buscar configuração de multa
-      let multaDiaria = 100;
+      // Sem ativação explícita não há juros automáticos de mora.
+      let multaDiaria = 0;
+      let multaPercentual = 0;
       try {
         const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
         if (configRows) {
           const configMap: Record<string, string> = {};
           for (const r of configRows) configMap[r.chave] = r.valor ?? '';
-          if (configMap['multaDiaria']) multaDiaria = parseFloat(configMap['multaDiaria']) || 100;
+          const automatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
+          if (automatico) {
+            const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
+            const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
+            multaDiaria = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
+            multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
+          }
         }
-      } catch (_) { /* usa padrão */ }
+      } catch (_) { /* sem configuração, não há cobrança automática */ }
 
       // Calcular KPIs
       const parcelasAbertas = parcelas.filter((p: any) => !['paga'].includes(p.status));
@@ -1135,17 +1151,20 @@ const contratosRouter = router({
       const lucroRealizado = Math.max(0, totalPago - valorPrincipal);
 
       const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
-        const venc = new Date(p.data_vencimento + 'T00:00:00');
-        const diasAtraso = Math.max(0, Math.floor((new Date().getTime() - venc.getTime()) / (1000 * 60 * 60 * 24)));
-        const jurosDiarios = multaDiaria;
-        const jurosAtraso = diasAtraso * jurosDiarios;
+        const calculoMora = calcularJurosMora(
+          parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0'),
+          new Date(`${p.data_vencimento}T12:00:00-03:00`),
+          new Date(),
+          multaDiaria,
+          multaPercentual,
+        );
         const multaAplicada = parseFloat(p.valor_multa ?? '0');
         return {
           ...p,
-          diasAtraso,
-          jurosAtraso,
+          diasAtraso: calculoMora.diasAtraso,
+          jurosAtraso: calculoMora.juros + calculoMora.multa,
           multaAplicada,
-          totalComAtraso: parseFloat(p.valor_original ?? '0') + jurosAtraso + multaAplicada,
+          totalComAtraso: parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0') + calculoMora.juros + calculoMora.multa + multaAplicada,
         };
       });
 
@@ -2173,14 +2192,22 @@ const parcelasRouter = router({
       if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
       if (parcelaData.status === 'paga') throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi quitada' });
 
-      // Buscar configuração de multa diária do usuário
+      // Buscar configuração de mora do usuário. Sem ativação explícita não há
+      // juros automáticos no pagamento, para coincidir com a tela de Parcelas.
       let multaDiariaReais = 0;
+      let multaAtrasoPercentual = 0;
       try {
         const { data: configRows } = await sb.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
         if (configRows) {
           const configMap: Record<string, string> = {};
           for (const r of configRows) configMap[r.chave] = r.valor ?? '';
-          if (configMap['multaDiaria']) multaDiariaReais = parseFloat(configMap['multaDiaria']) || 0;
+          const automatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
+          if (automatico) {
+            const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
+            const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
+            multaDiariaReais = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
+            multaAtrasoPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
+          }
         }
       } catch (_) { /* usa padrão 0 */ }
 
@@ -2208,7 +2235,7 @@ const parcelasRouter = router({
         new Date(parcelaData.data_vencimento + 'T12:00:00-03:00'),
         dataPagamentoDate,
         multaDiariaReais,
-        0 // multa percentual não usada no modelo CobraFácil
+        multaAtrasoPercentual,
       );
 
       // Usar juros customizado se fornecido pelo usuário, senão usar o calculado
@@ -3423,7 +3450,7 @@ const configuracoesRouter = router({
       multaPadrao: parseFloat(get('multaPadrao', 'multa_padrao', '2')),
       jurosMoraDiario: parseFloat(get('jurosMoraDiario', 'juros_mora_diario', '0.033')),
       diasLembrete: parseInt(get('diasLembrete', 'dias_lembrete', '3')),
-      multaDiaria: parseFloat(get('multaDiaria', 'multa_diaria', '100')),
+      multaDiaria: parseFloat(get('multaDiaria', 'multa_diaria', '0')),
       pixKey: get('pixKey', 'pix_key'),
       nomeCobranca: get('nomeCobranca', 'nome_cobranca'),
       linkPagamento: get('linkPagamento', 'link_pagamento'),

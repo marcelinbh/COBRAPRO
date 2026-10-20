@@ -126,7 +126,7 @@ export default function Configuracoes() {
   const [multaPadrao, setMultaPadrao] = useState(String(config?.multaPadrao ?? "2"));
   const [jurosMora, setJurosMora] = useState(String(config?.jurosMoraDiario ?? "0.033"));
   const [diasLembrete, setDiasLembrete] = useState(String(config?.diasLembrete ?? "3"));
-  const [multaDiaria, setMultaDiaria] = useState(String((config as any)?.multaDiaria ?? "100"));
+  const [multaDiaria, setMultaDiaria] = useState(String((config as any)?.multaDiaria ?? "0"));
 
   // Relatório Diário
   const [horarioRelatorio, setHorarioRelatorio] = useState((config as any)?.horarioRelatorio ?? "08:00");
@@ -191,7 +191,7 @@ export default function Configuracoes() {
       multaPadrao: parseFloat(multaPadrao) || 2,
       jurosMoraDiario: parseFloat(jurosMora) || 0.033,
       diasLembrete: parseInt(diasLembrete) || 3,
-      multaDiaria: parseFloat(multaDiaria) || 100,
+      multaDiaria: Number.isFinite(parseFloat(multaDiaria)) ? Math.max(0, parseFloat(multaDiaria)) : 0,
       pixKey,
       nomeCobranca,
       linkPagamento,
@@ -241,7 +241,7 @@ export default function Configuracoes() {
       multaPadrao: parseFloat(multaPadrao) || 2,
       jurosMoraDiario: parseFloat(jurosMora) || 0.033,
       diasLembrete: parseInt(diasLembrete) || 3,
-      multaDiaria: parseFloat(multaDiaria) || 100,
+      multaDiaria: Number.isFinite(parseFloat(multaDiaria)) ? Math.max(0, parseFloat(multaDiaria)) : 0,
       jurosMultaAutomatico,
       pixKey,
       nomeCobranca,
