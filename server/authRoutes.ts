@@ -9,6 +9,7 @@ import { getDb, getSupabaseClientAsync } from "./db";
 import { registrarLoginLog } from "./loginLogger";
 import { sdk } from "./_core/sdk";
 import { storagePut } from "./storage";
+import { validarUploadCliente } from "./uploadSecurity";
 
 // Helper: buscar usuário por email (Drizzle ou Supabase REST)
 async function findUserByEmail(email: string): Promise<typeof users.$inferSelect | null> {
@@ -408,80 +409,32 @@ export function registerAuthRoutes(app: Express) {
     }
   });
 
-  // ── POST /api/auth/seed-admin ─────────────────────────────────────────────
-  app.post("/api/auth/seed-admin", async (req: Request, res: Response) => {
-    try {
-      const { secret } = req.body as { secret?: string };
-      if (secret !== "cobrapro-seed-2026") {
-        res.status(403).json({ error: "Forbidden" });
-        return;
-      }
-
-      const adminEmail = "koletor3@gmail.com";
-      const passwordHash = await bcrypt.hash("97556511", 12);
-
-      const db = await getDb();
-      if (db) {
-        const existing = await db.select().from(users).where(eq(users.email, adminEmail)).limit(1);
-        if (existing.length > 0) {
-          await db.update(users).set({ passwordHash, role: "admin", loginMethod: "email" }).where(eq(users.email, adminEmail));
-          res.json({ success: true, message: "Admin atualizado com sucesso (Drizzle)" });
-          return;
-        }
-        const openId = `admin_cobrapro_${Date.now()}`;
-        await db.insert(users).values({
-          openId, name: "Administrador", email: adminEmail, passwordHash,
-          loginMethod: "email", role: "admin", lastSignedIn: new Date(),
-        });
-        res.json({ success: true, message: "Admin criado com sucesso (Drizzle)" });
-        return;
-      }
-
-      // Fallback: Supabase REST
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) {
-        res.status(500).json({ error: "Banco de dados indisponível" });
-        return;
-      }
-
-         const { data: existing } = await supabase.from("users").select("id, email").eq("email", adminEmail).limit(1).maybeSingle();
-      if (existing) {
-        await supabase.from("users").update({
-          passwordHash, role: "admin", loginMethod: "email",
-        }).eq("email", adminEmail);
-        res.json({ success: true, message: "Admin atualizado com sucesso (REST)" });
-        return;
-      }
-
-      const openId = `admin_cobrapro_${Date.now()}`;
-      await supabase.from("users").insert({
-        openId, name: "Administrador", email: adminEmail,
-        passwordHash, loginMethod: "email", role: "admin",
-        lastSignedIn: new Date().toISOString(),
-      });
-      res.json({ success: true, message: "Admin criado com sucesso (REST)" });
-    } catch (err) {
-      console.error("[Auth] Seed-admin error:", err);
-      res.status(500).json({ error: "Erro interno. Tente novamente." });
-    }
-  });
-
   // ─── UPLOAD DE ARQUIVOS (foto e documentos de clientes) ─────────────
   app.post("/api/upload", async (req: Request, res: Response) => {
     try {
-      const { base64, contentType, filename, folder } = req.body;
-      if (!base64 || !contentType || !filename) {
-        res.status(400).json({ error: "base64, contentType e filename são obrigatórios" });
+      const user = await sdk.authenticateRequest(req);
+      if (user.isCron || user.id <= 0) {
+        res.status(403).json({ error: "Esta rota exige uma sessão de usuário" });
         return;
       }
-      const buffer = Buffer.from(base64, "base64");
-      const safeFolder = (folder || "clientes").replace(/[^a-zA-Z0-9_-]/g, "");
-      const timestamp = Date.now();
-      const safeName = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-      const key = `${safeFolder}/${timestamp}_${safeName}`;
-      const { url } = await storagePut(key, buffer, contentType);
+
+      const upload = validarUploadCliente(req.body);
+      const key = `tenants/${user.id}/clientes/${upload.pasta}/${crypto.randomUUID()}_${upload.nomeSeguro}`;
+      const { url } = await storagePut(key, upload.buffer, upload.contentType);
       res.json({ url, key });
     } catch (err) {
+      const message = err instanceof Error ? err.message : "Erro ao fazer upload do arquivo";
+      const clientError = [
+        "Invalid session cookie", "User not found", "Failed to sync user info",
+        "Arquivo ausente ou excede o limite de 10 MB", "Conteúdo do arquivo inválido",
+        "Nome do arquivo inválido", "Tipo de arquivo não permitido", "Destino de upload não permitido",
+        "O conteúdo não corresponde ao tipo de arquivo informado",
+      ].includes(message);
+      if (clientError) {
+        const status = message.includes("session") || message === "User not found" || message.includes("sync") ? 401 : 400;
+        res.status(status).json({ error: status === 401 ? "Sessão inválida ou expirada" : message });
+        return;
+      }
       console.error("[Upload] Error:", err);
       res.status(500).json({ error: "Erro ao fazer upload do arquivo" });
     }

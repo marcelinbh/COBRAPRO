@@ -38,9 +38,10 @@ async function startServer() {
   const server = createServer(app);
   // Compressão gzip/brotli para reduzir tamanho das respostas
   app.use(compression());
-  // Configure body parser with larger size limit for file uploads
-  app.use(express.json({ limit: "50mb" }));
-  app.use(express.urlencoded({ limit: "50mb", extended: true }));
+  // Uploads de clientes são limitados a 10 MB e validados na rota. Manter um
+  // teto global abaixo evita que uma requisição anônima ocupe memória excessiva.
+  app.use(express.json({ limit: "15mb" }));
+  app.use(express.urlencoded({ limit: "1mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
   // Auth própria (email/senha)
@@ -183,6 +184,9 @@ async function startServer() {
   // Chamado pela scheduled task do Manus diariamente para manter status correto
   app.post('/api/scheduled/atualizar-parcelas', async (req, res) => {
     try {
+      if (!(await autenticarDisparadorDeAutomacao(req))) {
+        return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
+      }
       const { getSupabaseClientAsync } = await import('../db');
       const { dataHojeBrasilia } = await import('../services/businessDate');
       const sb = await getSupabaseClientAsync();
@@ -208,6 +212,9 @@ async function startServer() {
   // ─── Heartbeat: ping Supabase para evitar pause automático (a cada 3 dias) ───
   app.post('/api/scheduled/supabase-keepalive', async (req, res) => {
     try {
+      if (!(await autenticarDisparadorDeAutomacao(req))) {
+        return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
+      }
       const { getSupabaseClientAsync } = await import('../db');
       const sb = await getSupabaseClientAsync();
       if (!sb) return res.status(500).json({ error: 'DB indisponível' });
@@ -218,118 +225,6 @@ async function startServer() {
       return res.json({ success: true, timestamp: new Date().toISOString() });
     } catch (err: any) {
       console.error('[heartbeat/supabase-keepalive] Erro:', err);
-      res.status(500).json({ error: String(err) });
-    }
-  });
-
-  // ─── Endpoint temporário para migration da tabela contrato_historico ───
-  app.post('/api/admin/migration-historico', async (req, res) => {
-    try {
-      const { getSupabaseClientAsync } = await import('../db');
-      const sb = await getSupabaseClientAsync();
-      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
-      // Verificar se a tabela já existe
-      const { data: tableCheck } = await sb.from('contrato_historico').select('id').limit(1);
-      if (tableCheck !== null) {
-        return res.json({ success: true, message: 'Tabela contrato_historico já existe' });
-      }
-      return res.json({ success: false, message: 'Tabela não existe - use o Supabase Dashboard para criar' });
-    } catch (err: any) {
-      if (err?.message?.includes('relation') || err?.code === '42P01') {
-        return res.json({ success: false, message: 'Tabela não existe', error: err.message });
-      }
-      res.status(500).json({ error: String(err) });
-    }
-  });
-
-  // ─── Endpoint temporário para migration saldo_residual ───
-  app.post('/api/admin/migration-saldo-residual', async (req, res) => {
-    try {
-      const { getSupabaseClientAsync } = await import('../db');
-      const sb = await getSupabaseClientAsync();
-      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
-      
-      // Check if columns already exist
-      const { data: checkData, error: checkError } = await sb
-        .from('parcelas')
-        .select('saldo_residual, multa_diaria_usada')
-        .limit(1);
-      
-      if (!checkError) {
-        return res.json({ success: true, message: 'Colunas já existem', columns: ['saldo_residual', 'multa_diaria_usada'] });
-      }
-      
-      // Columns don't exist — try Supabase Management API to execute DDL
-      const supabaseUrl = process.env.SUPABASE_URL || '';
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-      const projectRef = supabaseUrl.replace('https://', '').split('.')[0];
-      
-      const ddlSql = `ALTER TABLE parcelas ADD COLUMN IF NOT EXISTS saldo_residual NUMERIC(15,2) DEFAULT 0.00 NOT NULL; ALTER TABLE parcelas ADD COLUMN IF NOT EXISTS multa_diaria_usada NUMERIC(15,2) DEFAULT 0.00;`;
-      
-      // Try Supabase Management API v1
-      const mgmtRes = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/database/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${serviceKey}`
-        },
-        body: JSON.stringify({ query: ddlSql }),
-        signal: AbortSignal.timeout(15000)
-      });
-      
-      const mgmtText = await mgmtRes.text();
-      
-      return res.json({ 
-        success: mgmtRes.ok,
-        status: mgmtRes.status,
-        message: mgmtRes.ok ? 'DDL executado via Management API' : 'Falha na Management API',
-        response: mgmtText,
-        originalError: checkError?.message,
-        projectRef
-      });
-    } catch (err: any) {
-      res.status(500).json({ error: String(err) });
-    }
-  });
-
-  // ─── Endpoint para criar tabela login_logs ───
-  app.post('/api/admin/migration-login-logs', async (req, res) => {
-    try {
-      const { getSupabaseClientAsync } = await import('../db');
-      const sb = await getSupabaseClientAsync();
-      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
-
-      // Verificar se já existe
-      const { error: checkError } = await sb.from('login_logs').select('id').limit(1);
-      if (!checkError) {
-        return res.json({ success: true, message: 'Tabela login_logs já existe' });
-      }
-
-      // Criar via Supabase REST rpc exec_sql
-      const supabaseUrl = process.env.SUPABASE_URL || '';
-      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
-      const ddl = `CREATE TABLE IF NOT EXISTS login_logs (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, ip VARCHAR(64), cidade VARCHAR(128), regiao VARCHAR(128), pais VARCHAR(64), pais_codigo VARCHAR(4), latitude DECIMAL(10,6), longitude DECIMAL(10,6), timezone VARCHAR(64), isp VARCHAR(256), user_agent TEXT, dispositivo VARCHAR(64), navegador VARCHAR(64), os VARCHAR(64), sucesso BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); CREATE INDEX IF NOT EXISTS login_logs_user_id_idx ON login_logs(user_id); CREATE INDEX IF NOT EXISTS login_logs_created_at_idx ON login_logs(created_at DESC); NOTIFY pgrst, 'reload schema';`;
-
-      // Tentar via Supabase REST rpc
-      const rpcRes = await fetch(`${supabaseUrl}/rest/v1/rpc/exec_sql`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': serviceKey,
-          'Authorization': `Bearer ${serviceKey}`
-        },
-        body: JSON.stringify({ sql: ddl }),
-        signal: AbortSignal.timeout(15000)
-      });
-      const rpcText = await rpcRes.text();
-      return res.json({
-        success: rpcRes.ok,
-        status: rpcRes.status,
-        message: rpcRes.ok ? 'Tabela criada via rpc' : 'Falha no rpc',
-        response: rpcText.substring(0, 500)
-      });
-    } catch (err: any) {
       res.status(500).json({ error: String(err) });
     }
   });
