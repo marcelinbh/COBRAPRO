@@ -12,7 +12,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Wallet, ArrowUpRight, ArrowDownRight, Building2, PlusCircle, MinusCircle } from "lucide-react";
+import { Plus, Wallet, ArrowUpRight, ArrowDownRight, Building2, PlusCircle, MinusCircle, ClipboardCheck, RefreshCw, ShieldCheck, AlertTriangle } from "lucide-react";
 import { formatarMoeda } from "../../../shared/finance";
 
 // ── Modal: Nova Conta ─────────────────────────────────────────────────────────
@@ -261,6 +261,107 @@ function LancamentoRapido({
   );
 }
 
+// ── Conferência operacional (somente leitura) ─────────────────────────────────
+function ConferenciaCaixa() {
+  const [open, setOpen] = useState(false);
+  const { data, isFetching, error, refetch } = trpc.caixa.conferencia.useQuery(undefined, {
+    enabled: open,
+    staleTime: 0,
+  });
+
+  const formatarData = (valor?: string) => valor
+    ? new Date(valor).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : '';
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" className="gap-2">
+          <ClipboardCheck className="h-4 w-4" /> Conferir caixa
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="font-display text-xl tracking-wide flex items-center gap-2">
+            <ClipboardCheck className="h-5 w-5 text-primary" /> CONFERÊNCIA FINANCEIRA
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-100 flex gap-2">
+          <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-blue-400" />
+          <span>Esta conferência é somente leitura: ela não cria, edita ou apaga lançamentos. Revise as divergências antes de qualquer ajuste manual.</span>
+        </div>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-muted-foreground">
+            {data?.geradoEm ? `Atualizado em ${formatarData(data.geradoEm)}` : 'Carregue os dados para iniciar a conferência.'}
+          </p>
+          <Button variant="outline" size="sm" className="gap-2 self-start" onClick={() => refetch()} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            {isFetching ? 'Conferindo...' : 'Atualizar conferência'}
+          </Button>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            Não foi possível conferir o caixa: {error.message}
+          </div>
+        )}
+
+        {isFetching && !data && (
+          <div className="py-10 text-center text-sm text-muted-foreground">Lendo o livro-caixa e os pagamentos registrados...</div>
+        )}
+
+        {data && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-lg border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Contas</p><p className="font-semibold text-lg">{data.resumo.contas}</p></div>
+              <div className="rounded-lg border border-border bg-muted/30 p-3"><p className="text-xs text-muted-foreground">Movimentos</p><p className="font-semibold text-lg">{data.resumo.movimentos}</p></div>
+              <div className="rounded-lg border border-primary/30 bg-primary/5 p-3"><p className="text-xs text-muted-foreground">Divergências</p><p className="font-semibold text-lg text-primary">{data.resumo.divergencias}</p></div>
+              <div className={`rounded-lg border p-3 ${data.resumo.criticas > 0 ? 'border-destructive/40 bg-destructive/10' : 'border-success/30 bg-success/10'}`}><p className="text-xs text-muted-foreground">Críticas</p><p className={`font-semibold text-lg ${data.resumo.criticas > 0 ? 'text-destructive' : 'text-success'}`}>{data.resumo.criticas}</p></div>
+            </div>
+
+            {data.truncado && (
+              <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 text-sm text-yellow-200 flex gap-2">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                A conta possui mais de {data.limitePorOrigem.toLocaleString('pt-BR')} registros em uma das origens. Esta leitura foi limitada e deve ser revisada por período.
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Saldos calculados pelo livro</h3>
+              {data.contas.map(conta => (
+                <div key={conta.id} className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg border border-border p-3 text-sm sm:grid-cols-5">
+                  <span className="col-span-2 font-medium truncate sm:col-span-1">{conta.nome}</span>
+                  <span className="text-muted-foreground">Base: {formatarMoeda(conta.saldoBase)}</span>
+                  <span className="text-success">Entradas: {formatarMoeda(conta.entradas)}</span>
+                  <span className="text-primary">Saídas: {formatarMoeda(conta.saidas)}</span>
+                  <span className="font-semibold">Livro: {formatarMoeda(conta.saldoLivro)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-sm font-semibold">Divergências encontradas</h3>
+              {data.divergencias.length === 0 ? (
+                <div className="rounded-lg border border-success/30 bg-success/10 p-4 text-sm text-success flex gap-2"><ShieldCheck className="h-4 w-4 shrink-0" /> Nenhuma divergência foi encontrada nos registros analisados.</div>
+              ) : data.divergencias.map((divergencia, indice) => (
+                <div key={`${divergencia.tipo}-${divergencia.referencia}-${indice}`} className={`rounded-lg border p-3 ${divergencia.severidade === 'critica' ? 'border-destructive/40 bg-destructive/10' : divergencia.severidade === 'atencao' ? 'border-yellow-500/40 bg-yellow-500/10' : 'border-blue-500/30 bg-blue-500/10'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div><p className="font-medium text-sm">{divergencia.referencia}</p><p className="text-xs text-muted-foreground mt-1">{divergencia.mensagem}</p></div>
+                    <span className="text-xs uppercase font-semibold shrink-0">{divergencia.severidade}</span>
+                  </div>
+                  {(divergencia.esperado !== null || divergencia.encontrado !== null) && <p className="text-xs mt-2 text-muted-foreground">Esperado: <strong>{divergencia.esperado === null ? '—' : formatarMoeda(divergencia.esperado)}</strong> · Encontrado: <strong>{divergencia.encontrado === null ? '—' : formatarMoeda(divergencia.encontrado)}</strong></p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ── Página Principal ──────────────────────────────────────────────────────────
 export default function Caixa() {
   const { t } = useTranslation();
@@ -294,7 +395,8 @@ export default function Caixa() {
           <h1 className="font-display text-3xl text-foreground tracking-wide">{t('cashbox.title').toUpperCase()}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('cashbox.transactions')}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2 justify-end">
+          <ConferenciaCaixa />
           <NovaConta onSuccess={invalidarTudo} />
           <NovaTransacao contas={contas ?? []} onSuccess={invalidarTudo} />
         </div>

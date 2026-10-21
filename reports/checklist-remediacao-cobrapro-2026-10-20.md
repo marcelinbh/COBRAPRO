@@ -45,7 +45,7 @@
 - [ ] Implementar transação/RPC única para renovação de juros.
 - [ ] Implementar transação/RPC única para despesas, cheques, reparcelamento e vendas de telefone.
 - [ ] Criar restrição única por empresa, contrato e número de parcela. **Migration `0013_integridade_parcelas.sql` pronta; aguarda auditoria de duplicidades e execução no Supabase, que está recusando autenticação do conector.**
-- [ ] Implantar relatório de reconciliação entre parcelas, operações e livro-caixa.
+- [x] Implantar conferência financeira somente leitura entre parcelas, despesas e livro-caixa; ela aponta ausência, valor divergente e provável duplicidade sem criar ajustes automáticos.
 - [x] Padronizar todos os fluxos financeiros pelo calendário `America/Sao_Paulo`.
 
 ## Prioridade P3 — WhatsApp e controle operacional

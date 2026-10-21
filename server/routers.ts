@@ -24,6 +24,7 @@ import { calcularSaldoAtual } from "../shared/caixa";
 import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia, diferencaDiasData } from "./services/businessDate";
 import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarClienteDoUsuario, validarContaDoUsuario } from "./services/operacoesFinanceiras";
 import { compensarRenovacaoJuros } from "./services/renovacaoJurosCompensacao";
+import { gerarConferenciaCaixa } from "./services/conferenciaCaixa";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
@@ -58,6 +59,35 @@ async function listarTransacoesCaixaDoUsuario(supabase: any, userId: number): Pr
     if (lote.length < tamanhoPagina) break;
   }
   return todas;
+}
+
+/** Limite intencional da conferência manual, para não sobrecarregar a API. */
+async function listarRegistrosParaConferencia(
+  supabase: any,
+  tabela: string,
+  colunas: string,
+  userId: number,
+  configurar?: (query: any) => any,
+): Promise<{ registros: any[]; truncado: boolean }> {
+  const registros: any[] = [];
+  const tamanhoPagina = 1000;
+  const maxPaginas = 20;
+  let truncado = true;
+
+  for (let pagina = 0; pagina < maxPaginas; pagina++) {
+    let query = supabase.from(tabela).select(colunas).eq('user_id', userId)
+      .range(pagina * tamanhoPagina, (pagina + 1) * tamanhoPagina - 1);
+    if (configurar) query = configurar(query);
+    const { data, error } = await query;
+    if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+    const lote = data ?? [];
+    registros.push(...lote);
+    if (lote.length < tamanhoPagina) {
+      truncado = false;
+      break;
+    }
+  }
+  return { registros, truncado };
 }
 
 // ─── HELPER: REGISTRAR HISTÓRICO ───────────────────────────────────────────
@@ -2890,6 +2920,51 @@ const caixaRouter = router({
         dataTransacao: t.data_transacao,
       }));
     }),
+
+  conferencia: protectedProcedure.query(async ({ ctx }) => {
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível para conferência' });
+
+    // Leitura separada de cada origem e análise em memória. Esta procedure não
+    // chama insert, update ou delete: o operador recebe evidências antes de
+    // decidir qualquer correção financeira.
+    const [{ data: contas, error: contasErro }, transacoes, parcelasPagas, despesasPagas] = await Promise.all([
+      supabase.from('contas_caixa').select('id, nome, saldo, ativo').eq('user_id', ctx.user.id).eq('ativo', true),
+      listarRegistrosParaConferencia(
+        supabase,
+        'transacoes_caixa',
+        'id, conta_caixa_id, tipo, categoria, valor, parcela_id, descricao',
+        ctx.user.id,
+      ),
+      listarRegistrosParaConferencia(
+        supabase,
+        'parcelas',
+        'id, conta_caixa_id, valor_pago, status',
+        ctx.user.id,
+        (query) => query.in('status', ['paga', 'parcial']),
+      ),
+      listarRegistrosParaConferencia(
+        supabase,
+        'contas_pagar',
+        'id, conta_caixa_id, descricao, valor, status',
+        ctx.user.id,
+        (query) => query.eq('status', 'paga'),
+      ),
+    ]);
+    if (contasErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contasErro.message });
+
+    const resultado = gerarConferenciaCaixa({
+      contas: contas ?? [],
+      transacoes: transacoes.registros,
+      parcelas: parcelasPagas.registros,
+      despesas: despesasPagas.registros,
+    });
+    return {
+      ...resultado,
+      truncado: transacoes.truncado || parcelasPagas.truncado || despesasPagas.truncado,
+      limitePorOrigem: 20_000,
+    };
+  }),
 
   criarConta: protectedProcedure
     .input(z.object({
