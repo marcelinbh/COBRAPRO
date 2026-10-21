@@ -29,6 +29,7 @@
 - [x] Restringir assinaturas, clientes vinculados, pagamentos recorrentes e contas de caixa à empresa proprietária.
 - [x] Restringir produtos, cheques, resumos e links do portal de cliente à empresa proprietária.
 - [x] Corrigir mutações de contratos, parcelas, caixa, produtos, cheques, templates, etiquetas, vendas, assinaturas e portal para filtrar `user_id`; importação de clientes e coletores incluídos.
+- [x] Corrigir os caminhos Drizzle que ainda permitiam consulta individual de contrato e edição/documentos de cliente apenas por ID; adicionados testes de regressão por empresa.
 - [ ] Validar o recurso de origem antes de qualquer escrita encadeada.
 - [ ] Criar testes de autorização: conta A não pode ler, editar ou apagar recurso da conta B.
 - [ ] Criar migration aditiva de índices e constraints por tenant; aplicar somente após verificar dados legados.

@@ -602,7 +602,10 @@ const clientesRouter = router({
       const { id, ...data } = input;
       if (db) {
         try {
-          await db.update(clientes).set(data).where(eq(clientes.id, id));
+          await db.update(clientes).set(data).where(and(
+            eq(clientes.id, id),
+            eq(clientes.userId, ctx.user.id),
+          ));
           return { success: true };
         } catch (err) {
           console.warn('[clientes.update] Drizzle failed, trying REST:', (err as Error).message);
@@ -891,7 +894,11 @@ const clientesRouter = router({
       if (db) {
         try {
           const contratosAtivos = await db.select().from(contratos).where(
-            and(eq(contratos.clienteId, input.id), eq(contratos.status, 'ativo'))
+            and(
+              eq(contratos.clienteId, input.id),
+              eq(contratos.status, 'ativo'),
+              eq(contratos.userId, ctx.user.id),
+            )
           );
           if (contratosAtivos.length > 0) {
             throw new TRPCError({
@@ -929,7 +936,10 @@ const clientesRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(clientes).set({ documentosUrls: input.documentosUrls } as any).where(eq(clientes.id, input.id));
+          await db.update(clientes).set({ documentosUrls: input.documentosUrls } as any).where(and(
+            eq(clientes.id, input.id),
+            eq(clientes.userId, ctx.user.id),
+          ));
           return { success: true };
         } catch (err) {
           console.warn('[clientes.updateDocumentos] Drizzle failed, trying REST:', (err as Error).message);
@@ -1344,7 +1354,11 @@ const contratosRouter = router({
           contrato: contratos, clienteNome: clientes.nome,
           clienteWhatsapp: clientes.whatsapp, clienteChavePix: clientes.chavePix,
         }).from(contratos).innerJoin(clientes, eq(contratos.clienteId, clientes.id))
-          .where(eq(contratos.id, input.id)).limit(1);
+          .where(and(
+            eq(contratos.id, input.id),
+            eq(contratos.userId, ctx.user.id),
+            eq(clientes.userId, ctx.user.id),
+          )).limit(1);
         return rows[0] ?? null;
       } catch (err) { console.warn('[contratos.byId] Drizzle failed:', (err as Error).message); resetDb(); }
     }
