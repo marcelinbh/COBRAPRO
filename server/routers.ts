@@ -23,6 +23,7 @@ import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcul
 import { calcularSaldoAtual } from "../shared/caixa";
 import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia, diferencaDiasData } from "./services/businessDate";
 import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarClienteDoUsuario, validarContaDoUsuario } from "./services/operacoesFinanceiras";
+import { compensarRenovacaoJuros } from "./services/renovacaoJurosCompensacao";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
@@ -2523,7 +2524,7 @@ const parcelasRouter = router({
         if (parcelaUpdateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: parcelaUpdateErr.message });
         if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'A parcela já foi processada ou não pertence a esta empresa' });
 
-        const { error: jurosTxErr } = await supabase.from('transacoes_caixa').insert({
+        const { data: jurosTx, error: jurosTxErr } = await supabase.from('transacoes_caixa').insert({
           conta_caixa_id: input.contaCaixaId,
           tipo: 'entrada',
           categoria: 'pagamento_parcela',
@@ -2533,12 +2534,39 @@ const parcelasRouter = router({
           contrato_id: parcela.contratoId,
           data_transacao: dataHojeBrasilia(),
           user_id: ctx.user.id,
-        });
+        }).select('id').single();
         if (jurosTxErr) {
           await supabase.from('parcelas').update({ valor_pago: parcela.valorPago ?? null, data_pagamento: parcela.dataPagamento ?? null, status: parcela.status, observacoes: parcela.observacoes ?? null, conta_caixa_id: parcela.contaCaixaId ?? null })
             .eq('id', input.parcelaId).eq('user_id', ctx.user.id).eq('status', 'paga');
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: jurosTxErr.message });
         }
+
+        // O Supabase REST não fornece transação entre estas escritas. Em cada
+        // falha posterior, restaura-se a parcela original e remove-se somente
+        // o lançamento criado nesta tentativa, identificado pelo seu próprio id.
+        const desfazerRenovacaoParcial = async (novaParcelaId?: number) => compensarRenovacaoJuros({
+          removerParcelaRenovada: novaParcelaId ? async () => {
+            const { error } = await supabase.from('parcelas').delete()
+              .eq('id', novaParcelaId).eq('user_id', ctx.user.id).eq('contrato_id', parcela.contratoId);
+            if (error) throw new Error(error.message);
+          } : undefined,
+          removerLancamentoCaixa: async () => {
+            if (!jurosTx?.id) return;
+            const { error } = await supabase.from('transacoes_caixa').delete()
+              .eq('id', jurosTx.id).eq('user_id', ctx.user.id);
+            if (error) throw new Error(error.message);
+          },
+          restaurarParcelaOriginal: async () => {
+            const { error } = await supabase.from('parcelas').update({
+              valor_pago: parcela.valorPago ?? null,
+              data_pagamento: parcela.dataPagamento ?? null,
+              status: parcela.status,
+              observacoes: parcela.observacoes ?? null,
+              conta_caixa_id: parcela.contaCaixaId ?? null,
+            }).eq('id', input.parcelaId).eq('user_id', ctx.user.id).eq('status', 'paga');
+            if (error) throw new Error(error.message);
+          },
+        });
 
         // Buscar o maior numero_parcela existente para evitar duplicatas no fallback REST
         const { data: maxParcelaRest } = await supabase.from('parcelas')
@@ -2550,7 +2578,7 @@ const parcelasRouter = router({
           .single();
         const novoNumero = ((maxParcelaRest?.numero_parcela as number) ?? (parcela.numeroParcela as number)) + 1;
         const novoValorRest = parseFloat(valorNovaParcela);
-        const { error: insertParcelaErr } = await supabase.from('parcelas').insert({
+        const { data: novaParcela, error: insertParcelaErr } = await supabase.from('parcelas').insert({
           user_id: ctx.user.id,
           cliente_id: parcela.clienteId,
           contrato_id: parcela.contratoId,
@@ -2562,16 +2590,29 @@ const parcelasRouter = router({
           data_vencimento: novaDataVencStr,
           status: 'pendente',
           conta_caixa_id: input.contaCaixaId ?? null,
-        });
+        }).select('id').single();
         if (insertParcelaErr) {
+          await desfazerRenovacaoParcial();
           console.error('[pagarJuros] ERRO ao criar nova parcela:', insertParcelaErr.message);
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: `Erro ao criar nova parcela: ${insertParcelaErr.message}` });
         }
 
-        const { error: contratoUpdateErr } = await supabase.from('contratos')
-          .update({ numero_parcelas: (contrato.numeroParcelas as number) + 1 })
-          .eq('id', parcela.contratoId).eq('user_id', ctx.user.id);
-        if (contratoUpdateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoUpdateErr.message });
+        const numeroParcelasAnterior = Number(contrato.numeroParcelas ?? 0);
+        const { data: contratoAtualizado, error: contratoUpdateErr } = await supabase.from('contratos')
+          .update({ numero_parcelas: numeroParcelasAnterior + 1 })
+          .eq('id', parcela.contratoId)
+          .eq('user_id', ctx.user.id)
+          // Compare-and-set: apenas uma renovação concorrente pode avançar
+          // este contador. A outra é compensada junto com sua parcela e caixa.
+          .eq('numero_parcelas', numeroParcelasAnterior)
+          .select('id').maybeSingle();
+        if (contratoUpdateErr || !contratoAtualizado) {
+          await desfazerRenovacaoParcial(novaParcela?.id);
+          throw new TRPCError({
+            code: contratoUpdateErr ? 'INTERNAL_SERVER_ERROR' : 'CONFLICT',
+            message: contratoUpdateErr?.message ?? 'O contrato não pôde ser atualizado; a renovação foi desfeita',
+          });
+        }
       }
 
       // Registrar histórico

@@ -40,6 +40,7 @@
 - [x] Corrigir dashboard, cartões e listas para não somarem novamente o principal de parcela parcial que já possui `saldo_residual`.
 - [x] Bloquear a rotina legada de sincronização automática que criava lançamentos no caixa sem uma conferência explícita.
 - [x] Suspender o reparcelamento não atômico até sua substituição por RPC/transação única, evitando contratos parcialmente quitados ou recriados.
+- [x] Compensar integralmente falhas REST na renovação de juros: remove a nova parcela e a entrada de caixa da tentativa, restaura a parcela original e bloqueia avanço concorrente do contrato.
 - [ ] Implementar transação/RPC única para pagamento de parcela e saldo residual.
 - [ ] Implementar transação/RPC única para renovação de juros.
 - [ ] Implementar transação/RPC única para despesas, cheques, reparcelamento e vendas de telefone.
