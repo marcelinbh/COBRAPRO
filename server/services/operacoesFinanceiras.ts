@@ -119,6 +119,20 @@ export async function validarContaDoUsuario(userId: number, contaCaixaId: number
   if (!data || data.ativo === false) throw new TRPCError({ code: "BAD_REQUEST", message: "A conta de caixa selecionada não está disponível para esta empresa" });
 }
 
+/**
+ * O backend usa a chave de serviço do Supabase, portanto toda referência de
+ * cliente recebida do navegador precisa ser vinculada ao assinante antes da
+ * primeira escrita. Não confiar em RLS implícito neste caminho.
+ */
+export async function validarClienteDoUsuario(userId: number, clienteId: number): Promise<void> {
+  const sb = await getSupabaseClientAsync();
+  if (!sb) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco de dados indisponível" });
+  const { data, error } = await sb.from("clientes").select("id")
+    .eq("id", clienteId).eq("user_id", userId).maybeSingle();
+  if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: error.message });
+  if (!data) throw new TRPCError({ code: "NOT_FOUND", message: "Cliente não encontrado para esta empresa" });
+}
+
 export async function registrarAuditoriaFinanceira(params: {
   userId: number;
   operacaoId: string;

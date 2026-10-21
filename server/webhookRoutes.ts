@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 import { Router, Request, Response } from "express";
 import { getSupabaseClientAsync } from "./db";
 import { ENV } from "./_core/env";
@@ -25,11 +26,27 @@ function extrairAtualizacoes(data: Record<string, unknown>): Array<Record<string
   return [];
 }
 
+export function validarTokenWebhook(configuredToken: string, receivedToken: unknown): "ok" | "ausente" | "invalido" {
+  if (!configuredToken) return "ausente";
+  if (typeof receivedToken !== "string") return "invalido";
+  const esperado = Buffer.from(configuredToken);
+  const recebido = Buffer.from(receivedToken);
+  if (esperado.length !== recebido.length) return "invalido";
+  return timingSafeEqual(esperado, recebido) ? "ok" : "invalido";
+}
+
 export function registerWebhookRoutes(app: Router) {
   app.post("/api/webhook/evolution", async (req: Request, res: Response) => {
     const configuredToken = ENV.evolutionWebhookToken;
     const receivedToken = typeof req.query.token === "string" ? req.query.token : req.header("x-cobrapro-webhook-token");
-    if (configuredToken && receivedToken !== configuredToken) {
+    const tokenStatus = validarTokenWebhook(configuredToken, receivedToken);
+    // A chave de serviço do Supabase não pode receber eventos sem um segredo
+    // configurado. Falhar fechado previne alteração de estado de outra empresa.
+    if (tokenStatus === "ausente") {
+      console.error("[Webhook Evolution] Token de autenticação não configurado; evento recusado.");
+      return res.status(503).json({ received: false, error: "Webhook temporariamente indisponível" });
+    }
+    if (tokenStatus === "invalido") {
       return res.status(401).json({ received: false, error: "Webhook não autorizado" });
     }
     // A resposta rápida impede que o provedor repita um evento já aceito. O

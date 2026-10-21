@@ -22,7 +22,7 @@ import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
 import { calcularSaldoAtual } from "../shared/caixa";
 import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia, diferencaDiasData } from "./services/businessDate";
-import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarContaDoUsuario } from "./services/operacoesFinanceiras";
+import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarClienteDoUsuario, validarContaDoUsuario } from "./services/operacoesFinanceiras";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
@@ -1327,6 +1327,7 @@ const contratosRouter = router({
       jurosMoraDiario: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await validarClienteDoUsuario(ctx.user.id, input.clienteId);
       if (input.contaCaixaId) await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       // Calcular valor da parcela
       let valorParcela: number;
@@ -3896,6 +3897,7 @@ const contasPagarRouter = router({
       contaCaixaId: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.contaCaixaId) await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       const db = await getDb();
       if (db) {
         try {
@@ -4269,6 +4271,8 @@ const chequesRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      await validarClienteDoUsuario(ctx.user.id, input.clienteId);
+      if (input.contaCaixaId) await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       const db = await getDb();
       const dbAvailable = !!db;
       const dataVenc = new Date(input.dataVencimento + 'T00:00:00');
@@ -4295,10 +4299,10 @@ const chequesRouter = router({
             dataVencimento: dataVenc.toISOString().split('T')[0], taxaDesconto: input.taxaDesconto.toFixed(4),
             tipoTaxa: input.tipoTaxa as 'diaria' | 'mensal' | 'anual',
             valorDesconto: valorDesconto.toFixed(2), valorLiquido: valorLiquido.toFixed(2),
-            contaCaixaId: input.contaCaixaId, observacoes: input.observacoes, status: 'aguardando',
+            contaCaixaId: input.contaCaixaId, observacoes: input.observacoes, status: 'aguardando', userId: ctx.user.id,
           }).returning({ id: cheques.id });
           if (input.contaCaixaId) {
-            await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'outros', valor: valorLiquido.toFixed(2), descricao: `Desconto de cheque - ${input.emitente}`, dataTransacao: new Date() });
+            await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'outros', valor: valorLiquido.toFixed(2), descricao: `Desconto de cheque - ${input.emitente}`, dataTransacao: new Date(), userId: ctx.user.id });
           }
           return { success: true, id: result[0].id, valorLiquido, valorDesconto };
         } catch (err) { console.warn('[cheques.criar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
@@ -4326,11 +4330,12 @@ const chequesRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          const cheque = await db.select().from(cheques).where(eq(cheques.id, input.id)).limit(1);
+          const cheque = await db.select().from(cheques).where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id))).limit(1);
           if (!cheque[0]) throw new Error('Cheque não encontrado');
           const contaId = input.contaCaixaId ?? cheque[0].contaCaixaId;
-          await db.update(cheques).set({ status: 'compensado', dataCompensacao: new Date(), contaCaixaId: contaId }).where(eq(cheques.id, input.id));
-          if (contaId) await db.insert(transacoesCaixa).values({ contaCaixaId: contaId, tipo: 'entrada', categoria: 'outros', valor: cheque[0].valorNominal, descricao: `Cheque compensado - ${cheque[0].emitente}`, dataTransacao: new Date() });
+          if (contaId) await validarContaDoUsuario(ctx.user.id, contaId);
+          await db.update(cheques).set({ status: 'compensado', dataCompensacao: new Date(), contaCaixaId: contaId }).where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id)));
+          if (contaId) await db.insert(transacoesCaixa).values({ contaCaixaId: contaId, tipo: 'entrada', categoria: 'outros', valor: cheque[0].valorNominal, descricao: `Cheque compensado - ${cheque[0].emitente}`, dataTransacao: new Date(), userId: ctx.user.id });
           return { success: true };
         } catch (err: any) { if (err.message === 'Cheque não encontrado') throw err; console.warn('[cheques.compensar] Drizzle failed, trying REST:', err.message); resetDb(); }
       }
@@ -4344,6 +4349,7 @@ const chequesRouter = router({
         throw new TRPCError({ code: 'CONFLICT', message: 'Este cheque já foi processado' });
       }
       const contaId = input.contaCaixaId ?? chqData.conta_caixa_id;
+      if (contaId) await validarContaDoUsuario(ctx.user.id, contaId);
       const { data: chequeAtualizado, error: chequeAtualizarErro } = await supabase.from('cheques')
         .update({ status: 'compensado', data_compensacao: new Date().toISOString(), conta_caixa_id: contaId })
         .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'aguardando').select('id').maybeSingle();
