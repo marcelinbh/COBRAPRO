@@ -66,4 +66,27 @@ describe("contratos.byId - isolamento por empresa", () => {
     expect(query.sql).toContain('"clientes"."user_id" = $3');
     expect(query.params).toEqual([99, 41, 41]);
   });
+
+  it("não atualiza nem consulta parcelas quando o contrato pertence a outra empresa", async () => {
+    const returning = vi.fn().mockResolvedValue([]);
+    const where = vi.fn(() => ({ returning }));
+    const set = vi.fn(() => ({ where }));
+    const db = {
+      update: vi.fn(() => ({ set })),
+      select: vi.fn(),
+    };
+    mocks.getDb.mockResolvedValue(db);
+
+    await expect(appRouter.createCaller(contexto(41)).contratos.editar({
+      id: 99,
+      valorPrincipal: 1000,
+      taxaJuros: "10",
+      tipoTaxa: "mensal",
+      numeroParcelas: 2,
+      dataPrimeiraParcela: "2026-11-01",
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(db.select).not.toHaveBeenCalled();
+    expect(db.update).toHaveBeenCalledTimes(1);
+  });
 });

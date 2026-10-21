@@ -128,4 +128,84 @@ describe("operações financeiras - validação de recursos por empresa", () => 
     await expect(appRouter.createCaller(contexto(41)).cheques.compensar({ id: 700, contaCaixaId: 800 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(supabase.filtros.contas_caixa).toEqual(expect.arrayContaining([["id", 800], ["user_id", 41]]));
   });
+
+  it("não reserva pagamento de parcela quando a parcela é de outra empresa", async () => {
+    const supabase = supabaseComRespostas({
+      contas_caixa: { data: { id: 800, ativo: true }, error: null },
+      parcelas: { data: null, error: null },
+    });
+    mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
+
+    await expect(appRouter.createCaller(contexto(41)).parcelas.registrarPagamento({
+      parcelaId: 700,
+      valorPago: 100,
+      contaCaixaId: 800,
+      idempotencyKey: "2c90f2d2-e640-49be-9cfb-ec21102f3c5e",
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(supabase.filtros.parcelas).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
+    expect(supabase.from).not.toHaveBeenCalledWith("operacoes_financeiras");
+  });
+
+  it("não reserva renovação de juros quando a parcela é de outra empresa", async () => {
+    const supabase = supabaseComRespostas({
+      contas_caixa: { data: { id: 800, ativo: true }, error: null },
+      parcelas: { data: null, error: null },
+    });
+    mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
+
+    await expect(appRouter.createCaller(contexto(41)).parcelas.pagarJuros({
+      parcelaId: 700,
+      valorJurosPago: 100,
+      contaCaixaId: 800,
+      idempotencyKey: "46a1a4a2-09fb-44ea-9f23-3a9c5a51e5f4",
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(supabase.filtros.parcelas).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
+    expect(supabase.from).not.toHaveBeenCalledWith("operacoes_financeiras");
+  });
+
+  it("não reserva pagamento de despesa quando a despesa é de outra empresa", async () => {
+    const supabase = supabaseComRespostas({
+      contas_caixa: { data: { id: 800, ativo: true }, error: null },
+      contas_pagar: { data: null, error: null },
+    });
+    mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
+
+    await expect(appRouter.createCaller(contexto(41)).contasPagar.pagar({
+      id: 700,
+      contaCaixaId: 800,
+      idempotencyKey: "19ed02d8-91a8-4b24-89c2-4b9b8f5e0d21",
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(supabase.filtros.contas_pagar).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
+    expect(supabase.from).not.toHaveBeenCalledWith("operacoes_financeiras");
+  });
+
+  it("não cria histórico ao editar juros de contrato de outra empresa", async () => {
+    const supabase = supabaseComRespostas({ contratos: { data: null, error: null } });
+    mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
+
+    await expect(appRouter.createCaller(contexto(41)).contratos.editarJuros({
+      id: 700,
+      novaTaxa: "10",
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(supabase.filtros.contratos).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
+    expect(supabase.from).not.toHaveBeenCalledWith("contrato_historico");
+  });
+
+  it("não aplica multa nem registra histórico em contrato de outra empresa", async () => {
+    const supabase = supabaseComRespostas({ contratos: { data: null, error: null } });
+    mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
+
+    await expect(appRouter.createCaller(contexto(41)).contratos.aplicarMulta({
+      id: 700,
+      multa: "5.00",
+    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+
+    expect(supabase.filtros.contratos).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
+    expect(supabase.from).not.toHaveBeenCalledWith("parcelas");
+    expect(supabase.from).not.toHaveBeenCalledWith("contrato_historico");
+  });
 });

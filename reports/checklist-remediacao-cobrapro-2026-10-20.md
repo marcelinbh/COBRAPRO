@@ -30,8 +30,8 @@
 - [x] Restringir produtos, cheques, resumos e links do portal de cliente à empresa proprietária.
 - [x] Corrigir mutações de contratos, parcelas, caixa, produtos, cheques, templates, etiquetas, vendas, assinaturas e portal para filtrar `user_id`; importação de clientes e coletores incluídos.
 - [x] Corrigir os caminhos Drizzle que ainda permitiam consulta individual de contrato e edição/documentos de cliente apenas por ID; adicionados testes de regressão por empresa.
-- [ ] Validar o recurso de origem antes de qualquer escrita encadeada.
-- [ ] Criar testes de autorização: conta A não pode ler, editar ou apagar recurso da conta B.
+- [x] Validar o recurso de origem antes de qualquer escrita encadeada nos fluxos de veículos, contratos, parcelas, renovação, despesas e Blacklist.
+- [x] Criar regressões de autorização: conta A não cria veículo para cliente B, não apaga veículo/parcela B, não edita contrato B, não cria reserva financeira com IDs B e não remove foto de outro registro Blacklist.
 - [ ] Criar migration aditiva de índices e constraints por tenant; aplicar somente após verificar dados legados.
 
 ## Prioridade P2 — Caixa, parcelas e renovação

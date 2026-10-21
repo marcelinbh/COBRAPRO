@@ -2,7 +2,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { getDb } from "../db";
 import { TRPCError } from "@trpc/server";
-import { veiculos, parcelasVeiculo } from "../../drizzle/schema";
+import { clientes, veiculos, parcelasVeiculo } from "../../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
 
 export const veiculosRouter = router({
@@ -21,7 +21,13 @@ export const veiculosRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
-      
+
+      const [cliente] = await db.select({ id: clientes.id }).from(clientes).where(and(
+        eq(clientes.id, input.clienteId),
+        eq(clientes.userId, ctx.user.id),
+      )).limit(1);
+      if (!cliente) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado para esta empresa' });
+
       const result = await db.insert(veiculos).values({ ...input, userId: ctx.user.id }).returning();
       return result[0];
     }),
@@ -46,12 +52,20 @@ export const veiculosRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
-      
+
+      // A autorização do pai precisa acontecer antes de apagar qualquer filha.
+      const [veiculo] = await db.select({ id: veiculos.id }).from(veiculos).where(and(
+        eq(veiculos.id, input.id),
+        eq(veiculos.userId, ctx.user.id),
+      )).limit(1);
+      if (!veiculo) throw new TRPCError({ code: 'NOT_FOUND', message: 'Veículo não encontrado para esta empresa' });
+
       // Deletar parcelas associadas
-      await db.delete(parcelasVeiculo).where(eq(parcelasVeiculo.veiculoId, input.id));
+      await db.delete(parcelasVeiculo).where(eq(parcelasVeiculo.veiculoId, veiculo.id));
       
       // Deletar veículo
-      await db.delete(veiculos).where(and(eq(veiculos.id, input.id), eq(veiculos.userId, ctx.user.id)));
+      const removido = await db.delete(veiculos).where(and(eq(veiculos.id, veiculo.id), eq(veiculos.userId, ctx.user.id))).returning({ id: veiculos.id });
+      if (removido.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'O veículo não pôde ser removido' });
       
       return { success: true };
     }),
@@ -62,10 +76,17 @@ export const veiculosRouter = router({
       valorPago: z.number(),
       observacoes: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (!db) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Database unavailable' });
-      
+
+      const [parcela] = await db.select({ id: parcelasVeiculo.id, veiculoId: parcelasVeiculo.veiculoId })
+        .from(parcelasVeiculo)
+        .innerJoin(veiculos, eq(parcelasVeiculo.veiculoId, veiculos.id))
+        .where(and(eq(parcelasVeiculo.id, input.parcelaId), eq(veiculos.userId, ctx.user.id)))
+        .limit(1);
+      if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela de veículo não encontrada para esta empresa' });
+
       const hoje = new Date();
       
       const result = await db.update(parcelasVeiculo)
@@ -76,9 +97,9 @@ export const veiculosRouter = router({
           observacoes: input.observacoes,
           updatedAt: new Date(),
         })
-        .where(eq(parcelasVeiculo.id, input.parcelaId))
+        .where(and(eq(parcelasVeiculo.id, parcela.id), eq(parcelasVeiculo.veiculoId, parcela.veiculoId)))
         .returning();
-      
+      if (result.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'A parcela de veículo não pôde ser atualizada' });
       return result[0];
     }),
 });

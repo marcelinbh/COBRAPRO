@@ -1485,6 +1485,7 @@ const contratosRouter = router({
             if (dataVenc.getTime() < hoje2.getTime()) status = 'atrasada';
             else if (dataVenc.getTime() === hoje2.getTime()) status = 'vencendo_hoje';
             await db.insert(parcelas).values({
+              userId: ctx.user.id,
               contratoId,
               clienteId: input.clienteId,
               numeroParcela: i + 1,
@@ -1497,6 +1498,7 @@ const contratosRouter = router({
           }
           if (input.contaCaixaId) {
             await db.insert(transacoesCaixa).values({
+              userId: ctx.user.id,
               contaCaixaId: input.contaCaixaId,
               tipo: 'saida',
               categoria: 'emprestimo_liberado',
@@ -1889,27 +1891,28 @@ const contratosRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(contratos).set({
+          const contratoAtualizado = await db.update(contratos).set({
             valorPrincipal: input.valorPrincipal.toString(),
             taxaJuros: input.taxaJuros,
             tipoTaxa: input.tipoTaxa as 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'anual',
             numeroParcelas: input.numeroParcelas,
-          }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
+          }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id))).returning({ id: contratos.id });
+          if (contratoAtualizado.length !== 1) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
 
           // Atualizar parcelas pendentes com nova data se fornecida
           if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
             const parcelasPendentes = await db.select().from(parcelas)
-              .where(and(eq(parcelas.contratoId, input.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
+              .where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
               .orderBy(parcelas.numeroParcela);
             for (let i = 0; i < parcelasPendentes.length; i++) {
               if (input.datasParcelasCustom[i]) {
-                await db.update(parcelas).set({ dataVencimento: input.datasParcelasCustom[i] }).where(eq(parcelas.id, parcelasPendentes[i].id));
+                await db.update(parcelas).set({ dataVencimento: input.datasParcelasCustom[i] }).where(and(eq(parcelas.id, parcelasPendentes[i].id), eq(parcelas.userId, ctx.user.id)));
               }
             }
           } else if (input.dataPrimeiraParcela) {
             // Recalcular datas de todas as parcelas pendentes a partir da nova 1ª parcela
             const parcelasPendentes = await db.select().from(parcelas)
-              .where(and(eq(parcelas.contratoId, input.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
+              .where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
               .orderBy(parcelas.numeroParcela);
             if (parcelasPendentes.length > 0) {
               const baseDate = new Date(input.dataPrimeiraParcela + 'T00:00:00');
@@ -1920,25 +1923,27 @@ const contratosRouter = router({
                 else if (input.tipoTaxa === 'quinzenal') novaData.setDate(novaData.getDate() + i * 15);
                 else if (input.tipoTaxa === 'anual') novaData.setFullYear(novaData.getFullYear() + i);
                 else novaData.setMonth(novaData.getMonth() + i);
-                await db.update(parcelas).set({ dataVencimento: novaData.toISOString() }).where(eq(parcelas.id, parcelasPendentes[i].id));
+                await db.update(parcelas).set({ dataVencimento: novaData.toISOString() }).where(and(eq(parcelas.id, parcelasPendentes[i].id), eq(parcelas.userId, ctx.user.id)));
               }
             }
           }
           return { success: true };
         } catch (err) {
+          if (err instanceof TRPCError) throw err;
           console.warn('[contratos.editar] Drizzle failed, trying REST:', (err as Error).message);
           resetDb();
         }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { error } = await supabase.from('contratos').update({
+      const { data: contratoAtualizado, error } = await supabase.from('contratos').update({
         valor_principal: input.valorPrincipal,
         taxa_juros: input.taxaJuros,
         tipo_taxa: input.tipoTaxa,
         numero_parcelas: input.numeroParcelas,
-      }).eq('id', input.id).eq('user_id', ctx.user.id);
+      }).eq('id', input.id).eq('user_id', ctx.user.id).select('id').maybeSingle();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      if (!contratoAtualizado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
 
       // Atualizar datas das parcelas pendentes via Supabase
       if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
@@ -1992,17 +1997,22 @@ const contratosRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(contratos).set({ taxaJuros: input.novaTaxa }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
+          const contratoAtualizado = await db.update(contratos).set({ taxaJuros: input.novaTaxa })
+            .where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)))
+            .returning({ id: contratos.id });
+          if (contratoAtualizado.length !== 1) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
           return { success: true };
         } catch (err) {
+          if (err instanceof TRPCError) throw err;
           console.warn('[contratos.editarJuros] Drizzle failed, trying REST:', (err as Error).message);
           resetDb();
         }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-       const { error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id).eq('user_id', ctx.user.id);
+       const { data: contratoAtualizado, error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id).eq('user_id', ctx.user.id).select('id').maybeSingle();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      if (!contratoAtualizado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
       await registrarHistorico({ contratoId: input.id, userId: String(ctx.user.id), tipo: 'edicao_juros', descricao: `Taxa de juros alterada para ${input.novaTaxa}%`, valorNovo: input.novaTaxa });
       return { success: true };
     }),
@@ -2036,6 +2046,11 @@ const contratosRouter = router({
       const hoje = dataHojeBrasilia();
       if (db) {
         try {
+          const contrato = await db.select({ id: contratos.id }).from(contratos).where(and(
+            eq(contratos.id, input.id),
+            eq(contratos.userId, ctx.user.id),
+          )).limit(1);
+          if (!contrato[0]) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
           const parcelasAtraso = await db.select().from(parcelas).where(and(
             eq(parcelas.contratoId, input.id),
             eq(parcelas.userId, ctx.user.id),
@@ -2048,6 +2063,7 @@ const contratosRouter = router({
           }
           return { success: true };
         } catch (err) {
+          if (err instanceof TRPCError) throw err;
           console.warn('[contratos.aplicarMulta] Drizzle failed, trying REST:', (err as Error).message);
           resetDb();
         }
@@ -2055,12 +2071,18 @@ const contratosRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       // Verificar que o contrato pertence ao usuário antes de aplicar multa
+      const { data: contrato, error: contratoErro } = await supabase.from('contratos').select('id')
+        .eq('id', input.id).eq('user_id', ctx.user.id).maybeSingle();
+      if (contratoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoErro.message });
+      if (!contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
       const { data: pAtraso } = await supabase.from('parcelas').select('id, valor_multa').eq('contrato_id', input.id).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada', 'vencendo_hoje']).lt('data_vencimento', hoje);
       for (const parcela of (pAtraso ?? [])) {
         const multaAtual = parcela.valor_multa ? parseFloat(parcela.valor_multa) : 0;
         await supabase.from('parcelas').update({ valor_multa: (multaAtual + parseFloat(input.multa)).toString() }).eq('id', parcela.id).eq('user_id', ctx.user.id);
       }
-      await registrarHistorico({ contratoId: input.id, userId: String(ctx.user.id), tipo: 'aplicacao_multa', descricao: `Multa de R$ ${input.multa} aplicada nas parcelas em atraso`, valorNovo: input.multa });
+      if ((pAtraso?.length ?? 0) > 0) {
+        await registrarHistorico({ contratoId: input.id, userId: String(ctx.user.id), tipo: 'aplicacao_multa', descricao: `Multa de R$ ${input.multa} aplicada nas parcelas em atraso`, valorNovo: input.multa });
+      }
       return { success: true };
     }),
 });
@@ -2256,6 +2278,12 @@ const parcelasRouter = router({
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
       if (!input.contaCaixaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de caixa para registrar o recebimento' });
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
+      // Autorizar a origem antes de gravar a reserva de idempotência. Um ID de
+      // outra empresa não pode criar nenhum estado operacional no tenant atual.
+      const { data: parcelaAutorizada, error: parcelaAutorizadaErro } = await sb.from('parcelas')
+        .select('id').eq('id', input.parcelaId).eq('user_id', ctx.user.id).maybeSingle();
+      if (parcelaAutorizadaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: parcelaAutorizadaErro.message });
+      if (!parcelaAutorizada) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
       const chaveIdempotencia = input.idempotencyKey ?? criarChaveIdempotencia();
       const reserva = await reservarOperacaoFinanceira({
         userId: ctx.user.id,
@@ -2464,6 +2492,14 @@ const parcelasRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (!input.contaCaixaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de caixa para registrar o recebimento' });
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
+      // A reserva só é criada depois de confirmar que a parcela pertence à
+      // empresa autenticada. Isso impede operações órfãs com IDs externos.
+      const supabaseAutorizacao = await getSupabaseClientAsync();
+      if (!supabaseAutorizacao) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { data: parcelaAutorizada, error: parcelaAutorizadaErro } = await supabaseAutorizacao.from('parcelas')
+        .select('id').eq('id', input.parcelaId).eq('user_id', ctx.user.id).maybeSingle();
+      if (parcelaAutorizadaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: parcelaAutorizadaErro.message });
+      if (!parcelaAutorizada) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
       const reserva = await reservarOperacaoFinanceira({
         userId: ctx.user.id,
         tipo: 'renovacao_juros',
@@ -4132,6 +4168,14 @@ const contasPagarRouter = router({
       const db = await getDb();
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       const dataReferencia = input.dataPagamento ?? dataHojeBrasilia();
+      // Não persistir uma reserva de operação antes de confirmar a origem da
+      // despesa. O ID é controlado pelo cliente e precisa ser isolado por tenant.
+      const supabaseAutorizacao = await getSupabaseClientAsync();
+      if (!supabaseAutorizacao) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      const { data: contaAutorizada, error: contaAutorizadaErro } = await supabaseAutorizacao.from('contas_pagar')
+        .select('id').eq('id', input.id).eq('user_id', ctx.user.id).maybeSingle();
+      if (contaAutorizadaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contaAutorizadaErro.message });
+      if (!contaAutorizada) throw new TRPCError({ code: 'NOT_FOUND', message: 'Conta não encontrada' });
       const reserva = await reservarOperacaoFinanceira({
         userId: ctx.user.id,
         tipo: 'pagamento_conta',

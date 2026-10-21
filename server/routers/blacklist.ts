@@ -338,7 +338,13 @@ export const blacklistRouter = router({
         throw new TRPCError({ code: "FORBIDDEN", message: "Sem permissão" });
       }
 
-      await db.delete(blacklistFotos).where(eq(blacklistFotos.id, input.fotoId));
+      const removidas = await db.delete(blacklistFotos).where(and(
+        eq(blacklistFotos.id, input.fotoId),
+        eq(blacklistFotos.blacklistId, input.blacklistId),
+      )).returning({ id: blacklistFotos.id });
+      if (removidas.length !== 1) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Foto não encontrada neste registro" });
+      }
       return { sucesso: true };
     }),
 
