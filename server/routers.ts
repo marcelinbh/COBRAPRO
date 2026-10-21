@@ -23,6 +23,7 @@ import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcul
 import { calcularSaldoAtual } from "../shared/caixa";
 import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia, diferencaDiasData } from "./services/businessDate";
 import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarClienteDoUsuario, validarContaDoUsuario } from "./services/operacoesFinanceiras";
+import { executarEfeitosPosConfirmacao } from "./services/efeitosPosConfirmacaoFinanceira";
 import { compensarRenovacaoJuros } from "./services/renovacaoJurosCompensacao";
 import { gerarConferenciaCaixa } from "./services/conferenciaCaixa";
 import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembolso";
@@ -98,11 +99,11 @@ async function registrarHistorico(params: {
   descricao: string;
   valorAnterior?: string;
   valorNovo?: string;
-}) {
+}): Promise<{ ok: boolean; erro?: string }> {
   try {
     const sb = await getSupabaseClientAsync();
-    if (!sb) return;
-    await sb.from('contrato_historico').insert({
+    if (!sb) return { ok: false, erro: "Banco de dados indisponível" };
+    const { error } = await sb.from('contrato_historico').insert({
       contrato_id: params.contratoId,
       user_id: params.userId,
       tipo: params.tipo,
@@ -110,8 +111,14 @@ async function registrarHistorico(params: {
       valor_anterior: params.valorAnterior ?? null,
       valor_novo: params.valorNovo ?? null,
     });
+    if (error) {
+      console.warn('[registrarHistorico] Falha ao registrar histórico:', error.message);
+      return { ok: false, erro: error.message };
+    }
+    return { ok: true };
   } catch (e) {
     console.warn('[registrarHistorico] Falha ao registrar histórico:', e);
+    return { ok: false, erro: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -2258,6 +2265,7 @@ const parcelasRouter = router({
       });
       if (reserva.repetida) return { success: true, repetida: true, ...(reserva.resultado ?? {}) } as any;
 
+      let financeiroConfirmado = false;
       try {
       // Buscar parcela
       const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
@@ -2355,7 +2363,7 @@ const parcelasRouter = router({
 
       // Registrar uma única entrada no caixa, vinculada à operação idempotente.
       {
-        const { error: txErr } = await sb.from('transacoes_caixa').insert({
+        const { data: transacaoCriada, error: txErr } = await sb.from('transacoes_caixa').insert({
           conta_caixa_id: input.contaCaixaId,
           tipo: 'entrada',
           categoria: 'pagamento_parcela',
@@ -2365,45 +2373,79 @@ const parcelasRouter = router({
           contrato_id: parcelaData.contrato_id,
           data_transacao: dataPagamentoStr,
           user_id: ctx.user.id,
-        });
+        }).select('id').maybeSingle();
         if (txErr) {
-          await sb.from('parcelas').update(estadoParcelaAnterior).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
+          const { error: rollbackErr } = await sb.from('parcelas').update(estadoParcelaAnterior)
+            .eq('id', input.parcelaId).eq('user_id', ctx.user.id);
+          if (rollbackErr) {
+            console.error('[Financeiro] Falha grave ao reverter parcela após erro no Caixa:', rollbackErr.message);
+          }
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
         }
+        if (!transacaoCriada?.id) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'O lançamento no Caixa não retornou confirmação' });
+        financeiroConfirmado = true;
       }
 
-      // Verificar se contrato foi quitado
-      const { data: pendentes } = await sb.from('parcelas')
-        .select('id')
-        .eq('contrato_id', parcelaData.contrato_id)
-        .eq('user_id', ctx.user.id)
-        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
-      if ((pendentes?.length ?? 0) === 0) {
-        const { error: contratoStatusErr } = await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcelaData.contrato_id).eq('user_id', ctx.user.id);
-        if (contratoStatusErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoStatusErr.message });
-      }
-
-      // Registrar histórico
+      const resultado = {
+        status: novoStatus,
+        saldoResidual: saldoRestante,
+        parcelaId: input.parcelaId,
+        confirmadoFinanceiro: true,
+      };
       const descHistorico = novoStatus === 'paga'
         ? `Parcela #${parcelaData.numero_parcela} quitada - R$ ${input.valorPago.toFixed(2)}`
         : `Parcela #${parcelaData.numero_parcela} paga parcialmente - R$ ${input.valorPago.toFixed(2)} (saldo pendente nesta parcela: R$ ${saldoRestante.toFixed(2)})`;
-      await registrarHistorico({
-        contratoId: parcelaData.contrato_id,
-        userId: String(parcelaData.user_id ?? parcelaData.koletor_id ?? ''),
-        tipo: 'pagamento',
-        descricao: descHistorico,
-        valorNovo: input.valorPago.toFixed(2),
-      });
 
-      const resultado = { status: novoStatus, saldoResidual: saldoRestante, parcelaId: input.parcelaId };
-      await concluirOperacaoFinanceira(reserva.id, resultado);
-      await registrarAuditoriaFinanceira({
-        userId: ctx.user.id, operacaoId: reserva.id, acao: 'registrar_pagamento_parcela', entidade: 'parcelas', entidadeId: input.parcelaId,
-        detalhes: { valorPago: input.valorPago, contaCaixaId: input.contaCaixaId, status: novoStatus, saldoResidual: saldoRestante, dataPagamento: dataReferencia },
-      });
-      return { success: true, repetida: false, operationId: reserva.id, ...resultado };
+      const pendenciasPosConfirmacao = await executarEfeitosPosConfirmacao([
+        {
+          etapa: 'status do contrato', codigo: 'status_contrato', executar: async () => {
+            const { data: pendentes, error: pendentesErr } = await sb.from('parcelas')
+              .select('id')
+              .eq('contrato_id', parcelaData.contrato_id)
+              .eq('user_id', ctx.user.id)
+              .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
+            if (pendentesErr) throw new Error(pendentesErr.message);
+            if ((pendentes?.length ?? 0) === 0) {
+              const { data: contratoAtualizado, error: contratoStatusErr } = await sb.from('contratos')
+                .update({ status: 'quitado' }).eq('id', parcelaData.contrato_id).eq('user_id', ctx.user.id)
+                .select('id').maybeSingle();
+              if (contratoStatusErr) throw new Error(contratoStatusErr.message);
+              if (!contratoAtualizado) throw new Error('Contrato não encontrado ao concluir quitação');
+            }
+          },
+        },
+        {
+          etapa: 'histórico do contrato', codigo: 'historico_contrato', executar: async () => {
+            const historico = await registrarHistorico({
+              contratoId: parcelaData.contrato_id,
+              userId: String(parcelaData.user_id ?? parcelaData.koletor_id ?? ''),
+              tipo: 'pagamento',
+              descricao: descHistorico,
+              valorNovo: input.valorPago.toFixed(2),
+            });
+            if (!historico.ok) throw new Error(historico.erro ?? 'Histórico não confirmado');
+          },
+        },
+        {
+          etapa: 'auditoria financeira', codigo: 'auditoria_financeira', executar: () => registrarAuditoriaFinanceira({
+            userId: ctx.user.id, operacaoId: reserva.id, acao: 'registrar_pagamento_parcela', entidade: 'parcelas', entidadeId: input.parcelaId,
+            detalhes: { valorPago: input.valorPago, contaCaixaId: input.contaCaixaId, status: novoStatus, saldoResidual: saldoRestante, dataPagamento: dataReferencia },
+          }),
+        },
+      ]);
+      const pendenciasIdempotencia = await executarEfeitosPosConfirmacao([{
+        etapa: 'idempotência da operação',
+        codigo: 'idempotencia_pendente',
+        executar: () => concluirOperacaoFinanceira(reserva.id, { ...resultado, pendenciasPosConfirmacao }),
+      }]);
+      pendenciasPosConfirmacao.push(...pendenciasIdempotencia);
+      return { success: true, repetida: false, operationId: reserva.id, ...resultado, pendenciasPosConfirmacao };
       } catch (error) {
-        await falharOperacaoFinanceira(reserva.id, error);
+        if (!financeiroConfirmado) {
+          await falharOperacaoFinanceira(reserva.id, error);
+        } else {
+          console.error('[Financeiro] Erro inesperado após confirmação de pagamento:', error);
+        }
         throw error;
       }
     }),

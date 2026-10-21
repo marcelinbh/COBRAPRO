@@ -20,6 +20,7 @@ import {
 import { formatarMoeda, formatarData } from '../../../shared/finance';
 import { trpc } from '@/lib/trpc';
 import { gerarComprovantePDF } from '@/lib/gerarComprovante';
+import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 
 export default function EmprestimoDetalhes() {
@@ -73,10 +74,11 @@ export default function EmprestimoDetalhes() {
   );
 
   const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       const parcelaNum = emprestimo?.todasParcelas?.find((p: any) => p.id === variables.parcelaId)?.numero_parcela ?? 1;
       setPagamentoRealizado({ valorPago: variables.valorPago, parcelaNum });
-      toast.success(t('toast_success.pagamento_registrado'));
+      const aviso = avisoDePendenciasPosPagamento(data);
+      if (aviso) toast.warning(aviso); else toast.success(t('toast_success.pagamento_registrado'));
       refetch();
       utils.contratos.listComParcelas.invalidate();
       utils.dashboard.kpis.invalidate();

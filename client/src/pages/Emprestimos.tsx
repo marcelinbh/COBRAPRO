@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
+import { avisoDePendenciasPosPagamento } from "@/lib/pagamentoConfirmado";
 import { useLocation } from "wouter";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { EmprestimoDetalhesModal } from "@/components/EmprestimoDetalhesModal";
@@ -213,20 +214,22 @@ function EditarEmprestimoModal({
   });
 
   const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       const parcelaNum = detalhes?.todasParcelas?.find((p: any) => p.id === variables.parcelaId)?.numero_parcela ?? 1;
       setPagamentoRealizado({ valorPago: variables.valorPago, parcelaNum });
-      toast.success(t('toast_success.pagamento_registrado'));
+      const aviso = avisoDePendenciasPosPagamento(data);
+      if (aviso) toast.warning(aviso); else toast.success(t('toast_success.pagamento_registrado'));
       invalidarTudo();
     },
     onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
   });
 
   const pagarParcelaIndividualMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       const parcelaNum = parcelaSelecionadaPagamento?.numero ?? 1;
       setPagamentoParcelaRealizado({ valorPago: variables.valorPago, parcelaNum });
-      toast.success(t('toast_success.pagamento_registrado'));
+      const aviso = avisoDePendenciasPosPagamento(data);
+      if (aviso) toast.warning(aviso); else toast.success(t('toast_success.pagamento_registrado'));
       invalidarTudo();
     },
     onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
@@ -1186,11 +1189,12 @@ function PagamentoModal({
   const utils = trpc.useUtils();
 
   const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       const valorPago = variables.valorPago;
       const parcelaNum = parcela?.numero_parcela ?? 1;
       setPagamentoRealizado({ valorPago, parcelaNum });
-      toast.success(t('toast_success.pagamento_registrado'));
+      const aviso = avisoDePendenciasPosPagamento(data);
+      if (aviso) toast.warning(aviso); else toast.success(t('toast_success.pagamento_registrado'));
       setTimeout(() => {
         onSuccess();
         utils.contratos.listComParcelas.invalidate();

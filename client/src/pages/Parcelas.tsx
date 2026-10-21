@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
+import { avisoDePendenciasPosPagamento } from "@/lib/pagamentoConfirmado";
 // xlsx e jspdf são carregados sob demanda (lazy) para reduzir o bundle inicial em ~1.1MB
 
 // Templates padrão (mesmos do Cobra Fácil)
@@ -192,8 +193,9 @@ function PagamentoDialog({
     onError: (e) => toast.error('Erro ao pagar juros: ' + e.message),
   });
   const pagarMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.pagamento_registrado_com_sucesso'));
+    onSuccess: (data) => {
+      const aviso = avisoDePendenciasPosPagamento(data);
+      if (aviso) toast.warning(aviso); else toast.success(t('toast_success.pagamento_registrado_com_sucesso'));
       setOpen(false);
       onSuccess();
       utils.dashboard.kpis.invalidate();

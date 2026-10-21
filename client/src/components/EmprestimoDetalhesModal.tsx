@@ -18,6 +18,7 @@ import {
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { trpc } from '@/lib/trpc';
 import { gerarComprovantePDF } from '@/lib/gerarComprovante';
+import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { DeleteEmprestimoDialog } from './DeleteEmprestimoDialog';
 
 interface EmprestimoDetalhesModalProps {
@@ -67,10 +68,11 @@ export function EmprestimoDetalhesModal({
   const utils = trpc.useUtils();
 
   const pagarParcelaIndividualMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       const parcelaNum = parcelaSelecionadaPagamento?.numero ?? 1;
       setPagamentoParcelaRealizado({ valorPago: variables.valorPago, parcelaNum });
-      toast.success('Pagamento registrado!');
+      const aviso = avisoDePendenciasPosPagamento(data);
+      if (aviso) toast.warning(aviso); else toast.success('Pagamento registrado!');
       setTimeout(() => {
         onRefresh();
         utils.contratos.listComParcelas.invalidate();
@@ -81,10 +83,11 @@ export function EmprestimoDetalhesModal({
   });
 
   const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: (_data, variables) => {
+    onSuccess: (data, variables) => {
       const parcelaNum = emprestimo?.todasParcelas?.find((p: any) => p.id === variables.parcelaId)?.numero_parcela ?? 1;
       setPagamentoRealizado({ valorPago: variables.valorPago, parcelaNum });
-      toast.success('Pagamento registrado!');
+      const aviso = avisoDePendenciasPosPagamento(data);
+      if (aviso) toast.warning(aviso); else toast.success('Pagamento registrado!');
       setTimeout(() => {
         onRefresh();
         utils.contratos.listComParcelas.invalidate();
