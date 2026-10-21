@@ -167,7 +167,10 @@ export default function EmprestimoDetalhes() {
   const isAtrasado = diasAtraso > 0;
   const isQuitado = emprestimo.status === 'quitado';
   const parcela = emprestimo.todasParcelas?.find((p: any) => p.status !== 'paga') ?? emprestimo.todasParcelas?.[0];
-  const valorOriginalParcela = parcela ? parseFloat(String(parcela.valor_original ?? '0')) : 0;
+  const saldoParcial = parcela?.status === 'parcial' ? parseFloat(String(parcela.saldo_residual ?? '0')) : 0;
+  const valorOriginalParcela = parcela
+    ? (saldoParcial > 0 ? saldoParcial : parseFloat(String(parcela.valor_original ?? '0')))
+    : 0;
   const valorJurosParcela = emprestimo.valorJurosParcela;
 
   const handlePagar = () => {

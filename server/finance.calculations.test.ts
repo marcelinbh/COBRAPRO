@@ -49,7 +49,7 @@ describe("Finance Calculations", () => {
       expect(totalReceber).toBe(235);
     });
 
-    it("should handle parcelas with status parcial", () => {
+    it("should use only saldo_residual for parcelas with status parcial", () => {
       const parcelas = [
         {
           id: 1,
@@ -60,19 +60,14 @@ describe("Finance Calculations", () => {
         },
       ];
 
-      const totalReceber = parcelas
-        .filter((p) => !["paga"].includes(p.status))
-        .reduce(
-          (s: number, p: any) =>
-            s +
-            parseFloat(p.valor_original ?? "0") +
-            parseFloat(p.valor_multa ?? "0") +
-            parseFloat(p.saldo_residual ?? "0"),
-          0
-        );
+      // saldo_residual já representa o valor que falta na própria parcela.
+      // Somar valor_original aqui voltaria a cobrar o que já foi recebido.
+      const totalReceber = parcelas.reduce((s: number, p: any) =>
+        s + (p.status === "parcial" && parseFloat(p.saldo_residual ?? "0") > 0
+          ? parseFloat(p.saldo_residual)
+          : parseFloat(p.valor_original ?? "0") + parseFloat(p.valor_multa ?? "0") + parseFloat(p.saldo_residual ?? "0")), 0);
 
-      // Esperado: 100 + 5 + 50 = 155
-      expect(totalReceber).toBe(155);
+      expect(totalReceber).toBe(50);
     });
 
     it("should return 0 when all parcelas are paid", () => {
@@ -249,10 +244,9 @@ describe("Finance Calculations", () => {
 
       const totalReceber = parcelasAbertas.reduce(
         (s: number, p: any) =>
-          s +
-          parseFloat(p.valor_original ?? "0") +
-          parseFloat(p.valor_multa ?? "0") +
-          parseFloat(p.saldo_residual ?? "0"),
+          s + (p.status === "parcial" && parseFloat(p.saldo_residual ?? "0") > 0
+            ? parseFloat(p.saldo_residual)
+            : parseFloat(p.valor_original ?? "0") + parseFloat(p.valor_multa ?? "0") + parseFloat(p.saldo_residual ?? "0")),
         0
       );
 
@@ -261,8 +255,8 @@ describe("Finance Calculations", () => {
         0
       );
 
-      // totalReceber: (100+10+0) + (100+20+25) + (100+5+50) = 110 + 145 + 155 = 410
-      expect(totalReceber).toBe(410);
+      // Parcela parcial já carrega o restante em saldo_residual: 50, não 155.
+      expect(totalReceber).toBe(305);
 
       // lucroRealizado: 5 (apenas da parcela paga)
       expect(lucroRealizado).toBe(5);

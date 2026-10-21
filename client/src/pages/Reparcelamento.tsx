@@ -56,15 +56,7 @@ export default function Reparcelamento() {
   }
 
   function confirmarReparcelamento() {
-    if (!contratoId) return;
-    executarMutation.mutate({
-      contratoId,
-      numeroParcelas,
-      taxaJuros,
-      dataInicio,
-      incluirMultas,
-      observacoes,
-    });
+    toast.error("Reparcelamento está temporariamente suspenso para proteção do caixa. Em breve será liberado com confirmação atômica.");
   }
 
   return (

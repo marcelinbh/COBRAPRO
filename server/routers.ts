@@ -19,7 +19,7 @@ import {
 } from "../drizzle/schema";
 import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual } from "../shared/finance";
+import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual, calcularValorAbertoParcela } from "../shared/finance";
 import { calcularSaldoAtual } from "../shared/caixa";
 import { adicionarDiasData, dataCivilBrasiliaParaIso, dataHojeBrasilia, diferencaDiasData } from "./services/businessDate";
 import { concluirOperacaoFinanceira, criarChaveIdempotencia, falharOperacaoFinanceira, registrarAuditoriaFinanceira, reservarOperacaoFinanceira, validarClienteDoUsuario, validarContaDoUsuario } from "./services/operacoesFinanceiras";
@@ -115,7 +115,7 @@ const dashboardRouter = router({
         .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
       const capitalCirculacao = parseFloat(capitalResult[0]?.total ?? '0');
 
-      const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original + COALESCE(saldo_residual, 0) + COALESCE(valor_multa, 0)), 0)` })
+      const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(CASE WHEN status = 'parcial' AND COALESCE(saldo_residual, 0) > 0 THEN saldo_residual ELSE valor_original + COALESCE(saldo_residual, 0) + COALESCE(valor_multa, 0) END), 0)` })
         .from(parcelas).where(and(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']), eq(parcelas.userId, ctx.user.id)));
       const totalReceber = parseFloat(receberResult[0]?.total ?? '0');
 
@@ -168,7 +168,7 @@ const dashboardRouter = router({
     const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
       supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true).eq('user_id', userId),
       supabase.from('contratos').select('valor_principal').eq('status', 'ativo').eq('user_id', userId),
-      supabase.from('parcelas').select('valor_original, valor_juros, valor_multa, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
+      supabase.from('parcelas').select('valor_original, valor_juros, valor_multa, saldo_residual, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
       supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao').eq('user_id', userId)
     ]);
 
@@ -183,7 +183,12 @@ const dashboardRouter = router({
     const capitalCirculacao = (contratosRes.data ?? []).reduce((s: number, c: any) => s + parseFloat(c.valor_principal ?? '0'), 0);
     
     const parcelasData = parcelasRes.data ?? [];
-    const totalReceber = parcelasData.filter((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
+    const totalReceber = parcelasData.reduce((s: number, p: any) => s + calcularValorAbertoParcela({
+      status: p.status,
+      valorOriginal: p.valor_original,
+      saldoResidual: p.saldo_residual,
+      valorMulta: p.valor_multa,
+    }), 0);
     
     const atrasadas = parcelasData.filter((p: any) => p.status === 'atrasada');
     const totalInadimplente = atrasadas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
@@ -770,7 +775,12 @@ const clientesRouter = router({
           const saldoResidualParcela = parseFloat(parcela.saldo_residual ?? parcela.saldoResidual ?? '0');
           const valorMultaParcela = parseFloat(parcela.valor_multa ?? parcela.valorMulta ?? '0');
           capitalTotal += valorOriginalParcela;
-          if (parcela.status !== 'paga') totalReceber += valorOriginalParcela + saldoResidualParcela + valorMultaParcela;
+          if (parcela.status !== 'paga') totalReceber += calcularValorAbertoParcela({
+            status: parcela.status,
+            valorOriginal: valorOriginalParcela,
+            saldoResidual: saldoResidualParcela,
+            valorMulta: valorMultaParcela,
+          });
           if (parcela.status === 'paga') {
             parcelasQuitadas++;
             score += 10; // +10 por parcela paga
@@ -955,7 +965,7 @@ const contratosRouter = router({
       const contratoIds = filtrados.map((c: any) => c.id);
       const { data: parcelasData } = await supabase
         .from('parcelas')
-        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, data_vencimento, data_pagamento, status')
+        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status')
         .in('contrato_id', contratoIds)
         .eq('user_id', ctx.user.id)
         .order('data_vencimento');
@@ -1013,8 +1023,13 @@ const contratosRouter = router({
         // Isso é sempre correto: R$500 × 50% = R$250 de juros por parcela
         const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
 
-        // Total a receber = soma das parcelas abertas (incluindo multas e saldo residual)
-        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
+        // Total a receber = exatamente o saldo ainda aberto de cada parcela.
+        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + calcularValorAbertoParcela({
+          status: p.status,
+          valorOriginal: p.valor_original,
+          saldoResidual: p.saldo_residual,
+          valorMulta: p.valor_multa,
+        }), 0);
         // Total pago = soma das parcelas pagas
         const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
         // Lucro previsto = total a receber restante - capital ainda não recebido
@@ -1101,7 +1116,7 @@ const contratosRouter = router({
       // Buscar parcelas
       const { data: parcelasData } = await supabase
         .from('parcelas')
-        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, data_vencimento, data_pagamento, status')
+        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status')
         .eq('contrato_id', input.id)
         .eq('user_id', ctx.user.id)
         .order('data_vencimento');
@@ -1145,7 +1160,12 @@ const contratosRouter = router({
       const taxaJuros = parseFloat(contratoData.taxa_juros ?? '0');
       const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
 
-      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0') + parseFloat(p.valor_multa ?? '0') + parseFloat(p.saldo_residual ?? '0'), 0);
+      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + calcularValorAbertoParcela({
+        status: p.status,
+        valorOriginal: p.valor_original,
+        saldoResidual: p.saldo_residual,
+        valorMulta: p.valor_multa,
+      }), 0);
       const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
       const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
       // Lucro realizado = total pago - capital emprestado
@@ -2037,6 +2057,7 @@ const parcelasRouter = router({
             valorPago: parcelas.valorPago,
             valorJuros: parcelas.valorJuros,
             valorMulta: parcelas.valorMulta,
+            saldoResidual: parcelas.saldoResidual,
             dataVencimento: parcelas.dataVencimento,
             dataPagamento: parcelas.dataPagamento,
             status: parcelas.status,
@@ -2093,7 +2114,7 @@ const parcelasRouter = router({
       await supabase.from('parcelas').update({ status: 'vencendo_hoje' })
         .eq('data_vencimento', hoje).eq('user_id', ctx.user.id).eq('status', 'pendente');
       let pQuery = supabase.from('parcelas')
-        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, data_vencimento, data_pagamento, status, contratos(koletor_id)')
+        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, saldo_residual, data_vencimento, data_pagamento, status, contratos(koletor_id)')
         .order('data_vencimento')
         .eq('user_id', ctx.user.id);
       if (input?.status) pQuery = (pQuery as any).eq('status', input.status);
@@ -2152,6 +2173,7 @@ const parcelasRouter = router({
         valorPago: r.valor_pago,
         valorJuros: r.valor_juros,
         valorMulta: r.valor_multa,
+        saldoResidual: r.saldo_residual,
         dataVencimento: r.data_vencimento,
         dataPagamento: r.data_pagamento,
         status: r.status,
@@ -2172,7 +2194,9 @@ const parcelasRouter = router({
       desconto: z.number().default(0),
       valorJurosCustom: z.number().optional(),   // juros de atraso editado manualmente
       dataPagamento: z.string().optional(),       // data manual no formato YYYY-MM-DD
-      transferirSaldoResidual: z.boolean().default(true), // transferir saldo para próxima parcela
+      // Mantido no contrato da API para clientes já abertos, porém ignorado.
+      // O saldo de um pagamento parcial passa a permanecer na própria parcela.
+      transferirSaldoResidual: z.boolean().default(false),
       idempotencyKey: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -2224,22 +2248,27 @@ const parcelasRouter = router({
         multa_diaria_usada: parcelaData.multa_diaria_usada,
         data_pagamento: parcelaData.data_pagamento,
         status: parcelaData.status,
+        saldo_residual: parcelaData.saldo_residual,
         conta_caixa_id: parcelaData.conta_caixa_id,
         observacoes: parcelaData.observacoes,
       };
-      // Valor total que o cliente deve nesta parcela (original + saldo residual de parcelas anteriores)
-      const valorTotalDevido = valorOriginal + saldoResidualAnterior;
+      const parcelaJaParcial = parcelaData.status === 'parcial' && saldoResidualAnterior > 0;
+      // Em pagamentos parciais, saldo_residual já é a dívida remanescente.
+      // Somá-lo novamente ao principal duplicaria o valor cobrado.
+      const valorTotalDevido = parcelaJaParcial ? saldoResidualAnterior : valorOriginal + saldoResidualAnterior;
 
       // Calcular juros de atraso usando multaDiaria em R$/dia (modelo CobraFácil)
       const dataReferencia = input.dataPagamento ?? dataHojeBrasilia();
       const dataPagamentoDate = new Date(`${dataReferencia}T12:00:00-03:00`);
-      const { juros: jurosCalculado, multa } = calcularJurosMora(
-        valorTotalDevido,
-        new Date(parcelaData.data_vencimento + 'T12:00:00-03:00'),
-        dataPagamentoDate,
-        multaDiariaReais,
-        multaAtrasoPercentual,
-      );
+      const { juros: jurosCalculado, multa } = parcelaJaParcial
+        ? { juros: 0, multa: 0 }
+        : calcularJurosMora(
+            valorTotalDevido,
+            new Date(parcelaData.data_vencimento + 'T12:00:00-03:00'),
+            dataPagamentoDate,
+            multaDiariaReais,
+            multaAtrasoPercentual,
+          );
 
       // Usar juros customizado se fornecido pelo usuário, senão usar o calculado
       const juros = input.valorJurosCustom !== undefined ? input.valorJurosCustom : jurosCalculado;
@@ -2252,6 +2281,8 @@ const parcelasRouter = router({
       const valorTotalComJuros = valorTotalDevido + juros + multa - input.desconto;
       const isPago = input.valorPago >= valorTotalComJuros - 0.01; // tolerância de 1 centavo
       const novoStatus = isPago ? 'paga' : 'parcial';
+      const valorPagoAnterior = Number.parseFloat(parcelaData.valor_pago ?? '0') || 0;
+      const valorPagoAcumulado = Math.round((valorPagoAnterior + input.valorPago) * 100) / 100;
 
       // Calcular saldo residual (quanto falta pagar)
       const saldoRestante = isPago ? 0 : calcularSaldoResidual(valorTotalComJuros, input.valorPago);
@@ -2261,11 +2292,12 @@ const parcelasRouter = router({
       // concorrente não consegue registrar outro recebimento após a primeira
       // mudar a parcela para paga/parcial.
       const { data: parcelaAtualizada, error: updateErr } = await sb.from('parcelas').update({
-        valor_pago: input.valorPago.toFixed(2),
+        valor_pago: valorPagoAcumulado.toFixed(2),
         valor_juros: juros.toFixed(2),
         valor_multa: multa.toFixed(2),
         valor_desconto: input.desconto.toFixed(2),
         multa_diaria_usada: multaDiariaReais.toFixed(2),
+        saldo_residual: saldoRestante.toFixed(2),
         data_pagamento: dataPagamentoISO,
         status: novoStatus,
         conta_caixa_id: input.contaCaixaId ?? null,
@@ -2275,28 +2307,6 @@ const parcelasRouter = router({
         .select('id').maybeSingle();
       if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message });
       if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada ou não pertence a esta empresa' });
-
-      // ─── SALDO RESIDUAL AUTOMÁTICO ─────────────────────────────────────────
-      // Se pagamento parcial E transferirSaldoResidual=true, adicionar saldo à próxima parcela
-      let saldoProximaParcelaAnterior: { id: number; saldoResidual: string | null } | null = null;
-      if (novoStatus === 'parcial' && saldoRestante > 0 && input.transferirSaldoResidual) {
-        const { data: proximaParcela } = await sb.from('parcelas')
-          .select('id, saldo_residual, valor_original')
-          .eq('contrato_id', parcelaData.contrato_id)
-          .eq('user_id', ctx.user.id)
-          .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
-          .order('numero_parcela', { ascending: true })
-          .limit(1)
-          .single();
-        if (proximaParcela) {
-          saldoProximaParcelaAnterior = { id: proximaParcela.id, saldoResidual: proximaParcela.saldo_residual ?? null };
-          const saldoAtualProxima = parseFloat(proximaParcela.saldo_residual ?? '0');
-          const novoSaldo = Math.round((saldoAtualProxima + saldoRestante) * 100) / 100;
-          const { error: residualErr } = await sb.from('parcelas').update({ saldo_residual: novoSaldo.toFixed(2) }).eq('id', proximaParcela.id).eq('user_id', ctx.user.id);
-          if (residualErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: residualErr.message });
-          console.log(`[registrarPagamento] Saldo residual R$ ${saldoRestante.toFixed(2)} transferido para parcela #${proximaParcela.id}`);
-        }
-      }
 
       // Registrar uma única entrada no caixa, vinculada à operação idempotente.
       {
@@ -2312,10 +2322,6 @@ const parcelasRouter = router({
           user_id: ctx.user.id,
         });
         if (txErr) {
-          if (saldoProximaParcelaAnterior) {
-            await sb.from('parcelas').update({ saldo_residual: saldoProximaParcelaAnterior.saldoResidual })
-              .eq('id', saldoProximaParcelaAnterior.id).eq('user_id', ctx.user.id);
-          }
           await sb.from('parcelas').update(estadoParcelaAnterior).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
         }
@@ -2335,7 +2341,7 @@ const parcelasRouter = router({
       // Registrar histórico
       const descHistorico = novoStatus === 'paga'
         ? `Parcela #${parcelaData.numero_parcela} quitada - R$ ${input.valorPago.toFixed(2)}`
-        : `Parcela #${parcelaData.numero_parcela} paga parcialmente - R$ ${input.valorPago.toFixed(2)} (falta R$ ${saldoRestante.toFixed(2)})${input.transferirSaldoResidual ? ' → transferido para próxima parcela' : ''}`;
+        : `Parcela #${parcelaData.numero_parcela} paga parcialmente - R$ ${input.valorPago.toFixed(2)} (saldo pendente nesta parcela: R$ ${saldoRestante.toFixed(2)})`;
       await registrarHistorico({
         contratoId: parcelaData.contrato_id,
         userId: String(parcelaData.user_id ?? parcelaData.koletor_id ?? ''),
@@ -3762,6 +3768,16 @@ const reparcelamentoRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      // Este fluxo realiza várias escritas REST sem transação. Mantê-lo ativo
+      // permitiria marcar o contrato original como quitado antes de criar todas
+      // as novas parcelas. A operação volta quando for movida para RPC atômica.
+      if (process.env.ENABLE_ATOMIC_REPARCELAMENTO !== 'true') {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message: 'Reparcelamento temporariamente indisponível durante a atualização de segurança financeira.',
+        });
+      }
+
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
@@ -4074,6 +4090,19 @@ const contasPagarRouter = router({
     }),
 
   sincronizarCaixa: protectedProcedure.mutation(async ({ ctx }) => {
+    // A antiga rotina criava saídas ao abrir telas e podia alterar o livro-caixa
+    // sem revisão do operador. Ela permanece bloqueada até ser substituída por
+    // uma reconciliação que apresente divergências antes de qualquer correção.
+    if (process.env.ENABLE_LEGACY_CASH_SYNC === 'true') {
+      // Mantido apenas para recuperação controlada de instalações legadas.
+      // Não configurar em produção: o fluxo abaixo não apresenta prévia.
+    } else {
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'A sincronização automática do caixa foi desativada. Use apenas a conferência financeira revisada.',
+      });
+    }
+
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
     const { data: pagas, error: contasErro } = await supabase.from('contas_pagar')

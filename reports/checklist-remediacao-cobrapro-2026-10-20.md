@@ -36,6 +36,10 @@
 ## Prioridade P2 — Caixa, parcelas e renovação
 
 - [x] Desabilitar/corrigir a quitação total que marca parcelas sem lançar entrada de caixa.
+- [x] Remover a transferência automática de saldo parcial para a parcela seguinte; o saldo pendente permanece na própria parcela e é acumulado corretamente em cada baixa.
+- [x] Corrigir dashboard, cartões e listas para não somarem novamente o principal de parcela parcial que já possui `saldo_residual`.
+- [x] Bloquear a rotina legada de sincronização automática que criava lançamentos no caixa sem uma conferência explícita.
+- [x] Suspender o reparcelamento não atômico até sua substituição por RPC/transação única, evitando contratos parcialmente quitados ou recriados.
 - [ ] Implementar transação/RPC única para pagamento de parcela e saldo residual.
 - [ ] Implementar transação/RPC única para renovação de juros.
 - [ ] Implementar transação/RPC única para despesas, cheques, reparcelamento e vendas de telefone.

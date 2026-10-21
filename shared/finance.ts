@@ -138,6 +138,37 @@ export function calcularSaldoResidual(
   return saldo > 0 ? Math.round(saldo * 100) / 100 : 0;
 }
 
+/**
+ * Retorna exclusivamente o que ainda falta receber de uma parcela.
+ * Em uma parcela parcial, saldo_residual já representa o valor remanescente
+ * (inclusive encargos calculados no momento da baixa); somá-lo novamente ao
+ * valor original duplica a dívida nos cards, relatórios e no dashboard.
+ */
+export function calcularValorAbertoParcela(parcela: {
+  status: string;
+  valorOriginal: number | string | null | undefined;
+  saldoResidual?: number | string | null | undefined;
+  valorMulta?: number | string | null | undefined;
+}): number {
+  if (parcela.status === "paga") return 0;
+
+  const paraNumero = (valor: number | string | null | undefined) => {
+    const numero = typeof valor === "number" ? valor : Number(valor ?? 0);
+    return Number.isFinite(numero) ? numero : 0;
+  };
+  const valorOriginal = paraNumero(parcela.valorOriginal);
+  const saldoResidual = paraNumero(parcela.saldoResidual);
+  const valorMulta = paraNumero(parcela.valorMulta);
+
+  // Compatibilidade com registros parciais antigos que ainda não possuíam
+  // saldo_residual preenchido: eles continuam exibindo o principal em aberto.
+  const principalAberto = parcela.status === "parcial" && saldoResidual > 0
+    ? saldoResidual
+    : valorOriginal + saldoResidual;
+  const total = principalAberto + (parcela.status === "parcial" && saldoResidual > 0 ? 0 : valorMulta);
+  return Math.round((total + Number.EPSILON) * 100) / 100;
+}
+
 export function formatarMoeda(valor: number | string | null | undefined): string {
   const num = typeof valor === 'string' ? parseFloat(valor) : (valor ?? 0);
   return new Intl.NumberFormat('pt-BR', {

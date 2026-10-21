@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,22 +73,6 @@ export default function ContasPagar() {
     filtroStatus !== "todos" ? { status: filtroStatus as 'pendente' | 'paga' | 'atrasada' | 'cancelada' } : undefined
   );
   const { data: contasCaixa } = trpc.caixa.contas.useQuery();
-
-  const sincronizarMutation = trpc.contasPagar.sincronizarCaixa.useMutation({
-    onSuccess: (resultado) => {
-      if (resultado.corrigidas > 0) {
-        utils.caixa.contas.invalidate();
-        utils.caixa.transacoes.invalidate();
-        utils.dashboard.kpis.invalidate();
-      }
-    },
-  });
-
-  useEffect(() => {
-    sincronizarMutation.mutate();
-    // A procedure é idempotente e executa uma vez ao abrir a tela.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const criarMutation = trpc.contasPagar.criar.useMutation({
     onSuccess: () => {

@@ -60,6 +60,8 @@ export function EmprestimoDetalhesModal({
   const [valorCustomPagarParcela, setValorCustomPagarParcela] = useState('');
   const [pagamentoParcelaRealizado, setPagamentoParcelaRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
   const [idempotencyKeyJuros, setIdempotencyKeyJuros] = useState('');
+  const [idempotencyKeyParcela, setIdempotencyKeyParcela] = useState('');
+  const [idempotencyKeyPagamento, setIdempotencyKeyPagamento] = useState('');
 
   const { data: config } = trpc.configuracoes.get.useQuery();
   const utils = trpc.useUtils();
@@ -142,17 +144,23 @@ export function EmprestimoDetalhesModal({
   const isAtrasado = diasAtraso > 0;
   const isQuitado = emprestimo.status === 'quitado';
   const parcela = emprestimo.todasParcelas?.find((p: any) => p.status !== 'paga') ?? emprestimo.todasParcelas?.[0];
-  const valorOriginalParcela = parcela ? parseFloat(String(parcela.valor_original ?? '0')) : 0;
+  const saldoParcial = parcela?.status === 'parcial' ? parseFloat(String(parcela.saldo_residual ?? '0')) : 0;
+  const valorOriginalParcela = parcela
+    ? (saldoParcial > 0 ? saldoParcial : parseFloat(String(parcela.valor_original ?? '0')))
+    : 0;
   const valorJurosParcela = emprestimo.valorJurosParcela ?? 0;
 
   const handlePagar = () => {
     if (!contaCaixaId) { toast.error('Selecione uma conta'); return; }
     if (!parcela) { toast.error('Nenhuma parcela pendente'); return; }
     const valor = valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela);
+    const idempotencyKey = idempotencyKeyPagamento || crypto.randomUUID();
+    if (!idempotencyKeyPagamento) setIdempotencyKeyPagamento(idempotencyKey);
     pagarTotalMutation.mutate({
       parcelaId: parcela.id,
       valorPago: valor,
       contaCaixaId: parseInt(contaCaixaId),
+      idempotencyKey,
     });
   };
 
@@ -405,6 +413,7 @@ export function EmprestimoDetalhesModal({
                                   });
                                   setValorCustomPagarParcela('');
                                   setPagamentoParcelaRealizado(null);
+                                  setIdempotencyKeyParcela(crypto.randomUUID());
                                   setModalPagarParcela(true);
                                 }}
                                 className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300"
@@ -452,7 +461,7 @@ export function EmprestimoDetalhesModal({
 
             {/* Botões de Ação */}
             <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
-              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" size="sm" onClick={() => { setValorCustomPagar(''); setModalPagar(true); }} disabled={isQuitado}>
+              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" size="sm" onClick={() => { setValorCustomPagar(''); setIdempotencyKeyPagamento(crypto.randomUUID()); setModalPagar(true); }} disabled={isQuitado}>
                 <DollarSign className="h-4 w-4" /> Pagar
               </Button>
               <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorCustomJuros(''); setModalPagarJuros(true); }} disabled={isQuitado}>
@@ -567,7 +576,7 @@ export function EmprestimoDetalhesModal({
       </Dialog>
 
       {/* ── SUB-MODAL PAGAR PARCELA INDIVIDUAL ── */}
-      <Dialog open={modalPagarParcela} onOpenChange={(v) => { setModalPagarParcela(v); if (!v) { setPagamentoParcelaRealizado(null); setParcelaSelecionadaPagamento(null); } }}>
+      <Dialog open={modalPagarParcela} onOpenChange={(v) => { setModalPagarParcela(v); if (!v) { setPagamentoParcelaRealizado(null); setParcelaSelecionadaPagamento(null); setIdempotencyKeyParcela(''); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>PAGAR PARCELA #{parcelaSelecionadaPagamento?.numero}</DialogTitle>
@@ -645,6 +654,7 @@ export function EmprestimoDetalhesModal({
                       parcelaId: parcelaSelecionadaPagamento.id,
                       valorPago: valor,
                       contaCaixaId: parseInt(contaCaixaId),
+                      idempotencyKey: idempotencyKeyParcela || crypto.randomUUID(),
                     });
                   }}
                 >

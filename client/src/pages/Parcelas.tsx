@@ -123,6 +123,7 @@ type ParcelaRow = {
   valorPago: string | null;
   valorJuros: string | null;
   valorMulta: string | null;
+  saldoResidual?: string | null;
   dataVencimento: Date;
   dataPagamento: Date | null;
   status: string;
@@ -164,7 +165,8 @@ function PagamentoDialog({
   );
 
   // Calcular valor dos juros do período (taxa do contrato)
-  const valorOriginal = parseFloat(parcela.valorOriginal);
+  const saldoParcial = parcela.status === 'parcial' ? parseFloat(parcela.saldoResidual ?? '0') : 0;
+  const valorOriginal = saldoParcial > 0 ? saldoParcial : parseFloat(parcela.valorOriginal ?? '0');
   // Usar valor_juros do banco se disponível (calculado na criação da parcela)
   // Fallback: calcular a partir do principal e taxa
   const principalContrato = parseFloat(parcela.valorPrincipal ?? parcela.valorPrincipalContrato ?? '0');

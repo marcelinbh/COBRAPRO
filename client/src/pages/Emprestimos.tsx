@@ -51,6 +51,7 @@ type EmprestimoCard = {
     id: number;
     numero_parcela: number;
     valor_original: string;
+    saldo_residual?: string | null;
     data_vencimento: string;
     status: string;
   } | null;
@@ -58,6 +59,7 @@ type EmprestimoCard = {
     id: number;
     numero_parcela: number;
     valor_original: string;
+    saldo_residual?: string | null;
     data_vencimento: string;
     status: string;
     diasAtraso: number;
@@ -284,7 +286,10 @@ function EditarEmprestimoModal({
   };
 
   const parcela = emprestimo.proximaParcela ?? emprestimo.parcelasComAtraso[0];
-  const valorOriginalParcela = parcela ? parseFloat(String(parcela.valor_original ?? '0')) : 0;
+  const saldoParcial = parcela?.status === 'parcial' ? parseFloat(String(parcela.saldo_residual ?? '0')) : 0;
+  const valorOriginalParcela = parcela
+    ? (saldoParcial > 0 ? saldoParcial : parseFloat(String(parcela.valor_original ?? '0')))
+    : 0;
   const valorJurosParcela = emprestimo.valorJurosParcela;
   const parcelaComAtraso = parcela ? emprestimo.parcelasComAtraso.find(p => p.id === parcela.id) : undefined;
   const diasAtraso = parcelaComAtraso?.diasAtraso ?? 0;
@@ -1172,7 +1177,6 @@ function PagamentoModal({
   const [valorCustom, setValorCustom] = useState("");
   const [jurosCustom, setJurosCustom] = useState(""); // juros editável manualmente
   const [dataPagamentoCustom, setDataPagamentoCustom] = useState(""); // data manual
-  const [transferirSaldo, setTransferirSaldo] = useState(true); // transferir saldo residual automaticamente
   const [novaDataVencJuros, setNovaDataVencJuros] = useState(""); // data do próximo vencimento (só juros)
   const [novoValorParcelaJuros, setNovoValorParcelaJuros] = useState(""); // valor do próximo vencimento (só juros)
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
@@ -1245,7 +1249,9 @@ function PagamentoModal({
         contaCaixaId: contaId,
         valorJurosCustom: jurosVal,
         dataPagamento: dataManual,
-        transferirSaldoResidual: transferirSaldo,
+        // Saldo de baixa parcial permanece na própria parcela para não
+        // distorcer a parcela seguinte nem duplicar valores no caixa.
+        transferirSaldoResidual: false,
         idempotencyKey: chaveOperacao,
       });
     } else {
@@ -1267,7 +1273,6 @@ function PagamentoModal({
     setValorCustom("");
     setJurosCustom("");
     setDataPagamentoCustom("");
-    setTransferirSaldo(true);
     setNovaDataVencJuros("");
     setNovoValorParcelaJuros("");
     setIdempotencyKey(crypto.randomUUID());
@@ -1484,26 +1489,7 @@ function PagamentoModal({
                       <span className="text-muted-foreground">{t('loanDetails.balanceShortfall')}</span>
                       <span className="text-blue-400 font-bold">{formatarMoeda(Math.max(0, totalDevido - valorDigitado))}</span>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground text-xs">{t('loanDetails.transferBalanceToNext')}</span>
-                      <button
-                        type="button"
-                        onClick={() => setTransferirSaldo(!transferirSaldo)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          transferirSaldo ? 'bg-blue-500' : 'bg-muted'
-                        }`}
-                      >
-                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                          transferirSaldo ? 'translate-x-4' : 'translate-x-1'
-                        }`} />
-                      </button>
-                    </div>
-                    {transferirSaldo && (
-                      <p className="text-[10px] text-blue-300">✓ O saldo de {formatarMoeda(Math.max(0, totalDevido - valorDigitado))} será somado automaticamente à próxima parcela.</p>
-                    )}
-                    {!transferirSaldo && (
-                      <p className="text-[10px] text-muted-foreground">O saldo não será transferido. A parcela ficará como "parcial".</p>
-                    )}
+                    <p className="text-[10px] text-blue-300">O saldo de {formatarMoeda(Math.max(0, totalDevido - valorDigitado))} permanecerá nesta parcela como pendente. A próxima parcela não será alterada.</p>
                   </div>
                 ) : null;
               })()}
