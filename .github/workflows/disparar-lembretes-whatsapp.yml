@@ -1,8 +1,8 @@
 name: Disparar lembretes WhatsApp
 
 on:
-  # Pausado até que a migration 0012 crie a outbox na produção.
-  # Sem essa tabela, cada execução agendada falha e gera alerta por e-mail.
+  schedule:
+    - cron: "*/5 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:

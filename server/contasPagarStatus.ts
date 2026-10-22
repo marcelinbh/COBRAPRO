@@ -9,3 +9,10 @@ export function deveRepetirComStatusPagoLegado(error: SchemaError): boolean {
 export function normalizarStatusContaPagar(status: string | null | undefined): string {
   return status === "pago" ? "paga" : status ?? "pendente";
 }
+
+/** O banco atual usa `paga`; instalações legadas podem usar `pago`. */
+export const STATUS_CONTA_PAGA = ["paga", "pago"] as const;
+
+export function statusContaPaga(status: string | null | undefined): boolean {
+  return STATUS_CONTA_PAGA.includes(status as (typeof STATUS_CONTA_PAGA)[number]);
+}

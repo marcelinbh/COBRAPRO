@@ -30,7 +30,7 @@ import { criarDesembolsoContrato, deveRegistrarDesembolso } from "./caixaDesembo
 import { deveRepetirSemPeriodicidade } from "./contasPagarSchemaFallback";
 import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagamento";
 import { idsDuplicadosParaRemocao } from "./caixaDuplicidades";
-import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar } from "./contasPagarStatus";
+import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar, statusContaPaga } from "./contasPagarStatus";
 import { podeRegistrarMovimento } from "./financeIdempotency";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
@@ -43,6 +43,22 @@ function descricaoPagamentoConta(id: number, descricao: string): string {
 
 function descricaoEstornoConta(id: number, descricao: string): string {
   return `Estorno da conta #${id}: ${descricao}`;
+}
+
+async function marcarContaPagaComCompatibilidade(supabase: any, id: number, userId: number, dataPagamento: string, contaCaixaId: number) {
+  const payload = { data_pagamento: dataPagamento, conta_caixa_id: contaCaixaId };
+  let resultado = await supabase.from('contas_pagar').update({ ...payload, status: 'paga' })
+    .eq('id', id).eq('user_id', userId).in('status', ['pendente', 'atrasada'])
+    .select('id, status').maybeSingle();
+
+  // Instalações antigas possuem um CHECK que aceita `pago`, não `paga`.
+  // O primeiro UPDATE falha antes de alterar a linha; repetir é seguro e não duplica Caixa.
+  if (resultado.error && deveRepetirComStatusPagoLegado(resultado.error)) {
+    resultado = await supabase.from('contas_pagar').update({ ...payload, status: 'pago' })
+      .eq('id', id).eq('user_id', userId).in('status', ['pendente', 'atrasada'])
+      .select('id, status').maybeSingle();
+  }
+  return resultado;
 }
 
 async function listarTransacoesCaixaDoUsuario(supabase: any, userId: number): Promise<any[]> {
@@ -4191,9 +4207,9 @@ const contasPagarRouter = router({
           const conta = await db.select().from(contasPagar).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id))).limit(1);
           if (!conta[0]) throw new Error('Conta não encontrada');
           if (!contaPagarPodeSerProcessada(conta[0].status)) throw new TRPCError({ code: 'CONFLICT', message: 'Esta despesa já foi processada' });
-          mutacaoIniciada = true;
           const atualizada = await db.update(contasPagar).set({ status: 'paga', dataPagamento: dataPag, contaCaixaId: input.contaCaixaId }).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id))).returning({ id: contasPagar.id });
           if (atualizada.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'A despesa não pôde ser marcada como paga' });
+          mutacaoIniciada = true;
           try {
             await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'despesa_operacional', valor: conta[0].valor, descricao: descricaoPagamentoConta(input.id, conta[0].descricao), dataTransacao: dataPag, userId: ctx.user.id });
           } catch (txError) {
@@ -4218,10 +4234,9 @@ const contasPagarRouter = router({
       if (!contaPagarPodeSerProcessada(contaData.status)) throw new TRPCError({ code: 'CONFLICT', message: 'Esta despesa já foi processada' });
 
       // A atualização condicional funciona como trava: apenas uma solicitação concorrente pode pagar a despesa.
-      const { data: contaAtualizada, error: updateError } = await supabase.from('contas_pagar')
-        .update({ status: 'paga', data_pagamento: dataPag.toISOString(), conta_caixa_id: input.contaCaixaId })
-        .eq('id', input.id).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada'])
-        .select('id').maybeSingle();
+      const { data: contaAtualizada, error: updateError } = await marcarContaPagaComCompatibilidade(
+        supabase, input.id, ctx.user.id, dataPag.toISOString(), input.contaCaixaId,
+      );
       if (updateError) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateError.message });
       if (!contaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta despesa já foi processada' });
 
@@ -4276,11 +4291,11 @@ const contasPagarRouter = router({
         .select('id, valor, descricao, status, conta_caixa_id, data_pagamento')
         .eq('id', input.id).eq('user_id', ctx.user.id).single();
       if (contaErro || !conta) throw new TRPCError({ code: 'NOT_FOUND', message: 'Conta não encontrada' });
-      if (conta.status !== 'paga') throw new TRPCError({ code: 'CONFLICT', message: 'Apenas despesas pagas podem ser estornadas' });
+      if (!statusContaPaga(conta.status)) throw new TRPCError({ code: 'CONFLICT', message: 'Apenas despesas pagas podem ser estornadas' });
 
       const { data: contaEstornada, error: estornoErro } = await supabase.from('contas_pagar')
         .update({ status: 'cancelada' })
-        .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'paga')
+        .eq('id', input.id).eq('user_id', ctx.user.id).in('status', ['paga', 'pago'])
         .select('id').maybeSingle();
       if (estornoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: estornoErro.message });
       if (!contaEstornada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta despesa já foi estornada' });
@@ -4297,7 +4312,7 @@ const contasPagarRouter = router({
         });
         if (transacaoErro) {
           // Compensação: se a devolução não entrou no Caixa, a despesa continua paga.
-          await supabase.from('contas_pagar').update({ status: 'paga' })
+          await supabase.from('contas_pagar').update({ status: conta.status })
             .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'cancelada');
           throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: transacaoErro.message });
         }
@@ -4323,7 +4338,7 @@ const contasPagarRouter = router({
     if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
     const { data: pagas, error: contasErro } = await supabase.from('contas_pagar')
       .select('id, valor, descricao, conta_caixa_id, data_pagamento')
-      .eq('user_id', ctx.user.id).eq('status', 'paga').not('conta_caixa_id', 'is', null);
+      .eq('user_id', ctx.user.id).in('status', ['paga', 'pago']).not('conta_caixa_id', 'is', null);
     if (contasErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contasErro.message });
 
     let corrigidas = 0;
@@ -4370,7 +4385,7 @@ const contasPagarRouter = router({
       const { data: all } = await supabase.from('contas_pagar').select('status, valor').eq('user_id', ctx.user.id);
       const pendentes = (all ?? []).filter((r: any) => r.status === 'pendente');
       const atrasadas = (all ?? []).filter((r: any) => r.status === 'atrasada');
-      const pagas = (all ?? []).filter((r: any) => r.status === 'paga');
+      const pagas = (all ?? []).filter((r: any) => statusContaPaga(r.status));
       return {
         totalPendente: pendentes.reduce((s: number, r: any) => s + parseFloat(r.valor ?? 0), 0), qtdPendente: pendentes.length,
         totalAtrasado: atrasadas.reduce((s: number, r: any) => s + parseFloat(r.valor ?? 0), 0), qtdAtrasado: atrasadas.length,

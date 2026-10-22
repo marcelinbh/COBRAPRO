@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar } from "./contasPagarStatus";
+import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar, statusContaPaga } from "./contasPagarStatus";
 
 describe("compatibilidade do status de contas a pagar", () => {
   it("reconhece o erro do check constraint da base legada", () => {
@@ -11,5 +11,11 @@ describe("compatibilidade do status de contas a pagar", () => {
   it("normaliza pago legado para a interface atual", () => {
     expect(normalizarStatusContaPagar("pago")).toBe("paga");
     expect(normalizarStatusContaPagar("pendente")).toBe("pendente");
+  });
+
+  it("reconhece os dois status de pagamento no banco", () => {
+    expect(statusContaPaga("paga")).toBe(true);
+    expect(statusContaPaga("pago")).toBe(true);
+    expect(statusContaPaga("pendente")).toBe(false);
   });
 });
