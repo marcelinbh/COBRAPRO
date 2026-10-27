@@ -13,6 +13,7 @@ import { createContext } from "./context";
 import { sdk } from "./sdk";
 import { possuiSegredoDeAutomacaoValido, possuiTokenGithubActionsValido } from "../services/cronAuth";
 import { LIMITE_CORPO_PADRAO, LIMITE_CORPO_UPLOAD, LIMITE_FORMULARIO } from "../requestLimits";
+import { cabecalhosSeguranca } from "../securityHeaders";
 import { serveStatic, setupVite } from "./vite";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -39,6 +40,7 @@ async function startServer() {
   const server = createServer(app);
   // Compressão gzip/brotli para reduzir tamanho das respostas
   app.use(compression());
+  app.use(cabecalhosSeguranca);
   // Somente o endpoint autenticado de documentos recebe o teto maior. O
   // restante da API (login, webhooks e tRPC) não deve aceitar corpos de upload.
   app.use("/api/upload", express.json({ limit: LIMITE_CORPO_UPLOAD }));

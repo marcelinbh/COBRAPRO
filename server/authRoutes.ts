@@ -59,6 +59,25 @@ export function hashTokenDeRecuperacao(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+/**
+ * Faz o compare-and-set do token no Supabase: somente a primeira chamada com
+ * token válido, ainda não usado e não expirado recebe o usuário associado.
+ */
+export async function consumirTokenRecuperacaoNoSupabase(supabase: any, tokenHash: string, now: Date): Promise<number | null> {
+  const { data, error } = await supabase
+    .from("password_resets")
+    .update({ usado: true })
+    .eq("token", tokenHash)
+    .eq("usado", false)
+    .gt("expires_at", now.toISOString())
+    .select("user_id")
+    .maybeSingle();
+
+  if (error) throw new Error(`Não foi possível consumir o token de recuperação: ${error.message}`);
+  const userId = data?.user_id ?? data?.userId;
+  return typeof userId === "number" ? userId : null;
+}
+
 // Helper: buscar usuário por email (Drizzle ou Supabase REST)
 async function findUserByEmail(email: string): Promise<typeof users.$inferSelect | null> {
   const db = await getDb();
@@ -418,9 +437,9 @@ export function registerAuthRoutes(app: Express) {
 
       const db = await getDb();
       if (db) {
-        const resetResult = await db
-          .select()
-          .from(passwordResets)
+        const resetsConsumidos = await db
+          .update(passwordResets)
+          .set({ usado: true })
           .where(
             and(
               eq(passwordResets.token, tokenHash),
@@ -428,16 +447,19 @@ export function registerAuthRoutes(app: Express) {
               gt(passwordResets.expiresAt, now)
             )
           )
-          .limit(1);
+          .returning({ userId: passwordResets.userId });
 
-        const reset = resetResult[0];
+        const reset = resetsConsumidos[0];
         if (!reset) {
           res.status(400).json({ error: "Token inválido ou expirado" });
           return;
         }
 
-        await db.update(users).set({ passwordHash }).where(eq(users.id, reset.userId));
-        await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.id, reset.id));
+        const usuarioAtualizado = await db.update(users)
+          .set({ passwordHash, updatedAt: now })
+          .where(eq(users.id, reset.userId))
+          .returning({ id: users.id });
+        if (!usuarioAtualizado[0]) throw new Error("Usuário associado ao token não encontrado");
       } else {
         // Fallback: Supabase REST
         const supabase = await getSupabaseClientAsync();
@@ -445,23 +467,21 @@ export function registerAuthRoutes(app: Express) {
           res.status(500).json({ error: "Banco de dados indisponível" });
           return;
         }
-        const { data: resetData, error: resetError } = await supabase
-          .from("password_resets")
-          .select("*")
-          .eq("token", tokenHash)
-          .eq("usado", false)
-          .gt("expires_at", now.toISOString())
-          .limit(1)
-          .maybeSingle();
-
-        if (resetError || !resetData) {
-          console.error("[Auth] reset-password token error:", resetError?.message, "data:", resetData);
+        const userId = await consumirTokenRecuperacaoNoSupabase(supabase, tokenHash, now);
+        if (!userId) {
           res.status(400).json({ error: "Token inválido ou expirado" });
           return;
         }
 
-        await supabase.from("users").update({ passwordHash }).eq("id", resetData.user_id ?? resetData.userId);
-        await supabase.from("password_resets").update({ usado: true }).eq("id", resetData.id);
+        const { data: usuarioAtualizado, error: usuarioErro } = await supabase
+          .from("users")
+          .update({ passwordHash, updatedAt: now.toISOString() })
+          .eq("id", userId)
+          .select("id")
+          .maybeSingle();
+        if (usuarioErro || !usuarioAtualizado) {
+          throw new Error(usuarioErro?.message ?? "Usuário associado ao token não encontrado");
+        }
       }
 
       res.json({ success: true, message: "Senha alterada com sucesso!" });

@@ -15,6 +15,7 @@
 - [x] Impedir que o cabeçalho `Origin` redirecione e-mails de recuperação de senha a domínios externos.
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
+- [x] Consumir token de recuperação condicionalmente no banco antes de alterar a senha, bloqueando uso concorrente do mesmo link.
 - [x] Remover a chave padrão da Evolution do código e exigir variável criptografada na DigitalOcean.
 - [x] Remover artefatos compilados versionados e impedir que `dist/` volte ao repositório.
 - [x] Restringir uploads de logo a PNG/JPG/WEBP de até 2 MB, verificar assinatura do arquivo e eliminar a rota de upload inexistente.
@@ -32,6 +33,7 @@
 - [x] Corrigir os caminhos Drizzle que ainda permitiam consulta individual de contrato e edição/documentos de cliente apenas por ID; adicionados testes de regressão por empresa.
 - [x] Validar o recurso de origem antes de qualquer escrita encadeada nos fluxos de veículos, contratos, parcelas, renovação, despesas e Blacklist.
 - [x] Criar regressões de autorização: conta A não cria veículo para cliente B, não apaga veículo/parcela B, não edita contrato B, não cria reserva financeira com IDs B e não remove foto de outro registro Blacklist.
+- [x] Escapar dados de negócio nos comprovantes e contratos HTML; limitar logo a URL HTTPS e fotos compartilhadas da Blacklist a JPEG/PNG/WEBP de até 2 MB com assinatura binária.
 - [ ] Criar migration aditiva de índices e constraints por tenant; aplicar somente após verificar dados legados.
 
 ## Prioridade P2 — Caixa, parcelas e renovação
@@ -57,6 +59,10 @@
 - [x] Mostrar na tela: aceita pela API, enviada, entregue, lida, falhou ou estado desconhecido.
 - [x] Registrar relatório diário como concluído somente após aceite técnico confirmado pelo worker.
 - [x] Limitar tentativas, alertar sobre instância desconectada e evitar reenvio indevido.
+
+## Proteção HTTP complementar
+
+- [x] Aplicar CSP de base, proteção contra clickjacking, MIME sniffing, referrer excessivo, permissões sensíveis e HSTS quando a requisição chegar por HTTPS.
 
 ## Prioridade P4 — Kiwify (por último, conforme solicitado)
 
