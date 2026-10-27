@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { getSupabaseClientAsync } from "../db";
 
-export type TipoOperacaoFinanceira = "recebimento_parcela" | "renovacao_juros" | "pagamento_conta" | "estorno_conta" | "ajuste_manual";
+export type TipoOperacaoFinanceira = "recebimento_parcela" | "renovacao_juros" | "pagamento_conta" | "estorno_conta" | "ajuste_manual" | "pagamento_assinatura";
 
 type Reserva = {
   id: string;

@@ -50,6 +50,7 @@
 - [ ] Implementar transação/RPC única para renovação de juros.
 - [ ] Implementar transação/RPC única para despesas, cheques, reparcelamento e vendas de telefone.
 - [ ] Criar restrição única por empresa, contrato e número de parcela. **Migration `0013_integridade_parcelas.sql` pronta; aguarda auditoria de duplicidades e execução no Supabase, que está recusando autenticação do conector.**
+- [ ] Aplicar a migration `0014_integridade_assinaturas_financeiras.sql` após sua pré-auditoria: ela torna obrigatório o tenant/caixa dos pagamentos recorrentes, bloqueia competência duplicada e liga o movimento de Caixa ao pagamento. A aplicação já exige conta de Caixa, valor integral e compensa falhas de Caixa; a unicidade/RPC no banco segue pendente da execução controlada no Supabase.
 - [x] Implantar conferência financeira somente leitura entre parcelas, despesas e livro-caixa; ela aponta ausência, valor divergente e provável duplicidade sem criar ajustes automáticos.
 - [x] Padronizar todos os fluxos financeiros pelo calendário `America/Sao_Paulo`.
 

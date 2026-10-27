@@ -55,17 +55,19 @@ export default function Assinaturas() {
     valorMensal: '',
     diaVencimento: '10',
     dataInicio: new Date().toISOString().split('T')[0],
+    contaCaixaId: '',
     observacoes: '',
   });
   const [formPagamento, setFormPagamento] = useState({
     valorPago: '',
     mesReferencia: getMesAtual(),
+    contaCaixaId: '',
     observacoes: '',
   });
 
   // Queries
   const utils = trpc.useUtils();
-  const { data: assinaturas = [], isLoading } = trpc.assinaturas.list.useQuery({
+  const { data: assinaturas = [], isLoading, error: assinaturasErro } = trpc.assinaturas.list.useQuery({
     status: filtroStatus,
     busca: busca || undefined,
   });
@@ -87,7 +89,7 @@ export default function Assinaturas() {
       utils.assinaturas.list.invalidate();
       utils.assinaturas.kpis.invalidate();
       setModalCriar(false);
-      setForm({ clienteId: '', servico: '', descricao: '', valorMensal: '', diaVencimento: '10', dataInicio: new Date().toISOString().split('T')[0], observacoes: '' });
+      setForm({ clienteId: '', servico: '', descricao: '', valorMensal: '', diaVencimento: '10', dataInicio: new Date().toISOString().split('T')[0], contaCaixaId: '', observacoes: '' });
     },
     onError: (e) => toast.error('Erro ao criar: ' + e.message),
   });
@@ -99,7 +101,7 @@ export default function Assinaturas() {
       utils.assinaturas.kpis.invalidate();
       if (expandedId) utils.assinaturas.pagamentos.invalidate({ assinaturaId: expandedId });
       setModalPagar(null);
-      setFormPagamento({ valorPago: '', mesReferencia: getMesAtual(), observacoes: '' });
+      setFormPagamento({ valorPago: '', mesReferencia: getMesAtual(), contaCaixaId: '', observacoes: '' });
     },
     onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
   });
@@ -116,7 +118,7 @@ export default function Assinaturas() {
 
   const deletarMutation = trpc.assinaturas.deletar.useMutation({
     onSuccess: () => {
-      toast.success(t('toast_success.assinatura_removida'));
+      toast.success('Assinatura cancelada e histórico preservado.');
       utils.assinaturas.list.invalidate();
       utils.assinaturas.kpis.invalidate();
     },
@@ -124,8 +126,8 @@ export default function Assinaturas() {
   });
 
   const handleCriar = () => {
-    if (!form.clienteId || !form.servico || !form.valorMensal) {
-      toast.error(t('toast_error.preencha_cliente_serviço_e_valor_mensal'));
+    if (!form.clienteId || !form.servico || !form.valorMensal || !form.contaCaixaId) {
+      toast.error('Preencha cliente, serviço, valor mensal e a conta de Caixa.');
       return;
     }
     criarMutation.mutate({
@@ -135,13 +137,14 @@ export default function Assinaturas() {
       valorMensal: parseFloat(form.valorMensal),
       diaVencimento: parseInt(form.diaVencimento),
       dataInicio: form.dataInicio,
+      contaCaixaId: parseInt(form.contaCaixaId),
       observacoes: form.observacoes || undefined,
     });
   };
 
   const handlePagar = (assinatura: any) => {
-    if (!formPagamento.valorPago) {
-      toast.error(t('toast_error.informe_o_valor_pago'));
+    if (!formPagamento.valorPago || !formPagamento.contaCaixaId) {
+      toast.error('Informe o valor pago e a conta de Caixa de recebimento.');
       return;
     }
     pagarMutation.mutate({
@@ -149,6 +152,7 @@ export default function Assinaturas() {
       clienteId: assinatura.cliente_id,
       valorPago: parseFloat(formPagamento.valorPago),
       mesReferencia: formPagamento.mesReferencia,
+      contaCaixaId: parseInt(formPagamento.contaCaixaId),
       observacoes: formPagamento.observacoes || undefined,
     });
   };
@@ -158,8 +162,7 @@ export default function Assinaturas() {
     return assinaturas.find((a: any) => a.id === modalPagar);
   }, [modalPagar, assinaturas]);
 
-  // Verificar se as tabelas existem (se der erro de relação, mostrar banner)
-  const tabelasNaoExistem = isLoading === false && (assinaturas as any)?.error?.message?.includes('relation') || false;
+  const tabelasNaoExistem = !isLoading && /relation|schema cache|does not exist/i.test(assinaturasErro?.message ?? '');
 
   return (
     <div className="space-y-6">
@@ -169,9 +172,7 @@ export default function Assinaturas() {
           <AlertCircle className="text-amber-400 shrink-0 mt-0.5" size={20} />
           <div>
             <p className="text-amber-300 font-medium text-sm">{t('subscriptions.setupRequired')}</p>
-            <p className="text-amber-400/80 text-xs mt-1">Para usar o módulo de Assinaturas, execute o SQL abaixo no <strong>Supabase Dashboard → SQL Editor</strong>:</p>
-            <pre className="mt-2 text-[10px] bg-black/30 rounded p-2 text-amber-300 overflow-x-auto whitespace-pre-wrap">CREATE TABLE IF NOT EXISTS assinaturas (id BIGSERIAL PRIMARY KEY, cliente_id BIGINT NOT NULL REFERENCES clientes(id) ON DELETE CASCADE, servico TEXT NOT NULL, descricao TEXT, valor_mensal NUMERIC(10,2) NOT NULL, dia_vencimento INTEGER NOT NULL DEFAULT 1, status TEXT NOT NULL DEFAULT 'ativa', data_inicio DATE NOT NULL DEFAULT CURRENT_DATE, data_fim DATE, observacoes TEXT, created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assinatura_id BIGINT NOT NULL REFERENCES assinaturas(id) ON DELETE CASCADE, valor_pago NUMERIC(10,2) NOT NULL, data_pagamento TIMESTAMPTZ DEFAULT NOW(), mes_referencia TEXT NOT NULL, forma_pagamento TEXT DEFAULT 'dinheiro', observacoes TEXT, created_at TIMESTAMPTZ DEFAULT NOW());</pre>
+            <p className="text-amber-400/80 text-xs mt-1">A estrutura do módulo ainda não está disponível neste ambiente. A ativação é feita pela migration verificada do sistema; não execute SQL manual sugerido pela tela.</p>
           </div>
         </div>
       )}
@@ -332,7 +333,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
                         className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/20 gap-1"
                         onClick={() => {
                           setModalPagar(a.id);
-                          setFormPagamento({ valorPago: a.valor_mensal, mesReferencia: getMesAtual(), observacoes: '' });
+                          setFormPagamento({ valorPago: a.valor_mensal, mesReferencia: getMesAtual(), contaCaixaId: a.conta_caixa_id ? String(a.conta_caixa_id) : '', observacoes: '' });
                         }}
                       >
                         <CreditCard size={14} />
@@ -352,7 +353,7 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
                       variant="ghost"
                       className="text-slate-400 hover:text-red-400"
                       onClick={() => {
-                        if (confirm('Remover esta assinatura?')) {
+                          if (confirm('Cancelar esta assinatura? Os pagamentos já registrados serão preservados.')) {
                           deletarMutation.mutate({ id: a.id });
                         }
                       }}
@@ -463,6 +464,15 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
               />
             </div>
             <div>
+              <Label className="text-slate-300">Conta de Caixa dos recebimentos *</Label>
+              <Select value={form.contaCaixaId} onValueChange={(v) => setForm(f => ({ ...f, contaCaixaId: v }))}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>
+                  {contas.map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
               <Label className="text-slate-300">{t('subscriptions.description')}</Label>
               <Textarea
                 placeholder={t('subscriptions.planDetailsPlaceholder') || 'Detalhes do plano...'}
@@ -533,13 +543,22 @@ CREATE TABLE IF NOT EXISTS pagamentos_assinatura (id BIGSERIAL PRIMARY KEY, assi
                   className="bg-slate-700 border-slate-600 text-white mt-1"
                 />
               </div>
+              <div>
+                <Label className="text-slate-300">Conta de Caixa de recebimento *</Label>
+                <Select value={formPagamento.contaCaixaId} onValueChange={(v) => setFormPagamento(f => ({ ...f, contaCaixaId: v }))}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                  <SelectContent>
+                    {contas.map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
               <div className="flex gap-3 pt-2">
                 <Button variant="outline" onClick={() => setModalPagar(null)} className="flex-1 border-slate-600">
                   Cancelar
                 </Button>
                 <Button
                   onClick={() => handlePagar(assinaturaParaPagar)}
-                  disabled={pagarMutation.isPending}
+                  disabled={pagarMutation.isPending || !formPagamento.contaCaixaId}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                 >
                   {pagarMutation.isPending ? 'Registrando...' : 'Confirmar Pagamento'}
