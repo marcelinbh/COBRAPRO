@@ -3981,20 +3981,46 @@ const cobradoresRouter = router({
 });
 
 // ─── REPARCELAMENTO ───────────────────────────────────────────────────────────
+function dataCivilValida(data: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return false;
+  const [ano, mes, dia] = data.split('-').map(Number);
+  const date = new Date(Date.UTC(ano, mes - 1, dia));
+  return date.getUTCFullYear() === ano && date.getUTCMonth() === mes - 1 && date.getUTCDate() === dia;
+}
+
+function adicionarPeriodoReparcelamento(data: string, indice: number, tipoTaxa: 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'anual'): string {
+  if (tipoTaxa === 'diaria') return adicionarDiasData(data, indice);
+  if (tipoTaxa === 'semanal') return adicionarDiasData(data, indice * 7);
+  if (tipoTaxa === 'quinzenal') return adicionarDiasData(data, indice * 15);
+  if (tipoTaxa === 'anual') return adicionarDiasData(data, indice * 365);
+  const [ano, mes, dia] = data.split('-').map(Number);
+  const alvo = new Date(Date.UTC(ano, mes - 1 + indice, 1));
+  const ultimoDia = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
+  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(dia, ultimoDia)).padStart(2, '0')}`;
+}
+
+function saldoAbertoParaReparcelamento(parcela: any): number {
+  return calcularValorAbertoParcela({ status: parcela.status, valorOriginal: parcela.valor_original, saldoResidual: parcela.saldo_residual, valorMulta: parcela.valor_multa });
+}
+
 const reparcelamentoRouter = router({
   preview: protectedProcedure
     .input(z.object({
-      contratoId: z.number(),
-      numeroParcelas: z.number().min(1),
-      taxaJuros: z.number().min(0),
+      contratoId: z.number().int().positive(),
+      numeroParcelas: z.number().int().min(1).max(60),
+      taxaJuros: z.number().min(0).max(1000),
       tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
       dataInicio: z.string(),
       incluirMultas: z.boolean().default(true),
     }))
     .query(async ({ ctx, input }) => {
-      // Use Supabase REST to fetch open parcelas
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
+      if (!dataCivilValida(input.dataInicio)) throw new TRPCError({ code: 'BAD_REQUEST', message: 'A data de início é inválida' });
+      const { data: contrato, error: contratoErro } = await supabase.from('contratos')
+        .select('id, multa_atraso, juros_mora_diario').eq('id', input.contratoId).eq('user_id', ctx.user.id).maybeSingle();
+      if (contratoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoErro.message });
+      if (!contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
 
       const { data: parcelasAbertas, error: parcelasErr } = await supabase
         .from('parcelas')
@@ -4004,15 +4030,15 @@ const reparcelamentoRouter = router({
         .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
       if (parcelasErr) throw new Error(parcelasErr.message);
 
-      const hoje = new Date();
+      const hoje = new Date(dataCivilBrasiliaParaIso(dataHojeBrasilia()));
       let saldoDevedor = 0;
       for (const p of (parcelasAbertas ?? [])) {
-        const valorBase = parseFloat(p.valor_original) - parseFloat(p.valor_pago ?? '0');
+        const valorBase = saldoAbertoParaReparcelamento(p);
         let multa = 0;
         let juros = 0;
         if (input.incluirMultas && p.status === 'atrasada') {
-          const vencDate = new Date(String(p.data_vencimento) + 'T00:00:00');
-          const resultado = calcularJurosMora(valorBase, vencDate, hoje, 0.033, 2);
+          const vencDate = new Date(dataCivilBrasiliaParaIso(String(p.data_vencimento).slice(0, 10)));
+          const resultado = calcularJurosMora(valorBase, vencDate, hoje, Number(contrato.juros_mora_diario ?? 0), Number(contrato.multa_atraso ?? 0));
           multa = resultado.multa;
           juros = resultado.juros;
         }
@@ -4020,20 +4046,17 @@ const reparcelamentoRouter = router({
       }
 
       const valorNovaParcela = calcularParcelaPadrao(saldoDevedor, input.taxaJuros, input.numeroParcelas);
-      const dataInicioDate = new Date(input.dataInicio);
-
       return {
         saldoDevedor,
         valorNovaParcela,
         totalNovo: valorNovaParcela * input.numeroParcelas,
         qtdParcelasAbertas: (parcelasAbertas ?? []).length,
         parcelas: Array.from({ length: input.numeroParcelas }, (_, i) => {
-          const venc = new Date(dataInicioDate);
-          venc.setMonth(venc.getMonth() + i);
+          const vencimento = adicionarPeriodoReparcelamento(input.dataInicio, i, input.tipoTaxa);
           return {
             numero: i + 1,
             valor: valorNovaParcela,
-            vencimento: venc.toISOString().split('T')[0],
+            vencimento,
           };
         }),
       };
@@ -4041,9 +4064,9 @@ const reparcelamentoRouter = router({
 
   executar: protectedProcedure
     .input(z.object({
-      contratoId: z.number(),
-      numeroParcelas: z.number().min(1),
-      taxaJuros: z.number().min(0),
+      contratoId: z.number().int().positive(),
+      numeroParcelas: z.number().int().min(1).max(60),
+      taxaJuros: z.number().min(0).max(1000),
       tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
       dataInicio: z.string(),
       incluirMultas: z.boolean().default(true),
