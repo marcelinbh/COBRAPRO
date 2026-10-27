@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
-import { useSearch } from "wouter";
+import { useRoute, useSearch } from "wouter";
+import { resolverTokenPortal } from "@/lib/portalToken";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,8 +19,8 @@ function StatusIcon({ status }: { status: string }) {
 export default function PortalCliente() {
   const { t } = useTranslation();
   const search = useSearch();
-  const params = new URLSearchParams(search);
-  const token = params.get('token');
+  const [, paramsDaRota] = useRoute("/portal/:token");
+  const token = resolverTokenPortal(paramsDaRota?.token, search);
 
   const { data: portalData, isLoading, error } = trpc.portal.acessar.useQuery(
     { token: token ?? "" },

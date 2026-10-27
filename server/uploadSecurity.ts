@@ -1,5 +1,7 @@
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_BASE64_LENGTH = Math.ceil(MAX_UPLOAD_BYTES * 4 / 3) + 8;
+export const MAX_BLACKLIST_FOTO_BYTES = 2 * 1024 * 1024;
+const MAX_BLACKLIST_FOTO_BASE64_LENGTH = Math.ceil(MAX_BLACKLIST_FOTO_BYTES * 4 / 3) + 8;
 
 const FOLDERS_PERMITIDOS: Record<string, string> = {
   "clientes/fotos": "fotos",
@@ -18,6 +20,12 @@ const MIME_PERMITIDOS = new Set([
   "application/vnd.ms-excel",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+]);
+
+const MIME_FOTO_BLACKLIST_PERMITIDOS = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
 ]);
 
 export type UploadValidado = {
@@ -72,6 +80,21 @@ function decodificarBase64(base64: unknown): Buffer {
   return buffer;
 }
 
+function decodificarBase64ComLimite(base64: unknown, limiteBytes: number, limiteBase64: number): Buffer {
+  if (typeof base64 !== "string" || base64.length === 0 || base64.length > limiteBase64) {
+    throw new Error(`Arquivo ausente ou excede o limite de ${limiteBytes / (1024 * 1024)} MB`);
+  }
+  if (base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) {
+    throw new Error("Conteúdo do arquivo inválido");
+  }
+
+  const buffer = Buffer.from(base64, "base64");
+  if (buffer.length === 0 || buffer.length > limiteBytes) {
+    throw new Error(`Arquivo ausente ou excede o limite de ${limiteBytes / (1024 * 1024)} MB`);
+  }
+  return buffer;
+}
+
 function normalizarNomeArquivo(filename: unknown): string {
   if (typeof filename !== "string") throw new Error("Nome do arquivo inválido");
   const nome = filename.trim().replace(/[^a-zA-Z0-9._-]/g, "_").replace(/^\.+/, "");
@@ -99,5 +122,39 @@ export function validarUploadCliente(body: unknown): UploadValidado {
     contentType,
     nomeSeguro: normalizarNomeArquivo(filename),
     pasta: FOLDERS_PERMITIDOS[folder],
+  };
+}
+
+export type FotoBlacklistValidada = {
+  buffer: Buffer;
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  extensao: "jpg" | "png" | "webp";
+};
+
+/**
+ * Fotos compartilhadas da Blacklist aceitam somente formatos de imagem seguros,
+ * com conteúdo Base64 canônico, assinatura binária e limite compatível com o
+ * limite global de corpo HTTP da aplicação.
+ */
+export function validarFotoBlacklist(base64: unknown, contentType: unknown): FotoBlacklistValidada {
+  if (typeof contentType !== "string" || !MIME_FOTO_BLACKLIST_PERMITIDOS.has(contentType)) {
+    throw new Error("A foto deve ser JPEG, PNG ou WEBP");
+  }
+
+  const buffer = decodificarBase64ComLimite(base64, MAX_BLACKLIST_FOTO_BYTES, MAX_BLACKLIST_FOTO_BASE64_LENGTH);
+  if (!temCabecalhoEsperado(buffer, contentType)) {
+    throw new Error("O conteúdo da foto não corresponde ao tipo informado");
+  }
+
+  const extensaoPorMime: Record<string, FotoBlacklistValidada["extensao"]> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+
+  return {
+    buffer,
+    contentType: contentType as FotoBlacklistValidada["contentType"],
+    extensao: extensaoPorMime[contentType],
   };
 }

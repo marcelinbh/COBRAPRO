@@ -14,6 +14,13 @@ import { Link } from "wouter";
 const ESTADOS_BR = [
   "AC","AL","AP","AM","BA","CE","DF","ES","GO","MA","MT","MS","MG","PA","PB","PR","PE","PI","RJ","RN","RS","RO","RR","SC","SP","SE","TO"
 ];
+const TIPOS_FOTO_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"] as const;
+type TipoFotoPermitido = (typeof TIPOS_FOTO_PERMITIDOS)[number];
+const MAX_FOTO_BLACKLIST_BYTES = 2 * 1024 * 1024;
+
+function tipoFotoPermitido(tipo: string): tipo is TipoFotoPermitido {
+  return (TIPOS_FOTO_PERMITIDOS as readonly string[]).includes(tipo);
+}
 
 function formatCpfCnpj(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -63,7 +70,7 @@ export default function BlacklistNova() {
     observacoes: "",
   });
 
-  const [fotos, setFotos] = useState<{ file: File; preview: string; base64: string }[]>([]);
+  const [fotos, setFotos] = useState<{ file: File; preview: string; base64: string; mimeType: TipoFotoPermitido }[]>([]);
   const [fotoUploading, setFotoUploading] = useState(false);
 
   const criar = trpc.blacklist.criar.useMutation();
@@ -77,15 +84,24 @@ export default function BlacklistNova() {
     const files = Array.from(e.target.files ?? []);
     if (files.length === 0) return;
 
+    const arquivosValidos = files.filter((file) => tipoFotoPermitido(file.type) && file.size > 0 && file.size <= MAX_FOTO_BLACKLIST_BYTES);
+    if (arquivosValidos.length !== files.length) {
+      toast.error("Foto não adicionada", { description: "Use JPEG, PNG ou WEBP de até 2 MB." });
+    }
+    if (arquivosValidos.length === 0) {
+      e.target.value = "";
+      return;
+    }
+
     const novasFotos = await Promise.all(
-      files.slice(0, 5 - fotos.length).map(async (file) => {
+      arquivosValidos.slice(0, 5 - fotos.length).map(async (file) => {
         const preview = URL.createObjectURL(file);
         const base64 = await new Promise<string>((resolve) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.readAsDataURL(file);
         });
-        return { file, preview, base64 };
+        return { file, preview, base64, mimeType: file.type as TipoFotoPermitido };
       })
     );
 
@@ -128,7 +144,7 @@ export default function BlacklistNova() {
           await adicionarFoto.mutateAsync({
             blacklistId: registro.id,
             fotoBase64: foto.base64,
-            mimeType: foto.file.type || "image/jpeg",
+            mimeType: foto.mimeType,
           });
         } catch (err) {
           console.warn("Erro ao fazer upload de foto:", err);

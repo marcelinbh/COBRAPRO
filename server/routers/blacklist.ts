@@ -4,11 +4,9 @@ import { getDb } from "../db";
 import { blacklist, blacklistFotos, type Blacklist, type BlacklistFoto } from "../../drizzle/schema";
 import { eq, or, ilike, desc, and, sql } from "drizzle-orm";
 import { storagePut } from "../storage";
+import { validarFotoBlacklist } from "../uploadSecurity";
 import { TRPCError } from "@trpc/server";
-
-function randomSuffix() {
-  return Math.random().toString(36).substring(2, 10);
-}
+import { randomUUID } from "node:crypto";
 
 async function requireDb() {
   const db = await getDb();
@@ -288,8 +286,8 @@ export const blacklistRouter = router({
     .input(
       z.object({
         blacklistId: z.number(),
-        fotoBase64: z.string(),
-        mimeType: z.string().default("image/jpeg"),
+        fotoBase64: z.string().min(1),
+        mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -307,11 +305,18 @@ export const blacklistRouter = router({
       }
 
       const base64Data = input.fotoBase64.replace(/^data:[^;]+;base64,/, "");
-      const buffer = Buffer.from(base64Data, "base64");
-      const ext = input.mimeType.split("/")[1] || "jpg";
-      const fileKey = `blacklist/${input.blacklistId}/foto-${randomSuffix()}.${ext}`;
+      let fotoValidada;
+      try {
+        fotoValidada = validarFotoBlacklist(base64Data, input.mimeType);
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: error instanceof Error ? error.message : "Foto inválida",
+        });
+      }
+      const fileKey = `blacklist/${input.blacklistId}/foto-${randomUUID()}.${fotoValidada.extensao}`;
 
-      const { url } = await storagePut(fileKey, buffer, input.mimeType);
+      const { url } = await storagePut(fileKey, fotoValidada.buffer, fotoValidada.contentType);
 
       const [foto] = await db
         .insert(blacklistFotos)

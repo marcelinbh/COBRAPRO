@@ -32,6 +32,7 @@ import { dataPagamentoParaBanco, statusPodeSerPago } from "./contasPagarPagament
 import { idsDuplicadosParaRemocao } from "./caixaDuplicidades";
 import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar, statusContaPaga } from "./contasPagarStatus";
 import { podeRegistrarMovimento } from "./financeIdempotency";
+import { montarHtmlContrato } from "./utils/contratoHtml";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -1729,12 +1730,36 @@ const contratosRouter = router({
         const valorParcela2 = Number(c2.valor_parcela).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         const taxaJuros2 = `${c2.taxa_juros}% ${c2.tipo_taxa === 'mensal' ? 'ao mês' : 'ao dia'}`;
         const nomeEmpresa2 = configMap2['nomeEmpresa'] ?? 'CobraPro';
-        const parcelasHTML2 = (parcelasData2 ?? []).slice(0, 24).map((p: any) => {
-          const venc = p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR') : '-';
-          const val = Number(p.valor_original).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-          return `<tr><td>${p.numero_parcela}</td><td>${venc}</td><td>${val}</td><td>${p.status === 'paga' ? 'PAGA' : p.status === 'atrasada' ? 'ATRASADA' : 'PENDENTE'}</td></tr>`;
-        }).join('');
-        const html2 = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><style>body{font-family:Arial,sans-serif;font-size:11px;color:#111;margin:0;padding:20px}h1{font-size:18px;text-align:center}h2{font-size:13px;margin:16px 0 6px;border-bottom:1px solid #ccc;padding-bottom:4px}.header{text-align:center;margin-bottom:20px}.empresa{font-size:14px;font-weight:bold}.grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px}.field{margin-bottom:4px}.label{font-weight:bold;color:#555}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#1a1a1a;color:white;padding:6px;text-align:left;font-size:10px}td{padding:5px 6px;border-bottom:1px solid #eee;font-size:10px}.assinatura{margin-top:40px;display:grid;grid-template-columns:1fr 1fr;gap:40px}.ass-box{border-top:1px solid #333;padding-top:6px;text-align:center}.rodape{margin-top:20px;font-size:9px;color:#888;text-align:center}</style></head><body><div class="header"><div class="empresa">${nomeEmpresa2}</div><h1>CONTRATO DE CRÉDITO</h1><div>Nº ${String(c2.id).padStart(6,'0')} &bull; ${dataInicio2}</div></div><h2>DADOS DO CONTRATANTE</h2><div class="grid"><div class="field"><span class="label">Nome:</span> ${cli2?.nome ?? ''}</div><div class="field"><span class="label">CPF/CNPJ:</span> ${cli2?.cpf_cnpj ?? '-'}</div><div class="field"><span class="label">Telefone:</span> ${cli2?.telefone ?? '-'}</div><div class="field"><span class="label">Chave PIX:</span> ${cli2?.chave_pix ?? '-'}</div></div><h2>CONDIÇÕES DO CONTRATO</h2><div class="grid"><div class="field"><span class="label">Modalidade:</span> ${c2.modalidade}</div><div class="field"><span class="label">Capital:</span> ${valorPrincipal2}</div><div class="field"><span class="label">Valor Total:</span> ${valorTotal2}</div><div class="field"><span class="label">Taxa:</span> ${taxaJuros2}</div><div class="field"><span class="label">Parcelas:</span> ${c2.numero_parcelas}x de ${valorParcela2}</div></div><h2>PLANO DE PAGAMENTO</h2><table><thead><tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead><tbody>${parcelasHTML2}</tbody></table><div class="assinatura"><div class="ass-box"><div>${nomeEmpresa2}</div><div style="font-size:9px;color:#888">Credor</div></div><div class="ass-box"><div>${cli2?.nome ?? ''}</div><div style="font-size:9px;color:#888">Devedor</div></div></div><div class="rodape">Documento gerado em ${new Date().toLocaleString('pt-BR')} — CobraPro</div></body></html>`;
+        const html2 = montarHtmlContrato({
+          empresa: { nome: nomeEmpresa2 },
+          cliente: {
+            nome: cli2?.nome,
+            cpfCnpj: cli2?.cpf_cnpj,
+            telefone: cli2?.telefone,
+            chavePix: cli2?.chave_pix,
+            endereco: cli2?.endereco,
+            cidade: cli2?.cidade,
+            estado: cli2?.estado,
+          },
+          contrato: {
+            id: c2.id,
+            modalidade: c2.modalidade,
+            status: c2.status,
+            capital: valorPrincipal2,
+            total: valorTotal2,
+            taxa: taxaJuros2,
+            numeroParcelas: c2.numero_parcelas,
+            valorParcela: valorParcela2,
+            dataInicio: dataInicio2,
+          },
+          parcelas: (parcelasData2 ?? []).map((p: any) => ({
+            numero: p.numero_parcela,
+            vencimento: p.data_vencimento ? new Date(p.data_vencimento).toLocaleDateString('pt-BR') : '-',
+            valor: Number(p.valor_original).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            status: p.status,
+          })),
+          geradoEm: new Date().toLocaleString('pt-BR'),
+        });
         return { html: html2, contratoId: c2.id, clienteNome: cli2?.nome ?? '' };
       }
       const rows = await db.select({
@@ -1774,88 +1799,37 @@ const contratosRouter = router({
       const nomeEmpresa = configMap['nome_empresa'] ?? configMap['nomeEmpresa'] ?? 'CobraPro';
       const cnpjEmpresa = configMap['cnpj'] ?? '';
       const enderecoEmpresa = configMap['endereco'] ?? '';
-      const modalidadeLabel: Record<string, string> = {
-        emprestimo_padrao: 'Empréstimo Padrão',
-        emprestimo_diario: 'Empréstimo Diário',
-        tabela_price: 'Parcela Fixa',
-        venda_produto: 'Venda de Produto',
-        desconto_cheque: 'Desconto de Cheque',
-        reparcelamento: 'Reparcelamento',
-      };
-      // Gerar HTML do contrato
-      const parcelasHTML = parcelasData.slice(0, 24).map(p => {
-        const venc = p.dataVencimento ? new Date(p.dataVencimento).toLocaleDateString('pt-BR') : '-';
-        const val = Number(p.valorOriginal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        return `<tr><td>${p.numeroParcela}</td><td>${venc}</td><td>${val}</td><td>${p.status === 'paga' ? 'PAGA' : p.status === 'atrasada' ? 'ATRASADA' : 'PENDENTE'}</td></tr>`;
-      }).join('');
-      const html = `
-        <!DOCTYPE html><html lang="pt-BR"><head>
-        <meta charset="UTF-8">
-        <style>
-          body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 20px; }
-          h1 { font-size: 18px; text-align: center; margin-bottom: 4px; }
-          h2 { font-size: 13px; margin: 16px 0 6px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
-          .header { text-align: center; margin-bottom: 20px; }
-          .empresa { font-size: 14px; font-weight: bold; }
-          .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; }
-          .field { margin-bottom: 4px; }
-          .label { font-weight: bold; color: #555; }
-          table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-          th { background: #1a1a1a; color: white; padding: 6px; text-align: left; font-size: 10px; }
-          td { padding: 5px 6px; border-bottom: 1px solid #eee; font-size: 10px; }
-          tr:nth-child(even) td { background: #f9f9f9; }
-          .assinatura { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
-          .ass-box { border-top: 1px solid #333; padding-top: 6px; text-align: center; }
-          .rodape { margin-top: 20px; font-size: 9px; color: #888; text-align: center; }
-          .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 10px; }
-          .badge-ativo { background: #dcfce7; color: #166534; }
-          .badge-quitado { background: #dbeafe; color: #1e40af; }
-        </style></head><body>
-        <div class="header">
-          <div class="empresa">${nomeEmpresa}</div>
-          ${cnpjEmpresa ? `<div>CNPJ: ${cnpjEmpresa}</div>` : ''}
-          ${enderecoEmpresa ? `<div>${enderecoEmpresa}</div>` : ''}
-          <h1>CONTRATO DE ${(modalidadeLabel[c.modalidade ?? ''] ?? 'CRÉDITO').toUpperCase()}</h1>
-          <div>Nº ${String(c.id).padStart(6, '0')} &nbsp;&bull;&nbsp; ${dataInicio}</div>
-        </div>
-        <h2>DADOS DO CONTRATANTE</h2>
-        <div class="grid">
-          <div class="field"><span class="label">Nome:</span> ${row.clienteNome}</div>
-          <div class="field"><span class="label">CPF/CNPJ:</span> ${row.clienteCpfCnpj ?? '-'}</div>
-          <div class="field"><span class="label">Telefone:</span> ${row.clienteTelefone ?? '-'}</div>
-          <div class="field"><span class="label">Chave PIX:</span> ${row.clienteChavePix ?? '-'}</div>
-          ${row.clienteEndereco ? `<div class="field col-span-2"><span class="label">Endereço:</span> ${row.clienteEndereco}${row.clienteCidade ? ', ' + row.clienteCidade : ''}${row.clienteEstado ? '/' + row.clienteEstado : ''}</div>` : ''}
-        </div>
-        <h2>CONDIÇÕES DO CONTRATO</h2>
-        <div class="grid">
-          <div class="field"><span class="label">Modalidade:</span> ${modalidadeLabel[c.modalidade ?? ''] ?? c.modalidade}</div>
-          <div class="field"><span class="label">Status:</span> <span class="badge badge-${c.status}">${c.status?.toUpperCase()}</span></div>
-          <div class="field"><span class="label">Capital:</span> ${valorPrincipal}</div>
-          <div class="field"><span class="label">Valor Total:</span> ${valorTotal}</div>
-          <div class="field"><span class="label">Taxa de Juros:</span> ${taxaJuros}</div>
-          <div class="field"><span class="label">Nº Parcelas:</span> ${c.numeroParcelas}x de ${valorParcela}</div>
-          ${c.descricao ? `<div class="field" style="grid-column:span 2"><span class="label">Descrição:</span> ${c.descricao}</div>` : ''}
-        </div>
-        <h2>PLANO DE PAGAMENTO</h2>
-        <table>
-          <thead><tr><th>#</th><th>Vencimento</th><th>Valor</th><th>Status</th></tr></thead>
-          <tbody>${parcelasHTML}</tbody>
-        </table>
-        ${parcelasData.length > 24 ? `<p style="font-size:9px;color:#888">... e mais ${parcelasData.length - 24} parcelas</p>` : ''}
-        <div class="assinatura">
-          <div class="ass-box">
-            <div>${nomeEmpresa}</div>
-            <div style="font-size:9px;color:#888">Credor / Contratado</div>
-          </div>
-          <div class="ass-box">
-            <div>${row.clienteNome}</div>
-            <div style="font-size:9px;color:#888">Devedor / Contratante</div>
-          </div>
-        </div>
-        <div class="rodape">
-          Documento gerado em ${new Date().toLocaleString('pt-BR')} — CobraPro Sistema de Gestão Financeira
-        </div>
-        </body></html>`;
+      const html = montarHtmlContrato({
+        empresa: { nome: nomeEmpresa, cnpj: cnpjEmpresa, endereco: enderecoEmpresa },
+        cliente: {
+          nome: row.clienteNome,
+          cpfCnpj: row.clienteCpfCnpj,
+          telefone: row.clienteTelefone,
+          chavePix: row.clienteChavePix,
+          endereco: row.clienteEndereco,
+          cidade: row.clienteCidade,
+          estado: row.clienteEstado,
+        },
+        contrato: {
+          id: c.id,
+          modalidade: c.modalidade,
+          status: c.status,
+          capital: valorPrincipal,
+          total: valorTotal,
+          taxa: taxaJuros,
+          numeroParcelas: c.numeroParcelas,
+          valorParcela,
+          descricao: c.descricao,
+          dataInicio,
+        },
+        parcelas: parcelasData.map((p) => ({
+          numero: p.numeroParcela,
+          vencimento: p.dataVencimento ? new Date(p.dataVencimento).toLocaleDateString('pt-BR') : '-',
+          valor: Number(p.valorOriginal).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+          status: p.status,
+        })),
+        geradoEm: new Date().toLocaleString('pt-BR'),
+      });
       return { html, contratoId: c.id, clienteNome: row.clienteNome };
     }),
 

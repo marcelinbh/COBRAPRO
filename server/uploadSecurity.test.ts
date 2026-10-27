@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MAX_UPLOAD_BYTES, validarUploadCliente } from "./uploadSecurity";
+import { MAX_BLACKLIST_FOTO_BYTES, MAX_UPLOAD_BYTES, validarFotoBlacklist, validarUploadCliente } from "./uploadSecurity";
 
 const pngBase64 = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
@@ -65,5 +65,26 @@ describe("validarUploadCliente", () => {
       filename: "grande.pdf",
       folder: "clientes/documentos",
     })).toThrow("Arquivo ausente ou excede o limite de 10 MB");
+  });
+});
+
+describe("validarFotoBlacklist", () => {
+  it("aceita PNG com assinatura válida e normaliza a extensão", () => {
+    const foto = validarFotoBlacklist(pngBase64, "image/png");
+    expect(foto.contentType).toBe("image/png");
+    expect(foto.extensao).toBe("png");
+  });
+
+  it("rejeita MIME não permitido, Base64 inválido e assinatura incompatível", () => {
+    expect(() => validarFotoBlacklist(pngBase64, "image/gif")).toThrow("A foto deve ser JPEG, PNG ou WEBP");
+    expect(() => validarFotoBlacklist("não é base64", "image/png")).toThrow("Conteúdo do arquivo inválido");
+    expect(() => validarFotoBlacklist(pdfBase64, "image/png")).toThrow("O conteúdo da foto não corresponde ao tipo informado");
+  });
+
+  it("rejeita fotos acima do limite específico", () => {
+    expect(() => validarFotoBlacklist(
+      "A".repeat(Math.ceil(MAX_BLACKLIST_FOTO_BYTES * 4 / 3) + 12),
+      "image/jpeg",
+    )).toThrow("Arquivo ausente ou excede o limite de 2 MB");
   });
 });
