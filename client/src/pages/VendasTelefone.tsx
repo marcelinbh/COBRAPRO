@@ -379,6 +379,8 @@ export default function VendasTelefone() {
   const [compradorEstado, setCompradorEstado] = useState("");
   const [compradorEndereco, setCompradorEndereco] = useState("");
   const [compradorLocalTrabalho, setCompradorLocalTrabalho] = useState("");
+  const [contaCaixaId, setContaCaixaId] = useState("");
+  const [contaCaixaPagamentoId, setContaCaixaPagamentoId] = useState("");
   const [dataPrimeiraParcela, setDataPrimeiraParcela] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() + 1);
     return d.toISOString().split("T")[0];
@@ -395,6 +397,7 @@ export default function VendasTelefone() {
   // ── Queries & Mutations ──
   const { data: vendas = [], refetch } = trpc.vendasTelefone.listar.useQuery();
   const { data: kpis } = trpc.vendasTelefone.kpis.useQuery();
+  const { data: contasCaixa = [] } = trpc.caixa.contas.useQuery();
   const { data: parcelasVenda = [] } = trpc.vendasTelefone.parcelas.useQuery(
     { vendaId: vendaSelecionada?.id ?? 0 },
     { enabled: !!vendaSelecionada?.id }
@@ -432,6 +435,7 @@ export default function VendasTelefone() {
     setCompradorEmail(""); setCompradorEstadoCivil(""); setCompradorProfissao("");
     setCompradorInstagram(""); setCompradorCep(""); setCompradorCidade("");
     setCompradorEstado(""); setCompradorEndereco(""); setCompradorLocalTrabalho("");
+    setContaCaixaId(""); setContaCaixaPagamentoId("");
   }
 
   function handleCriarContrato() {
@@ -441,6 +445,10 @@ export default function VendasTelefone() {
     }
     if (!marca.trim() || !modelo.trim()) {
       toast.error(t('toast_error.produto_obrigatório_informe_marca_e_mode'));
+      return;
+    }
+    if (sim.entradaValor > 0 && !contaCaixaId) {
+      toast.error("Selecione a conta de Caixa que receberá a entrada.");
       return;
     }
     criarMutation.mutate({
@@ -455,7 +463,7 @@ export default function VendasTelefone() {
       compradorInstagram: compradorInstagram || undefined, compradorCep: compradorCep || undefined,
       compradorCidade: compradorCidade || undefined, compradorEstado: compradorEstado || undefined,
       compradorEndereco: compradorEndereco || undefined, compradorLocalTrabalho: compradorLocalTrabalho || undefined,
-      dataPrimeiraParcela,
+      dataPrimeiraParcela, contaCaixaId: contaCaixaId ? Number(contaCaixaId) : undefined,
     });
   }
 
@@ -702,6 +710,13 @@ export default function VendasTelefone() {
                 <FileText className="w-3.5 h-3.5" /> Baixar Contrato PDF
               </Button>
             </div>
+            <div className="space-y-1.5 mb-3">
+              <Label className="text-sm">Conta de Caixa para os recebimentos *</Label>
+              <Select value={contaCaixaPagamentoId} onValueChange={setContaCaixaPagamentoId}>
+                <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>{contasCaixa.filter((conta: any) => conta.ativo !== false).map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
             <div className="space-y-2">
               {parcelasVenda.map((p: any) => (
                 <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border ${p.status === 'paga' ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}>
@@ -717,8 +732,8 @@ export default function VendasTelefone() {
                       <Button
                         size="sm"
                         className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-7"
-                        onClick={() => pagarMutation.mutate({ parcelaId: p.id, valorPago: parseFloat(p.valor) })}
-                        disabled={pagarMutation.isPending}
+                        onClick={() => pagarMutation.mutate({ parcelaId: p.id, valorPago: parseFloat(p.valor), contaCaixaId: Number(contaCaixaPagamentoId) })}
+                        disabled={pagarMutation.isPending || !contaCaixaPagamentoId}
                       >
                         Pagar
                       </Button>
@@ -975,6 +990,14 @@ export default function VendasTelefone() {
             <div className="space-y-1.5">
               <Label className="text-sm">{t('vendaTelefone.firstInstallmentDate')}</Label>
               <Input type="date" value={dataPrimeiraParcela} onChange={e => setDataPrimeiraParcela(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm">Conta de Caixa da entrada *</Label>
+              <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
+                <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
+                <SelectContent>{contasCaixa.filter((conta: any) => conta.ativo !== false).map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}</SelectContent>
+              </Select>
+              {sim.entradaValor <= 0 && <p className="text-xs text-gray-500">Sem entrada, esta seleção é opcional.</p>}
             </div>
           </div>
         </div>

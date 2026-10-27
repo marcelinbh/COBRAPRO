@@ -4851,10 +4851,17 @@ const vendasTelefoneRouter = router({
       compradorEndereco: z.string().optional(),
       compradorLocalTrabalho: z.string().optional(),
       dataPrimeiraParcela: z.string().optional(),
+      contaCaixaId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      if (input.entradaValor > 0) {
+        if (!input.contaCaixaId) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione a conta de Caixa que receberá a entrada da venda' });
+        }
+        await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
+      }
 
       const { data: venda, error } = await supabase
         .from('vendas_telefone')
@@ -4912,50 +4919,43 @@ const vendasTelefoneRouter = router({
         };
       });
 
-        await supabase.from('parcelas_venda_telefone').insert(parcelasData);
+      const { error: parcelasErro } = await supabase.from('parcelas_venda_telefone').insert(parcelasData);
+      if (parcelasErro) {
+        await supabase.from('vendas_telefone').delete().eq('id', venda.id).eq('user_id', ctx.user.id);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível gerar as parcelas da venda' });
+      }
 
       // ── Integração com Caixa: registrar entrada da entrada (valor inicial) ──
       if (input.entradaValor > 0) {
-        try {
-          // Buscar a primeira conta ativa do caixa
-          const { data: contas } = await supabase
-            .from('contas_caixa')
-            .select('id, nome, saldo')
-            .eq('user_id', ctx.user.id)
-            .order('id', { ascending: true })
-            .limit(1);
-          if (contas && contas.length > 0) {
-            const conta = contas[0];
-            // Registrar entrada no caixa
-            await supabase.from('transacoes_caixa').insert({
-              conta_caixa_id: conta.id,
-              tipo: 'entrada',
-              categoria: 'outros',
-              valor: input.entradaValor,
-              descricao: `Entrada venda ${input.marca} ${input.modelo} - ${input.compradorNome}`,
-              data_transacao: new Date().toISOString(),
-              user_id: ctx.user.id,
-            });
-            // Atualizar saldo da conta
-            // Registrar transação de entrada (saldo calculado via transações)
-            // Não atualizar campo saldo diretamente (campo inexistente, saldo é calculado)
-          }
-        } catch (caixaErr) {
-          console.warn('[vendasTelefone.criar] Erro ao registrar no caixa:', caixaErr);
-          // Não falhar a criação da venda por erro no caixa
+        const { error: caixaErro } = await supabase.from('transacoes_caixa').insert({
+          conta_caixa_id: input.contaCaixaId,
+          tipo: 'entrada',
+          categoria: 'outros',
+          valor: input.entradaValor,
+          descricao: `Entrada venda #${venda.id} - ${input.marca} ${input.modelo}`,
+          data_transacao: new Date().toISOString(),
+          user_id: ctx.user.id,
+        });
+        if (caixaErro) {
+          // Não permitir contrato ativo sem a entrada que o operador informou.
+          await supabase.from('parcelas_venda_telefone').delete().eq('venda_id', venda.id).eq('user_id', ctx.user.id);
+          await supabase.from('vendas_telefone').delete().eq('id', venda.id).eq('user_id', ctx.user.id);
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível registrar a entrada no Caixa; a venda foi desfeita' });
         }
       }
 
       return venda;
     }),
    pagarParcela: protectedProcedure
-    .input(z.object({
+   .input(z.object({
       parcelaId: z.number(),
       valorPago: z.number().positive(),
+      contaCaixaId: z.number().int().positive(),
     }))
     .mutation(async ({ ctx, input }) => {
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
+      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       // Buscar dados da parcela para obter informações da venda
       const { data: parcela } = await supabase
         .from('parcelas_venda_telefone')
@@ -4967,42 +4967,31 @@ const vendasTelefoneRouter = router({
       if (!podeRegistrarMovimento((parcela as any).status, ['pendente', 'atrasada'])) {
         throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
       }
+      const valorEsperado = Number((parcela as any).valor);
+      if (!Number.isFinite(valorEsperado) || Math.abs(input.valorPago - valorEsperado) > 0.000001) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O pagamento deve corresponder ao valor integral da parcela de venda' });
+      }
       const { data: parcelaAtualizada, error } = await supabase
         .from('parcelas_venda_telefone')
         .update({ status: 'paga', pago_em: new Date().toISOString(), valor_pago: input.valorPago })
         .eq('id', input.parcelaId).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada']).select('id').maybeSingle();
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
       if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
-      // ── Integração com Caixa: registrar pagamento da parcela ──
-      try {
-          const { data: contas } = await supabase
-            .from('contas_caixa')
-            .select('id, saldo')
-            .eq('user_id', ctx.user.id)
-            .order('id', { ascending: true })
-          .limit(1);
-        if (contas && contas.length > 0) {
-          const conta = contas[0];
-          const venda = (parcela as any)?.vendas_telefone;
-          const descricao = venda
-            ? `Parcela ${(parcela as any)?.numero} - ${venda.marca} ${venda.modelo} - ${venda.comprador_nome}`
-            : `Parcela venda telefone #${input.parcelaId}`;
-          const { data: entradaVendaExistente, error: buscaEntradaVendaErro } = await supabase.from('transacoes_caixa')
-            .select('id').eq('conta_caixa_id', conta.id).eq('tipo', 'entrada').eq('descricao', descricao)
-            .eq('user_id', ctx.user.id).limit(1).maybeSingle();
-          if (buscaEntradaVendaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: buscaEntradaVendaErro.message });
-          if (!entradaVendaExistente) {
-            const { error: entradaVendaErro } = await supabase.from('transacoes_caixa').insert({
-              conta_caixa_id: conta.id, tipo: 'entrada', categoria: 'pagamento_parcela', valor: input.valorPago,
-              descricao, data_transacao: new Date().toISOString(), user_id: ctx.user.id,
-            });
-            if (entradaVendaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: entradaVendaErro.message });
-          }
-          // Registrar transação de entrada (saldo calculado via transações)
-          // Não atualizar campo saldo diretamente (campo inexistente, saldo é calculado)
-        }
-      } catch (caixaErr) {
-        console.warn('[vendasTelefone.pagarParcela] Erro ao registrar no caixa:', caixaErr);
+      // ── Integração com Caixa: uma baixa só é confirmada com sua entrada. ──
+      const venda = (parcela as any)?.vendas_telefone;
+      const descricao = venda
+        ? `Parcela venda #${input.parcelaId} (${(parcela as any)?.numero}) - ${venda.marca} ${venda.modelo}`
+        : `Parcela venda telefone #${input.parcelaId}`;
+      const { error: entradaVendaErro } = await supabase.from('transacoes_caixa').insert({
+        conta_caixa_id: input.contaCaixaId, tipo: 'entrada', categoria: 'pagamento_parcela', valor: input.valorPago,
+        descricao, data_transacao: new Date().toISOString(), user_id: ctx.user.id,
+      });
+      if (entradaVendaErro) {
+        const { error: rollbackErro } = await supabase.from('parcelas_venda_telefone')
+          .update({ status: (parcela as any).status, pago_em: null, valor_pago: null })
+          .eq('id', input.parcelaId).eq('user_id', ctx.user.id).eq('status', 'paga');
+        if (rollbackErro) console.error('[vendasTelefone.pagarParcela] falha ao reverter baixa sem Caixa:', rollbackErro.message);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível registrar o recebimento no Caixa; a baixa foi desfeita' });
       }
       // ── Verificar se todas as parcelas foram pagas → marcar venda como quitada ──
       try {
