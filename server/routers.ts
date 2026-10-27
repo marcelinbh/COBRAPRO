@@ -4350,7 +4350,13 @@ const contasPagarRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.update(contasPagar).set({ status: 'cancelada' }).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id), inArray(contasPagar.status, ['pendente', 'atrasada']))); return { success: true }; }
+        try {
+          const atualizada = await db.update(contasPagar).set({ status: 'cancelada' })
+            .where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id), inArray(contasPagar.status, ['pendente', 'atrasada'])))
+            .returning({ id: contasPagar.id });
+          if (atualizada.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'A despesa não pode ser cancelada neste estado' });
+          return { success: true };
+        }
         catch (err) { console.warn('[contasPagar.cancelar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
@@ -4447,7 +4453,13 @@ const contasPagarRouter = router({
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
-        try { await db.delete(contasPagar).where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id), eq(contasPagar.status, 'cancelada'), isNull(contasPagar.dataPagamento))); return { success: true }; }
+        try {
+          const removida = await db.delete(contasPagar)
+            .where(and(eq(contasPagar.id, input.id), eq(contasPagar.userId, ctx.user.id), eq(contasPagar.status, 'cancelada'), isNull(contasPagar.dataPagamento)))
+            .returning({ id: contasPagar.id });
+          if (removida.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'Só é possível excluir uma despesa cancelada sem pagamento' });
+          return { success: true };
+        }
         catch (err) { console.warn('[contasPagar.excluir] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
       }
       const supabase = await getSupabaseClientAsync();
