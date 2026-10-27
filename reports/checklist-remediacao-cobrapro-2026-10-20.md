@@ -34,6 +34,7 @@
 - [x] Validar o recurso de origem antes de qualquer escrita encadeada nos fluxos de veículos, contratos, parcelas, renovação, despesas e Blacklist.
 - [x] Criar regressões de autorização: conta A não cria veículo para cliente B, não apaga veículo/parcela B, não edita contrato B, não cria reserva financeira com IDs B e não remove foto de outro registro Blacklist.
 - [x] Escapar dados de negócio nos comprovantes e contratos HTML; limitar logo a URL HTTPS e fotos compartilhadas da Blacklist a JPEG/PNG/WEBP de até 2 MB com assinatura binária.
+- [x] Endurecer o Portal do Cliente: novas emissões armazenam somente hash do token, o acesso é de uso único por compare-and-set, respostas não entram em cache e parcelas são projetadas com campos mínimos.
 - [ ] Criar migration aditiva de índices e constraints por tenant; aplicar somente após verificar dados legados.
 
 ## Prioridade P2 — Caixa, parcelas e renovação

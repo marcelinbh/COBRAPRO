@@ -241,6 +241,8 @@ export type InsertTransacaoCaixa = typeof transacoesCaixa.$inferInsert;
 export const magicLinks = pgTable("magic_links", {
   id: serial("id").primaryKey(),
   clienteId: integer("cliente_id").notNull(),
+  // Novas emissões guardam SHA-256; links legados em texto puro só são aceitos
+  // temporariamente para compatibilidade até expirarem.
   token: varchar("token", { length: 128 }).notNull().unique(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   usado: boolean("usado").default(false).notNull(),

@@ -179,7 +179,7 @@ export default function PortalCliente() {
                       <StatusIcon status={parcela.status} />
                       <div>
                         <div className="text-sm font-medium text-foreground">
-                          Parcela {parcela.numeroParcela}/{parcela.numeroParcelas}
+                          Parcela {parcela.numeroParcela}{parcela.numeroParcelas ? `/${parcela.numeroParcelas}` : ''}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           Vence: {formatarData(parcela.dataVencimento)}

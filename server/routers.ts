@@ -17,7 +17,7 @@ import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
   koletores, configuracoes, contasPagar, produtos, cheques, contratoHistorico
 } from "../drizzle/schema";
-import { eq, and, sql, desc, gte, lte, lt, isNull, or, inArray, ne } from "drizzle-orm";
+import { eq, and, sql, desc, gte, lte, lt, gt, isNull, or, inArray, ne } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { calcularJurosMora, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, calcularParcelaBullet, getDiasModalidade, calcularSaldoResidual, calcularValorAbertoParcela } from "../shared/finance";
 import { calcularSaldoAtual } from "../shared/caixa";
@@ -33,6 +33,7 @@ import { idsDuplicadosParaRemocao } from "./caixaDuplicidades";
 import { deveRepetirComStatusPagoLegado, normalizarStatusContaPagar, statusContaPaga } from "./contasPagarStatus";
 import { podeRegistrarMovimento } from "./financeIdempotency";
 import { montarHtmlContrato } from "./utils/contratoHtml";
+import { candidatosTokenPortal, consumirLinkPortalNoSupabase, hashTokenPortal, normalizarParcelasPortal } from "./services/portalLinks";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -3171,6 +3172,7 @@ const portalRouter = router({
       }
       const db = await getDb();
       const token = nanoid(48);
+      const tokenHash = hashTokenPortal(token);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 7);
       if (db) {
@@ -3178,7 +3180,7 @@ const portalRouter = router({
           const cliente = await db.select({ id: clientes.id }).from(clientes)
             .where(and(eq(clientes.id, input.clienteId), eq(clientes.userId, ctx.user.id))).limit(1);
           if (!cliente[0]) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
-          await db.insert(magicLinks).values({ clienteId: input.clienteId, token, expiresAt });
+          await db.insert(magicLinks).values({ clienteId: input.clienteId, token: tokenHash, expiresAt });
           return { url: `${originSeguro}/portal/${token}`, token };
         } catch (err) {
           console.warn('[portal.gerarLink] Drizzle failed, trying REST:', (err as Error).message);
@@ -3193,7 +3195,7 @@ const portalRouter = router({
       if (!cliente) throw new TRPCError({ code: 'NOT_FOUND', message: 'Cliente não encontrado' });
       const { error } = await supabase.from('magic_links').insert({
         cliente_id: input.clienteId,
-        token,
+        token: tokenHash,
         expires_at: expiresAt.toISOString(),
       });
       if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
@@ -3201,39 +3203,65 @@ const portalRouter = router({
     }),
 
   acessar: publicProcedure
-    .input(z.object({ token: z.string() }))
-    .query(async ({ input }) => {
+    .input(z.object({ token: z.string().min(32).max(128) }))
+    .query(async ({ ctx, input }) => {
+      // A resposta contém dados financeiros pessoais; não pode entrar em cache
+      // de browser, proxy ou CDN após a primeira leitura do link de uso único.
+      ctx.res.setHeader('Cache-Control', 'no-store, private, max-age=0');
+      const agora = new Date();
+      const tokensCandidatos = candidatosTokenPortal(input.token);
       const db = await getDb();
       if (db) {
         try {
-          const links = await db.select().from(magicLinks).where(eq(magicLinks.token, input.token)).limit(1);
-          const link = links[0];
-          if (!link) throw new Error('Link inválido');
-          if (link.usado) throw new Error('Link já utilizado');
-          if (new Date() > link.expiresAt) throw new Error('Link expirado');
+          // Compare-and-set: uma única requisição consegue consumir o link.
+          const linksConsumidos = await db.update(magicLinks).set({ usado: true })
+            .where(and(
+              or(...tokensCandidatos.map((token) => eq(magicLinks.token, token))),
+              eq(magicLinks.usado, false),
+              gt(magicLinks.expiresAt, agora),
+            ))
+            .returning({ clienteId: magicLinks.clienteId });
+          const link = linksConsumidos[0];
+          if (!link) throw new Error('Link inválido ou expirado');
           const clienteRows = await db.select().from(clientes).where(eq(clientes.id, link.clienteId)).limit(1);
           const cliente = clienteRows[0];
           if (!cliente) throw new Error('Cliente não encontrado');
-          const parcelasCliente = await db.select().from(parcelas)
+          const parcelasCliente = await db.select({
+            id: parcelas.id,
+            numeroParcela: parcelas.numeroParcela,
+            valorOriginal: parcelas.valorOriginal,
+            valorPago: parcelas.valorPago,
+            dataVencimento: parcelas.dataVencimento,
+            dataPagamento: parcelas.dataPagamento,
+            status: parcelas.status,
+          }).from(parcelas)
             .where(and(eq(parcelas.clienteId, link.clienteId), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])))
             .orderBy(parcelas.dataVencimento).limit(10);
-          return { cliente: { nome: cliente.nome, chavePix: cliente.chavePix, tipoChavePix: cliente.tipoChavePix }, parcelas: parcelasCliente };
+          return {
+            cliente: { nome: cliente.nome, chavePix: cliente.chavePix, tipoChavePix: cliente.tipoChavePix },
+            parcelas: normalizarParcelasPortal(parcelasCliente),
+          };
         } catch (err: any) {
-          if (['Link inválido', 'Link já utilizado', 'Link expirado', 'Cliente não encontrado'].includes(err.message)) throw err;
+          if (['Link inválido ou expirado', 'Cliente não encontrado'].includes(err.message)) throw err;
           console.warn('[portal.acessar] Drizzle failed, trying REST:', err.message);
           resetDb();
         }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
-      const { data: linkData } = await supabase.from('magic_links').select('*').eq('token', input.token).single();
-      if (!linkData) throw new Error('Link inválido');
-      if (linkData.usado) throw new Error('Link já utilizado');
-      if (new Date() > new Date(linkData.expires_at)) throw new Error('Link expirado');
-      const { data: cliData } = await supabase.from('clientes').select('nome, chave_pix, tipo_chave_pix').eq('id', linkData.cliente_id).single();
+      const linkData = await consumirLinkPortalNoSupabase(supabase, input.token, agora);
+      if (!linkData) throw new Error('Link inválido ou expirado');
+      const { data: cliData } = await supabase.from('clientes').select('nome, chave_pix, tipo_chave_pix').eq('id', linkData.clienteId).single();
       if (!cliData) throw new Error('Cliente não encontrado');
-      const { data: pData } = await supabase.from('parcelas').select('*').eq('cliente_id', linkData.cliente_id).in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']).order('data_vencimento').limit(10);
-      return { cliente: { nome: cliData.nome, chavePix: cliData.chave_pix, tipoChavePix: cliData.tipo_chave_pix }, parcelas: pData ?? [] };
+      const { data: pData } = await supabase.from('parcelas')
+        .select('id, numero_parcela, valor_original, valor_pago, data_vencimento, data_pagamento, status')
+        .eq('cliente_id', linkData.clienteId)
+        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
+        .order('data_vencimento').limit(10);
+      return {
+        cliente: { nome: cliData.nome, chavePix: cliData.chave_pix, tipoChavePix: cliData.tipo_chave_pix },
+        parcelas: normalizarParcelasPortal(pData ?? []),
+      };
     }),
 });
 
