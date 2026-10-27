@@ -2256,9 +2256,9 @@ const parcelasRouter = router({
       valorPago: z.number().positive(),
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
-      desconto: z.number().default(0),
-      valorJurosCustom: z.number().optional(),   // juros de atraso editado manualmente
-      dataPagamento: z.string().optional(),       // data manual no formato YYYY-MM-DD
+      desconto: z.number().min(0).max(999_999_999).default(0),
+      valorJurosCustom: z.number().min(0).max(999_999_999).optional(),   // juros de atraso editado manualmente
+      dataPagamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), // data manual no formato YYYY-MM-DD
       // Mantido no contrato da API para clientes já abertos, porém ignorado.
       // O saldo de um pagamento parcial passa a permanecer na própria parcela.
       transferirSaldoResidual: z.boolean().default(false),
@@ -2280,7 +2280,15 @@ const parcelasRouter = router({
         userId: ctx.user.id,
         tipo: 'recebimento_parcela',
         chaveIdempotencia,
-        payload: { parcelaId: input.parcelaId, valorPago: input.valorPago, contaCaixaId: input.contaCaixaId, desconto: input.desconto, dataPagamento: input.dataPagamento ?? dataHojeBrasilia() },
+        payload: {
+          parcelaId: input.parcelaId,
+          valorPago: input.valorPago,
+          contaCaixaId: input.contaCaixaId,
+          desconto: input.desconto,
+          valorJurosCustom: input.valorJurosCustom ?? null,
+          dataPagamento: input.dataPagamento ?? dataHojeBrasilia(),
+          observacoes: input.observacoes ?? null,
+        },
       });
       if (reserva.repetida) return { success: true, repetida: true, ...(reserva.resultado ?? {}) } as any;
 
@@ -2351,6 +2359,12 @@ const parcelasRouter = router({
 
       // Determinar status e saldo residual
       const valorTotalComJuros = valorTotalDevido + juros + multa - input.desconto;
+      if (valorTotalComJuros < 0) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O desconto não pode superar o valor devido' });
+      }
+      if (input.valorPago > valorTotalComJuros + 0.000001) {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O valor informado supera o saldo devido; registre um ajuste separado se houver crédito' });
+      }
       const isPago = input.valorPago >= valorTotalComJuros - 0.01; // tolerância de 1 centavo
       const novoStatus = isPago ? 'paga' : 'parcial';
       const valorPagoAnterior = Number.parseFloat(parcelaData.valor_pago ?? '0') || 0;
@@ -2476,7 +2490,7 @@ const parcelasRouter = router({
       valorJurosPago: z.number().positive(),
       contaCaixaId: z.number().optional(),
       observacoes: z.string().optional(),
-      novaDataVencimento: z.string().optional(), // YYYY-MM-DD — sobrescreve o cálculo automático
+      novaDataVencimento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), // YYYY-MM-DD — sobrescreve o cálculo automático
       novoValorParcela: z.number().positive().optional(), // sobrescreve o valor original da nova parcela
       idempotencyKey: z.string().uuid().optional(),
     }))
@@ -2495,7 +2509,14 @@ const parcelasRouter = router({
         userId: ctx.user.id,
         tipo: 'renovacao_juros',
         chaveIdempotencia: input.idempotencyKey ?? criarChaveIdempotencia(),
-        payload: { parcelaId: input.parcelaId, valorJurosPago: input.valorJurosPago, contaCaixaId: input.contaCaixaId, novaDataVencimento: input.novaDataVencimento, novoValorParcela: input.novoValorParcela },
+        payload: {
+          parcelaId: input.parcelaId,
+          valorJurosPago: input.valorJurosPago,
+          contaCaixaId: input.contaCaixaId,
+          novaDataVencimento: input.novaDataVencimento ?? null,
+          novoValorParcela: input.novoValorParcela ?? null,
+          observacoes: input.observacoes ?? null,
+        },
       });
       if (reserva.repetida) return { success: true, repetida: true, ...(reserva.resultado ?? {}) } as any;
       try {

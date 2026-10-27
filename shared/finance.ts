@@ -221,7 +221,11 @@ export const STATUS_CONTRATO_LABELS: Record<string, string> = {
  */
 export function getDiasModalidade(modalidade: string): number {
   switch (modalidade) {
-    case 'diario': return 1;
+    // modalidade legada usa "diario"; tipo_taxa persistido usa "diaria".
+    // A renovação recebe tipo_taxa prioritariamente, portanto ambos devem ser
+    // tratados como um dia para não deslocar contratos diários em 30 dias.
+    case 'diario':
+    case 'diaria': return 1;
     case 'semanal': return 7;
     case 'quinzenal': return 15;
     case 'mensal': return 30;

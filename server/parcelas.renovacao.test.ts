@@ -7,6 +7,10 @@ describe('Lógica de Renovação de Parcelas ao Pagar Juros', () => {
       expect(getDiasModalidade('diario')).toBe(1);
     });
 
+    it('deve retornar 1 dia para tipo_taxa diária persistido no contrato', () => {
+      expect(getDiasModalidade('diaria')).toBe(1);
+    });
+
     it('deve retornar 7 dias para modalidade SEMANAL', () => {
       expect(getDiasModalidade('semanal')).toBe(7);
     });
