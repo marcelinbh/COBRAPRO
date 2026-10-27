@@ -100,29 +100,32 @@ export default function Cheques() {
   });
 
   const devolverMutation = trpc.cheques.devolver.useMutation({
-    onSuccess: () => {
+    onSuccess: (resultado) => {
       utils.cheques.listar.invalidate();
       utils.cheques.resumo.invalidate();
       setDialogDevolverAberto(false);
       setMotivoDevolucao("");
-      toast.success(t('toast_success.cheque_marcado_como_devolvido'));
+      if (resultado.requerConferenciaCaixa) toast.warning('Cheque devolvido. Confira o Caixa: este registro legado não possui movimento rastreável para estorno automático.');
+      else toast.success(t('toast_success.cheque_marcado_como_devolvido'));
     },
     onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   const cancelarMutation = trpc.cheques.cancelar.useMutation({
-    onSuccess: () => {
+    onSuccess: (resultado) => {
       utils.cheques.listar.invalidate();
       utils.cheques.resumo.invalidate();
-      toast.success(t('toast_success.cheque_cancelado'));
+      if (resultado.requerConferenciaCaixa) toast.warning('Cheque cancelado. Confira o Caixa: este registro legado não possui movimento rastreável para estorno automático.');
+      else toast.success(t('toast_success.cheque_cancelado'));
     },
+    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
   function handleCriar() {
     const valor = parseFloat(form.valorNominal.replace(",", "."));
     const taxa = parseFloat(form.taxaDesconto);
-    if (!form.clienteId || !form.emitente || !valor || !taxa || !form.dataVencimento) {
-      toast.error(t('toast_error.preencha_todos_os_campos_obrigatórios'));
+    if (!form.clienteId || !form.emitente || !valor || !taxa || !form.dataVencimento || !form.contaCaixaId) {
+      toast.error('Preencha todos os campos obrigatórios, incluindo a conta de Caixa.');
       return;
     }
     criarMutation.mutate({
@@ -137,7 +140,7 @@ export default function Cheques() {
       dataVencimento: form.dataVencimento,
       taxaDesconto: taxa,
       tipoTaxa: form.tipoTaxa,
-      contaCaixaId: form.contaCaixaId ? parseInt(form.contaCaixaId) : undefined,
+      contaCaixaId: parseInt(form.contaCaixaId),
       observacoes: form.observacoes || undefined,
     });
   }
@@ -229,7 +232,7 @@ export default function Cheques() {
                   </Select>
                 </div>
                 <div className="col-span-2 space-y-1.5">
-                  <Label>{t('emprestimos.cashAccount')} ({t('common.optional')})</Label>
+                  <Label>{t('emprestimos.cashAccount')} *</Label>
                   <Select value={form.contaCaixaId} onValueChange={(v) => setForm({ ...form, contaCaixaId: v })}>
                     <SelectTrigger className="bg-background border-border">
                       <SelectValue placeholder={t('emprestimos.cashAccount')} />

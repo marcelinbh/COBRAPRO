@@ -113,6 +113,7 @@ describe("operações financeiras - validação de recursos por empresa", () => 
       valorNominal: 500,
       dataVencimento: "2026-11-01",
       taxaDesconto: 1,
+      contaCaixaId: 800,
     })).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(supabase.filtros.clientes).toEqual(expect.arrayContaining([["id", 900], ["user_id", 41]]));
     expect(supabase.from).not.toHaveBeenCalledWith("cheques");
