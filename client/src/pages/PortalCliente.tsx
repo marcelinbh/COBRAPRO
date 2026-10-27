@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useState } from "react";
+import { useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useRoute, useSearch } from "wouter";
 import { resolverTokenPortal } from "@/lib/portalToken";
@@ -21,11 +21,18 @@ export default function PortalCliente() {
   const search = useSearch();
   const [, paramsDaRota] = useRoute("/portal/:token");
   const token = resolverTokenPortal(paramsDaRota?.token, search);
+  const tokenResgatado = useRef<string | null>(null);
+  const resgatarPortal = trpc.portal.acessar.useMutation();
 
-  const { data: portalData, isLoading, error } = trpc.portal.acessar.useQuery(
-    { token: token ?? "" },
-    { enabled: !!token, retry: false }
-  );
+  useEffect(() => {
+    if (!token || tokenResgatado.current === token) return;
+    tokenResgatado.current = token;
+    resgatarPortal.mutate({ token });
+  }, [token, resgatarPortal.mutate]);
+
+  const portalData = resgatarPortal.data;
+  const isLoading = Boolean(token) && resgatarPortal.isPending;
+  const error = resgatarPortal.error;
 
   const copiarPix = (chave: string) => {
     navigator.clipboard.writeText(chave);
@@ -68,7 +75,7 @@ export default function PortalCliente() {
           </div>
           <h1 className="font-display text-2xl text-foreground mb-2">{t('clientPortal.invalidLink')}</h1>
           <p className="text-muted-foreground text-sm">
-            Este link de acesso é inválido ou expirou. Solicite um novo link ao seu credor.
+            Este link está indisponível, expirou ou já foi utilizado. Solicite um novo link ao seu credor.
           </p>
         </div>
       </div>

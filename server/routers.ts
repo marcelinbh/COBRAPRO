@@ -3204,14 +3204,19 @@ const portalRouter = router({
 
   acessar: publicProcedure
     .input(z.object({ token: z.string().min(32).max(128) }))
-    .query(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       // A resposta contém dados financeiros pessoais; não pode entrar em cache
       // de browser, proxy ou CDN após a primeira leitura do link de uso único.
       ctx.res.setHeader('Cache-Control', 'no-store, private, max-age=0');
+      const linkIndisponivel = () => new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Link indisponível. Solicite um novo link ao seu credor.',
+      });
       const agora = new Date();
       const tokensCandidatos = candidatosTokenPortal(input.token);
       const db = await getDb();
       if (db) {
+        let linkConsumido = false;
         try {
           // Compare-and-set: uma única requisição consegue consumir o link.
           const linksConsumidos = await db.update(magicLinks).set({ usado: true })
@@ -3222,10 +3227,11 @@ const portalRouter = router({
             ))
             .returning({ clienteId: magicLinks.clienteId });
           const link = linksConsumidos[0];
-          if (!link) throw new Error('Link inválido ou expirado');
+          if (!link) throw linkIndisponivel();
+          linkConsumido = true;
           const clienteRows = await db.select().from(clientes).where(eq(clientes.id, link.clienteId)).limit(1);
           const cliente = clienteRows[0];
-          if (!cliente) throw new Error('Cliente não encontrado');
+          if (!cliente) throw linkIndisponivel();
           const parcelasCliente = await db.select({
             id: parcelas.id,
             numeroParcela: parcelas.numeroParcela,
@@ -3242,26 +3248,42 @@ const portalRouter = router({
             parcelas: normalizarParcelasPortal(parcelasCliente),
           };
         } catch (err: any) {
-          if (['Link inválido ou expirado', 'Cliente não encontrado'].includes(err.message)) throw err;
+          if (err instanceof TRPCError) throw err;
+          // Depois de vencer o CAS, nunca tenta o REST: isso ocultaria uma
+          // indisponibilidade posterior como se o link fosse inválido.
+          if (linkConsumido) {
+            console.error('[portal.acessar] falha após consumir link:', err);
+            throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível abrir o portal. Solicite um novo link.' });
+          }
           console.warn('[portal.acessar] Drizzle failed, trying REST:', err.message);
           resetDb();
         }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new Error('DB unavailable');
-      const linkData = await consumirLinkPortalNoSupabase(supabase, input.token, agora);
-      if (!linkData) throw new Error('Link inválido ou expirado');
-      const { data: cliData } = await supabase.from('clientes').select('nome, chave_pix, tipo_chave_pix').eq('id', linkData.clienteId).single();
-      if (!cliData) throw new Error('Cliente não encontrado');
-      const { data: pData } = await supabase.from('parcelas')
-        .select('id, numero_parcela, valor_original, valor_pago, data_vencimento, data_pagamento, status')
-        .eq('cliente_id', linkData.clienteId)
-        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
-        .order('data_vencimento').limit(10);
-      return {
-        cliente: { nome: cliData.nome, chavePix: cliData.chave_pix, tipoChavePix: cliData.tipo_chave_pix },
-        parcelas: normalizarParcelasPortal(pData ?? []),
-      };
+      try {
+        const linkData = await consumirLinkPortalNoSupabase(supabase, input.token, agora);
+        if (!linkData) throw linkIndisponivel();
+        const { data: cliData, error: clienteErro } = await supabase.from('clientes')
+          .select('nome, chave_pix, tipo_chave_pix')
+          .eq('id', linkData.clienteId)
+          .maybeSingle();
+        if (clienteErro || !cliData) throw new Error(clienteErro?.message ?? 'Cliente do portal não encontrado');
+        const { data: pData, error: parcelasErro } = await supabase.from('parcelas')
+          .select('id, numero_parcela, valor_original, valor_pago, data_vencimento, data_pagamento, status')
+          .eq('cliente_id', linkData.clienteId)
+          .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
+          .order('data_vencimento').limit(10);
+        if (parcelasErro) throw new Error(parcelasErro.message);
+        return {
+          cliente: { nome: cliData.nome, chavePix: cliData.chave_pix, tipoChavePix: cliData.tipo_chave_pix },
+          parcelas: normalizarParcelasPortal(pData ?? []),
+        };
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
+        console.error('[portal.acessar] falha após consumir link:', err);
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível abrir o portal. Solicite um novo link.' });
+      }
     }),
 });
 
