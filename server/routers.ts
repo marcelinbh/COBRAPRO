@@ -4357,7 +4357,11 @@ const contasPagarRouter = router({
           if (atualizada.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'A despesa não pode ser cancelada neste estado' });
           return { success: true };
         }
-        catch (err) { console.warn('[contasPagar.cancelar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
+        catch (err) {
+          if (err instanceof TRPCError) throw err;
+          console.warn('[contasPagar.cancelar] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
@@ -4460,7 +4464,11 @@ const contasPagarRouter = router({
           if (removida.length !== 1) throw new TRPCError({ code: 'CONFLICT', message: 'Só é possível excluir uma despesa cancelada sem pagamento' });
           return { success: true };
         }
-        catch (err) { console.warn('[contasPagar.excluir] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
+        catch (err) {
+          if (err instanceof TRPCError) throw err;
+          console.warn('[contasPagar.excluir] Drizzle failed, trying REST:', (err as Error).message);
+          resetDb();
+        }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
