@@ -4072,103 +4072,14 @@ const reparcelamentoRouter = router({
       incluirMultas: z.boolean().default(true),
       observacoes: z.string().optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      // Este fluxo realiza várias escritas REST sem transação. Mantê-lo ativo
-      // permitiria marcar o contrato original como quitado antes de criar todas
-      // as novas parcelas. A operação volta quando for movida para RPC atômica.
-      if (process.env.ENABLE_ATOMIC_REPARCELAMENTO !== 'true') {
-        throw new TRPCError({
-          code: 'PRECONDITION_FAILED',
-          message: 'Reparcelamento temporariamente indisponível durante a atualização de segurança financeira.',
-        });
-      }
-
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-
-      // Buscar contrato original
-      const { data: contratoOriginalArr, error: contratoErr } = await supabase
-        .from('contratos').select('*').eq('id', input.contratoId).eq('user_id', ctx.user.id).single();
-      if (contratoErr || !contratoOriginalArr) throw new Error('Contrato não encontrado');
-      const contratoOriginal = contratoOriginalArr;
-
-      // Buscar parcelas em aberto
-      const { data: parcelasAbertas } = await supabase
-        .from('parcelas').select('*')
-        .eq('contrato_id', input.contratoId)
-        .eq('user_id', ctx.user.id)
-        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
-
-      const hoje = new Date();
-      let saldoDevedor = 0;
-      for (const p of (parcelasAbertas ?? [])) {
-        const valorBase = parseFloat(p.valor_original) - parseFloat(p.valor_pago ?? '0');
-        let multa = 0;
-        let juros = 0;
-        if (input.incluirMultas && p.status === 'atrasada') {
-          const vencDate = new Date(String(p.data_vencimento) + 'T00:00:00');
-          const resultado = calcularJurosMora(valorBase, vencDate, hoje, 0.033, 2);
-          multa = resultado.multa;
-          juros = resultado.juros;
-        }
-        saldoDevedor += valorBase + multa + juros;
-      }
-
-      // Cancelar parcelas abertas do contrato original
-      for (const p of (parcelasAbertas ?? [])) {
-        await supabase.from('parcelas').update({ status: 'paga', observacoes: 'Reparcelado' }).eq('id', p.id).eq('user_id', ctx.user.id);
-      }
-
-      // Cancelar contrato original
-      await supabase.from('contratos').update({ status: 'quitado' }).eq('id', input.contratoId).eq('user_id', ctx.user.id);
-
-      // Criar novo contrato de reparcelamento
-      const valorNovaParcela2 = calcularParcelaPadrao(saldoDevedor, input.taxaJuros, input.numeroParcelas);
-      const dataInicioDate = new Date(input.dataInicio);
-
-      const { data: novoContrato, error: novoContratoErr } = await supabase
-        .from('contratos')
-        .insert({
-          cliente_id: contratoOriginal.cliente_id,
-          koletor_id: contratoOriginal.koletor_id ?? null,
-          modalidade: 'reparcelamento',
-          status: 'ativo',
-          valor_principal: saldoDevedor.toFixed(2),
-          taxa_juros: input.taxaJuros.toFixed(4),
-          tipo_taxa: input.tipoTaxa,
-          numero_parcelas: input.numeroParcelas,
-          valor_parcela: valorNovaParcela2.toFixed(2),
-          total_contrato: (valorNovaParcela2 * input.numeroParcelas).toFixed(2),
-          multa_atraso: contratoOriginal.multa_atraso ?? '2.00',
-          juros_mora_diario: contratoOriginal.juros_mora_diario ?? '0.033',
-          data_inicio: dataInicioDate.toISOString().split('T')[0],
-          data_vencimento_primeira: dataInicioDate.toISOString().split('T')[0],
-          contrato_origem_id: input.contratoId,
-          observacoes: input.observacoes || `Reparcelamento do contrato #${input.contratoId}`,
-          user_id: ctx.user.id,
-        })
-        .select('id')
-        .single();
-      if (novoContratoErr || !novoContrato) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: novoContratoErr?.message ?? 'Failed to create reparcelamento' });
-      const novoContratoId = novoContrato.id;
-
-      // Criar novas parcelas via REST
-      for (let i = 0; i < input.numeroParcelas; i++) {
-        const venc = new Date(dataInicioDate);
-        venc.setMonth(venc.getMonth() + i);
-        await supabase.from('parcelas').insert({
-          contrato_id: novoContratoId,
-          cliente_id: contratoOriginal.cliente_id,
-          koletor_id: contratoOriginal.koletor_id ?? null,
-          numero: i + 1,
-          valor: valorNovaParcela2.toFixed(2),
-          valor_original: valorNovaParcela2.toFixed(2),
-          data_vencimento: venc.toISOString().split('T')[0],
-          status: 'pendente',
-          user_id: ctx.user.id,
-        });
-      }
-      return { success: true, novoContratoId };
+    .mutation(async () => {
+      // A implementação anterior encadeava escritas REST sem uma transação.
+      // Ela foi removida para que não possa ser reativada acidentalmente. A
+      // execução volta apenas com uma RPC atômica e cobertura de regressão.
+      throw new TRPCError({
+        code: 'PRECONDITION_FAILED',
+        message: 'Reparcelamento temporariamente indisponível durante a atualização de segurança financeira.',
+      });
     }),
 });
 

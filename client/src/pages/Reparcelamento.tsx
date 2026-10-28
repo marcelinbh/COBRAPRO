@@ -8,10 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { RefreshCw, Search, AlertTriangle, CheckCircle, DollarSign, Calendar } from "lucide-react";
-import { useLocation } from "wouter";
+import { RefreshCw, Search, AlertTriangle, DollarSign } from "lucide-react";
 
 function formatMoeda(v: number | string | null | undefined) {
   const n = typeof v === "string" ? parseFloat(v) : (v ?? 0);
@@ -20,15 +18,12 @@ function formatMoeda(v: number | string | null | undefined) {
 
 export default function Reparcelamento() {
   const { t } = useTranslation();
-  const [, navigate] = useLocation();
   const [contratoIdInput, setContratoIdInput] = useState("");
   const [contratoId, setContratoId] = useState<number | null>(null);
   const [numeroParcelas, setNumeroParcelas] = useState(6);
   const [taxaJuros, setTaxaJuros] = useState(5);
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().split("T")[0]);
   const [incluirMultas, setIncluirMultas] = useState(true);
-  const [observacoes, setObservacoes] = useState("");
-  const [confirmando, setConfirmando] = useState(false);
 
   const { data: preview, isLoading: loadingPreview } = trpc.reparcelamento.preview.useQuery(
     { contratoId: contratoId!, numeroParcelas, taxaJuros, dataInicio, incluirMultas },
@@ -41,22 +36,10 @@ export default function Reparcelamento() {
   );
   const contrato = contratos?.find((c) => c.id === contratoId);
 
-  const executarMutation = trpc.reparcelamento.executar.useMutation({
-    onSuccess: (data) => {
-      toast.success(`Reparcelamento realizado! Novo contrato #${data.novoContratoId}`);
-      navigate(`/contratos`);
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
   function buscarContrato() {
     const id = parseInt(contratoIdInput);
     if (!id || isNaN(id)) return toast.error(t('toast_error.digite_um_número_de_contrato_válido'));
     setContratoId(id);
-  }
-
-  function confirmarReparcelamento() {
-    toast.error("Reparcelamento está temporariamente suspenso para proteção do caixa. Em breve será liberado com confirmação atômica.");
   }
 
   return (
@@ -233,51 +216,17 @@ export default function Reparcelamento() {
                   </div>
                 </div>
 
-                {/* Aviso */}
-                <div className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                {/* Execução suspensa enquanto não houver transação atômica */}
+                <div id="reparcelamento-suspenso" className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                   <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
                   <p className="text-xs text-yellow-300">
-                    Ao confirmar, as parcelas em aberto do contrato #{contratoId} serão encerradas e um novo contrato de reparcelamento será criado automaticamente.
+                    Esta é apenas uma simulação: nenhuma parcela ou contrato será alterado. O reparcelamento está suspenso até a implantação de uma transação atômica com conferência de Caixa.
                   </p>
                 </div>
 
-                {/* Observações */}
-                <div>
-                  <Label>{t('rescheduling.observations')}</Label>
-                  <Textarea
-                    value={observacoes}
-                    onChange={(e) => setObservacoes(e.target.value)}
-                    placeholder="Motivo do reparcelamento, acordo, etc."
-                    className="bg-background border-border"
-                    rows={2}
-                  />
-                </div>
-
-                {/* Botão confirmar */}
-                {!confirmando ? (
-                  <Button onClick={() => setConfirmando(true)} className="w-full bg-primary hover:bg-primary/90">
-                    <RefreshCw className="w-4 h-4 mr-2" /> Confirmar Reparcelamento
-                  </Button>
-                ) : (
-                  <div className="space-y-2">
-                    <p className="text-center text-sm text-yellow-400 font-medium">
-                      Tem certeza? Esta ação não pode ser desfeita.
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" onClick={() => setConfirmando(false)} className="flex-1">
-                        Cancelar
-                      </Button>
-                      <Button
-                        onClick={confirmarReparcelamento}
-                        disabled={executarMutation.isPending}
-                        className="flex-1 bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        {executarMutation.isPending ? "Processando..." : "Sim, Reparcelar"}
-                      </Button>
-                    </div>
-                  </div>
-                )}
+                <Button disabled className="w-full" aria-describedby="reparcelamento-suspenso">
+                  <RefreshCw className="w-4 h-4 mr-2" /> Reparcelamento temporariamente suspenso
+                </Button>
               </CardContent>
             </Card>
           )}
