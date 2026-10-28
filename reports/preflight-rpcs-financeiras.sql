@@ -1,7 +1,7 @@
 -- CobraPro — pré-auditoria SOMENTE LEITURA para as RPCs financeiras.
 -- Execute exclusivamente no projeto Supabase COBRA PRO (ref oxvtmibrgjruldkouhhb).
 -- Não aplica constraints, funções ou atualizações; cada consulta deve retornar zero
--- linhas de divergência antes do rollout de 0014.
+-- linhas de divergência antes do rollout de 0015.
 
 -- 1. Inventário físico: confirme nomes/capitalização e tipos usados pelas RPCs.
 SELECT table_name, column_name, data_type, udt_name, is_nullable, column_default
@@ -79,9 +79,36 @@ FROM public.configuracoes
 GROUP BY user_id, chave
 HAVING count(*) > 1;
 
+-- 8b. Também não pode haver chaves sinônimas concorrentes para a mesma regra.
+SELECT user_id, regra, array_agg(chave ORDER BY chave) AS chaves
+FROM (
+  SELECT user_id, chave,
+    CASE
+      WHEN chave IN ('jurosMultaAutomatico', 'juros_multa_automatico') THEN 'automatico'
+      WHEN chave IN ('multaDiaria', 'multa_diaria') THEN 'diaria'
+      WHEN chave IN ('multaPadrao', 'multa_padrao') THEN 'percentual'
+    END AS regra
+  FROM public.configuracoes
+  WHERE chave IN ('jurosMultaAutomatico', 'juros_multa_automatico', 'multaDiaria', 'multa_diaria', 'multaPadrao', 'multa_padrao')
+) configuracoes_financeiras
+GROUP BY user_id, regra
+HAVING count(*) > 1;
+
+-- 8c. Valores de multa devem ser numéricos se a automação estiver ativa.
+SELECT c.user_id, c.chave, c.valor
+FROM public.configuracoes c
+WHERE c.chave IN ('multaDiaria', 'multa_diaria', 'multaPadrao', 'multa_padrao')
+  AND c.valor !~ '^[0-9]+([.][0-9]+)?$';
+
 -- 9. Extensão e índices indispensáveis ao rollout.
 SELECT extname FROM pg_extension WHERE extname = 'pgcrypto';
 SELECT schemaname, tablename, indexname, indexdef
 FROM pg_indexes
 WHERE schemaname = 'public'
-  AND indexname IN ('operacoes_financeiras_user_chave_uk', 'parcelas_user_contrato_numero_uk');
+  AND indexname IN ('operacoes_financeiras_user_chave_uk', 'parcelas_user_contrato_numero_uk', 'transacoes_caixa_operacao_financeira_uk');
+
+-- 10. Duplicidade de chave idempotente impede ON CONFLICT seguro.
+SELECT user_id, chave_idempotencia, count(*) AS quantidade
+FROM public.operacoes_financeiras
+GROUP BY user_id, chave_idempotencia
+HAVING count(*) > 1;

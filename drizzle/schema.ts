@@ -10,6 +10,7 @@ import {
   timestamp,
   pgEnum,
   uniqueIndex,
+  uuid,
 } from "drizzle-orm/pg-core";
 
 // ─── ENUMS ───────────────────────────────────────────────────────────────────
@@ -230,6 +231,8 @@ export const transacoesCaixa = pgTable("transacoes_caixa", {
   contratoId: integer("contrato_id"),
   clienteId: integer("cliente_id"),
   pagamentoAssinaturaId: integer("pagamento_assinatura_id"),
+  // Criado por 0015: um recebimento atômico só pode gerar um lançamento de Caixa.
+  operacaoFinanceiraId: uuid("operacao_financeira_id"),
   contaDestinoId: integer("conta_destino_id"),
   dataTransacao: timestamp("data_transacao", { withTimezone: true }).defaultNow().notNull(),
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),

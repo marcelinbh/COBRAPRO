@@ -1,5 +1,11 @@
 # Especificação de rollout — RPCs financeiras atômicas
 
+## Atualização de revisão — 28/10/2026
+
+A primeira RPC preparada, `0015_rpc_recebimento_parcela.sql`, passou por revisão independente antes de qualquer execução no banco. Foram corrigidos os bloqueadores identificados: a chave de idempotência é obrigatória (não há geração implícita em retry), a unicidade `(user_id, chave_idempotencia)` é verificada, valores monetários com mais de duas casas são rejeitados e não existe tolerância que quite uma diferença de R$ 0,01 sem lançamento. A migration também valida tabela física, colunas, enums, FK de operação–Caixa e extensão criptográfica antes de criar a função; o evento de auditoria preserva payload, hash, encargos, dias de atraso e saldos.
+
+Ela continua **não aplicada**. A condição de avanço é executar a pré-auditoria somente leitura no projeto Supabase COBRA PRO, sanear divergências e então aplicar a migration em janela controlada, testar com dados sintéticos e somente depois substituir a contenção P0 pelo caminho RPC.
+
 ## Objetivo
 
 Substituir os fluxos REST multi-etapa de pagamento de parcela e renovação de juros por funções PostgreSQL transacionais. A troca elimina janelas entre baixa de parcela, lançamento de Caixa, histórico, auditoria e idempotência.
