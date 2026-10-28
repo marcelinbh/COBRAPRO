@@ -103,8 +103,8 @@ describe("operações financeiras - validação de recursos por empresa", () => 
     expect(supabase.from).not.toHaveBeenCalledWith("contas_pagar");
   });
 
-  it("não cria cheque associado a cliente externo", async () => {
-    const supabase = supabaseComRespostas({ clientes: { data: null, error: null } });
+  it("suspende criação de cheque antes de qualquer escrita financeira", async () => {
+    const supabase = supabaseComRespostas({});
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
     await expect(appRouter.createCaller(contexto(41)).cheques.criar({
@@ -114,27 +114,21 @@ describe("operações financeiras - validação de recursos por empresa", () => 
       dataVencimento: "2026-11-01",
       taxaDesconto: 1,
       contaCaixaId: 800,
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(supabase.filtros.clientes).toEqual(expect.arrayContaining([["id", 900], ["user_id", 41]]));
-    expect(supabase.from).not.toHaveBeenCalledWith("cheques");
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("não compensa cheque em conta de caixa de outra empresa", async () => {
-    const supabase = supabaseComRespostas({
-      cheques: { data: { valor_nominal: 500, emitente: "Emitente", conta_caixa_id: null, status: "aguardando" }, error: null },
-      contas_caixa: { data: null, error: null },
-    });
+  it("suspende compensação de cheque antes de qualquer escrita financeira", async () => {
+    const supabase = supabaseComRespostas({});
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
-    await expect(appRouter.createCaller(contexto(41)).cheques.compensar({ id: 700, contaCaixaId: 800 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(supabase.filtros.contas_caixa).toEqual(expect.arrayContaining([["id", 800], ["user_id", 41]]));
+    await expect(appRouter.createCaller(contexto(41)).cheques.compensar({ id: 700, contaCaixaId: 800 }))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("não reserva pagamento de parcela quando a parcela é de outra empresa", async () => {
-    const supabase = supabaseComRespostas({
-      contas_caixa: { data: { id: 800, ativo: true }, error: null },
-      parcelas: { data: null, error: null },
-    });
+  it("suspende recebimento de parcela antes de qualquer escrita financeira", async () => {
+    const supabase = supabaseComRespostas({});
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
     await expect(appRouter.createCaller(contexto(41)).parcelas.registrarPagamento({
@@ -142,17 +136,12 @@ describe("operações financeiras - validação de recursos por empresa", () => 
       valorPago: 100,
       contaCaixaId: 800,
       idempotencyKey: "2c90f2d2-e640-49be-9cfb-ec21102f3c5e",
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
-
-    expect(supabase.filtros.parcelas).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
-    expect(supabase.from).not.toHaveBeenCalledWith("operacoes_financeiras");
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("não reserva renovação de juros quando a parcela é de outra empresa", async () => {
-    const supabase = supabaseComRespostas({
-      contas_caixa: { data: { id: 800, ativo: true }, error: null },
-      parcelas: { data: null, error: null },
-    });
+  it("suspende renovação de juros antes de qualquer escrita financeira", async () => {
+    const supabase = supabaseComRespostas({});
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
     await expect(appRouter.createCaller(contexto(41)).parcelas.pagarJuros({
@@ -160,27 +149,20 @@ describe("operações financeiras - validação de recursos por empresa", () => 
       valorJurosPago: 100,
       contaCaixaId: 800,
       idempotencyKey: "46a1a4a2-09fb-44ea-9f23-3a9c5a51e5f4",
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
-
-    expect(supabase.filtros.parcelas).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
-    expect(supabase.from).not.toHaveBeenCalledWith("operacoes_financeiras");
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("não reserva pagamento de despesa quando a despesa é de outra empresa", async () => {
-    const supabase = supabaseComRespostas({
-      contas_caixa: { data: { id: 800, ativo: true }, error: null },
-      contas_pagar: { data: null, error: null },
-    });
+  it("suspende pagamento de despesa antes de qualquer escrita financeira", async () => {
+    const supabase = supabaseComRespostas({});
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
     await expect(appRouter.createCaller(contexto(41)).contasPagar.pagar({
       id: 700,
       contaCaixaId: 800,
       idempotencyKey: "19ed02d8-91a8-4b24-89c2-4b9b8f5e0d21",
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
-
-    expect(supabase.filtros.contas_pagar).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
-    expect(supabase.from).not.toHaveBeenCalledWith("operacoes_financeiras");
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(supabase.from).not.toHaveBeenCalled();
   });
 
   it("não cria histórico ao editar juros de contrato de outra empresa", async () => {

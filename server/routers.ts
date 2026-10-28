@@ -35,6 +35,7 @@ import { podeRegistrarMovimento } from "./financeIdempotency";
 import { montarHtmlContrato } from "./utils/contratoHtml";
 import { candidatosTokenPortal, consumirLinkPortalNoSupabase, hashTokenPortal, normalizarParcelasPortal } from "./services/portalLinks";
 import { calcularDescontoCheque, dataChequeValida } from "./services/chequesFinanceiros";
+import { bloquearOperacaoFinanceiraNaoAtomica } from "./services/financialSafety";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -1698,6 +1699,9 @@ const contratosRouter = router({
   updateStatus: protectedProcedure
     .input(z.object({ id: z.number(), status: z.enum(['ativo', 'quitado', 'inadimplente', 'cancelado']) }))
      .mutation(async ({ ctx, input }) => {
+      if (input.status === 'quitado') {
+        bloquearOperacaoFinanceiraNaoAtomica('A quitação manual de contrato');
+      }
       const db = await getDb();
       if (db) {
         try {
@@ -2278,6 +2282,7 @@ const parcelasRouter = router({
       idempotencyKey: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('O recebimento de parcela');
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
       if (!input.contaCaixaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de caixa para registrar o recebimento' });
@@ -2508,6 +2513,7 @@ const parcelasRouter = router({
       idempotencyKey: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A renovação com pagamento de juros');
       if (!input.contaCaixaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de caixa para registrar o recebimento' });
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       // A reserva só é criada depois de confirmar que a parcela pertence à
@@ -2791,6 +2797,7 @@ const parcelasRouter = router({
       novaDataVencimento: z.string().optional(), // formato YYYY-MM-DD
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A edição de parcelas');
       if (!input.novoValor && !input.novaDataVencimento) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Informe ao menos um campo para editar' });
       }
@@ -2828,6 +2835,7 @@ const parcelasRouter = router({
       parcelaId: z.number(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de parcelas');
       const sb = await getSupabaseClientAsync();
       if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
@@ -4173,6 +4181,7 @@ const contasPagarRouter = router({
       idempotencyKey: z.string().uuid().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A baixa de despesas');
       const db = await getDb();
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       const dataReferencia = input.dataPagamento ?? dataHojeBrasilia();
@@ -4286,6 +4295,7 @@ const contasPagarRouter = router({
   estornar: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('O estorno de despesas');
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 
@@ -4543,6 +4553,7 @@ const chequesRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('O registro de cheque');
       await validarClienteDoUsuario(ctx.user.id, input.clienteId);
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       if (!dataChequeValida(input.dataVencimento)) {
@@ -4604,6 +4615,7 @@ const chequesRouter = router({
   compensar: protectedProcedure
     .input(z.object({ id: z.number().int().positive(), contaCaixaId: z.number().int().positive().optional() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A compensação de cheque');
       const db = await getDb();
       if (db) {
         try {
@@ -4653,6 +4665,7 @@ const chequesRouter = router({
   devolver: protectedProcedure
     .input(z.object({ id: z.number().int().positive(), motivo: z.string().trim().min(1).max(255) }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A devolução de cheque');
       const db = await getDb();
       if (db) {
         try {
@@ -4699,6 +4712,7 @@ const chequesRouter = router({
   cancelar: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('O cancelamento de cheque');
       const db = await getDb();
       if (db) {
         try {
@@ -4890,6 +4904,7 @@ const vendasTelefoneRouter = router({
       contaCaixaId: z.number().int().positive().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('O registro de venda de telefone');
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       if (input.entradaValor > 0) {
@@ -4989,6 +5004,7 @@ const vendasTelefoneRouter = router({
       contaCaixaId: z.number().int().positive(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('O recebimento de parcela de venda de telefone');
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
@@ -5061,6 +5077,7 @@ const vendasTelefoneRouter = router({
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de venda de telefone');
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
 

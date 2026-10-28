@@ -2,7 +2,7 @@
 
 - **Data de início:** 2026-10-28 (America/Sao_Paulo)
 - **Ambiente:** produção — `https://cobrapro.online`
-- **Commit validado:** `633757d1d2d4d18228d42e950c1e22a3b9a80068`
+- **Commit validado:** `abe91a9889980ef58a2cfd54f68e4bcb12cd611c`
 - **Conta autorizada:** `koletor3`
 - **Identificador único:** `AUDITORIA-TESTE-20261028-1032`
 - **Autorização:** usuário autorizou criar e movimentar dados de teste de baixo valor, com estorno/limpeza do que for reversível. Não enviar WhatsApp real, não alterar credenciais, não modificar dados de terceiros.
@@ -12,7 +12,7 @@
 - CobraPro: HTTP 200
 - API de saúde: HTTP 200
 - Evolution API: HTTP 200
-- App Platform DigitalOcean: deployment do commit `633757d` em produção, confirmado como ativo.
+- App Platform DigitalOcean: deployment do commit `abe91a9` em produção, confirmado como ativo.
 
 ## Bloqueio financeiro encontrado antes das mutações de teste
 
@@ -24,7 +24,13 @@
 
 Às 10:40 BRT, a consulta somente leitura do contrato operacional `#379` em `/reparcelamento` exibiu uma simulação e o botão **"Confirmar Reparcelamento" habilitado**. A ação **não foi clicada**, pois se refere a um contrato operacional existente e não a um dado de auditoria. A revisão do código confirmou que o segundo clique mostrado na interface apenas exibia uma mensagem de suspensão, mas a cópia da tela era enganosa e o endpoint de execução ainda continha o fluxo REST inseguro atrás de uma variável de ambiente.
 
-**Correção preparada:** removido o código de execução REST, o endpoint agora devolve incondicionalmente `PRECONDITION_FAILED` e a interface passou a mostrar a simulação como somente leitura, com o botão desativado. A correção foi coberta por regressão; aguarda publicação/deploy e nova checagem visual.
+**Correção publicada e verificada:** removido o código de execução REST, o endpoint agora devolve incondicionalmente `PRECONDITION_FAILED` e a interface passou a mostrar a simulação como somente leitura, com o botão desativado. O deploy do commit `abe91a9` entrou em produção às 16:16:19 BRT. Às 16:19 BRT, a mesma consulta do contrato `#379` exibiu a cópia de suspensão e o botão desativado, sem possibilidade de confirmar a operação.
+
+## Auditoria estática dos fluxos financeiros e contenção P0
+
+Uma revisão paralela dos recebimentos de parcelas e renovações, despesas, cheques, vendas de telefone e assinaturas confirmou o mesmo defeito estrutural em todos os módulos: a entidade de negócio é alterada e o movimento de Caixa é inserido em chamadas REST independentes. Os rollbacks existentes são compensações de melhor esforço, não transações; em erros de rede, timeout ou falha da compensação, podem deixar baixa sem movimento, movimento órfão ou duplicidade. O risco é compatível com as seis divergências preexistentes de parcelas, mas a revisão não atribui causalidade individual sem uma reconciliação aprovada.
+
+**Contenção implementada no código, aguardando deploy:** operações capazes de criar, baixar, renovar, estornar, compensar, devolver, cancelar ou excluir registros financeiros agora retornam `PRECONDITION_FAILED` antes de acessar o banco: recebimentos e renovações de parcelas, quitação manual, pagamentos e estornos de despesas, transições de cheque, vendas de telefone e recebimentos de assinatura. Consultas, conferência de Caixa, cadastros sem movimento e simulação continuam acessíveis. A reabertura deverá ocorrer somente após RPC PostgreSQL atômica, vínculo estrutural do evento ao movimento de Caixa e testes de falha e concorrência.
 
 ## Escopo de execução
 
@@ -54,7 +60,9 @@
 | 10:32 | Acesso | Confirmar sessão koletor3 | Aprovado | Sessão autenticada como administrador da conta autorizada |
 | 10:33 | Caixa | Conferência inicial somente leitura | Reprovado: 6 críticas preexistentes | Parcelas baixadas sem entrada no livro-caixa; nenhuma mutação de auditoria feita |
 | 10:36–10:39 | Clientes | Criar, editar, recarregar e excluir cliente sintético | Aprovado | Registro `AUDITORIA-TESTE-20261028-1032` removido após validação; sem efeito financeiro |
-| 10:40 | Reparcelamento | Consultar contrato #379 sem confirmar | Correção preparada | Simulação correta; ação não executada. Endpoint REST inseguro removido e UI alterada, pendente de deploy |
+| 10:40 | Reparcelamento | Consultar contrato #379 sem confirmar | Falha de UX/risco identificado | Nenhuma mutação executada; botão induzia a uma confirmação apesar de a tela não concluir a ação |
+| 16:16–16:19 | Deploy/Reparcelamento | Publicar `abe91a9` e revalidar contrato #379 sem confirmar | Aprovado | App Platform saudável; servidor bloqueia a execução e interface mostra simulação somente leitura com botão desativado |
+| 16:20–16:25 | Auditoria financeira estática | Revisar parcelas, renovação, despesas, cheques, telefone e assinaturas | Reprovado: risco crítico | Escritas REST multi-etapa e compensações não atômicas; contenção P0 preparada e testada com 28 regressões |
 | Pendente | Financeiro | Criar e testar contrato de auditoria | Pendente | |
 | Pendente | Despesas | Baixar e estornar despesa de teste | Pendente | |
 | Pendente | Cheques | Testar transições e conciliação | Pendente | |

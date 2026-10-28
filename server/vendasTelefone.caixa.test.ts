@@ -39,15 +39,15 @@ describe("vendas de telefone e Caixa", () => {
     mocks.getSupabaseClientAsync.mockReset();
   });
 
-  it("não cria venda com entrada sem conta de Caixa escolhida", async () => {
+  it("suspende o cadastro de venda antes de qualquer lançamento financeiro", async () => {
     mocks.getSupabaseClientAsync.mockResolvedValue({});
     await expect(appRouter.createCaller(contexto()).vendasTelefone.criar(vendaComEntrada))
-      .rejects.toMatchObject({ code: "BAD_REQUEST", message: expect.stringContaining("Caixa") });
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 
-  it("exige uma conta de Caixa antes de aceitar baixa de parcela", async () => {
-    await expect(appRouter.createCaller(contexto()).vendasTelefone.pagarParcela({ parcelaId: 12, valorPago: 100 } as any))
-      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+  it("suspende baixa de parcela antes de qualquer lançamento financeiro", async () => {
+    await expect(appRouter.createCaller(contexto()).vendasTelefone.pagarParcela({ parcelaId: 12, valorPago: 100, contaCaixaId: 5 }))
+      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
   });
 });

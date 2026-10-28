@@ -9,6 +9,7 @@ import {
   mesmoValorMonetario,
   mesReferenciaValido,
 } from "../services/assinaturasFinanceiras";
+import { bloquearOperacaoFinanceiraNaoAtomica } from "../services/financialSafety";
 
 type Supabase = NonNullable<Awaited<ReturnType<typeof getSupabaseClientAsync>>>;
 
@@ -205,6 +206,7 @@ export const assinaturasRouter = router({
       observacoes: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica("O recebimento de assinatura");
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
       const assinatura = await obterAssinaturaDoUsuario(supabase, ctx.user.id, input.assinaturaId);

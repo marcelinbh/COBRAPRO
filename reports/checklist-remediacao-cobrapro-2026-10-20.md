@@ -47,9 +47,10 @@
 - [x] Suspender o reparcelamento não atômico até sua substituição por RPC/transação única, evitando contratos parcialmente quitados ou recriados.
 - [x] Corrigir o preview do reparcelamento: valida contrato e data civil no tenant, limita entradas, usa `saldo_residual`, aplica mora configurada no contrato e gera datas conforme periodicidade; a execução continua bloqueada até RPC transacional.
 - [x] Compensar integralmente falhas REST na renovação de juros: remove a nova parcela e a entrada de caixa da tentativa, restaura a parcela original e bloqueia avanço concorrente do contrato.
+- [x] Aplicar contenção P0 no servidor para mutações financeiras REST não atômicas: recebimentos/renovações de parcelas, quitação/edição/exclusão de parcelas, baixa/estorno de despesas, transições de cheque, vendas de telefone e recebimentos de assinatura retornam `PRECONDITION_FAILED` até a RPC substituta. Consultas e conferência permanecem disponíveis.
 - [ ] Implementar transação/RPC única para pagamento de parcela e saldo residual.
 - [ ] Implementar transação/RPC única para renovação de juros.
-- [ ] Implementar transação/RPC única para despesas, cheques, reparcelamento e vendas de telefone.
+- [ ] Implementar transação/RPC única para despesas, cheques, reparcelamento, vendas de telefone e assinaturas, com vínculo estrutural do evento ao livro-caixa, idempotência obrigatória, tenant, datas de Brasília e cobertura de falha/concorrência.
 - [x] Fechar as transições inseguras de cheque no app: novos cheques exigem Caixa e vencimento civil válido; a taxa usa o período correto, compensação reverte para aguardando se o Caixa falhar e devolução/cancelamento aceitam somente cheque pendente. Movimentos novos usam identificador do cheque na descrição, permitindo estorno rastreável; cheques legados sem esse identificador são sinalizados para conferência e a RPC transacional permanece pendente.
 - [x] Corrigir falso sucesso no caminho Drizzle de despesas: cancelar e excluir agora exigem que exatamente uma linha seja alterada, mantendo conflito explícito para estado inválido ou registro inexistente.
 - [ ] Criar restrição única por empresa, contrato e número de parcela. **Migration `0013_integridade_parcelas.sql` pronta; aguarda auditoria de duplicidades e execução no Supabase, que está recusando autenticação do conector.**
