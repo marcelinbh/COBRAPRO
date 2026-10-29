@@ -76,6 +76,8 @@
 - [x] Mostrar na tela: aceita pela API, enviada, entregue, lida, falhou ou estado desconhecido.
 - [x] Registrar relatório diário como concluído somente após aceite técnico confirmado pelo worker.
 - [x] Limitar tentativas, alertar sobre instância desconectada e evitar reenvio indevido.
+- [x] Endurecer o intake do webhook: permitir somente eventos reconhecidos, validar e limitar atualizações, guardar resumo sem corpo/JID/mídia, confirmar HTTP somente após persistência e impedir regressão de `lido` para estados inferiores.
+- [ ] Adicionar deduplicação estrutural por evento/status, vínculo único `(user_id, provider_message_id)` e fencing token de lease na outbox. **Exige migration controlada e pré-auditoria no Supabase COBRA PRO; o código atual já reduz replay e regressão, mas não substitui essa garantia de banco.**
 
 ## Proteção HTTP complementar
 
