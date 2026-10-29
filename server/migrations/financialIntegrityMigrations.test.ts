@@ -49,6 +49,12 @@ describe("migrations financeiras — garantias de integridade", () => {
     expect(recebimento).toContain("REFERENCES public.contas_caixa (user_id, id)");
   });
 
+  it("permite retomar a migration sem recriar constraints já instaladas", () => {
+    expect(recebimento).toContain("IF NOT EXISTS (\n    SELECT 1 FROM pg_constraint");
+    expect(recebimento).toContain("transacoes_caixa_operacao_financeira_tenant_check");
+    expect(recebimento).not.toContain("ADD CONSTRAINT transacoes_caixa_operacao_financeira_tenant_fk\n  FOREIGN KEY");
+  });
+
   it("mantém o preflight capaz de detectar vínculos cruzados e estados residuais inválidos", () => {
     expect(preflight).toContain("transacao_user_id");
     expect(preflight).toContain("saldo_residual IS NULL OR saldo_residual <= 0");

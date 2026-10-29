@@ -13,6 +13,7 @@ import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
 import { TRPCError } from "@trpc/server";
+import { ENV } from "./_core/env";
 import {
   clientes, contratos, parcelas, contasCaixa, transacoesCaixa, magicLinks, templatesWhatsapp,
   koletores, configuracoes, contasPagar, produtos, cheques, contratoHistorico
@@ -36,6 +37,7 @@ import { montarHtmlContrato } from "./utils/contratoHtml";
 import { candidatosTokenPortal, consumirLinkPortalNoSupabase, hashTokenPortal, normalizarParcelasPortal } from "./services/portalLinks";
 import { calcularDescontoCheque, dataChequeValida } from "./services/chequesFinanceiros";
 import { bloquearOperacaoFinanceiraNaoAtomica } from "./services/financialSafety";
+import { dataCivilValida as dataCivilValidaRecebimento, registrarPagamentoParcelaAtomico } from "./services/recebimentoParcelaRpc";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -2269,236 +2271,47 @@ const parcelasRouter = router({
 
   registrarPagamento: protectedProcedure
     .input(z.object({
-      parcelaId: z.number(),
-      valorPago: z.number().positive(),
-      contaCaixaId: z.number().optional(),
-      observacoes: z.string().optional(),
-      desconto: z.number().min(0).max(999_999_999).default(0),
-      valorJurosCustom: z.number().min(0).max(999_999_999).optional(),   // juros de atraso editado manualmente
-      dataPagamento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(), // data manual no formato YYYY-MM-DD
-      // Mantido no contrato da API para clientes já abertos, porém ignorado.
-      // O saldo de um pagamento parcial passa a permanecer na própria parcela.
+      parcelaId: z.number().int().positive(),
+      valorPago: z.number().finite().positive().refine((valor) => Math.abs(valor * 100 - Math.round(valor * 100)) < 0.000001, {
+        message: 'O valor pago deve ter no máximo duas casas decimais',
+      }),
+      contaCaixaId: z.number().int().positive(),
+      observacoes: z.string().max(1000).optional(),
+      desconto: z.number().finite().min(0).max(999_999_999).default(0).refine((valor) => Math.abs(valor * 100 - Math.round(valor * 100)) < 0.000001, {
+        message: 'O desconto deve ter no máximo duas casas decimais',
+      }),
+      valorJurosCustom: z.number().finite().min(0).max(999_999_999).refine((valor) => Math.abs(valor * 100 - Math.round(valor * 100)) < 0.000001, {
+        message: 'Os juros devem ter no máximo duas casas decimais',
+      }).optional(),
+      dataPagamento: z.string().refine(dataCivilValidaRecebimento, { message: 'A data de pagamento é inválida' }).optional(),
+      // Mantido somente para compatibilidade de telas abertas. A RPC sempre
+      // preserva o saldo de baixa parcial na própria parcela.
       transferirSaldoResidual: z.boolean().default(false),
-      idempotencyKey: z.string().uuid().optional(),
+      idempotencyKey: z.string().uuid(),
     }))
     .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('O recebimento de parcela');
-      const sb = await getSupabaseClientAsync();
-      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
-      if (!input.contaCaixaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione uma conta de caixa para registrar o recebimento' });
-      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
-      // Autorizar a origem antes de gravar a reserva de idempotência. Um ID de
-      // outra empresa não pode criar nenhum estado operacional no tenant atual.
-      const { data: parcelaAutorizada, error: parcelaAutorizadaErro } = await sb.from('parcelas')
-        .select('id').eq('id', input.parcelaId).eq('user_id', ctx.user.id).maybeSingle();
-      if (parcelaAutorizadaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: parcelaAutorizadaErro.message });
-      if (!parcelaAutorizada) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
-      const chaveIdempotencia = input.idempotencyKey ?? criarChaveIdempotencia();
-      const reserva = await reservarOperacaoFinanceira({
+      // Fail-closed: nenhum fallback REST é permitido. A flag só pode ser
+      // ligada após a migration 0015 e o preflight no Supabase COBRA PRO.
+      if (!ENV.enableRpcRecebimentoParcela) {
+        bloquearOperacaoFinanceiraNaoAtomica('O recebimento de parcela');
+      }
+
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
+      }
+
+      return registrarPagamentoParcelaAtomico(supabase, {
         userId: ctx.user.id,
-        tipo: 'recebimento_parcela',
-        chaveIdempotencia,
-        payload: {
-          parcelaId: input.parcelaId,
-          valorPago: input.valorPago,
-          contaCaixaId: input.contaCaixaId,
-          desconto: input.desconto,
-          valorJurosCustom: input.valorJurosCustom ?? null,
-          dataPagamento: input.dataPagamento ?? dataHojeBrasilia(),
-          observacoes: input.observacoes ?? null,
-        },
-      });
-      if (reserva.repetida) return { success: true, repetida: true, ...(reserva.resultado ?? {}) } as any;
-
-      let financeiroConfirmado = false;
-      try {
-      // Buscar parcela
-      const { data: parcelaData, error: parcelaErr } = await sb.from('parcelas').select('*').eq('id', input.parcelaId).eq('user_id', ctx.user.id).single();
-      if (parcelaErr || !parcelaData) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
-      if (parcelaData.status === 'paga') throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi quitada' });
-
-      // Buscar configuração de mora do usuário. Sem ativação explícita não há
-      // juros automáticos no pagamento, para coincidir com a tela de Parcelas.
-      let multaDiariaReais = 0;
-      let multaAtrasoPercentual = 0;
-      try {
-        const { data: configRows } = await sb.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
-        if (configRows) {
-          const configMap: Record<string, string> = {};
-          for (const r of configRows) configMap[r.chave] = r.valor ?? '';
-          const automatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
-          if (automatico) {
-            const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
-            const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
-            multaDiariaReais = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
-            multaAtrasoPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
-          }
-        }
-      } catch (_) { /* usa padrão 0 */ }
-
-      const valorOriginal = parseFloat(parcelaData.valor_original);
-      const saldoResidualAnterior = parseFloat(parcelaData.saldo_residual ?? '0');
-      const estadoParcelaAnterior = {
-        valor_pago: parcelaData.valor_pago,
-        valor_juros: parcelaData.valor_juros,
-        valor_multa: parcelaData.valor_multa,
-        valor_desconto: parcelaData.valor_desconto,
-        multa_diaria_usada: parcelaData.multa_diaria_usada,
-        data_pagamento: parcelaData.data_pagamento,
-        status: parcelaData.status,
-        saldo_residual: parcelaData.saldo_residual,
-        conta_caixa_id: parcelaData.conta_caixa_id,
-        observacoes: parcelaData.observacoes,
-      };
-      const parcelaJaParcial = parcelaData.status === 'parcial' && saldoResidualAnterior > 0;
-      // Em pagamentos parciais, saldo_residual já é a dívida remanescente.
-      // Somá-lo novamente ao principal duplicaria o valor cobrado.
-      const valorTotalDevido = parcelaJaParcial ? saldoResidualAnterior : valorOriginal + saldoResidualAnterior;
-
-      // Calcular juros de atraso usando multaDiaria em R$/dia (modelo CobraFácil)
-      const dataReferencia = input.dataPagamento ?? dataHojeBrasilia();
-      const dataPagamentoDate = new Date(`${dataReferencia}T12:00:00-03:00`);
-      const { juros: jurosCalculado, multa } = parcelaJaParcial
-        ? { juros: 0, multa: 0 }
-        : calcularJurosMora(
-            valorTotalDevido,
-            new Date(parcelaData.data_vencimento + 'T12:00:00-03:00'),
-            dataPagamentoDate,
-            multaDiariaReais,
-            multaAtrasoPercentual,
-          );
-
-      // Usar juros customizado se fornecido pelo usuário, senão usar o calculado
-      const juros = input.valorJurosCustom !== undefined ? input.valorJurosCustom : jurosCalculado;
-
-      // Data de pagamento
-      const dataPagamentoISO = dataCivilBrasiliaParaIso(dataReferencia);
-      const dataPagamentoStr = dataReferencia;
-
-      // Determinar status e saldo residual
-      const valorTotalComJuros = valorTotalDevido + juros + multa - input.desconto;
-      if (valorTotalComJuros < 0) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O desconto não pode superar o valor devido' });
-      }
-      if (input.valorPago > valorTotalComJuros + 0.000001) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O valor informado supera o saldo devido; registre um ajuste separado se houver crédito' });
-      }
-      const isPago = input.valorPago >= valorTotalComJuros - 0.01; // tolerância de 1 centavo
-      const novoStatus = isPago ? 'paga' : 'parcial';
-      const valorPagoAnterior = Number.parseFloat(parcelaData.valor_pago ?? '0') || 0;
-      const valorPagoAcumulado = Math.round((valorPagoAnterior + input.valorPago) * 100) / 100;
-
-      // Calcular saldo residual (quanto falta pagar)
-      const saldoRestante = isPago ? 0 : calcularSaldoResidual(valorTotalComJuros, input.valorPago);
-
-      // Atualizar parcela atual
-      // A condição de status torna a baixa atômica: uma segunda solicitação
-      // concorrente não consegue registrar outro recebimento após a primeira
-      // mudar a parcela para paga/parcial.
-      const { data: parcelaAtualizada, error: updateErr } = await sb.from('parcelas').update({
-        valor_pago: valorPagoAcumulado.toFixed(2),
-        valor_juros: juros.toFixed(2),
-        valor_multa: multa.toFixed(2),
-        valor_desconto: input.desconto.toFixed(2),
-        multa_diaria_usada: multaDiariaReais.toFixed(2),
-        saldo_residual: saldoRestante.toFixed(2),
-        data_pagamento: dataPagamentoISO,
-        status: novoStatus,
-        conta_caixa_id: input.contaCaixaId ?? null,
-        observacoes: input.observacoes ?? null,
-      }).eq('id', input.parcelaId).eq('user_id', ctx.user.id)
-        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'])
-        .select('id').maybeSingle();
-      if (updateErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: updateErr.message });
-      if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada ou não pertence a esta empresa' });
-
-      // Registrar uma única entrada no caixa, vinculada à operação idempotente.
-      {
-        const { data: transacaoCriada, error: txErr } = await sb.from('transacoes_caixa').insert({
-          conta_caixa_id: input.contaCaixaId,
-          tipo: 'entrada',
-          categoria: 'pagamento_parcela',
-          valor: input.valorPago.toFixed(2),
-          descricao: `Pagamento parcela #${parcelaData.numero_parcela} - Contrato #${parcelaData.contrato_id}${saldoRestante > 0 ? ` (parcial, falta R$ ${saldoRestante.toFixed(2)})` : ''}`,
-          parcela_id: input.parcelaId,
-          contrato_id: parcelaData.contrato_id,
-          data_transacao: dataPagamentoStr,
-          user_id: ctx.user.id,
-        }).select('id').maybeSingle();
-        if (txErr) {
-          const { error: rollbackErr } = await sb.from('parcelas').update(estadoParcelaAnterior)
-            .eq('id', input.parcelaId).eq('user_id', ctx.user.id);
-          if (rollbackErr) {
-            console.error('[Financeiro] Falha grave ao reverter parcela após erro no Caixa:', rollbackErr.message);
-          }
-          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: txErr.message });
-        }
-        if (!transacaoCriada?.id) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'O lançamento no Caixa não retornou confirmação' });
-        financeiroConfirmado = true;
-      }
-
-      const resultado = {
-        status: novoStatus,
-        saldoResidual: saldoRestante,
         parcelaId: input.parcelaId,
-        confirmadoFinanceiro: true,
-      };
-      const descHistorico = novoStatus === 'paga'
-        ? `Parcela #${parcelaData.numero_parcela} quitada - R$ ${input.valorPago.toFixed(2)}`
-        : `Parcela #${parcelaData.numero_parcela} paga parcialmente - R$ ${input.valorPago.toFixed(2)} (saldo pendente nesta parcela: R$ ${saldoRestante.toFixed(2)})`;
-
-      const pendenciasPosConfirmacao = await executarEfeitosPosConfirmacao([
-        {
-          etapa: 'status do contrato', codigo: 'status_contrato', executar: async () => {
-            const { data: pendentes, error: pendentesErr } = await sb.from('parcelas')
-              .select('id')
-              .eq('contrato_id', parcelaData.contrato_id)
-              .eq('user_id', ctx.user.id)
-              .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
-            if (pendentesErr) throw new Error(pendentesErr.message);
-            if ((pendentes?.length ?? 0) === 0) {
-              const { data: contratoAtualizado, error: contratoStatusErr } = await sb.from('contratos')
-                .update({ status: 'quitado' }).eq('id', parcelaData.contrato_id).eq('user_id', ctx.user.id)
-                .select('id').maybeSingle();
-              if (contratoStatusErr) throw new Error(contratoStatusErr.message);
-              if (!contratoAtualizado) throw new Error('Contrato não encontrado ao concluir quitação');
-            }
-          },
-        },
-        {
-          etapa: 'histórico do contrato', codigo: 'historico_contrato', executar: async () => {
-            const historico = await registrarHistorico({
-              contratoId: parcelaData.contrato_id,
-              userId: String(parcelaData.user_id ?? parcelaData.koletor_id ?? ''),
-              tipo: 'pagamento',
-              descricao: descHistorico,
-              valorNovo: input.valorPago.toFixed(2),
-            });
-            if (!historico.ok) throw new Error(historico.erro ?? 'Histórico não confirmado');
-          },
-        },
-        {
-          etapa: 'auditoria financeira', codigo: 'auditoria_financeira', executar: () => registrarAuditoriaFinanceira({
-            userId: ctx.user.id, operacaoId: reserva.id, acao: 'registrar_pagamento_parcela', entidade: 'parcelas', entidadeId: input.parcelaId,
-            detalhes: { valorPago: input.valorPago, contaCaixaId: input.contaCaixaId, status: novoStatus, saldoResidual: saldoRestante, dataPagamento: dataReferencia },
-          }),
-        },
-      ]);
-      const pendenciasIdempotencia = await executarEfeitosPosConfirmacao([{
-        etapa: 'idempotência da operação',
-        codigo: 'idempotencia_pendente',
-        executar: () => concluirOperacaoFinanceira(reserva.id, { ...resultado, pendenciasPosConfirmacao }),
-      }]);
-      pendenciasPosConfirmacao.push(...pendenciasIdempotencia);
-      return { success: true, repetida: false, operationId: reserva.id, ...resultado, pendenciasPosConfirmacao };
-      } catch (error) {
-        if (!financeiroConfirmado) {
-          await falharOperacaoFinanceira(reserva.id, error);
-        } else {
-          console.error('[Financeiro] Erro inesperado após confirmação de pagamento:', error);
-        }
-        throw error;
-      }
+        contaCaixaId: input.contaCaixaId,
+        valorPago: input.valorPago,
+        desconto: input.desconto,
+        valorJurosCustom: input.valorJurosCustom,
+        dataPagamento: input.dataPagamento,
+        observacoes: input.observacoes,
+        idempotencyKey: input.idempotencyKey,
+      });
     }),
 
   // Pagar apenas os juros do período e renovar a parcela por mais um período

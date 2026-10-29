@@ -15,4 +15,6 @@ export const ENV = {
   evolutionWebhookToken: process.env.EVOLUTION_WEBHOOK_TOKEN ?? "",
   facebookCapiToken: process.env.FACEBOOK_CAPI_TOKEN ?? "",
   facebookPixelId: "2748566625524880",
+  // Liberação explícita e reversível: sem migration/preflight a baixa segue bloqueada.
+  enableRpcRecebimentoParcela: process.env.ENABLE_RPC_RECEBIMENTO_PARCELA === "true",
 };

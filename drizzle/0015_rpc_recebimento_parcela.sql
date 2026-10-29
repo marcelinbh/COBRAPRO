@@ -93,17 +93,42 @@ ALTER TABLE public.transacoes_caixa
   DROP CONSTRAINT IF EXISTS transacoes_caixa_operacao_financeira_fk,
   DROP CONSTRAINT IF EXISTS transacoes_caixa_conta_tenant_fk;
 
-ALTER TABLE public.transacoes_caixa
-  ADD CONSTRAINT transacoes_caixa_operacao_financeira_tenant_fk
-  FOREIGN KEY (user_id, operacao_financeira_id)
-  REFERENCES public.operacoes_financeiras (user_id, id)
-  ON DELETE RESTRICT,
-  ADD CONSTRAINT transacoes_caixa_conta_tenant_fk
-  FOREIGN KEY (user_id, conta_caixa_id)
-  REFERENCES public.contas_caixa (user_id, id)
-  ON DELETE RESTRICT,
-  ADD CONSTRAINT transacoes_caixa_operacao_financeira_tenant_check
-  CHECK (operacao_financeira_id IS NULL OR user_id IS NOT NULL);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'transacoes_caixa_operacao_financeira_tenant_fk'
+      AND conrelid = 'public.transacoes_caixa'::regclass
+  ) THEN
+    ALTER TABLE public.transacoes_caixa
+      ADD CONSTRAINT transacoes_caixa_operacao_financeira_tenant_fk
+      FOREIGN KEY (user_id, operacao_financeira_id)
+      REFERENCES public.operacoes_financeiras (user_id, id)
+      ON DELETE RESTRICT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'transacoes_caixa_conta_tenant_fk'
+      AND conrelid = 'public.transacoes_caixa'::regclass
+  ) THEN
+    ALTER TABLE public.transacoes_caixa
+      ADD CONSTRAINT transacoes_caixa_conta_tenant_fk
+      FOREIGN KEY (user_id, conta_caixa_id)
+      REFERENCES public.contas_caixa (user_id, id)
+      ON DELETE RESTRICT;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'transacoes_caixa_operacao_financeira_tenant_check'
+      AND conrelid = 'public.transacoes_caixa'::regclass
+  ) THEN
+    ALTER TABLE public.transacoes_caixa
+      ADD CONSTRAINT transacoes_caixa_operacao_financeira_tenant_check
+      CHECK (operacao_financeira_id IS NULL OR user_id IS NOT NULL);
+  END IF;
+END $$;
 
 DO $$
 BEGIN

@@ -4,7 +4,7 @@
 
 A primeira RPC preparada, `0015_rpc_recebimento_parcela.sql`, passou por revisão independente antes de qualquer execução no banco. Foram corrigidos os bloqueadores identificados: a chave de idempotência é obrigatória (não há geração implícita em retry), a unicidade `(user_id, chave_idempotencia)` é verificada, valores monetários com mais de duas casas são rejeitados e não existe tolerância que quite uma diferença de R$ 0,01 sem lançamento. A migration também valida tabela física, colunas, enums, FK de operação–Caixa e extensão criptográfica antes de criar a função; o evento de auditoria preserva payload, hash, encargos, dias de atraso e saldos.
 
-Ela continua **não aplicada**. A condição de avanço é executar a pré-auditoria somente leitura no projeto Supabase COBRA PRO, sanear divergências e então aplicar a migration em janela controlada, testar com dados sintéticos e somente depois substituir a contenção P0 pelo caminho RPC.
+Ela continua **não aplicada**. O backend já contém um adaptador que chama exclusivamente a RPC, normaliza sua resposta e falha fechada; as telas fornecem chave UUID obrigatória. Porém, a flag `ENABLE_RPC_RECEBIMENTO_PARCELA` continua desligada por padrão. A condição de avanço é executar a pré-auditoria somente leitura no projeto Supabase COBRA PRO, sanear divergências e então aplicar a migration em janela controlada, testar com dados sintéticos e somente depois habilitar a flag para este fluxo.
 
 ## Objetivo
 
@@ -16,7 +16,7 @@ Executar primeiro [preflight-rpcs-financeiras.sql](preflight-rpcs-financeiras.sq
 
 ## RPCs planejadas
 
-1. `public.rpc_registrar_pagamento`: recebe `user_id` exclusivamente do backend, parcela, conta, valor, desconto, juros customizado, data civil de Brasília, observação e chave UUID obrigatória. Bloqueia conta, contrato e parcela; calcula mora sobre `DATE`; atualiza parcela, Caixa, contrato, histórico, auditoria e `operacoes_financeiras` na mesma transação.
+1. `public.rpc_registrar_pagamento_parcela`: recebe `user_id` exclusivamente do backend, parcela, conta, valor, desconto, juros customizado, data civil de Brasília, observação e chave UUID obrigatória. Bloqueia conta, contrato e parcela; calcula mora sobre `DATE`; atualiza parcela, Caixa, contrato, histórico, auditoria e `operacoes_financeiras` na mesma transação.
 2. `public.rpc_renovar_pagamento_juros`: bloqueia a mesma sequência, baixa a parcela de origem, lança Caixa, gera o próximo número sob lock do contrato, cria a nova parcela, atualiza contador, insere `parcelas_renovacoes`, histórico, auditoria e operação em uma única transação.
 
 ## Regras de segurança

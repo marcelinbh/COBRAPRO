@@ -50,6 +50,10 @@ A revisão independente identificou que a RPC `0015` reaplicava juros/multa/desc
 
 Foi confirmado que a troca de senha não invalidava cookies JWT de longa duração já emitidos. A migration `0016_revogacao_sessoes_reset_senha.sql` foi preparada para adicionar `session_version`, incrementá-la exclusivamente quando a hash de senha muda e expor uma RPC atômica que consome o token de reset, atualiza a senha e revoga sessões na mesma transação. O schema local e os mapeamentos REST já aceitam o campo com `0` compatível, mas **a emissão/verificação do claim e o handler que chama a RPC não serão publicados antes de validar/aplicar o DDL no Supabase COBRA PRO**; isso evita colocar em produção código dependente de coluna/função ausentes. Foram aprovadas 21 regressões de migration, autenticação e cookie, TypeScript e build.
 
+## Integração fail-closed da RPC de recebimento
+
+O caminho de `parcelas.registrarPagamento` foi reduzido a um adaptador da função PostgreSQL `rpc_registrar_pagamento_parcela`: não há mais fallback REST quando a liberação ocorrer. A entrada exige conta de Caixa e UUID de idempotência; o adaptador valida centavos/data civil, envia `user_id` apenas do contexto autenticado, elimina IDs `BIGINT` do retorno ao navegador e rejeita respostas incompletas antes de informar pagamento confirmado. As telas de baixa foram alinhadas para gerar a chave uma vez por abertura do modal. A flag `ENABLE_RPC_RECEBIMENTO_PARCELA` está **desligada por padrão**, mantendo a contenção P0 até preflight, migration `0015` e testes sintéticos de retry/concorrência no projeto COBRA PRO. Nenhum DDL, DML financeiro ou ativação da flag foi realizado durante esta etapa.
+
 ## Escopo de execução
 
 1. Acesso, navegação e leitura de dashboard.

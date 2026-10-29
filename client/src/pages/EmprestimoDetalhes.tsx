@@ -63,6 +63,7 @@ export default function EmprestimoDetalhes() {
   const [jurosCustomDetalhes, setJurosCustomDetalhes] = useState('');
   const [idempotencyKeyPagamento, setIdempotencyKeyPagamento] = useState('');
   const [idempotencyKeyJuros, setIdempotencyKeyJuros] = useState('');
+  const [idempotencyKeyParcela, setIdempotencyKeyParcela] = useState('');
 
   const utils = trpc.useUtils();
   const { data: contas } = trpc.caixa.contas.useQuery();
@@ -510,6 +511,7 @@ export default function EmprestimoDetalhes() {
                                     setParcelaPagando({ id: p.id, numero: p.numero_parcela, valor: parseFloat(p.valor_original) });
                                     setValorPagIndividual(parseFloat(p.valor_original).toFixed(2));
                                     setContaPagIndividual('');
+                                    setIdempotencyKeyParcela(crypto.randomUUID());
                                   }}
                                   className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors flex items-center gap-1"
                                   title="Pagar esta parcela"
@@ -891,7 +893,7 @@ export default function EmprestimoDetalhes() {
       </Dialog>
 
       {/* ── MODAL PAGAR PARCELA INDIVIDUAL ── */}
-      <Dialog open={!!parcelaPagando} onOpenChange={(v) => { if (!v) { setParcelaPagando(null); setValorPagIndividual(''); setContaPagIndividual(''); } }}>
+      <Dialog open={!!parcelaPagando} onOpenChange={(v) => { if (!v) { setParcelaPagando(null); setValorPagIndividual(''); setContaPagIndividual(''); setIdempotencyKeyParcela(''); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>PAGAR PARCELA #{parcelaPagando?.numero}</DialogTitle>
@@ -930,14 +932,16 @@ export default function EmprestimoDetalhes() {
               <Button variant="outline" className="flex-1" onClick={() => setParcelaPagando(null)}>{t('common.cancel')}</Button>
               <Button
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                disabled={pagarTotalMutation.isPending}
+                disabled={!contaPagIndividual || !idempotencyKeyParcela || pagarTotalMutation.isPending}
                 onClick={() => {
                   if (!parcelaPagando) return;
+                  if (!contaPagIndividual) { toast.error('Selecione uma conta de Caixa'); return; }
                   const valorFinal = valorPagIndividual ? parseFloat(valorPagIndividual) : parcelaPagando.valor;
                   pagarTotalMutation.mutate({
                     parcelaId: parcelaPagando.id,
                     valorPago: valorFinal,
-                    contaCaixaId: contaPagIndividual ? parseInt(contaPagIndividual) : undefined,
+                    contaCaixaId: parseInt(contaPagIndividual),
+                    idempotencyKey: idempotencyKeyParcela,
                   }, {
                     onSuccess: () => {
                       toast.success(`Parcela #${parcelaPagando.numero} paga com sucesso!`);
