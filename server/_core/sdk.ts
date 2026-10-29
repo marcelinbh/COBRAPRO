@@ -179,6 +179,11 @@ class SDKServer {
 
   private getSessionSecret() {
     const secret = ENV.cookieSecret;
+    if (!secret) {
+      // Nunca assinar/verificar sessões com uma chave vazia: isso permitiria
+      // forjar HS256 em qualquer ambiente mal configurado.
+      throw new Error("JWT_SECRET não configurado");
+    }
     return new TextEncoder().encode(secret);
   }
 

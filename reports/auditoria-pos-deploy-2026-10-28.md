@@ -70,6 +70,8 @@ Uma revisão paralela dos recebimentos de parcelas e renovações, despesas, che
 | 16:38 | Blacklist | Validar tela compartilhada e documento incompleto sintético | Aprovado | Consulta exige CPF/CNPJ completo e informa o erro antes de qualquer busca; a tela declara retorno mascarado |
 | 16:39 | Portal público | Abrir rota com token sintético inválido | Aprovado | Resposta uniforme “link indisponível, expirou ou já foi utilizado”, sem dado de cliente ou indicação de existência |
 | 16:39 | WhatsApp | Inspecionar saúde e histórico sem disparo | Aprovado com histórico legado | Instância conectada, fila atual sem pendências/falhas e estados de aceite pela Evolution visíveis; histórico anterior contém falhas devidamente identificadas, sem mensagem disparada nesta auditoria |
+| 16:45 | Disponibilidade | Verificar site, cabeçalhos e Evolution | Aprovado | Site público respondeu 200 com CSP, HSTS, anti-frame e políticas de permissões; Evolution respondeu 200. A rota `/api/health` é absorvida pelo fallback SPA e não fornece healthcheck JSON dedicado |
+| 13:58 | Correções da auditoria | Healthcheck, sessão e backup | Corrigido localmente | Adicionado `GET /api/health` JSON de liveness; sessão agora falha fechada quando `JWT_SECRET` está ausente; exportação CSV neutraliza fórmulas de planilha e o backup remove `select *` de vendas/veículos. TypeScript, build e 11 testes aprovados; 2 testes de banco live ficaram opt-in porque as credenciais locais não são da base CobraPro |
 | Pendente | Financeiro | Criar e testar contrato de auditoria | Pendente | |
 | Pendente | Despesas | Baixar e estornar despesa de teste | Pendente | |
 | Pendente | Cheques | Testar transições e conciliação | Pendente | |

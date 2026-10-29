@@ -8,7 +8,15 @@ import { Download, Database, AlertCircle, CheckCircle, Users, FileText, DollarSi
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 
-function jsonToCsv(data: any[]): string {
+function protegerCelulaCsv(value: unknown): string {
+  const text = String(value ?? '');
+  // Excel/LibreOffice podem interpretar texto iniciado por =, +, - ou @
+  // como fórmula ao abrir um CSV. Números reais permanecem numéricos.
+  if (typeof value === 'string' && /^[=+\-@]/.test(text)) return `'${text}`;
+  return text;
+}
+
+export function jsonToCsv(data: any[]): string {
   if (!data || data.length === 0) return '';
   const flatten = (obj: any, prefix = ''): Record<string, any> => {
     return Object.keys(obj).reduce((acc: Record<string, any>, k) => {
@@ -27,7 +35,7 @@ function jsonToCsv(data: any[]): string {
   const headers = Array.from(new Set(flat.flatMap(r => Object.keys(r))));
   const rows = flat.map(r => headers.map(h => {
     const v = r[h] ?? '';
-    const s = String(v);
+    const s = protegerCelulaCsv(v);
     return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
   }).join(','));
   return [headers.join(','), ...rows].join('\n');

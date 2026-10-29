@@ -22,6 +22,9 @@
 - [x] Separar o limite de 15 MB do upload autenticado dos corpos das rotas comuns (3 MB) e formulários (256 KB).
 - [ ] Rotacionar credenciais administrativas e segredos expostos em histórico. **Depende de configuração segura de variáveis na DigitalOcean; não será exposto em chat.**
 - [x] Remover chave padrão da Evolution API do código depois de confirmar a variável de ambiente de produção.
+- [x] Fazer a autenticação de sessão falhar fechada quando `JWT_SECRET` estiver ausente; adicionar regressão contra HS256 com chave vazia.
+- [x] Adicionar `GET /api/health` JSON de liveness, separado do fallback SPA, sem expor dados ou consultar o banco.
+- [x] Neutralizar fórmulas em exportações CSV e remover `select *` dos módulos de backup de vendas/veículos.
 
 ## Prioridade P1 — Proteção entre assinantes (isolamento multiempresa)
 

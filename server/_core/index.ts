@@ -55,6 +55,14 @@ async function startServer() {
   // Webhook da Kiwify (vendas → criação de usuário + e-mail)
   registerKiwifyWebhookRoutes(app);
 
+  // Liveness público: não autentica nem consulta dados de clientes. A rota é
+  // deliberadamente leve para que App Platform, Cloudflare e monitoramento
+  // externo não recebam o HTML do fallback SPA ao verificar a disponibilidade.
+  app.get('/api/health', (_req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.status(200).json({ ok: true, service: 'cobrapro' });
+  });
+
   async function autenticarDisparadorDeAutomacao(req: express.Request): Promise<boolean> {
     if (possuiSegredoDeAutomacaoValido(req)) return true;
     if (await possuiTokenGithubActionsValido(req)) return true;

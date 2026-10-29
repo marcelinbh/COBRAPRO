@@ -66,14 +66,14 @@ export const backupRouter = router({
     // Usar vendas_telefone como "produtos vendidos" já que a tabela vendas genérica não existe
     const { data: produtos, error: errProd } = await client
       .from('vendas_telefone')
-      .select('*')
+      .select('id, marca, modelo, imei, cor, armazenamento, custo, preco_venda, entrada_percentual, entrada_valor, num_parcelas, juros_mensal, valor_parcela, total_juros, total_a_receber, lucro_bruto, roi, payback_meses, comprador_nome, comprador_cpf, comprador_rg, comprador_telefone, comprador_email, comprador_estado_civil, comprador_profissao, comprador_instagram, comprador_cep, comprador_cidade, comprador_estado, comprador_endereco, comprador_local_trabalho, status, data_venda, "createdAt"')
       .eq('user_id', ctx.user.id)
       .order('data_venda', { ascending: false });
     if (errProd) throw errProd;
 
     const { data: veiculos, error: errVeic } = await client
       .from('veiculos')
-      .select('*')
+      .select('id, cliente_id, placa, marca, modelo, ano, cor, renavam, chassi, observacoes, "createdAt", "updatedAt"')
       .eq('user_id', ctx.user.id)
       .order('"createdAt"', { ascending: false });
     if (errVeic) throw errVeic;
