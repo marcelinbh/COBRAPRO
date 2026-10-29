@@ -335,14 +335,14 @@ function PagamentoDialog({
                     pagarJurosMutation.mutate({
                       parcelaId: parcela.id,
                       valorJurosPago: parseFloat(valorPago),
-                      contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
+                      contaCaixaId: parseInt(contaCaixaId),
                       idempotencyKey: idempotencyKey || crypto.randomUUID(),
                     });
                   } else {
                     pagarMutation.mutate({
                       parcelaId: parcela.id,
                       valorPago: parseFloat(valorPago),
-                      contaCaixaId: contaCaixaId ? parseInt(contaCaixaId) : undefined,
+                      contaCaixaId: parseInt(contaCaixaId),
                       desconto: parseFloat(desconto),
                       idempotencyKey: idempotencyKey || crypto.randomUUID(),
                     });
