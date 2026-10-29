@@ -20,7 +20,9 @@ describe("migration 0015 — recebimento de parcela atômico", () => {
     expect(migration).toContain("transacoes_caixa_operacao_financeira_uk");
     expect(migration).toContain("tabela física public.% ausente");
     expect(migration).toContain("FOR requisito IN");
-    expect(migration).toContain("FK de transacoes_caixa para operacoes_financeiras inválida");
+    expect(migration).toContain("FK composta de transacoes_caixa para operacoes_financeiras ausente");
+    expect(migration).toContain("FOREIGN KEY (user_id, operacao_financeira_id)");
+    expect(migration).toContain("FOREIGN KEY (user_id, conta_caixa_id)");
   });
 
   it("preserva data civil de Brasília e bloqueia reencargos em parcela parcial", () => {
@@ -28,6 +30,7 @@ describe("migration 0015 — recebimento de parcela atômico", () => {
     expect(migration).toContain("p_data_pagamento - v_parcela.data_vencimento");
     expect(migration).toContain("Uma parcela parcial preserva os encargos já apurados");
     expect(migration).toContain("v_parcela.status = 'parcial'");
+    expect(migration).toContain("Parcela parcial possui saldo residual inválido");
     expect(migration).toContain("O desconto não pode superar o valor devido");
     expect(migration).toContain("Valores monetários devem ter no máximo duas casas decimais");
     expect(migration).toContain("v_valor_pago_normalizado = v_valor_total");
