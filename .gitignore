@@ -112,3 +112,7 @@ temp/
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
 .project-config.json
+
+# Scripts locais de administração/autenticação nunca devem conter ou instalar credenciais.
+create_vt_supabase.mjs
+set_cookie_cdp.mjs
