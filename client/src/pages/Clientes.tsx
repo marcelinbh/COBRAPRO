@@ -1,5 +1,6 @@
 'use client';
 import { useTranslation } from 'react-i18next';
+import { textoSeguroParaPlanilha } from "@/lib/spreadsheetSafety";
 import { useState, useCallback, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
@@ -715,7 +716,7 @@ export default function Clientes() {
       c.createdAt ? new Date(c.createdAt).toLocaleDateString('pt-BR') : '',
     ]);
     const csvContent = [headers, ...rows].map(row =>
-      row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+      row.map(v => `"${textoSeguroParaPlanilha(v).replace(/"/g, '""')}"`).join(',')
     ).join('\n');
     const bom = '\uFEFF';
     const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });

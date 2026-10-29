@@ -9,6 +9,30 @@ import { useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { trpc } from "@/lib/trpc";
 
+declare global {
+  interface Window {
+    __WOUTER_ROUTES__?: string[];
+  }
+}
+
+// A infraestrutura de preview usa esta lista para identificar as rotas SPA.
+// Mantê-la no app elimina a necessidade de alterar o pacote wouter em node_modules.
+const APP_ROUTES = [
+  "/portal/:token", "/", "/login", "/recuperar-senha", "/reset-senha",
+  "/dashboard", "/clientes", "/clientes/:id", "/contratos", "/contratos/novo",
+  "/parcelas", "/caixa", "/calendario", "/relatorios", "/configuracoes",
+  "/usuarios", "/cobradores", "/reparcelamento", "/simulador", "/contas-pagar",
+  "/vendas", "/cheques", "/emprestimos", "/emprestimos/novo", "/emprestimos/:id",
+  "/scores", "/veiculos", "/backup", "/install", "/analise-risco", "/vendas-telefone",
+  "/assinaturas", "/whatsapp", "/perfil", "/relatorio-diario", "/inadimplencia",
+  "/notificacoes-automaticas", "/onboarding", "/admin/login-logs", "/blacklist",
+  "/blacklist/nova", "/blacklist/meus", "/404",
+];
+
+if (typeof window !== "undefined") {
+  window.__WOUTER_ROUTES__ = APP_ROUTES;
+}
+
 // Sincroniza o idioma salvo no banco com o i18n ao fazer login
 function IdiomaSyncProvider({ children }: { children: React.ReactNode }) {
   const { i18n } = useTranslation();

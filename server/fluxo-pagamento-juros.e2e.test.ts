@@ -3,6 +3,10 @@ import { db } from './db';
 import { usuarios, clientes, emprestimos, parcelas } from '../drizzle/schema';
 import { eq, and } from 'drizzle-orm';
 
+// O cenário cria e remove registros em um banco real; não deve rodar na suíte
+// padrão sem uma base de testes explicitamente autorizada.
+const describeLive = process.env.RUN_LIVE_SUPABASE_TESTS === '1' ? describe : describe.skip;
+
 /**
  * Teste End-to-End: Fluxo Completo de Pagamento de Juros com Renovação Automática
  * 
@@ -12,7 +16,7 @@ import { eq, and } from 'drizzle-orm';
  * - Cliente paga SÓ JUROS (R$ 500) no dia do vencimento
  * - Esperado: Parcela renova automaticamente para 15 dias depois
  */
-describe('Fluxo Completo: Pagamento de Juros com Renovação Automática', () => {
+describeLive('Fluxo Completo: Pagamento de Juros com Renovação Automática', () => {
   let userId: string;
   let clienteId: string;
   let emprestimoId: string;

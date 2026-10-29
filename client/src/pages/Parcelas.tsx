@@ -18,7 +18,8 @@ import {
 import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 import { avisoDePendenciasPosPagamento } from "@/lib/pagamentoConfirmado";
-// xlsx e jspdf são carregados sob demanda (lazy) para reduzir o bundle inicial em ~1.1MB
+import { protegerValorDePlanilha } from "@/lib/spreadsheetSafety";
+// Excel e PDF são carregados sob demanda para reduzir o bundle inicial.
 
 // Templates padrão (mesmos do Cobra Fácil)
 const TEMPLATE_ATRASO = `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━
@@ -432,21 +433,46 @@ export default function Parcelas() {
   // Funções de exportação (lazy loading para reduzir bundle inicial em ~1.1MB)
   const exportarExcel = async () => {
     if (!filtradas || filtradas.length === 0) { toast.error(t('toast_error.nenhuma_parcela_para_exportar')); return; }
-    const XLSX = await import('xlsx');
+    const { default: ExcelJS } = await import('exceljs');
     const dados = filtradas.map(p => ({
-      'Cliente': p.clienteNome,
-      'Parcela': `${p.numeroParcela}/${p.numeroParcelas}`,
-      'Modalidade': p.modalidade ?? '-',
-      'Vencimento': formatarData(p.dataVencimento),
-      'Valor Original': parseFloat(p.valorOriginal),
-      'Valor Pago': parseFloat(p.valorPago ?? '0'),
-      'Status': p.status,
-      'Data Pagamento': p.dataPagamento ? formatarData(p.dataPagamento) : '-',
+      cliente: protegerValorDePlanilha(p.clienteNome),
+      parcela: `${p.numeroParcela}/${p.numeroParcelas}`,
+      modalidade: protegerValorDePlanilha(p.modalidade ?? '-'),
+      vencimento: formatarData(p.dataVencimento),
+      valorOriginal: parseFloat(p.valorOriginal),
+      valorPago: parseFloat(p.valorPago ?? '0'),
+      status: protegerValorDePlanilha(p.status),
+      dataPagamento: p.dataPagamento ? formatarData(p.dataPagamento) : '-',
     }));
-    const ws = XLSX.utils.json_to_sheet(dados);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Parcelas');
-    XLSX.writeFile(wb, `parcelas_${new Date().toISOString().split('T')[0]}.xlsx`);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Parcelas');
+    worksheet.columns = [
+      { header: 'Cliente', key: 'cliente', width: 32 },
+      { header: 'Parcela', key: 'parcela', width: 14 },
+      { header: 'Modalidade', key: 'modalidade', width: 15 },
+      { header: 'Vencimento', key: 'vencimento', width: 16 },
+      { header: 'Valor Original', key: 'valorOriginal', width: 17 },
+      { header: 'Valor Pago', key: 'valorPago', width: 15 },
+      { header: 'Status', key: 'status', width: 15 },
+      { header: 'Data Pagamento', key: 'dataPagamento', width: 18 },
+    ];
+    worksheet.addRows(dados);
+    worksheet.getRow(1).font = { bold: true };
+    worksheet.getColumn('valorOriginal').numFmt = 'R$ #,##0.00';
+    worksheet.getColumn('valorPago').numFmt = 'R$ #,##0.00';
+
+    const conteudo = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([new Uint8Array(conteudo)], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `parcelas_${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
     toast.success(t('toast_success.excel_exportado_com_sucesso'));
   };
 

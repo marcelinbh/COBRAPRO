@@ -33,6 +33,7 @@
 - [x] Fazer a autenticação de sessão falhar fechada quando `JWT_SECRET` estiver ausente; adicionar regressão contra HS256 com chave vazia.
 - [x] Adicionar `GET /api/health` JSON de liveness, separado do fallback SPA, sem expor dados ou consultar o banco.
 - [x] Neutralizar fórmulas em exportações CSV e remover `select *` dos módulos de backup de vendas/veículos.
+- [x] Atualizar dependências de produção vulneráveis e substituir SheetJS por ExcelJS com exportações CSV/XLSX protegidas contra fórmulas. A auditoria de produção não possui achados críticos ou altos; há uma exceção moderada limitada a `uuid@8` transitivo do ExcelJS, documentada em `reports/fontes-atualizacao-dependencias-2026-10-29.md`.
 
 ## Prioridade P1 — Proteção entre assinantes (isolamento multiempresa)
 
@@ -87,10 +88,10 @@
 
 ## Prioridade P4 — Kiwify (por último, conforme solicitado)
 
-- [ ] Validar assinatura oficial usando corpo bruto e segredo em ambiente.
-- [ ] Substituir senha temporária fixa por fluxo de definição de senha de uso único.
+- [ ] **P0 quando este lote for iniciado:** validar assinatura oficial usando corpo bruto e segredo em ambiente. A auditoria confirmou que o endpoint atual lê o segredo mas não o valida, devendo falhar fechado até haver autenticação verificável.
+- [ ] **P0 quando este lote for iniciado:** remover a redefinição de senha de conta existente e a senha temporária fixa; novos compradores devem receber fluxo de definição de senha de uso único.
 - [ ] Reservar idempotência de pedido antes de criar usuário/enviar e-mail.
-- [ ] Cobrir webhook aprovado, duplicado, inválido e erro de e-mail com testes.
+- [ ] Cobrir webhook aprovado, concorrente/duplicado, token ou assinatura inválidos e erro de e-mail com testes.
 
 ## Critério de publicação
 

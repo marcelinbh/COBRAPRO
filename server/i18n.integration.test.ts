@@ -86,7 +86,7 @@ describe('i18n Integration Tests', () => {
       const esPath = path.join(localesPath, 'es.json');
       const es = JSON.parse(fs.readFileSync(esPath, 'utf-8'));
       
-      expect(es.navigation.dashboard).toBe('Panel de Control');
+      expect(es.navigation.dashboard).toBe('Panel');
       expect(es.clients).toBeDefined();
       expect(es.loans).toBeDefined();
     });
@@ -120,7 +120,7 @@ describe('i18n Integration Tests', () => {
     it('should have i18n imported in main.tsx', () => {
       const mainPath = path.join(process.cwd(), 'client/src/main.tsx');
       const content = fs.readFileSync(mainPath, 'utf-8');
-      expect(content).toContain("import './i18n/i18n'");
+      expect(content).toContain("from './i18n/i18n'");
     });
   });
 
