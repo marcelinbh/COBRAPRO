@@ -88,10 +88,12 @@
 
 ## Prioridade P4 — Kiwify (por último, conforme solicitado)
 
-- [ ] **P0 quando este lote for iniciado:** validar assinatura oficial usando corpo bruto e segredo em ambiente. A auditoria confirmou que o endpoint atual lê o segredo mas não o valida, devendo falhar fechado até haver autenticação verificável.
-- [ ] **P0 quando este lote for iniciado:** remover a redefinição de senha de conta existente e a senha temporária fixa; novos compradores devem receber fluxo de definição de senha de uso único.
-- [ ] Reservar idempotência de pedido antes de criar usuário/enviar e-mail.
-- [ ] Cobrir webhook aprovado, concorrente/duplicado, token ou assinatura inválidos e erro de e-mail com testes.
+- [x] Validar assinatura oficial HMAC-SHA1 sobre o corpo bruto, em comparação de tempo constante; o endpoint falha fechado em ausência de segredo (503) ou assinatura inválida (401), antes de acessar banco, enviar e-mail ou criar conta.
+- [x] Remover a redefinição de senha de conta existente e a senha temporária fixa. Uma conta nova recebe somente link individual de definição de senha, com token hash e expiração; reentrega nunca altera conta já existente.
+- [x] Reservar o pedido antes de criar usuário/enviar e-mail e minimizar log novo para estado, produto e e-mail mascarado. Se o e-mail falhar, o evento fica pendente e só a conta criada por aquele mesmo pedido pode receber novo convite autenticado.
+- [x] Cobrir vetor oficial HMAC, ausência de segredo, assinatura inválida, evento não aprovado e proteção de conta existente com testes automatizados.
+- [ ] Aplicar `0017_integridade_webhook_kiwify.sql` depois de preflight no Supabase COBRA PRO. Ela bloqueia `order_id` vazio/duplicado e cria unicidade estrutural, necessária para garantir idempotência contra concorrência e replay. **Nenhum DDL foi aplicado ainda.**
+- [ ] Rotacionar a chave de serviço Supabase e `JWT_SECRET` por terem sido encontrados em artefatos históricos do repositório; apagar os arquivos atuais é apenas contenção, não invalida cópias/histórico/sessões existentes.
 
 ## Critério de publicação
 

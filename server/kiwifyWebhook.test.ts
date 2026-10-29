@@ -1,159 +1,103 @@
-/**
- * Testes do webhook da Kiwify
- * Valida: token de segurança, idempotência, processamento de compra aprovada
- */
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// ─── Mocks ────────────────────────────────────────────────────────────────────
-vi.mock("./db", () => ({
-  getDb: vi.fn().mockResolvedValue(null),
-  getSupabaseClientAsync: vi.fn().mockResolvedValue({
-    from: vi.fn().mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      insert: vi.fn().mockReturnThis(),
-      update: vi.fn().mockReturnThis(),
-      upsert: vi.fn().mockResolvedValue({ error: null }),
-      eq: vi.fn().mockReturnThis(),
-      maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
-      single: vi.fn().mockResolvedValue({ data: { id: 99 }, error: null }),
-    }),
-  }),
+const mocks = vi.hoisted(() => ({
+  getSupabaseClientAsync: vi.fn(),
+  enviarEmail: vi.fn(),
 }));
 
-vi.mock("./_core/email", () => ({
-  enviarEmail: vi.fn().mockResolvedValue(true),
-}));
+vi.mock("./db", () => ({ getSupabaseClientAsync: mocks.getSupabaseClientAsync }));
+vi.mock("./_core/email", () => ({ enviarEmail: mocks.enviarEmail }));
 
-vi.mock("bcryptjs", () => ({
-  default: {
-    hash: vi.fn().mockResolvedValue("$2a$12$hashedpassword"),
-    compare: vi.fn().mockResolvedValue(true),
-  },
-}));
-
-// ─── Helpers de request/response mock ────────────────────────────────────────
-function mockReq(overrides: Record<string, unknown> = {}) {
-  return {
-    body: {},
-    headers: {},
-    query: {},
-    ...overrides,
-  };
+function resposta() {
+  return { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis() };
 }
 
-function mockRes() {
-  const res = {
-    status: vi.fn().mockReturnThis(),
-    json: vi.fn().mockReturnThis(),
-  };
-  return res;
+function aplicativo() {
+  return { post: vi.fn(), get: vi.fn() } as unknown as import("express").Express;
 }
 
-// ─── Testes ───────────────────────────────────────────────────────────────────
-// A integração Kiwify foi explicitamente deixada para a última etapa. Estes
-// cenários documentam o contrato desejado e voltam a ser obrigatórios quando a
-// correção HMAC/idempotente for implementada e configurada em produção.
-describe.skip("Kiwify Webhook — pendente da etapa final", () => {
+async function handlerKiwify() {
+  const { registerKiwifyWebhookRoutes } = await import("./kiwifyWebhook");
+  const app = aplicativo();
+  registerKiwifyWebhookRoutes(app);
+  return (app.post as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1] as (req: unknown, res: unknown) => Promise<void>;
+}
+
+function assinar(body: Buffer, token = "kiwify-token-de-teste") {
+  const crypto = require("crypto") as typeof import("crypto");
+  return crypto.createHmac("sha1", token).update(body).digest("hex");
+}
+
+describe("Webhook Kiwify seguro", () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
-    process.env.KIWIFY_WEBHOOK_TOKEN = "test-token-123";
+    process.env.KIWIFY_WEBHOOK_TOKEN = "kiwify-token-de-teste";
+    mocks.enviarEmail.mockResolvedValue(true);
   });
 
-  it("deve rejeitar requisição com token inválido", async () => {
-    const { registerKiwifyWebhookRoutes } = await import("./kiwifyWebhook");
-    const app = { post: vi.fn(), get: vi.fn() } as unknown as import("express").Express;
-    registerKiwifyWebhookRoutes(app);
+  it("valida o vetor HMAC-SHA1 oficial sobre os bytes originais", async () => {
+    const { assinaturaKiwifyEhValida } = await import("./kiwifyWebhook");
+    const body = Buffer.from('{"order_id":"9b1c2d3e-0000-4000-8000-000000000001","order_status":"paid","webhook_event_type":"order_approved"}', "utf8");
+    expect(assinaturaKiwifyEhValida(body, "bf18f352a4f981b91dfa3f6d8742a81080ab8c86", "kiwify-token-de-teste")).toBe(true);
+    expect(assinaturaKiwifyEhValida(body, "0".repeat(40), "kiwify-token-de-teste")).toBe(false);
+    expect(assinaturaKiwifyEhValida(body, "bf18f352a4f981b91dfa3f6d8742a81080ab8c86", "")).toBe(false);
+  });
 
-    // Capturar o handler registrado
-    const postCall = (app.post as ReturnType<typeof vi.fn>).mock.calls[0];
-    const handler = postCall[1] as (req: unknown, res: unknown) => Promise<void>;
+  it("falha fechado quando o segredo não está configurado", async () => {
+    delete process.env.KIWIFY_WEBHOOK_TOKEN;
+    const handler = await handlerKiwify();
+    const res = resposta();
+    await handler({ rawBody: Buffer.from("{}"), query: {}, body: {} }, res);
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
 
-    const req = mockReq({
-      headers: { "x-kiwify-token": "token-errado" },
-      body: { order_id: "123", order_status: "paid" },
-      query: {},
-    });
-    const res = mockRes();
-
-    await handler(req, res);
-
+  it("rejeita assinatura inválida sem tocar no banco", async () => {
+    const handler = await handlerKiwify();
+    const res = resposta();
+    await handler({ rawBody: Buffer.from("{}"), query: { signature: "0".repeat(40) }, body: {} }, res);
     expect(res.status).toHaveBeenCalledWith(401);
-    expect(res.json).toHaveBeenCalledWith({ error: "Token inválido" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
   });
 
-  it("deve aceitar requisição com token correto no header", async () => {
-    const { registerKiwifyWebhookRoutes } = await import("./kiwifyWebhook");
-    const app = { post: vi.fn(), get: vi.fn() } as unknown as import("express").Express;
-    registerKiwifyWebhookRoutes(app);
+  it("aceita evento autenticado não aprovado sem criar conta", async () => {
+    const rawBody = Buffer.from('{"order_id":"pedido-1","order_status":"refunded","webhook_event_type":"order_refunded","customer":{"email":"cliente@teste.com"}}');
+    const handler = await handlerKiwify();
+    const res = resposta();
+    await handler({ rawBody, query: { signature: assinar(rawBody) }, body: JSON.parse(rawBody.toString("utf8")) }, res);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({ received: true, ignored: true });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
 
-    const postCall = (app.post as ReturnType<typeof vi.fn>).mock.calls[0];
-    const handler = postCall[1] as (req: unknown, res: unknown) => Promise<void>;
+  it("nunca altera senha ou envia convite quando o e-mail já pertence a uma conta", async () => {
+    const update = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({ error: null }) });
+    const insertReserva = vi.fn().mockResolvedValue({ error: null });
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "kiwify_webhooks") return { insert: insertReserva, update };
+        if (table === "users") {
+          return {
+            select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ maybeSingle: vi.fn().mockResolvedValue({ data: { id: 77 }, error: null }) }) }),
+            insert: vi.fn(),
+            update: vi.fn(),
+          };
+        }
+        throw new Error(`Tabela inesperada: ${table}`);
+      }),
+    };
+    mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
-    const req = mockReq({
-      headers: { "x-kiwify-token": "test-token-123" },
-      body: {
-        order_id: "order_abc123",
-        order_status: "paid",
-        product_title: "CobraPro",
-        customer: { name: "João Silva", email: "joao@teste.com" },
-      },
-      query: {},
-    });
-    const res = mockRes();
-
-    await handler(req, res);
+    const rawBody = Buffer.from('{"order_id":"pedido-2","order_status":"paid","webhook_event_type":"order_approved","customer":{"email":"existente@teste.com","name":"Conta existente"}}');
+    const handler = await handlerKiwify();
+    const res = resposta();
+    await handler({ rawBody, query: { signature: assinar(rawBody) }, body: JSON.parse(rawBody.toString("utf8")) }, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ received: true });
-  });
-
-  it("deve aceitar token via query string", async () => {
-    const { registerKiwifyWebhookRoutes } = await import("./kiwifyWebhook");
-    const app = { post: vi.fn(), get: vi.fn() } as unknown as import("express").Express;
-    registerKiwifyWebhookRoutes(app);
-
-    const postCall = (app.post as ReturnType<typeof vi.fn>).mock.calls[0];
-    const handler = postCall[1] as (req: unknown, res: unknown) => Promise<void>;
-
-    const req = mockReq({
-      headers: {},
-      body: {
-        order_id: "order_xyz789",
-        order_status: "paid",
-        customer: { email: "maria@teste.com", name: "Maria" },
-      },
-      query: { token: "test-token-123" },
-    });
-    const res = mockRes();
-
-    await handler(req, res);
-
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  it("deve ignorar eventos com status diferente de paid/approved", async () => {
-    const { registerKiwifyWebhookRoutes } = await import("./kiwifyWebhook");
-    const app = { post: vi.fn(), get: vi.fn() } as unknown as import("express").Express;
-    registerKiwifyWebhookRoutes(app);
-
-    const postCall = (app.post as ReturnType<typeof vi.fn>).mock.calls[0];
-    const handler = postCall[1] as (req: unknown, res: unknown) => Promise<void>;
-
-    const req = mockReq({
-      headers: { "x-kiwify-token": "test-token-123" },
-      body: { order_id: "order_refund", order_status: "refunded" },
-      query: {},
-    });
-    const res = mockRes();
-
-    await handler(req, res);
-
-    // Deve responder 200 mas não processar
-    expect(res.status).toHaveBeenCalledWith(200);
-  });
-
-  it("KIWIFY_WEBHOOK_TOKEN deve estar configurado no ambiente", () => {
-    expect(process.env.KIWIFY_WEBHOOK_TOKEN).toBeTruthy();
-    expect(process.env.KIWIFY_WEBHOOK_TOKEN!.length).toBeGreaterThan(0);
+    expect(supabase.from).toHaveBeenCalledWith("users");
+    const usersBuilder = (supabase.from as ReturnType<typeof vi.fn>).mock.results.find((result: any) => result.value?.select)?.value;
+    expect(usersBuilder.update).not.toHaveBeenCalled();
+    expect(mocks.enviarEmail).not.toHaveBeenCalled();
   });
 });

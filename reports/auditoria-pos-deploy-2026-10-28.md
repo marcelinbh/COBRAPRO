@@ -56,6 +56,16 @@ O caminho de `parcelas.registrarPagamento` foi reduzido a um adaptador da funç�
 
 ## Escopo de execução
 
+## Webhook Kiwify: tomada de conta eliminada no código
+
+A revisão final da integração Kiwify confirmou que o endpoint legado aceitava uma compra aprovada forjada, não verificava o segredo configurado e redefinia a senha de qualquer usuário cujo e-mail viesse no payload para uma credencial fixa. O webhook foi reescrito para validar o HMAC-SHA1 oficial sobre os bytes crus recebidos e a `signature` da query, usando comparação de tempo constante. Sem segredo configurado a rota retorna 503; com assinatura inválida retorna 401; em ambos os casos não acessa banco, e-mail ou provisionamento.
+
+Para comprador novo, a conta agora recebe hash de senha aleatória que nunca é revelada e um link individual, de uso único e uma hora de validade para definir a própria senha. Reentregas não alteram senha, papel ou sessão de conta já existente. A reserva do `order_id` vem antes de efeitos externos, e logs novos retêm somente estado, produto e e-mail mascarado. Falha de entrega fica como convite pendente e pode ser retomada apenas para a conta que aquele pedido criou. Foram aprovados cinco testes específicos, TypeScript e build; a constraint definitiva de unicidade aguarda preflight e aplicação controlada da migration `0017` no Supabase COBRA PRO.
+
+Também foram removidos do diretório de trabalho dois scripts versionados que continham uma chave privilegiada do Supabase e um cookie JWT de sessão. A remoção reduz a exposição futura, mas não invalida cópias nem histórico: rotação controlada da service key e do `JWT_SECRET`, seguida de invalidação de sessões, continua obrigatória antes de declarar o ambiente livre desse risco.
+
+Em 29 de outubro, a revisão do painel de configurações do App Platform confirmou que variáveis críticas de banco e sessão estavam presentes como valores editáveis em nível de aplicativo. Nenhum valor foi registrado neste relatório. A observação reforça que a rotação deve incluir o armazenamento criptografado dos segredos e o menor escopo possível, sem copiar valores para logs, tickets ou repositório.
+
 1. Acesso, navegação e leitura de dashboard.
 2. Caixa: conta dedicada e conferência somente leitura.
 3. Cliente e empréstimo: criação, liberação, parcela parcial, quitação e renovação de juros.

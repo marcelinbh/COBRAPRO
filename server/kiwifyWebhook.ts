@@ -1,398 +1,283 @@
-/**
- * Webhook da Kiwify — Integração de Vendas
- *
- * Fluxo:
- *   1. Kiwify envia POST /api/webhook/kiwify com o evento de compra aprovada
- *   2. Validamos o token de segurança (header x-kiwify-token ou query ?token=)
- *   3. Verificamos idempotência pelo order_id (evita duplicatas)
- *   4. Criamos o usuário no banco com senha temporária gerada automaticamente
- *   5. Enviamos e-mail de boas-vindas via Brevo com login e senha
- *   6. Registramos o log na tabela kiwify_webhooks
- */
-
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import crypto, { timingSafeEqual } from "crypto";
 import type { Express, Request, Response } from "express";
-import { users } from "../drizzle/schema";
-import { getDb, getSupabaseClientAsync } from "./db";
+import { getSupabaseClientAsync } from "./db";
 import { enviarEmail } from "./_core/email";
+import { escapeHtml } from "./utils/html";
 
-// ─── Tipos do payload da Kiwify ──────────────────────────────────────────────
-// A Kiwify envia os dados dentro de um campo "order" aninhado
-// e o cliente em "Customer" com C maiúsculo
-interface KiwifyCustomer {
+/** A Kiwify assina os bytes originais do corpo; nunca reserialize JSON para validar. */
+type RawBodyRequest = Request & { rawBody?: Buffer };
+
+type KiwifyCustomer = {
   name?: string;
   full_name?: string;
   email?: string;
-  mobile?: string;
-  CPF?: string;
-}
+};
 
-interface KiwifyOrderInner {
+type KiwifyOrder = {
   order_id?: string;
-  order_ref?: string;
   order_status?: string;
-  payment_method?: string;
   webhook_event_type?: string;
   Customer?: KiwifyCustomer;
-  // campos do produto
   Product?: { product_id?: string; product_name?: string };
-  Subscription?: { status?: string };
-  [key: string]: unknown;
-}
+};
 
-interface KiwifyPayload {
-  // Formato novo: dados dentro de "order"
-  order?: KiwifyOrderInner;
-  // Formato legado / testes manuais: dados no nível raiz
+type KiwifyPayload = {
+  order?: KiwifyOrder;
   order_id?: string;
   order_status?: string;
-  payment_method?: string;
+  webhook_event_type?: string;
+  event?: string;
   product_id?: string;
   product_title?: string;
   customer?: KiwifyCustomer;
   Customer?: KiwifyCustomer;
-  // Assinatura
-  subscription?: { id?: string; status?: string };
-  // Campos extras que a Kiwify pode enviar
-  [key: string]: unknown;
-}
+};
 
-// ─── Senha padrão para novos usuários via Kiwify ────────────────────────────
-const SENHA_PADRAO_KIWIFY = "12345678";
-function gerarSenhaTemporaria(): string {
-  return SENHA_PADRAO_KIWIFY;
-}
-
-// ─── Template HTML do e-mail de boas-vindas ──────────────────────────────────
-function gerarHtmlBoasVindas(dados: {
-  nome: string;
-  email: string;
-  senha: string;
-  produto: string;
-}): string {
-  return `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#0f172a;font-family:Arial,sans-serif">
-  <div style="max-width:600px;margin:0 auto;padding:40px 20px">
-    <!-- Header -->
-    <div style="text-align:center;margin-bottom:32px">
-      <h1 style="color:#22c55e;font-size:32px;margin:0;letter-spacing:-1px">CobraPro</h1>
-      <p style="color:#64748b;margin:8px 0 0;font-size:14px">Sistema de Gestão de Cobranças</p>
-    </div>
-
-    <!-- Card principal -->
-    <div style="background:#1e293b;border-radius:12px;padding:32px;border:1px solid #334155">
-      <h2 style="color:#f1f5f9;margin:0 0 8px;font-size:22px">Bem-vindo(a), ${dados.nome}! 🎉</h2>
-      <p style="color:#94a3b8;margin:0 0 24px;font-size:15px">
-        Sua compra de <strong style="color:#22c55e">${dados.produto}</strong> foi aprovada com sucesso.
-        Seu acesso ao CobraPro já está ativo!
-      </p>
-
-      <!-- Credenciais -->
-      <div style="background:#0f172a;border-radius:8px;padding:20px;margin-bottom:24px;border:1px solid #22c55e33">
-        <p style="color:#64748b;margin:0 0 12px;font-size:12px;text-transform:uppercase;letter-spacing:1px">
-          Suas credenciais de acesso
-        </p>
-        <div style="margin-bottom:12px">
-          <span style="color:#64748b;font-size:13px">Login (e-mail)</span><br>
-          <span style="color:#f1f5f9;font-size:16px;font-weight:bold">${dados.email}</span>
-        </div>
-        <div>
-          <span style="color:#64748b;font-size:13px">Senha temporária</span><br>
-          <span style="color:#22c55e;font-size:20px;font-weight:bold;letter-spacing:2px">${dados.senha}</span>
-        </div>
-      </div>
-
-      <!-- CTA -->
-      <div style="text-align:center;margin-bottom:24px">
-        <a href="https://cobrapro.online/login"
-           style="display:inline-block;background:#22c55e;color:#0f172a;text-decoration:none;
-                  padding:14px 32px;border-radius:8px;font-weight:bold;font-size:16px">
-          Acessar o CobraPro →
-        </a>
-      </div>
-
-      <!-- Aviso de segurança -->
-      <div style="background:#fbbf2415;border:1px solid #fbbf2440;border-radius:8px;padding:16px">
-        <p style="color:#fbbf24;margin:0;font-size:13px">
-          🔒 <strong>Por segurança:</strong> recomendamos que você altere sua senha após o primeiro acesso.
-          Acesse <strong>Configurações → Minha Conta</strong> para trocar.
-        </p>
-      </div>
-    </div>
-
-    <!-- Suporte -->
-    <div style="text-align:center;margin-top:24px">
-      <p style="color:#475569;font-size:13px;margin:0">
-        Dúvidas? Entre em contato: <a href="mailto:contato@vitalfinanceira.com" style="color:#22c55e">contato@vitalfinanceira.com</a>
-      </p>
-      <p style="color:#334155;font-size:11px;margin:8px 0 0">
-        Este e-mail foi enviado automaticamente. Não responda diretamente.
-      </p>
-    </div>
-  </div>
-</body>
-</html>
-  `.trim();
-}
-
-// ─── Registro de log na tabela kiwify_webhooks ───────────────────────────────
-async function logWebhook(dados: {
+type DadosPedido = {
   orderId: string;
+  eventType: string;
+  status: string;
   email: string;
   nome: string;
-  status: string;
-  payload: KiwifyPayload;
-  userCriado?: number;
-  emailEnviado?: boolean;
-  erro?: string;
-}) {
-  try {
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return;
-    await supabase.from("kiwify_webhooks").upsert(
-      {
-        order_id: dados.orderId,
-        email: dados.email,
-        nome: dados.nome,
-        status: dados.status,
-        payload: dados.payload,
-        user_criado: dados.userCriado ?? null,
-        email_enviado: dados.emailEnviado ? 1 : 0,
-        erro: dados.erro ?? null,
-      },
-      { onConflict: "order_id" }
-    );
-  } catch (err) {
-    console.error("[Kiwify] Erro ao salvar log:", err);
+  produto: string;
+  produtoId: string | null;
+};
+
+const RESET_ORIGIN = "https://cobrapro.online";
+const RESET_TTL_MS = 60 * 60 * 1000;
+
+export function assinaturaKiwifyEhValida(rawBody: Buffer, signature: unknown, token: string): boolean {
+  if (!token || !Buffer.isBuffer(rawBody) || typeof signature !== "string" || !/^[a-f0-9]{40}$/.test(signature)) {
+    return false;
   }
+  const esperada = crypto.createHmac("sha1", token).update(rawBody).digest("hex");
+  const recebida = Buffer.from(signature, "utf8");
+  const calculada = Buffer.from(esperada, "utf8");
+  return recebida.length === calculada.length && timingSafeEqual(recebida, calculada);
 }
 
-// ─── Processamento principal ─────────────────────────────────────────────────
-async function processarCompraAprovada(payload: KiwifyPayload) {
-  // Suporta tanto o formato novo (dados dentro de "order") quanto o formato legado
+function hashResetToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+function mascararEmail(email: string): string {
+  const [local, dominio] = email.split("@");
+  if (!local || !dominio) return "oculto";
+  return `${local.slice(0, 1)}***@${dominio}`;
+}
+
+function extrairDadosPedido(payload: KiwifyPayload): DadosPedido | null {
   const order = payload.order;
-  const orderId = (order?.order_id ?? payload.order_id ?? "").trim();
-  // Customer pode vir como "Customer" (C maiúsculo) dentro de order, ou como "customer" na raiz
-  const customer = order?.Customer ?? payload.Customer ?? payload.customer ?? {};
-  const email = (customer.email ?? "").trim().toLowerCase();
-  const nome = (customer.full_name ?? customer.name ?? "Cliente").trim();
-  const produto = (order?.Product?.product_name ?? payload.product_title ?? "CobraPro").trim();
+  const orderId = String(order?.order_id ?? payload.order_id ?? "").trim();
+  const status = String(order?.order_status ?? payload.order_status ?? "").trim().toLowerCase();
+  const eventType = String(order?.webhook_event_type ?? payload.webhook_event_type ?? payload.event ?? "").trim().toLowerCase();
+  const customer = order?.Customer ?? payload.Customer ?? payload.customer;
+  const email = String(customer?.email ?? "").trim().toLowerCase();
+  const nome = String(customer?.full_name ?? customer?.name ?? "Cliente").trim().slice(0, 255) || "Cliente";
+  const produto = String(order?.Product?.product_name ?? payload.product_title ?? "CobraPro").trim().slice(0, 255) || "CobraPro";
+  const produtoId = String(order?.Product?.product_id ?? payload.product_id ?? "").trim() || null;
 
-  if (!email) {
-    console.error("[Kiwify] Compra sem e-mail do cliente:", orderId);
-    return;
+  if (!orderId || orderId.length > 255 || !email || email.length > 320 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return null;
   }
+  return { orderId, eventType, status, email, nome, produto, produtoId };
+}
 
-  console.log(`[Kiwify] Processando compra aprovada | order: ${orderId} | email: ${email}`);
+function compraAprovada(dados: DadosPedido): boolean {
+  return dados.status === "paid" || dados.status === "approved" || dados.status === "complete" || dados.eventType === "order_approved" || dados.eventType === "compra_aprovada";
+}
 
-  // Verificar idempotência — se já processamos este order_id, ignorar
-  try {
-    const supabase = await getSupabaseClientAsync();
-    if (supabase) {
-      const { data: existing } = await supabase
-        .from("kiwify_webhooks")
-        .select("id, user_criado")
-        .eq("order_id", orderId)
-        .maybeSingle();
+function payloadMinimo(dados: DadosPedido): Record<string, string | null> {
+  return {
+    eventType: dados.eventType || null,
+    orderStatus: dados.status || null,
+    productId: dados.produtoId,
+  };
+}
 
-      if (existing) {
-        console.log(`[Kiwify] order_id ${orderId} já processado anteriormente — ignorando`);
-        return;
-      }
-    }
-  } catch (_) { /* continuar mesmo se falhar a checagem */ }
+function htmlDefinirSenha(nome: string, produto: string, resetUrl: string): string {
+  return `
+<!doctype html>
+<html lang="pt-BR"><body style="font-family:Arial,sans-serif;background:#0f172a;color:#f8fafc;padding:32px">
+  <main style="max-width:600px;margin:auto;background:#1e293b;border-radius:12px;padding:32px">
+    <h1 style="color:#22c55e">CobraPro</h1>
+    <h2>Bem-vindo(a), ${escapeHtml(nome)}!</h2>
+    <p>Sua compra de <strong>${escapeHtml(produto)}</strong> foi aprovada. Para ativar sua conta, defina uma senha segura.</p>
+    <p><a href="${resetUrl}" style="display:inline-block;background:#22c55e;color:#0f172a;padding:14px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Definir minha senha</a></p>
+    <p style="color:#94a3b8;font-size:13px">Este link é individual, pode ser usado uma vez e expira em uma hora. Se você não reconhece esta compra, ignore esta mensagem.</p>
+  </main>
+</body></html>`.trim();
+}
 
-  const db = await getDb();
-  let userId: number | undefined;
-  let senhaGerada = "";
-  let erro: string | undefined;
-  let emailEnviado = false;
+async function atualizarReserva(orderId: string, patch: Record<string, unknown>): Promise<void> {
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) throw new Error("Banco de dados indisponível");
+  const { error } = await supabase.from("kiwify_webhooks").update(patch).eq("order_id", orderId);
+  if (error) throw new Error(`Falha ao atualizar evento Kiwify: ${error.message}`);
+}
 
-  try {
-    // ── 1. Verificar se usuário já existe ────────────────────────────────────
-    let usuarioExistente: typeof users.$inferSelect | null = null;
+/**
+ * Reserva order_id antes de criar conta ou enviar e-mail. O banco precisa ter
+ * unicidade em order_id; a API retorna conflito de unicidade em reentregas.
+ */
+type ReservaEvento = {
+  estado: "reservado" | "duplicado";
+  status?: string | null;
+  userId?: number | null;
+};
 
-    if (db) {
-      const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
-      usuarioExistente = result[0] ?? null;
-    } else {
-      const supabase = await getSupabaseClientAsync();
-      if (supabase) {
-        const { data } = await supabase.from("users").select("*").eq("email", email).maybeSingle();
-        if (data) {
-          usuarioExistente = {
-            id: data.id,
-            openId: data.openId ?? "",
-            name: data.name ?? null,
-            email: data.email ?? null,
-            passwordHash: data.passwordHash ?? null,
-            loginMethod: data.loginMethod ?? null,
-            role: (data.role ?? "user") as "admin" | "user",
-            lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn) : new Date(),
-            createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-            updatedAt: data.updatedAt ? new Date(data.updatedAt) : new Date(),
-            sessionVersion: Number.isSafeInteger(data.session_version) && data.session_version >= 0
-              ? data.session_version
-              : 0,
-            onboardingCompleto: (data.onboarding_completo ?? false) as boolean,
-            nomeEmpresa: (data.nome_empresa ?? null) as string | null,
-            idioma: (data.idioma ?? 'pt-BR') as string | null,
-          };
-        }
-      }
-    }
+async function reservarEvento(dados: DadosPedido): Promise<ReservaEvento> {
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) throw new Error("Banco de dados indisponível");
 
-    if (usuarioExistente) {
-      // Usuário já existe — apenas reenviar e-mail com nova senha temporária
-      console.log(`[Kiwify] Usuário ${email} já existe (id: ${usuarioExistente.id}) — reenviando acesso`);
-      userId = usuarioExistente.id;
-      senhaGerada = gerarSenhaTemporaria();
-      const novoHash = await bcrypt.hash(senhaGerada, 12);
+  const { error } = await supabase.from("kiwify_webhooks").insert({
+    order_id: dados.orderId,
+    email: mascararEmail(dados.email),
+    nome: "Webhook Kiwify",
+    status: "processando",
+    payload: payloadMinimo(dados),
+    email_enviado: 0,
+  });
 
-      if (db) {
-        await db.update(users).set({ passwordHash: novoHash, updatedAt: new Date() }).where(eq(users.id, usuarioExistente.id));
-      } else {
-        const supabase = await getSupabaseClientAsync();
-        if (supabase) {
-          await supabase.from("users").update({ passwordHash: novoHash }).eq("id", usuarioExistente.id);
-        }
-      }
-    } else {
-      // ── 2. Criar novo usuário ────────────────────────────────────────────
-      senhaGerada = gerarSenhaTemporaria();
-      const passwordHash = await bcrypt.hash(senhaGerada, 12);
-      const openId = `kiwify_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-
-      if (db) {
-        await db.insert(users).values({
-          openId,
-          name: nome,
-          email,
-          passwordHash,
-          loginMethod: "kiwify",
-          role: "user",
-          lastSignedIn: new Date(),
-        });
-        const created = await db.select().from(users).where(eq(users.email, email)).limit(1);
-        userId = created[0]?.id;
-      } else {
-        const supabase = await getSupabaseClientAsync();
-        if (!supabase) throw new Error("Banco de dados indisponível");
-
-        const { data, error: insertError } = await supabase
-          .from("users")
-          .insert({
-            openId,
-            name: nome,
-            email,
-            passwordHash,
-            loginMethod: "kiwify",
-            role: "user",
-            lastSignedIn: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (insertError) throw new Error(insertError.message);
-        userId = (data as { id: number }).id;
-      }
-
-      console.log(`[Kiwify] Usuário criado: ${email} (id: ${userId})`);
-    }
-
-    // ── 3. Enviar e-mail de boas-vindas via Brevo ────────────────────────────
-    const htmlContent = gerarHtmlBoasVindas({ nome, email, senha: senhaGerada, produto });
-
-    emailEnviado = await enviarEmail({
-      to: email,
-      toName: nome,
-      subject: `✅ Seu acesso ao CobraPro está pronto!`,
-      htmlContent,
-    });
-
-    if (emailEnviado) {
-      console.log(`[Kiwify] E-mail de boas-vindas enviado para ${email}`);
-    } else {
-      console.error(`[Kiwify] Falha ao enviar e-mail para ${email}`);
-      erro = "Usuário criado mas e-mail não foi enviado";
-    }
-  } catch (err) {
-    erro = (err as Error).message;
-    console.error(`[Kiwify] Erro ao processar compra ${orderId}:`, erro);
+  if (!error) return { estado: "reservado" };
+  // Postgres 23505 e a mensagem do PostgREST representam a mesma reentrega.
+  if (error.code === "23505" || /duplicate|unique/i.test(error.message ?? "")) {
+    const { data: existente, error: consultaErro } = await supabase
+      .from("kiwify_webhooks")
+      .select("status, user_criado")
+      .eq("order_id", dados.orderId)
+      .maybeSingle();
+    if (consultaErro) throw new Error(`Falha ao ler evento Kiwify existente: ${consultaErro.message}`);
+    return {
+      estado: "duplicado",
+      status: typeof existente?.status === "string" ? existente.status : null,
+      userId: typeof existente?.user_criado === "number" ? existente.user_criado : null,
+    };
   }
+  throw new Error(`Falha ao reservar evento Kiwify: ${error.message}`);
+}
 
-  // ── 4. Registrar log ─────────────────────────────────────────────────────
-  await logWebhook({
-    orderId,
-    email,
-    nome,
-    status: payload.order_status ?? "paid",
-    payload,
-    userCriado: userId,
-    emailEnviado,
-    erro,
+async function enviarConviteDeDefinicaoDeSenha(userId: number, dados: DadosPedido): Promise<boolean> {
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) throw new Error("Banco de dados indisponível");
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const { error: resetErro } = await supabase.from("password_resets").insert({
+    user_id: userId,
+    token: hashResetToken(token),
+    expires_at: new Date(Date.now() + RESET_TTL_MS).toISOString(),
+  });
+  if (resetErro) throw new Error(`Não foi possível emitir o link seguro: ${resetErro.message}`);
+
+  return enviarEmail({
+    to: dados.email,
+    toName: dados.nome,
+    subject: "Defina sua senha de acesso ao CobraPro",
+    htmlContent: htmlDefinirSenha(dados.nome, dados.produto, `${RESET_ORIGIN}/reset-senha?token=${token}`),
   });
 }
 
-// ─── Registro das rotas Express ───────────────────────────────────────────────
+async function criarContaEEnviarConvite(dados: DadosPedido): Promise<{ userId?: number; emailEnviado: boolean; existente: boolean }> {
+  const supabase = await getSupabaseClientAsync();
+  if (!supabase) throw new Error("Banco de dados indisponível");
+
+  const { data: existente, error: consultaErro } = await supabase
+    .from("users")
+    .select("id")
+    .eq("email", dados.email)
+    .maybeSingle();
+  if (consultaErro) throw new Error(`Falha ao consultar usuário: ${consultaErro.message}`);
+
+  // Um webhook de venda nunca altera credencial, papel ou sessão de uma conta existente.
+  if (existente?.id) return { userId: existente.id as number, emailEnviado: false, existente: true };
+
+  const senhaAleatoria = crypto.randomBytes(48).toString("base64url");
+  const passwordHash = await bcrypt.hash(senhaAleatoria, 12);
+  const openId = `kiwify_${crypto.randomUUID()}`;
+  const { data: criado, error: criacaoErro } = await supabase
+    .from("users")
+    .insert({
+      openId,
+      name: dados.nome,
+      email: dados.email,
+      passwordHash,
+      loginMethod: "kiwify",
+      role: "user",
+      lastSignedIn: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (criacaoErro || !criado?.id) throw new Error(criacaoErro?.message ?? "Não foi possível criar a conta");
+
+  const emailEnviado = await enviarConviteDeDefinicaoDeSenha(criado.id as number, dados);
+  return { userId: criado.id as number, emailEnviado, existente: false };
+}
+
+async function processarCompraAprovada(dados: DadosPedido): Promise<{ userId?: number; emailEnviado: boolean; existente: boolean }> {
+  const resultado = await criarContaEEnviarConvite(dados);
+  await atualizarReserva(dados.orderId, {
+    status: resultado.existente ? "usuario_existente" : resultado.emailEnviado ? "concluido" : "email_pendente",
+    user_criado: resultado.userId ?? null,
+    email_enviado: resultado.emailEnviado ? 1 : 0,
+    erro: resultado.emailEnviado || resultado.existente ? null : "Conta criada, mas convite não foi enviado",
+  });
+  return resultado;
+}
+
 export function registerKiwifyWebhookRoutes(app: Express) {
-  // Token de segurança — configurado na Kiwify como "Token"
-  const KIWIFY_TOKEN = process.env.KIWIFY_WEBHOOK_TOKEN ?? "";
+  app.post("/api/webhook/kiwify", async (req: RawBodyRequest, res: Response) => {
+    const token = process.env.KIWIFY_WEBHOOK_TOKEN ?? "";
+    if (!token) return res.status(503).json({ error: "Webhook temporariamente indisponível" });
 
-  // POST /api/webhook/kiwify — recebe eventos da Kiwify
-  app.post("/api/webhook/kiwify", async (req: Request, res: Response) => {
+    const signature = req.query.signature;
+    if (!req.rawBody || !assinaturaKiwifyEhValida(req.rawBody, signature, token)) {
+      return res.status(401).json({ error: "Assinatura inválida" });
+    }
+
+    const payload = req.body as KiwifyPayload;
+    const dados = extrairDadosPedido(payload);
+    if (!dados) return res.status(400).json({ error: "Payload de pedido inválido" });
+
+    if (!compraAprovada(dados)) {
+      return res.status(200).json({ received: true, ignored: true });
+    }
+
     try {
-      // A Kiwify envia autenticação via campo "signature" no corpo JSON
-      // Não valida o token aqui pois a Kiwify não envia o token no header
-      // A segurança é garantida pelo endpoint ser secreto (URL não divulgada)
-      const bodySignature = (req.body?.signature as string) ?? "";
-      console.log("[Kiwify] Webhook recebido | signature:", bodySignature ? "presente" : "ausente");
-
-      const reqBody = req.body as KiwifyPayload;
-      // Suporta formato novo (dados em "order") e legado (dados na raiz)
-      const orderData = reqBody.order;
-      // Status pode vir em vários campos dependendo da versão do payload
-      const reqBodyAny = reqBody as Record<string, unknown>;
-      const status = (
-        orderData?.order_status ??
-        (reqBodyAny.order_status as string | undefined) ??
-        ""
-      ).toLowerCase();
-      // Evento pode vir como "event" na raiz ou "webhook_event_type" dentro de order
-      const eventType = (
-        (reqBodyAny.event as string | undefined) ??
-        orderData?.webhook_event_type ??
-        ""
-      ).toLowerCase();
-      const orderId = orderData?.order_id ?? reqBody.order_id ?? "";
-      console.log(`[Kiwify] status: ${status} | event: ${eventType} | order: ${orderId}`);
-      // Responder imediatamente com 200 (Kiwify exige resposta rápida)
-      res.status(200).json({ received: true });
-      // Processar apenas compras aprovadas
-      const isApproved =
-        status === "paid" || status === "approved" || status === "complete" ||
-        eventType === "order_approved" || eventType === "compra_aprovada";
-      if (isApproved) {
-        await processarCompraAprovada(reqBody);
-      } else {
-        console.log(`[Kiwify] Evento ignorado (status: ${status}, event: ${eventType}) | order: ${orderId}`);
+      const reserva = await reservarEvento(dados);
+      if (reserva.estado === "duplicado") {
+        // Uma falha temporária de e-mail pode ser retomada somente para a conta
+        // que este mesmo pedido já criou. Nunca use uma reentrega para mexer em
+        // conta preexistente com o mesmo e-mail.
+        if (reserva.status === "email_pendente" && reserva.userId && reserva.userId > 0) {
+          const emailEnviado = await enviarConviteDeDefinicaoDeSenha(reserva.userId, dados);
+          await atualizarReserva(dados.orderId, {
+            status: emailEnviado ? "concluido" : "email_pendente",
+            email_enviado: emailEnviado ? 1 : 0,
+            erro: emailEnviado ? null : "Convite não foi enviado",
+          });
+          if (!emailEnviado) throw new Error("Convite não aceito pelo serviço de e-mail");
+          return res.status(200).json({ received: true, retried: true });
+        }
+        return res.status(200).json({ received: true, duplicate: true });
       }
+      const resultado = await processarCompraAprovada(dados);
+      if (!resultado.existente && !resultado.emailEnviado) {
+        return res.status(503).json({ error: "Convite pendente de entrega" });
+      }
+      return res.status(200).json({ received: true });
     } catch (err) {
-      console.error("[Kiwify] Erro no endpoint:", err);
-      // Já respondeu 200 acima — não enviar novamente
+      console.error("[Kiwify] Falha ao processar evento autenticado:", err instanceof Error ? err.message : err);
+      try {
+        await atualizarReserva(dados.orderId, { status: "erro", erro: "Falha transitória no processamento" });
+      } catch {
+        // A resposta 5xx continua permitindo retry da Kiwify mesmo se o log falhar.
+      }
+      return res.status(500).json({ error: "Não foi possível processar o evento" });
     }
   });
 
-  // GET /api/webhook/kiwify — health check
   app.get("/api/webhook/kiwify", (_req: Request, res: Response) => {
-    res.json({
-      status: "ok",
-      service: "CobraPro Kiwify Webhook",
-      timestamp: new Date().toISOString(),
-    });
+    res.json({ status: "ok", service: "CobraPro Kiwify Webhook" });
   });
 }

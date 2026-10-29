@@ -46,7 +46,16 @@ async function startServer() {
   // Somente o endpoint autenticado de documentos recebe o teto maior. O
   // restante da API (login, webhooks e tRPC) não deve aceitar corpos de upload.
   app.use("/api/upload", express.json({ limit: LIMITE_CORPO_UPLOAD }));
-  app.use(express.json({ limit: LIMITE_CORPO_PADRAO }));
+  app.use(express.json({
+    limit: LIMITE_CORPO_PADRAO,
+    // A assinatura Kiwify é HMAC-SHA1 dos bytes originais. Guardar apenas esse
+    // corpo, antes do JSON.parse, evita aceitar uma serialização alterada.
+    verify: (req, _res, buffer) => {
+      if ((req.url ?? "").split("?")[0] === "/api/webhook/kiwify") {
+        (req as express.Request & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+      }
+    },
+  }));
   app.use(express.urlencoded({ limit: LIMITE_FORMULARIO, extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
