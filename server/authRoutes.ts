@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { and, eq, gt, sql } from "drizzle-orm";
-import type { Express, Request, Response } from "express";
+import { and, eq, gt } from "drizzle-orm";
+import type { Express, NextFunction, Request, Response } from "express";
 import { passwordResets, users } from "../drizzle/schema";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -11,8 +11,13 @@ import { sdk } from "./_core/sdk";
 import { storagePut } from "./storage";
 import { validarUploadCliente } from "./uploadSecurity";
 import { chaveDeLimitacao, LimitadorDeTentativas } from "./authRateLimit";
+import { ROLE_CADASTRO_PUBLICO } from "./authRole";
 
 const ORIGEM_PUBLICA_PADRAO = "https://cobrapro.online";
+const ORIGENS_PRIMEIRA_PARTE = new Set([
+  "https://cobrapro.online",
+  "https://www.cobrapro.online",
+]);
 const limiteDeAutenticacao = new LimitadorDeTentativas();
 const JANELA_LOGIN_MS = 15 * 60 * 1000;
 const JANELA_RESET_MS = 60 * 60 * 1000;
@@ -26,16 +31,34 @@ export function obterOrigemSeguraParaReset(origin: unknown): string {
   if (typeof origin !== "string") return ORIGEM_PUBLICA_PADRAO;
   try {
     const url = new URL(origin);
-    const permitida = url.protocol === "https:" && (
-      url.hostname === "cobrapro.online" ||
-      url.hostname === "www.cobrapro.online" ||
-      url.hostname.endsWith(".manus.space") ||
-      url.hostname.endsWith(".manus.computer")
-    );
-    return permitida ? url.origin : ORIGEM_PUBLICA_PADRAO;
+    if (ORIGENS_PRIMEIRA_PARTE.has(url.origin)) return url.origin;
+    // Desenvolvimento local não deve ampliar a superfície de produção.
+    if (process.env.NODE_ENV !== "production" && ["localhost", "127.0.0.1", "::1"].includes(url.hostname)) {
+      return url.origin;
+    }
+    return ORIGEM_PUBLICA_PADRAO;
   } catch {
     return ORIGEM_PUBLICA_PADRAO;
   }
+}
+
+/**
+ * Evita login CSRF, criação indevida de contas e disparo de resets a partir de
+ * formulários hospedados por terceiros. Chamadas não oriundas de navegador
+ * (sem Origin / Sec-Fetch-Site) continuam possíveis para integrações legítimas.
+ */
+export function origemEhConfiavelParaMutacaoPublica(req: Pick<Request, "headers">): boolean {
+  const fetchSite = req.headers["sec-fetch-site"];
+  if (typeof fetchSite === "string" && fetchSite.toLowerCase() === "cross-site") return false;
+
+  const origin = req.headers.origin;
+  if (typeof origin !== "string" || !origin) return true;
+  return obterOrigemSeguraParaReset(origin) === origin;
+}
+
+function exigirOrigemConfiavelParaMutacaoPublica(req: Request, res: Response, next: NextFunction) {
+  if (origemEhConfiavelParaMutacaoPublica(req)) return next();
+  res.status(403).json({ error: "Origem da requisição não permitida" });
 }
 
 function limitarTentativaPublica(
@@ -156,15 +179,8 @@ async function createSessionForUser(
 }
 
 export function registerAuthRoutes(app: Express) {
-  // ── GET /api/auth/logout ──────────────────────────────────────────────────
-  app.get("/api/auth/logout", (req: Request, res: Response) => {
-    const cookieOptions = getSessionCookieOptions(req);
-    res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
-    res.redirect("/login");
-  });
-
   // ── POST /api/auth/login ──────────────────────────────────────────────────
-  app.post("/api/auth/login", async (req: Request, res: Response) => {
+  app.post("/api/auth/login", exigirOrigemConfiavelParaMutacaoPublica, async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body as { email?: string; password?: string };
       if (!email || !password) {
@@ -221,7 +237,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // ── POST /api/auth/register ───────────────────────────────────────────────
-  app.post("/api/auth/register", async (req: Request, res: Response) => {
+  app.post("/api/auth/register", exigirOrigemConfiavelParaMutacaoPublica, async (req: Request, res: Response) => {
     try {
       const { name, email, password } = req.body as {
         name?: string;
@@ -250,17 +266,14 @@ export function registerAuthRoutes(app: Express) {
       let newUser: typeof users.$inferSelect | null = null;
 
       if (db) {
-        // Primeiro usuário vira admin automaticamente
-        const countResult = await db.select({ count: sql<number>`count(*)` }).from(users);
-        const isFirstUser = (countResult[0]?.count ?? 0) === 0;
-
         await db.insert(users).values({
           openId,
           name,
           email,
           passwordHash,
           loginMethod: "email",
-          role: isFirstUser ? "admin" : "user",
+          // Privilégios administrativos são provisionados fora de rotas públicas.
+          role: ROLE_CADASTRO_PUBLICO,
           lastSignedIn: new Date(),
         });
         newUser = (await db.select().from(users).where(eq(users.email, email)).limit(1))[0] ?? null;
@@ -271,19 +284,15 @@ export function registerAuthRoutes(app: Express) {
           res.status(500).json({ error: "Banco de dados indisponível" });
           return;
         }
-        // Verificar se é primeiro usuário
-        const { count } = await supabase.from("users").select("*", { count: "exact", head: true });
-        const isFirstUser = (count ?? 0) === 0;
-
-          const { data, error } = await supabase.from("users").insert({
-            openId,
-            name,
-            email,
-            passwordHash,
-            loginMethod: "email",
-            role: isFirstUser ? "admin" : "user",
-            lastSignedIn: new Date().toISOString(),
-          }).select().single();
+        const { data, error } = await supabase.from("users").insert({
+          openId,
+          name,
+          email,
+          passwordHash,
+          loginMethod: "email",
+          role: ROLE_CADASTRO_PUBLICO,
+          lastSignedIn: new Date().toISOString(),
+        }).select().single();
 
         if (error || !data) {
           res.status(500).json({ error: "Erro ao criar usuário" });
@@ -309,7 +318,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // ── POST /api/auth/forgot-password ────────────────────────────────────
-  app.post("/api/auth/forgot-password", async (req: Request, res: Response) => {
+  app.post("/api/auth/forgot-password", exigirOrigemConfiavelParaMutacaoPublica, async (req: Request, res: Response) => {
     try {
       const { email } = req.body as { email?: string };
       if (!email) {
@@ -419,7 +428,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // ── POST /api/auth/reset-password ────────────────────────────────────
-  app.post("/api/auth/reset-password", async (req: Request, res: Response) => {
+  app.post("/api/auth/reset-password", exigirOrigemConfiavelParaMutacaoPublica, async (req: Request, res: Response) => {
     try {
       const { token, password } = req.body as { token?: string; password?: string };
       if (!token || !password) {
@@ -492,7 +501,7 @@ export function registerAuthRoutes(app: Express) {
   });
 
   // ─── UPLOAD DE ARQUIVOS (foto e documentos de clientes) ─────────────
-  app.post("/api/upload", async (req: Request, res: Response) => {
+  app.post("/api/upload", exigirOrigemConfiavelParaMutacaoPublica, async (req: Request, res: Response) => {
     try {
       const user = await sdk.authenticateRequest(req);
       if (user.isCron || user.id <= 0) {

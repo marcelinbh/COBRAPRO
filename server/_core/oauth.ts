@@ -9,7 +9,23 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * O CobraPro usa login próprio por e-mail/senha. O callback legado Manus só é
+ * mantido para uma migração explicitamente autorizada; sem state nonce emitido
+ * pelo iniciador, deixá-lo ativo permitiria login CSRF.
+ */
+export function oauthLegadoEstaHabilitado(environment = process.env): boolean {
+  return environment.ENABLE_LEGACY_MANUS_OAUTH === "true";
+}
+
 export function registerOAuthRoutes(app: Express) {
+  if (!oauthLegadoEstaHabilitado()) {
+    app.get("/api/oauth/callback", (_req: Request, res: Response) => {
+      res.status(410).json({ error: "Login OAuth legado desabilitado" });
+    });
+    return;
+  }
+
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");

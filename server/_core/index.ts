@@ -38,6 +38,8 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // Não exponha a tecnologia do servidor em cada resposta pública.
+  app.disable("x-powered-by");
   // Compressão gzip/brotli para reduzir tamanho das respostas
   app.use(compression());
   app.use(cabecalhosSeguranca);

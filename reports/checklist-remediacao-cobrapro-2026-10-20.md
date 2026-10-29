@@ -14,6 +14,10 @@
 - [x] Adicionar testes de regressão à validação de upload.
 - [x] Impedir que o cabeçalho `Origin` redirecione e-mails de recuperação de senha a domínios externos.
 - [x] Alterar o cookie de sessão para `SameSite=Lax`, preservando callback OAuth por GET e impedindo mutações autenticadas por formulário cross-site.
+- [x] Rejeitar mutações públicas de autenticação iniciadas por `Origin`/`Sec-Fetch-Site` externo e remover o logout HTTP legado por `GET`.
+- [x] Remover a promoção automática do primeiro cadastro público a administrador; perfis administrativos exigem provisionamento explícito.
+- [x] Desabilitar por padrão o callback OAuth legado sem nonce/state vinculado; só pode ser reativado por configuração explícita durante migração controlada.
+- [x] Minimizar logs de login: não há mais geolocalização por HTTP, IP bruto, coordenadas, ISP ou user-agent integral persistidos; o IP passa a ser apenas um identificador HMAC de auditoria.
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Consumir token de recuperação condicionalmente no banco antes de alterar a senha, bloqueando uso concorrente do mesmo link.
@@ -74,6 +78,7 @@
 ## Proteção HTTP complementar
 
 - [x] Aplicar CSP de base, proteção contra clickjacking, MIME sniffing, referrer excessivo, permissões sensíveis e HSTS quando a requisição chegar por HTTPS.
+- [x] Remover o cabeçalho de fingerprint `X-Powered-By` do Express.
 
 ## Prioridade P4 — Kiwify (por último, conforme solicitado)
 

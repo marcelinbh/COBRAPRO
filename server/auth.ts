@@ -6,6 +6,7 @@ import { sdk } from "./_core/sdk";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import type { Request, Response } from "express";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { ROLE_CADASTRO_PUBLICO } from "./authRole";
 
 export async function loginWithEmail(
   email: string,
@@ -56,17 +57,14 @@ export async function registerUser(
   const passwordHash = await bcrypt.hash(password, 12);
   const openId = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-  // Verificar se é o primeiro usuário (será admin)
-  const count = await db.select().from(users).limit(1);
-  const isFirstUser = count.length === 0;
-
   await db.insert(users).values({
     openId,
     name,
     email,
     passwordHash,
     loginMethod: "email",
-    role: isFirstUser ? "admin" : "user",
+    // Privilégios administrativos são provisionados fora de rotas públicas.
+    role: ROLE_CADASTRO_PUBLICO,
     lastSignedIn: new Date(),
   });
 
