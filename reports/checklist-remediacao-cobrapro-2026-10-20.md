@@ -23,6 +23,7 @@
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Consumir token de recuperação condicionalmente no banco antes de alterar a senha, bloqueando uso concorrente do mesmo link.
+- [ ] Revogar todas as sessões de uma conta após redefinição de senha. **Migration PostgreSQL `0016_revogacao_sessoes_reset_senha.sql` preparada: adiciona versão de sessão, trigger de defesa e RPC única para consumir token/trocar senha/revogar sessões. Exige preflight no Supabase COBRA PRO e rollout coordenado do backend; não foi aplicada.**
 - [x] Remover a chave padrão da Evolution do código e exigir variável criptografada na DigitalOcean.
 - [x] Remover artefatos compilados versionados e impedir que `dist/` volte ao repositório.
 - [x] Restringir uploads de logo a PNG/JPG/WEBP de até 2 MB, verificar assinatura do arquivo e eliminar a rota de upload inexistente.

@@ -46,6 +46,10 @@ A auditoria do callback da Evolution identificou três riscos: o endpoint reconh
 
 A revisão independente identificou que a RPC `0015` reaplicava juros/multa/desconto em uma segunda baixa parcial; isso criaria diferença de Caixa mesmo dentro de uma transação. O script foi corrigido para quitar a parcela parcial pelo `saldo_residual` líquido, passou a recusar saldo residual/vencimento inválidos, compara cliente da parcela com o contrato e rejeita configurações financeiras sinônimas ambíguas. As migrations `0013` e `0014` agora falham para chaves lógicas nulas, duplicidades e vínculos de assinatura/conta/pagamento entre empresas; o preflight também ganhou verificações de lançamentos órfãos/cruzados e estados residuais incompatíveis. Foram aprovadas 35 regressões financeiras direcionadas, TypeScript e build. **Nada desse DDL foi executado em produção**: permanece obrigatório realizar o preflight no Supabase COBRA PRO e sanar qualquer divergência antes da aplicação.
 
+## Sessões após redefinição de senha
+
+Foi confirmado que a troca de senha não invalidava cookies JWT de longa duração já emitidos. A migration `0016_revogacao_sessoes_reset_senha.sql` foi preparada para adicionar `session_version`, incrementá-la exclusivamente quando a hash de senha muda e expor uma RPC atômica que consome o token de reset, atualiza a senha e revoga sessões na mesma transação. O schema local e os mapeamentos REST já aceitam o campo com `0` compatível, mas **a emissão/verificação do claim e o handler que chama a RPC não serão publicados antes de validar/aplicar o DDL no Supabase COBRA PRO**; isso evita colocar em produção código dependente de coluna/função ausentes. Foram aprovadas 21 regressões de migration, autenticação e cookie, TypeScript e build.
+
 ## Escopo de execução
 
 1. Acesso, navegação e leitura de dashboard.

@@ -58,6 +58,9 @@ export const users = pgTable("users", {
   createdAt: timestamp("createdAt", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updatedAt", { withTimezone: true }).defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn", { withTimezone: true }).defaultNow().notNull(),
+  // Incrementada pelo banco quando a senha muda; a comparação com o JWT
+  // revoga sessões antigas depois que a migration 0016 for aplicada.
+  sessionVersion: integer("session_version").default(0).notNull(),
   onboardingCompleto: boolean("onboarding_completo").default(false).notNull(),
   nomeEmpresa: varchar("nome_empresa", { length: 255 }),
   idioma: varchar("idioma", { length: 10 }).default("pt-BR"),
