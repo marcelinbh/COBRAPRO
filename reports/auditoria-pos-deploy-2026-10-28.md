@@ -34,6 +34,12 @@ Uma revisão paralela dos recebimentos de parcelas e renovações, despesas, che
 
 **Pré-auditoria de banco:** a tentativa de executar o inventário somente leitura no SQL Editor do projeto correto retornou erro do editor (`query: Too small: expected string to have >=1 characters`) e nenhuma consulta foi enviada ao banco. O conector MCP ainda está autorizado apenas para outro projeto Supabase; por isso, nenhuma migration foi aplicada. A migration `0015_rpc_recebimento_parcela.sql` ficou preparada, testada estaticamente e pendente de pré-auditoria válida no projeto COBRA PRO. Ela inclui trava de tenant/linha, idempotência com hash, vínculo único do lançamento à operação, calendário civil de Brasília, histórico e auditoria na mesma transação.
 
+## Webhook Evolution: confiabilidade e privacidade
+
+A auditoria do callback da Evolution identificou três riscos: o endpoint reconhecia o evento antes de persistir qualquer evidência, guardava o payload integral (que pode conter JID/telefone, corpo e mídia) e um recibo atrasado podia reduzir um histórico `lido` para `entregue` ou `aceito_evolution`.
+
+**Correção validada localmente:** o webhook agora aceita apenas `MESSAGES_UPDATE` e `CONNECTION_UPDATE`, rejeita dados malformados/recebidos e limita lotes; registra um resumo mínimo antes de devolver HTTP 200 e retorna 503 quando não consegue persistir/processar para permitir retry do provedor. A atualização de status é monotônica (`aceito → entregue → lido`), portanto callbacks atrasados não reduzem o estado apresentado. Foram aprovadas 14 regressões direcionadas, `pnpm check` e build. A deduplicação definitiva de inbox por evento e o fencing de leases ainda dependem de migration e pré-auditoria no Supabase; não foram alegados como concluídos.
+
 ## Escopo de execução
 
 1. Acesso, navegação e leitura de dashboard.
