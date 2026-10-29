@@ -26,15 +26,15 @@ WHERE n.nspname = 'public'
   )
 GROUP BY t.typname;
 
--- 3. Duplicidades e tenant nulo: bloqueiam a unicidade de parcela.
+-- 3. Duplicidades ou chaves lógicas nulas bloqueiam a unicidade de parcela.
 SELECT user_id, contrato_id, numero_parcela, count(*) AS quantidade, array_agg(id ORDER BY id) AS ids
 FROM public.parcelas
 GROUP BY user_id, contrato_id, numero_parcela
 HAVING count(*) > 1;
 
-SELECT id, contrato_id, numero_parcela
+SELECT id, user_id, contrato_id, numero_parcela
 FROM public.parcelas
-WHERE user_id IS NULL;
+WHERE user_id IS NULL OR contrato_id IS NULL OR numero_parcela IS NULL;
 
 -- 4. Relação parcela/contrato/cliente fora da mesma empresa.
 SELECT p.id, p.user_id AS parcela_user_id, c.user_id AS contrato_user_id,
@@ -65,6 +65,26 @@ FROM public.parcelas p
 LEFT JOIN caixa c ON c.user_id = p.user_id AND c.parcela_id = p.id
 WHERE coalesce(p.valor_pago, 0) > 0
   AND coalesce(p.valor_pago, 0) <> coalesce(c.total, 0);
+
+-- 6b. Lançamentos de recebimento não podem apontar a parcela, contrato ou
+-- cliente de outra empresa, nem existir sem a parcela de origem.
+SELECT t.id, t.user_id AS transacao_user_id, t.parcela_id,
+       p.user_id AS parcela_user_id, t.contrato_id, p.contrato_id AS parcela_contrato_id,
+       t.cliente_id, p.cliente_id AS parcela_cliente_id
+FROM public.transacoes_caixa t
+LEFT JOIN public.parcelas p ON p.id = t.parcela_id
+WHERE t.categoria = 'pagamento_parcela'
+  AND (p.id IS NULL
+       OR t.user_id IS DISTINCT FROM p.user_id
+       OR t.contrato_id IS DISTINCT FROM p.contrato_id
+       OR t.cliente_id IS DISTINCT FROM p.cliente_id);
+
+-- 6c. Estados que a RPC trata de modo especial devem obedecer seus invariantes.
+SELECT id, user_id, status, saldo_residual, valor_pago, data_vencimento
+FROM public.parcelas
+WHERE (status = 'parcial' AND (saldo_residual IS NULL OR saldo_residual <= 0))
+   OR (status = 'paga' AND coalesce(saldo_residual, 0) <> 0)
+   OR data_vencimento IS NULL;
 
 -- 7. Operações idempotentes legadas que não podem ser migradas sem revisão.
 SELECT id, user_id, tipo, chave_idempotencia, status, erro, created_at, concluida_em
@@ -112,3 +132,27 @@ SELECT user_id, chave_idempotencia, count(*) AS quantidade
 FROM public.operacoes_financeiras
 GROUP BY user_id, chave_idempotencia
 HAVING count(*) > 1;
+
+SELECT id, user_id, chave_idempotencia
+FROM public.operacoes_financeiras
+WHERE user_id IS NULL OR chave_idempotencia IS NULL;
+
+-- 11. Relações de tenant exigidas pelas futuras constraints compostas.
+SELECT t.id, t.user_id AS transacao_user_id, t.operacao_financeira_id,
+       o.user_id AS operacao_user_id
+FROM public.transacoes_caixa t
+LEFT JOIN public.operacoes_financeiras o ON o.id = t.operacao_financeira_id
+WHERE t.operacao_financeira_id IS NOT NULL
+  AND (o.id IS NULL OR t.user_id IS DISTINCT FROM o.user_id);
+
+SELECT p.id, p.user_id AS pagamento_user_id, p.assinatura_id, p.cliente_id,
+       a.user_id AS assinatura_user_id, a.cliente_id AS assinatura_cliente_id,
+       p.conta_caixa_id, c.user_id AS conta_user_id
+FROM public.pagamentos_assinatura p
+LEFT JOIN public.assinaturas a ON a.id = p.assinatura_id
+LEFT JOIN public.contas_caixa c ON c.id = p.conta_caixa_id
+WHERE p.user_id IS NULL OR p.assinatura_id IS NULL OR p.cliente_id IS NULL
+   OR p.conta_caixa_id IS NULL OR p.mes_referencia IS NULL
+   OR a.id IS NULL OR a.user_id IS DISTINCT FROM p.user_id
+   OR a.cliente_id IS DISTINCT FROM p.cliente_id
+   OR c.id IS NULL OR c.user_id IS DISTINCT FROM p.user_id;

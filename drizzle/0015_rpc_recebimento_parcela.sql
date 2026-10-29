@@ -10,7 +10,7 @@ DECLARE
   requisito RECORD;
 BEGIN
   FOREACH tabela IN ARRAY ARRAY[
-    'parcelas', 'contratos', 'contas_caixa', 'transacoes_caixa',
+    'parcelas', 'contratos', 'clientes', 'contas_caixa', 'transacoes_caixa',
     'operacoes_financeiras', 'auditoria_financeira', 'contrato_historico',
     'configuracoes'
   ] LOOP
@@ -31,6 +31,7 @@ BEGIN
       ('parcelas','saldo_residual'), ('parcelas','multa_diaria_usada'), ('parcelas','data_vencimento'),
       ('parcelas','data_pagamento'), ('parcelas','status'), ('parcelas','conta_caixa_id'), ('parcelas','observacoes'),
       ('contratos','id'), ('contratos','user_id'), ('contratos','status'),
+      ('clientes','id'), ('clientes','user_id'),
       ('contas_caixa','id'), ('contas_caixa','user_id'), ('contas_caixa','ativo'),
       ('transacoes_caixa','id'), ('transacoes_caixa','user_id'), ('transacoes_caixa','conta_caixa_id'),
       ('transacoes_caixa','tipo'), ('transacoes_caixa','categoria'), ('transacoes_caixa','valor'),
@@ -63,35 +64,55 @@ BEGIN
 END $$;
 
 -- Vínculo imutável entre a operação idempotente e seu lançamento de Caixa.
+-- A empresa participa de todas as referências: IDs isolados não impedem que
+-- uma escrita futura ou legado apontem para dados de outra empresa.
 ALTER TABLE public.transacoes_caixa
   ADD COLUMN IF NOT EXISTS operacao_financeira_id UUID;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'transacoes_caixa_operacao_financeira_fk'
-      AND conrelid = 'public.transacoes_caixa'::regclass
+  IF EXISTS (
+    SELECT 1
+    FROM public.transacoes_caixa t
+    LEFT JOIN public.operacoes_financeiras o ON o.id = t.operacao_financeira_id
+    LEFT JOIN public.contas_caixa c ON c.id = t.conta_caixa_id
+    WHERE t.user_id IS NULL
+       OR c.id IS NULL OR c.user_id IS DISTINCT FROM t.user_id
+       OR (t.operacao_financeira_id IS NOT NULL AND (o.id IS NULL OR o.user_id IS DISTINCT FROM t.user_id))
   ) THEN
-    ALTER TABLE public.transacoes_caixa
-      ADD CONSTRAINT transacoes_caixa_operacao_financeira_fk
-      FOREIGN KEY (operacao_financeira_id)
-      REFERENCES public.operacoes_financeiras(id)
-      ON DELETE RESTRICT;
+    RAISE EXCEPTION 'RPC não instalada: há lançamentos de Caixa sem tenant ou com vínculo de empresa divergente.';
   END IF;
 END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS operacoes_financeiras_user_id_id_uk
+  ON public.operacoes_financeiras (user_id, id);
+CREATE UNIQUE INDEX IF NOT EXISTS contas_caixa_user_id_id_uk
+  ON public.contas_caixa (user_id, id);
+
+ALTER TABLE public.transacoes_caixa
+  DROP CONSTRAINT IF EXISTS transacoes_caixa_operacao_financeira_fk,
+  DROP CONSTRAINT IF EXISTS transacoes_caixa_conta_tenant_fk;
+
+ALTER TABLE public.transacoes_caixa
+  ADD CONSTRAINT transacoes_caixa_operacao_financeira_tenant_fk
+  FOREIGN KEY (user_id, operacao_financeira_id)
+  REFERENCES public.operacoes_financeiras (user_id, id)
+  ON DELETE RESTRICT,
+  ADD CONSTRAINT transacoes_caixa_conta_tenant_fk
+  FOREIGN KEY (user_id, conta_caixa_id)
+  REFERENCES public.contas_caixa (user_id, id)
+  ON DELETE RESTRICT,
+  ADD CONSTRAINT transacoes_caixa_operacao_financeira_tenant_check
+  CHECK (operacao_financeira_id IS NULL OR user_id IS NOT NULL);
 
 DO $$
 BEGIN
   IF NOT EXISTS (
-    SELECT 1
-    FROM pg_constraint c
-    WHERE c.conrelid = 'public.transacoes_caixa'::regclass
-      AND c.contype = 'f'
-      AND c.confrelid = 'public.operacoes_financeiras'::regclass
-      AND c.conkey = ARRAY[(SELECT attnum FROM pg_attribute WHERE attrelid = 'public.transacoes_caixa'::regclass AND attname = 'operacao_financeira_id' AND NOT attisdropped)]::smallint[]
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'transacoes_caixa_operacao_financeira_tenant_fk'
+      AND conrelid = 'public.transacoes_caixa'::regclass
   ) THEN
-    RAISE EXCEPTION 'RPC não instalada: FK de transacoes_caixa para operacoes_financeiras inválida.';
+    RAISE EXCEPTION 'RPC não instalada: FK composta de transacoes_caixa para operacoes_financeiras ausente.';
   END IF;
 END $$;
 
@@ -233,11 +254,14 @@ BEGIN
     RAISE EXCEPTION 'Conta de Caixa não encontrada ou inativa para esta empresa' USING ERRCODE = '42501';
   END IF;
 
-  -- Trava a parcela e o contrato proprietário na mesma transação.
+  -- Trava parcela, contrato e cliente na mesma empresa. A igualdade de tenant
+  -- por si só não basta: uma parcela não pode ser baixada sob outro cliente.
   SELECT p.*, c.status::text INTO v_parcela, v_contrato_status
   FROM public.parcelas p
   JOIN public.contratos c ON c.id = p.contrato_id AND c.user_id = p_user_id
+  JOIN public.clientes cl ON cl.id = p.cliente_id AND cl.user_id = p_user_id
   WHERE p.id = p_parcela_id AND p.user_id = p_user_id
+    AND p.cliente_id = c.cliente_id
   FOR UPDATE OF p, c;
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Parcela não encontrada para esta empresa' USING ERRCODE = '42501';
@@ -257,14 +281,32 @@ BEGIN
   END IF;
 
   -- Leitura única e determinística da configuração usada neste lançamento.
+  -- Sinônimos concorrentes são ambíguos, mesmo que existam apenas duas linhas.
+  WITH configuracoes_financeiras AS (
+    SELECT chave, valor,
+      CASE
+        WHEN chave IN ('jurosMultaAutomatico', 'juros_multa_automatico') THEN 'automatico'
+        WHEN chave IN ('multaDiaria', 'multa_diaria') THEN 'diaria'
+        WHEN chave IN ('multaPadrao', 'multa_padrao') THEN 'percentual'
+      END AS regra
+    FROM public.configuracoes
+    WHERE user_id = p_user_id
+      AND chave IN (
+        'jurosMultaAutomatico', 'juros_multa_automatico',
+        'multaDiaria', 'multa_diaria', 'multaPadrao', 'multa_padrao'
+      )
+  ), regras AS (
+    SELECT regra, count(*) AS quantidade, max(valor) AS valor
+    FROM configuracoes_financeiras
+    GROUP BY regra
+  )
   SELECT
-    coalesce(max(valor) FILTER (WHERE chave IN ('jurosMultaAutomatico', 'juros_multa_automatico')), 'false') = 'true',
-    coalesce(max(valor) FILTER (WHERE chave IN ('multaDiaria', 'multa_diaria')), '0'),
-    coalesce(max(valor) FILTER (WHERE chave IN ('multaPadrao', 'multa_padrao')), '0'),
-    count(*) FILTER (WHERE chave IN ('jurosMultaAutomatico', 'juros_multa_automatico', 'multaDiaria', 'multa_diaria', 'multaPadrao', 'multa_padrao')) > 3
+    coalesce(max(valor) FILTER (WHERE regra = 'automatico'), 'false') = 'true',
+    coalesce(max(valor) FILTER (WHERE regra = 'diaria'), '0'),
+    coalesce(max(valor) FILTER (WHERE regra = 'percentual'), '0'),
+    coalesce(bool_or(quantidade > 1), false)
   INTO v_config_automatico, v_config_diaria, v_config_percentual, v_config_duplicada
-  FROM public.configuracoes
-  WHERE user_id = p_user_id;
+  FROM regras;
 
   IF v_config_duplicada THEN
     RAISE EXCEPTION 'Configurações financeiras duplicadas; revise as chaves antes de receber' USING ERRCODE = '23505';
@@ -277,14 +319,22 @@ BEGIN
     v_multa_percentual := v_config_percentual::numeric;
   END IF;
 
-  IF v_parcela.status = 'parcial' AND coalesce(v_parcela.saldo_residual, 0) > 0 THEN
-    -- O saldo remanescente já contém os encargos calculados na primeira baixa.
+  IF v_parcela.status = 'parcial' THEN
+    IF v_parcela.saldo_residual IS NULL OR v_parcela.saldo_residual <= 0 THEN
+      RAISE EXCEPTION 'Parcela parcial possui saldo residual inválido' USING ERRCODE = '23514';
+    END IF;
+    -- O saldo remanescente já contém os encargos/desconto da primeira baixa.
+    -- Portanto, ele já é o valor líquido final que falta receber.
     v_valor_total_devido := round(v_parcela.saldo_residual, 2);
     v_juros := coalesce(v_parcela.valor_juros, 0);
     v_multa := coalesce(v_parcela.valor_multa, 0);
     v_desconto := coalesce(v_parcela.valor_desconto, 0);
     v_multa_diaria := coalesce(v_parcela.multa_diaria_usada, 0);
+    v_valor_total := v_valor_total_devido;
   ELSE
+    IF v_parcela.data_vencimento IS NULL THEN
+      RAISE EXCEPTION 'Parcela possui vencimento inválido' USING ERRCODE = '23514';
+    END IF;
     v_valor_total_devido := round(coalesce(v_parcela.valor_original, 0) + coalesce(v_parcela.saldo_residual, 0), 2);
     -- DATE civil: multa só surge quando virar o dia seguinte em Brasília.
     v_dias_atraso := greatest(0, p_data_pagamento - v_parcela.data_vencimento);
@@ -295,9 +345,9 @@ BEGIN
       ELSE 0
     END;
     v_desconto := v_desconto_normalizado;
+    v_valor_total := round(v_valor_total_devido + v_juros + v_multa - v_desconto, 2);
   END IF;
 
-  v_valor_total := round(v_valor_total_devido + v_juros + v_multa - v_desconto, 2);
   IF v_valor_total < 0 THEN
     RAISE EXCEPTION 'O desconto não pode superar o valor devido' USING ERRCODE = '22023';
   END IF;

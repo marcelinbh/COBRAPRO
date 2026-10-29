@@ -40,6 +40,12 @@ A auditoria do callback da Evolution identificou três riscos: o endpoint reconh
 
 **Correção validada localmente:** o webhook agora aceita apenas `MESSAGES_UPDATE` e `CONNECTION_UPDATE`, rejeita dados malformados/recebidos e limita lotes; registra um resumo mínimo antes de devolver HTTP 200 e retorna 503 quando não consegue persistir/processar para permitir retry do provedor. A atualização de status é monotônica (`aceito → entregue → lido`), portanto callbacks atrasados não reduzem o estado apresentado. Foram aprovadas 14 regressões direcionadas, `pnpm check` e build. A deduplicação definitiva de inbox por evento e o fencing de leases ainda dependem de migration e pré-auditoria no Supabase; não foram alegados como concluídos.
 
+**Publicação e validação:** o commit `6b48e5b` entrou em produção na DigitalOcean às 15:14 BRT. O healthcheck JSON e a Evolution responderam HTTP 200 após o rollout; as execuções recentes do workflow de lembretes também concluíram com sucesso. Nenhuma mensagem real foi disparada nesta validação.
+
+## Revisão das migrations financeiras pendentes
+
+A revisão independente identificou que a RPC `0015` reaplicava juros/multa/desconto em uma segunda baixa parcial; isso criaria diferença de Caixa mesmo dentro de uma transação. O script foi corrigido para quitar a parcela parcial pelo `saldo_residual` líquido, passou a recusar saldo residual/vencimento inválidos, compara cliente da parcela com o contrato e rejeita configurações financeiras sinônimas ambíguas. As migrations `0013` e `0014` agora falham para chaves lógicas nulas, duplicidades e vínculos de assinatura/conta/pagamento entre empresas; o preflight também ganhou verificações de lançamentos órfãos/cruzados e estados residuais incompatíveis. Foram aprovadas 35 regressões financeiras direcionadas, TypeScript e build. **Nada desse DDL foi executado em produção**: permanece obrigatório realizar o preflight no Supabase COBRA PRO e sanar qualquer divergência antes da aplicação.
+
 ## Escopo de execução
 
 1. Acesso, navegação e leitura de dashboard.
