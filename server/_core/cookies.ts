@@ -42,7 +42,10 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    // O app e a API vivem no mesmo site. Lax preserva navegação normal e o
+    // callback OAuth por GET, mas impede que formulários cross-site enviem a
+    // sessão em mutações autenticadas.
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }

@@ -13,6 +13,7 @@
 - [x] Exigir sessão de usuário e restringir tamanho, MIME, destino e nome nos uploads de clientes.
 - [x] Adicionar testes de regressão à validação de upload.
 - [x] Impedir que o cabeçalho `Origin` redirecione e-mails de recuperação de senha a domínios externos.
+- [x] Alterar o cookie de sessão para `SameSite=Lax`, preservando callback OAuth por GET e impedindo mutações autenticadas por formulário cross-site.
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Consumir token de recuperação condicionalmente no banco antes de alterar a senha, bloqueando uso concorrente do mesmo link.
