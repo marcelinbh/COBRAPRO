@@ -155,6 +155,9 @@ function mapSupabaseUser(data: Record<string, unknown>): typeof users.$inferSele
     lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn as string) : new Date(),
     createdAt: data.createdAt ? new Date(data.createdAt as string) : new Date(),
     updatedAt: data.updatedAt ? new Date(data.updatedAt as string) : new Date(),
+    sessionVersion: Number.isSafeInteger(data.session_version) && (data.session_version as number) >= 0
+      ? data.session_version as number
+      : 0,
     onboardingCompleto: (data.onboarding_completo ?? false) as boolean,
     nomeEmpresa: (data.nome_empresa ?? null) as string | null,
     idioma: (data.idioma ?? 'pt-BR') as string | null,
