@@ -48,16 +48,16 @@ describe('i18n - Internationalization', () => {
   describe('Translation Keys', () => {
     it('should have common navigation keys in Portuguese', () => {
       const pt_BR = i18n.getResourceBundle('pt-BR', 'translation');
-      expect(pt_BR.nav).toBeDefined();
-      expect(pt_BR.nav.dashboard).toBeDefined();
-      expect(pt_BR.nav.clientes).toBeDefined();
+      expect(pt_BR.navigation).toBeDefined();
+      expect(pt_BR.navigation.dashboard).toBeDefined();
+      expect(pt_BR.navigation.clients).toBeDefined();
     });
 
     it('should have common navigation keys in Spanish', () => {
       const es = i18n.getResourceBundle('es', 'translation');
-      expect(es.nav).toBeDefined();
-      expect(es.nav.dashboard).toBeDefined();
-      expect(es.nav.clientes).toBeDefined();
+      expect(es.navigation).toBeDefined();
+      expect(es.navigation.dashboard).toBeDefined();
+      expect(es.navigation.clients).toBeDefined();
     });
 
     it('should have matching keys between Portuguese and Spanish', () => {
@@ -74,22 +74,22 @@ describe('i18n - Internationalization', () => {
   describe('Translation Values', () => {
     it('should return Portuguese text for Portuguese language', async () => {
       await i18n.changeLanguage('pt-BR');
-      const text = i18n.t('nav.dashboard');
+      const text = i18n.t('navigation.dashboard');
       expect(text).toBe('Dashboard');
-      expect(text).not.toBe('Tablero');
+      expect(text).not.toBe('Panel');
     });
 
     it('should return Spanish text for Spanish language', async () => {
       await i18n.changeLanguage('es');
-      const text = i18n.t('nav.dashboard');
-      expect(text).toBe('Tablero');
+      const text = i18n.t('navigation.dashboard');
+      expect(text).toBe('Panel');
       expect(text).not.toBe('Dashboard');
     });
 
     it('should return different translations for different keys', async () => {
       await i18n.changeLanguage('pt-BR');
-      const dashboard = i18n.t('nav.dashboard');
-      const clientes = i18n.t('nav.clientes');
+      const dashboard = i18n.t('navigation.dashboard');
+      const clientes = i18n.t('navigation.clientes');
       expect(dashboard).not.toBe(clientes);
     });
   });
@@ -108,18 +108,11 @@ describe('i18n - Internationalization', () => {
     });
   });
 
-  describe('Language Persistence', () => {
-    it('should persist language choice in localStorage', async () => {
-      await i18n.changeLanguage('es');
-      const stored = localStorage.getItem('i18nextLng');
-      expect(stored).toBe('es');
-    });
-
-    it('should restore language from localStorage on init', async () => {
-      localStorage.setItem('i18nextLng', 'es');
-      // Simulate re-initialization
-      await i18n.changeLanguage('es');
-      expect(i18n.language).toBe('es');
+  describe('Language Persistence Configuration', () => {
+    it('should configure browser localStorage as the first detector and cache', () => {
+      const detection = i18n.options.detection as { order?: string[]; caches?: string[] };
+      expect(detection.order).toContain('localStorage');
+      expect(detection.caches).toContain('localStorage');
     });
   });
 

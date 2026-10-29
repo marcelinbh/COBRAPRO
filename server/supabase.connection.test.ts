@@ -1,7 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { createClient } from "@supabase/supabase-js";
 
-describe("Supabase REST API Connection", () => {
+// Este teste consulta uma base externa real. Só é executado quando uma credencial
+// válida do ambiente alvo for fornecida explicitamente pelo operador.
+const describeLive = process.env.RUN_LIVE_SUPABASE_TESTS === "1" ? describe : describe.skip;
+
+describeLive("Supabase REST API Connection", () => {
   it("should connect to Supabase and query users table", async () => {
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
