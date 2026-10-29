@@ -18,6 +18,7 @@
 - [x] Remover a promoção automática do primeiro cadastro público a administrador; perfis administrativos exigem provisionamento explícito.
 - [x] Desabilitar por padrão o callback OAuth legado sem nonce/state vinculado; só pode ser reativado por configuração explícita durante migração controlada.
 - [x] Minimizar logs de login: não há mais geolocalização por HTTP, IP bruto, coordenadas, ISP ou user-agent integral persistidos; o IP passa a ser apenas um identificador HMAC de auditoria.
+- [x] Remover o agendamento de cinco minutos que fazia `force-push` em `main`; o workflow restante é manual, somente leitura e usa ação fixada por SHA.
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Consumir token de recuperação condicionalmente no banco antes de alterar a senha, bloqueando uso concorrente do mesmo link.
