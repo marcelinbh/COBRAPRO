@@ -138,11 +138,14 @@ FROM public.operacoes_financeiras
 WHERE user_id IS NULL OR chave_idempotencia IS NULL;
 
 -- 11. Relações de tenant exigidas pelas futuras constraints compostas.
-SELECT t.id, t.user_id AS transacao_user_id, t.operacao_financeira_id,
+-- A coluna operacao_financeira_id é adicionada pela 0015. to_jsonb retorna NULL
+-- antes da instalação sem exigir DDL só para executar a pré-auditoria de leitura.
+SELECT t.id, t.user_id AS transacao_user_id,
+       to_jsonb(t)->>'operacao_financeira_id' AS operacao_financeira_id,
        o.user_id AS operacao_user_id
 FROM public.transacoes_caixa t
-LEFT JOIN public.operacoes_financeiras o ON o.id = t.operacao_financeira_id
-WHERE t.operacao_financeira_id IS NOT NULL
+LEFT JOIN public.operacoes_financeiras o ON o.id::text = to_jsonb(t)->>'operacao_financeira_id'
+WHERE to_jsonb(t)->>'operacao_financeira_id' IS NOT NULL
   AND (o.id IS NULL OR t.user_id IS DISTINCT FROM o.user_id);
 
 SELECT p.id, p.user_id AS pagamento_user_id, p.assinatura_id, p.cliente_id,

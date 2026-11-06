@@ -158,7 +158,8 @@ BEGIN
     WHERE i.indrelid = 'public.operacoes_financeiras'::regclass
       AND i.indisunique
       AND i.indpred IS NULL
-      AND i.indkey::smallint[] = ARRAY[
+      -- indkey usa limite inferior 0; normalizar evita rejeitar índice válido.
+      AND ARRAY(SELECT unnest(i.indkey::smallint[])) = ARRAY[
         (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.operacoes_financeiras'::regclass AND attname = 'user_id' AND NOT attisdropped),
         (SELECT attnum FROM pg_attribute WHERE attrelid = 'public.operacoes_financeiras'::regclass AND attname = 'chave_idempotencia' AND NOT attisdropped)
       ]::smallint[]
@@ -281,7 +282,7 @@ BEGIN
 
   -- Trava parcela, contrato e cliente na mesma empresa. A igualdade de tenant
   -- por si só não basta: uma parcela não pode ser baixada sob outro cliente.
-  SELECT p.*, c.status::text INTO v_parcela, v_contrato_status
+  SELECT p.* INTO v_parcela
   FROM public.parcelas p
   JOIN public.contratos c ON c.id = p.contrato_id AND c.user_id = p_user_id
   JOIN public.clientes cl ON cl.id = p.cliente_id AND cl.user_id = p_user_id
@@ -291,6 +292,11 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Parcela não encontrada para esta empresa' USING ERRCODE = '42501';
   END IF;
+  -- O contrato já está travado pelo SELECT anterior. Variáveis %ROWTYPE não
+  -- podem participar de um INTO com múltiplos destinos escalares.
+  SELECT c.status::text INTO v_contrato_status
+  FROM public.contratos c
+  WHERE c.id = v_parcela.contrato_id AND c.user_id = p_user_id;
   IF v_contrato_status NOT IN ('ativo', 'inadimplente') THEN
     RAISE EXCEPTION 'Contrato não está elegível para recebimento' USING ERRCODE = '23514';
   END IF;

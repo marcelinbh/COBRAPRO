@@ -49,4 +49,23 @@ describe("migration 0015 — recebimento de parcela atômico", () => {
     expect(migration).toContain("'valorTotalDevido', v_valor_total_devido");
     expect(migration).toContain("'diasAtraso', v_dias_atraso");
   });
+
+  it("normaliza os limites de indkey antes de comparar a unicidade", () => {
+    expect(migration).toContain("ARRAY(SELECT unnest(i.indkey::smallint[])) = ARRAY[");
+    expect(migration).not.toContain("AND i.indkey::smallint[] = ARRAY[");
+  });
+
+  it("atribui ROWTYPE sozinho e lê o status do contrato já travado", () => {
+    expect(migration).toContain("SELECT p.* INTO v_parcela");
+    expect(migration).not.toContain("INTO v_parcela, v_contrato_status");
+    const lock = migration.indexOf("FOR UPDATE OF p, c;");
+    const status = migration.indexOf("SELECT c.status::text INTO v_contrato_status");
+    expect(status).toBeGreaterThan(lock);
+  });
+
+  it("pré-auditoria não exige a coluna que a própria 0015 cria", () => {
+    const preflight = readFileSync(resolve(process.cwd(), "reports/preflight-rpcs-financeiras.sql"), "utf8");
+    expect(preflight).toContain("to_jsonb(t)->>'operacao_financeira_id'");
+    expect(preflight).not.toContain("ON o.id = t.operacao_financeira_id");
+  });
 });

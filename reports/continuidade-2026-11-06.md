@@ -33,3 +33,13 @@ O conector Supabase continua listando somente o projeto `vozmwdwpxacdsrzqevxg`, 
 A RPC de recebimento 0015 está sendo validada em PostgreSQL local descartável com fixtures sintéticas. O objetivo é verificar execução SQL, reaplicação, baixa parcial, idempotência, isolamento, calendário de Brasília, rollback e concorrência. Mesmo um resultado local aprovado não autoriza afirmar compatibilidade com o schema produtivo sem inventário real.
 
 As operações financeiras já contidas **não foram reativadas**. A flag `ENABLE_RPC_RECEBIMENTO_PARCELA` não foi habilitada. As seis divergências históricas registradas na auditoria de 28/10 não foram corrigidas por ajustes artificiais de Caixa.
+
+## Resultado da validação PostgreSQL real
+
+O PostgreSQL 16.15 local confirmou dois bloqueadores de instalação na migration 0015 original: igualdade de arrays com limites diferentes (`indkey` com limite inferior zero) rejeitava índice válido; e `%ROWTYPE` era usado em lista `INTO` de múltiplos destinos, impedindo compilar a função. Ambos foram corrigidos. A mesma comparação dimensional foi corrigida na 0013. A pré-auditoria agora usa extração de `to_jsonb` para consultar o vínculo operacional mesmo antes de a 0015 criar a coluna, sem DDL auxiliar.
+
+O projeto ganhou runner finito reproduzível em `tests/postgres-receipt/run.sh`, fixture sintético e testes de integração com duas conexões reais. A versão **atual do repositório** executou integralmente 0013 e 0015 duas vezes, executou o preflight antes e depois e passou **17/17 grupos**: integral, parcial com encargos preservados, replay, payload conflitante, tenant/cliente/conta inativa, permissões, multa apenas no dia seguinte de Brasília, rollback injetado, FKs e quatro corridas com espera por lock observada. Ao final: zero parcelas divergentes do livro-caixa, zero operações sem Caixa ou auditoria, zero operações incompletas; PostgreSQL encerrado (`STOP_EXIT=0`, status final 3).
+
+A suíte de aplicação passou a **417 testes aprovados e 11 ignorados**, sem falhas. Esses resultados validam SQL executável e as regras do fixture local; não verificam o schema, RLS/triggers, saldos históricos ou transporte PostgREST de produção. Migrations produtivas e liberação da flag continuam pendentes.
+
+O lote anterior de comunicação foi publicado em `github/main` como `cb27976b3d97a0c5fc1e30e2b1f820a66f8dcdff`. O healthcheck de preview e produção respondeu JSON saudável; as três últimas execuções de lembretes consultadas (42261861187, 42200672145, 42153400242) terminaram com sucesso. Deploy do novo lote ainda exige confirmar a sessão e o commit no App Platform.

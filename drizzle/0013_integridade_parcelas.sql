@@ -51,7 +51,7 @@ BEGIN
     WHERE i.indrelid = 'public.parcelas'::regclass
       AND i.indisunique
       AND i.indpred IS NULL
-      AND i.indkey::smallint[] = v_atts
+      AND ARRAY(SELECT unnest(i.indkey::smallint[])) = v_atts
   ) THEN
     RAISE EXCEPTION 'Índice de parcelas inválido: exige unicidade integral (user_id, contrato_id, numero_parcela).';
   END IF;

@@ -16,6 +16,8 @@ describe("migrations financeiras — garantias de integridade", () => {
     expect(parcelas).toContain("ALTER COLUMN numero_parcela SET NOT NULL");
     expect(parcelas).toContain("i.indpred IS NULL");
     expect(parcelas).not.toContain("WHERE user_id IS NOT NULL");
+    expect(parcelas).toContain("ARRAY(SELECT unnest(i.indkey::smallint[])) = v_atts");
+    expect(parcelas).not.toContain("AND i.indkey::smallint[] = v_atts");
   });
 
   it("exige tenant, cliente e Caixa compatíveis nos pagamentos recorrentes", () => {
