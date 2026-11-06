@@ -13,6 +13,9 @@ export const ENV = {
   // Nunca manter chave de provedor no código: a produção exige variável criptografada.
   evolutionApiKey: process.env.EVOLUTION_API_KEY ?? "",
   evolutionWebhookToken: process.env.EVOLUTION_WEBHOOK_TOKEN ?? "",
+  // Transição: callbacks antigos ainda podem carregar o segredo na query até
+  // todas as instâncias serem reconfiguradas com header customizado.
+  evolutionWebhookAllowLegacyQuery: process.env.EVOLUTION_WEBHOOK_ALLOW_LEGACY_QUERY !== "false",
   facebookCapiToken: process.env.FACEBOOK_CAPI_TOKEN ?? "",
   facebookPixelId: "2748566625524880",
   // Liberação explícita e reversível: sem migration/preflight a baixa segue bloqueada.

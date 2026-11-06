@@ -44,7 +44,12 @@ async function configurarWebhookDeEntrega(instanceName: string): Promise<Evoluti
   }
 
   return request("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
-    url: `${baseUrl}/api/webhook/evolution?token=${encodeURIComponent(ENV.evolutionWebhookToken)}`,
+    // A Evolution API suporta headers customizados por instância. O segredo
+    // não deve viajar em query string, que é normalmente retida em logs.
+    url: `${baseUrl}/api/webhook/evolution`,
+    headers: {
+      "x-cobrapro-webhook-token": ENV.evolutionWebhookToken,
+    },
     webhook_by_events: false,
     webhook_base64: false,
     events: ["MESSAGES_UPDATE", "CONNECTION_UPDATE"],

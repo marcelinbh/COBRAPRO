@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import crypto, { timingSafeEqual } from "crypto";
 import type { Express, Request, Response } from "express";
 import { getSupabaseClientAsync } from "./db";
-import { enviarEmail } from "./_core/email";
+import { enviarEmail, type EmailDeliveryResult } from "./_core/email";
 import { escapeHtml } from "./utils/html";
 
 /** A Kiwify assina os bytes originais do corpo; nunca reserialize JSON para validar. */
@@ -158,7 +158,15 @@ async function reservarEvento(dados: DadosPedido): Promise<ReservaEvento> {
   throw new Error(`Falha ao reservar evento Kiwify: ${error.message}`);
 }
 
-async function enviarConviteDeDefinicaoDeSenha(userId: number, dados: DadosPedido): Promise<boolean> {
+export function statusDoConviteKiwify(entrega: EmailDeliveryResult): string {
+  if (entrega.accepted) return "concluido";
+  if (!entrega.deliveryKnown) return "email_confirmacao_pendente";
+  return entrega.retryEligible ? "email_pendente" : "email_bloqueado";
+}
+
+type ResultadoCompra = { userId?: number; emailEnviado: boolean; existente: boolean; entrega?: EmailDeliveryResult };
+
+async function enviarConviteDeDefinicaoDeSenha(userId: number, dados: DadosPedido): Promise<EmailDeliveryResult> {
   const supabase = await getSupabaseClientAsync();
   if (!supabase) throw new Error("Banco de dados indisponível");
 
@@ -170,6 +178,8 @@ async function enviarConviteDeDefinicaoDeSenha(userId: number, dados: DadosPedid
   });
   if (resetErro) throw new Error(`Não foi possível emitir o link seguro: ${resetErro.message}`);
 
+  // Registrar antes do POST: uma interrupção após aceite não autoriza reenvio.
+  await atualizarReserva(dados.orderId, { status: "email_enviando", user_criado: userId });
   return enviarEmail({
     to: dados.email,
     toName: dados.nome,
@@ -178,7 +188,7 @@ async function enviarConviteDeDefinicaoDeSenha(userId: number, dados: DadosPedid
   });
 }
 
-async function criarContaEEnviarConvite(dados: DadosPedido): Promise<{ userId?: number; emailEnviado: boolean; existente: boolean }> {
+async function criarContaEEnviarConvite(dados: DadosPedido): Promise<ResultadoCompra> {
   const supabase = await getSupabaseClientAsync();
   if (!supabase) throw new Error("Banco de dados indisponível");
 
@@ -210,17 +220,18 @@ async function criarContaEEnviarConvite(dados: DadosPedido): Promise<{ userId?: 
     .single();
   if (criacaoErro || !criado?.id) throw new Error(criacaoErro?.message ?? "Não foi possível criar a conta");
 
-  const emailEnviado = await enviarConviteDeDefinicaoDeSenha(criado.id as number, dados);
-  return { userId: criado.id as number, emailEnviado, existente: false };
+  await atualizarReserva(dados.orderId, { status: "convite_preparando", user_criado: criado.id });
+  const entrega = await enviarConviteDeDefinicaoDeSenha(criado.id as number, dados);
+  return { userId: criado.id as number, emailEnviado: entrega.accepted, existente: false, entrega };
 }
 
-async function processarCompraAprovada(dados: DadosPedido): Promise<{ userId?: number; emailEnviado: boolean; existente: boolean }> {
+async function processarCompraAprovada(dados: DadosPedido): Promise<ResultadoCompra> {
   const resultado = await criarContaEEnviarConvite(dados);
   await atualizarReserva(dados.orderId, {
-    status: resultado.existente ? "usuario_existente" : resultado.emailEnviado ? "concluido" : "email_pendente",
+    status: resultado.existente ? "usuario_existente" : statusDoConviteKiwify(resultado.entrega!),
     user_criado: resultado.userId ?? null,
     email_enviado: resultado.emailEnviado ? 1 : 0,
-    erro: resultado.emailEnviado || resultado.existente ? null : "Conta criada, mas convite não foi enviado",
+    erro: resultado.emailEnviado || resultado.existente ? null : `Convite: ${resultado.entrega?.kind}`,
   });
   return resultado;
 }
@@ -250,29 +261,44 @@ export function registerKiwifyWebhookRoutes(app: Express) {
         // que este mesmo pedido já criou. Nunca use uma reentrega para mexer em
         // conta preexistente com o mesmo e-mail.
         if (reserva.status === "email_pendente" && reserva.userId && reserva.userId > 0) {
-          const emailEnviado = await enviarConviteDeDefinicaoDeSenha(reserva.userId, dados);
-          await atualizarReserva(dados.orderId, {
-            status: emailEnviado ? "concluido" : "email_pendente",
-            email_enviado: emailEnviado ? 1 : 0,
-            erro: emailEnviado ? null : "Convite não foi enviado",
+          const supabase = await getSupabaseClientAsync();
+          if (!supabase) throw new Error("Banco de dados indisponível");
+          const { data: usuario, error: usuarioErro } = await supabase.from("users")
+            .select("id, email, name").eq("id", reserva.userId).maybeSingle();
+          if (usuarioErro || !usuario?.email || usuario.email.toLowerCase() !== dados.email) {
+            return res.status(409).json({ error: "Pedido e conta de destino divergentes" });
+          }
+          // Somente uma reentrega pode adquirir o envio pendente.
+          const { data: adquirida, error: adquirirErro } = await supabase.from("kiwify_webhooks")
+            .update({ status: "convite_preparando" }).eq("order_id", dados.orderId)
+            .eq("status", "email_pendente").eq("user_criado", reserva.userId)
+            .select("user_criado").maybeSingle();
+          if (adquirirErro) throw new Error("Reserva de convite indisponível");
+          if (!adquirida) return res.status(200).json({ received: true, duplicate: true });
+          const entrega = await enviarConviteDeDefinicaoDeSenha(reserva.userId, {
+            ...dados, email: usuario.email, nome: usuario.name ?? "Cliente",
           });
-          if (!emailEnviado) throw new Error("Convite não aceito pelo serviço de e-mail");
+          await atualizarReserva(dados.orderId, {
+            status: statusDoConviteKiwify(entrega),
+            email_enviado: entrega.accepted ? 1 : 0,
+            erro: entrega.accepted ? null : `Convite: ${entrega.kind}`,
+          });
+          if (entrega.retryEligible) return res.status(503).json({ error: "Convite pendente de entrega" });
+          if (!entrega.accepted) return res.status(200).json({ received: true, needsReview: true });
           return res.status(200).json({ received: true, retried: true });
         }
         return res.status(200).json({ received: true, duplicate: true });
       }
       const resultado = await processarCompraAprovada(dados);
       if (!resultado.existente && !resultado.emailEnviado) {
-        return res.status(503).json({ error: "Convite pendente de entrega" });
+        if (resultado.entrega?.retryEligible) return res.status(503).json({ error: "Convite pendente de entrega" });
+        return res.status(200).json({ received: true, needsReview: true });
       }
       return res.status(200).json({ received: true });
-    } catch (err) {
-      console.error("[Kiwify] Falha ao processar evento autenticado:", err instanceof Error ? err.message : err);
-      try {
-        await atualizarReserva(dados.orderId, { status: "erro", erro: "Falha transitória no processamento" });
-      } catch {
-        // A resposta 5xx continua permitindo retry da Kiwify mesmo se o log falhar.
-      }
+    } catch {
+      // Nunca substituir um estado de envio por "erro": o POST ao provedor pode
+      // ter sido aceito antes da queda. Estados incompletos exigem conferência.
+      console.error("[Kiwify] Falha ao processar evento autenticado; conferir estado persistido.");
       return res.status(500).json({ error: "Não foi possível processar o evento" });
     }
   });
