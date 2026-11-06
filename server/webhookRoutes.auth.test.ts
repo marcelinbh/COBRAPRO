@@ -3,6 +3,7 @@ import {
   deveAvancarStatusHistorico,
   resumirEventoWebhook,
   statusHistoricoEvolution,
+  tokenDoWebhookEvolution,
   validarTokenWebhook,
 } from "./webhookRoutes";
 
@@ -19,6 +20,14 @@ describe("webhook Evolution - autenticação fail-closed", () => {
 
   it("aceita somente a credencial exata", () => {
     expect(validarTokenWebhook("segredo-longo", "segredo-longo")).toBe("ok");
+  });
+
+  it("prioriza o cabeçalho e mantém a query apenas para instâncias legadas", () => {
+    expect(tokenDoWebhookEvolution("segredo-no-header", "segredo-antigo-na-query", true))
+      .toBe("segredo-no-header");
+    expect(tokenDoWebhookEvolution(undefined, "segredo-antigo-na-query", true))
+      .toBe("segredo-antigo-na-query");
+    expect(tokenDoWebhookEvolution("", "segredo-antigo-na-query", false)).toBeUndefined();
   });
 });
 

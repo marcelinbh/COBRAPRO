@@ -8,6 +8,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { getDb, getSupabaseClientAsync } from "./db";
 import { registrarLoginLog } from "./loginLogger";
 import { sdk } from "./_core/sdk";
+import { enviarEmail } from "./_core/email";
 import { storagePut } from "./storage";
 import { validarUploadCliente } from "./uploadSecurity";
 import { chaveDeLimitacao, LimitadorDeTentativas } from "./authRateLimit";
@@ -109,8 +110,7 @@ async function findUserByEmail(email: string): Promise<typeof users.$inferSelect
       const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
       return result[0] ?? null;
     } catch (err) {
-      console.warn("[Auth] Drizzle findUserByEmail failed, trying REST:", (err as Error).message);
-      console.warn("[Auth] Full error:", JSON.stringify(err, Object.getOwnPropertyNames(err as object)));
+      console.warn("[Auth] Consulta local de usuário falhou; usando adaptador REST.");
     }
   }
   const supabase = await getSupabaseClientAsync();
@@ -119,7 +119,7 @@ async function findUserByEmail(email: string): Promise<typeof users.$inferSelect
     return null;
   }
   const { data, error } = await supabase.from("users").select("*").eq("email", email).limit(1).maybeSingle();
-  console.log("[Auth] Supabase findUserByEmail - data:", data ? "found" : "null", "error:", error ? error.message : "none");
+  if (error) console.warn("[Auth] Consulta REST de usuário indisponível.");
   if (error || !data) return null;
   return mapSupabaseUser(data);
 }
@@ -324,7 +324,7 @@ export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/forgot-password", exigirOrigemConfiavelParaMutacaoPublica, async (req: Request, res: Response) => {
     try {
       const { email } = req.body as { email?: string };
-      if (!email) {
+      if (typeof email !== "string" || !email.trim()) {
         res.status(400).json({ error: "Email é obrigatório" });
         return;
       }
@@ -337,8 +337,8 @@ export function registerAuthRoutes(app: Express) {
       const user = await findUserByEmail(email);
 
       // Sempre retornar sucesso para não revelar se o email existe
-      if (!user) {
-        res.json({ success: true, message: "Se o email existir, você receberá as instruções." });
+      if (!user?.email) {
+        res.json({ success: true, message: "Se o e-mail estiver cadastrado, você receberá as instruções em breve." });
         return;
       }
 
@@ -356,77 +356,59 @@ export function registerAuthRoutes(app: Express) {
       } else {
         // Fallback: Supabase REST (usa snake_case conforme o banco)
         const supabase = await getSupabaseClientAsync();
-        if (supabase) {
-          await supabase.from("password_resets").update({ usado: true }).eq("user_id", user.id);
-          // Omitir 'usado' no insert pois tem DEFAULT false no banco (evita erro de schema cache)
-          const { error: insertErr } = await supabase.from("password_resets").insert({
-            user_id: user.id,
-            token: tokenHash,
-            expires_at: expiresAt.toISOString(),
-          });
-          if (insertErr) {
-            console.error("[Auth] Erro ao inserir password_reset:", insertErr.message);
-          } else {
-            console.log(`[Auth] Token de reset inserido para user_id=${user.id}`);
-          }
-        }
+        if (!supabase) throw new Error("Persistência de token indisponível");
+        const { error: invalidarErro } = await supabase
+          .from("password_resets")
+          .update({ usado: true })
+          .eq("user_id", user.id);
+        if (invalidarErro) throw new Error("Não foi possível invalidar tokens anteriores");
+        // Omitir 'usado' no insert pois tem DEFAULT false no banco (evita erro de schema cache)
+        const { error: insertErr } = await supabase.from("password_resets").insert({
+          user_id: user.id,
+          token: tokenHash,
+          expires_at: expiresAt.toISOString(),
+        });
+        if (insertErr) throw new Error("Não foi possível persistir token de recuperação");
       }
 
       // Montar URL de reset
       const origin = obterOrigemSeguraParaReset(req.headers.origin);
       const resetUrl = `${origin}/reset-senha?token=${token}`;
 
-      // Enviar e-mail via Brevo
-      const brevoApiKey = process.env.BREVO_API_KEY ?? "";
-      console.log(`[Auth] forgot-password: brevoApiKey=${brevoApiKey ? 'presente' : 'AUSENTE'}, destino=${user.email}`);
-      if (brevoApiKey) {
-        try {
-          const brevoFetch = await fetch("https://api.brevo.com/v3/smtp/email", {
-            method: "POST",
-            headers: {
-              "api-key": brevoApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              sender: { name: "CobraPro", email: "noreply@cobrapro.online" },
-              to: [{ email: user.email, name: user.name ?? user.email }],
-              subject: "Recuperação de senha — CobraPro",
-              htmlContent: `
-                <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0a;color:#fff;padding:40px;border-radius:12px">
-                  <div style="text-align:center;margin-bottom:32px">
-                    <h1 style="color:#22c55e;font-size:28px;margin:0">CobraPro</h1>
-                    <p style="color:#6b7280;margin:8px 0 0">Sistema de Gestão de Cobranças</p>
-                  </div>
-                  <h2 style="color:#fff;font-size:20px">Recuperação de senha</h2>
-                  <p style="color:#d1d5db;line-height:1.6">Recebemos uma solicitação para redefinir a senha da sua conta CobraPro.</p>
-                  <p style="color:#d1d5db;line-height:1.6">Clique no botão abaixo para criar uma nova senha. Este link é válido por <strong style="color:#22c55e">1 hora</strong>.</p>
-                  <div style="text-align:center;margin:32px 0">
-                    <a href="${resetUrl}" style="background:#22c55e;color:#000;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block">Redefinir minha senha</a>
-                  </div>
-                  <p style="color:#6b7280;font-size:13px">Se você não solicitou a recuperação de senha, ignore este e-mail. Sua senha permanece a mesma.</p>
-                  <hr style="border:1px solid #1f2937;margin:24px 0">
-                  <p style="color:#4b5563;font-size:12px;text-align:center">CobraPro — cobrapro.online</p>
-                </div>
-              `,
-            }),
-          });
-          const brevoStatus = brevoFetch.status;
-          const brevoBody = await brevoFetch.text();
-          console.log(`[Brevo] Resposta: status=${brevoStatus}, body=${brevoBody.substring(0, 200)}`);
-        } catch (err) {
-          console.error("[Brevo] Erro ao enviar e-mail de recuperação:", err);
-        }
-      } else {
-        console.warn("[Auth] BREVO_API_KEY não configurada - e-mail de recuperação NÃO enviado");
+      const entrega = await enviarEmail({
+        to: user.email,
+        toName: user.name ?? user.email,
+        subject: "Recuperação de senha — CobraPro",
+        htmlContent: `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0a0a0a;color:#fff;padding:40px;border-radius:12px">
+            <div style="text-align:center;margin-bottom:32px">
+              <h1 style="color:#22c55e;font-size:28px;margin:0">CobraPro</h1>
+              <p style="color:#6b7280;margin:8px 0 0">Sistema de Gestão de Cobranças</p>
+            </div>
+            <h2 style="color:#fff;font-size:20px">Recuperação de senha</h2>
+            <p style="color:#d1d5db;line-height:1.6">Recebemos uma solicitação para redefinir a senha da sua conta CobraPro.</p>
+            <p style="color:#d1d5db;line-height:1.6">Clique no botão abaixo para criar uma nova senha. Este link é válido por <strong style="color:#22c55e">1 hora</strong>.</p>
+            <div style="text-align:center;margin:32px 0">
+              <a href="${resetUrl}" style="background:#22c55e;color:#000;padding:14px 32px;border-radius:8px;text-decoration:none;font-weight:bold;font-size:16px;display:inline-block">Redefinir minha senha</a>
+            </div>
+            <p style="color:#6b7280;font-size:13px">Se você não solicitou a recuperação de senha, ignore este e-mail. Sua senha permanece a mesma.</p>
+            <hr style="border:1px solid #1f2937;margin:24px 0">
+            <p style="color:#4b5563;font-size:12px;text-align:center">CobraPro — cobrapro.online</p>
+          </div>
+        `,
+      });
+      if (!entrega.accepted) {
+        console.warn(`[Auth] E-mail de recuperação não aceito: kind=${entrega.kind}`);
       }
 
       res.json({
         success: true,
         message: "Se o e-mail estiver cadastrado, você receberá as instruções em breve.",
       });
-    } catch (err) {
-      console.error("[Auth] Forgot-password error:", err);
-      res.status(500).json({ error: "Erro interno. Tente novamente." });
+    } catch {
+      console.error("[Auth] Falha ao iniciar recuperação de senha.");
+      // Falhas internas não devem revelar que uma conta foi encontrada.
+      res.json({ success: true, message: "Se o e-mail estiver cadastrado, você receberá as instruções em breve." });
     }
   });
 

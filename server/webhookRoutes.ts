@@ -99,10 +99,29 @@ export function validarTokenWebhook(configuredToken: string, receivedToken: unkn
   return timingSafeEqual(esperado, recebido) ? "ok" : "invalido";
 }
 
+/**
+ * Novas instâncias Evolution recebem o segredo no header customizado.
+ * A query string é aceita apenas enquanto instâncias antigas são
+ * reconfiguradas; o header sempre vence para impedir ambiguidade.
+ */
+export function tokenDoWebhookEvolution(
+  headerToken: unknown,
+  queryToken: unknown,
+  allowLegacyQuery = false,
+): string | undefined {
+  if (typeof headerToken === "string" && headerToken.trim()) return headerToken;
+  return allowLegacyQuery && typeof queryToken === "string" && queryToken.trim() ? queryToken : undefined;
+}
+
 export function registerWebhookRoutes(app: Router) {
   app.post("/api/webhook/evolution", async (req: Request, res: Response) => {
     const configuredToken = ENV.evolutionWebhookToken;
-    const receivedToken = typeof req.query.token === "string" ? req.query.token : req.header("x-cobrapro-webhook-token");
+    const headerToken = req.header("x-cobrapro-webhook-token");
+    const receivedToken = tokenDoWebhookEvolution(
+      headerToken,
+      req.query.token,
+      ENV.evolutionWebhookAllowLegacyQuery,
+    );
     const tokenStatus = validarTokenWebhook(configuredToken, receivedToken);
     // A chave de serviço do Supabase não pode receber eventos sem um segredo
     // configurado. Falhar fechado previne alteração de estado de outra empresa.

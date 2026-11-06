@@ -27,7 +27,10 @@ describe("Evolution — webhook de entrega", () => {
     const [url, options] = fetchMock.mock.calls[1] as [string, RequestInit];
     expect(url).toBe("https://evolution.test/webhook/set/user-4682");
     expect(JSON.parse(String(options.body))).toMatchObject({
-      url: "https://cobrapro.online/api/webhook/evolution?token=test-webhook-token",
+      url: "https://cobrapro.online/api/webhook/evolution",
+      headers: {
+        "x-cobrapro-webhook-token": "test-webhook-token",
+      },
       webhook_by_events: false,
       webhook_base64: false,
       events: ["MESSAGES_UPDATE", "CONNECTION_UPDATE"],
