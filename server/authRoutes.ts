@@ -13,6 +13,8 @@ import { storagePut } from "./storage";
 import { validarUploadCliente } from "./uploadSecurity";
 import { chaveDeLimitacao, LimitadorDeTentativas } from "./authRateLimit";
 import { ROLE_CADASTRO_PUBLICO } from "./authRole";
+import { ENV } from "./_core/env";
+import { resetPasswordAndRevokeSessions, sessionVersionFromUser } from "./services/sessionRevocation";
 
 const ORIGEM_PUBLICA_PADRAO = "https://cobrapro.online";
 const ORIGENS_PRIMEIRA_PARTE = new Set([
@@ -155,9 +157,9 @@ function mapSupabaseUser(data: Record<string, unknown>): typeof users.$inferSele
     lastSignedIn: data.lastSignedIn ? new Date(data.lastSignedIn as string) : new Date(),
     createdAt: data.createdAt ? new Date(data.createdAt as string) : new Date(),
     updatedAt: data.updatedAt ? new Date(data.updatedAt as string) : new Date(),
-    sessionVersion: Number.isSafeInteger(data.session_version) && (data.session_version as number) >= 0
-      ? data.session_version as number
-      : 0,
+    sessionVersion: ENV.enableSessionRevocation ? sessionVersionFromUser(data)
+      : Number.isSafeInteger(data.session_version) && (data.session_version as number) >= 0
+        ? data.session_version as number : 0,
     onboardingCompleto: (data.onboarding_completo ?? false) as boolean,
     nomeEmpresa: (data.nome_empresa ?? null) as string | null,
     idioma: (data.idioma ?? 'pt-BR') as string | null,
@@ -172,8 +174,10 @@ async function createSessionForUser(
   const sessionToken = await sdk.signSession(
     {
       openId: user.openId,
-      appId: process.env.VITE_APP_ID ?? "cobrapro",
+      appId: ENV.enableSessionRevocation ? ENV.appId : process.env.VITE_APP_ID ?? "cobrapro",
       name: user.name ?? user.email ?? "",
+      // Snapshot da mesma linha usada no bcrypt: não reler versão depois de validar a senha.
+      ...(ENV.enableSessionRevocation ? { sessionVersion: sessionVersionFromUser(user) } : {}),
     },
     { expiresInMs: ONE_YEAR_MS }
   );
@@ -416,7 +420,7 @@ export function registerAuthRoutes(app: Express) {
   app.post("/api/auth/reset-password", exigirOrigemConfiavelParaMutacaoPublica, async (req: Request, res: Response) => {
     try {
       const { token, password } = req.body as { token?: string; password?: string };
-      if (!token || !password) {
+      if (typeof token !== "string" || typeof password !== "string" || !token || !password || token.length > 512) {
         res.status(400).json({ error: "Token e nova senha são obrigatórios" });
         return;
       }
@@ -428,6 +432,18 @@ export function registerAuthRoutes(app: Express) {
       const passwordHash = await bcrypt.hash(password, 12);
       const tokenHash = hashTokenDeRecuperacao(token);
       const now = new Date();
+
+      if (ENV.enableSessionRevocation) {
+        const supabase = await getSupabaseClientAsync();
+        if (!supabase) throw new Error("Redefinição transacional de senha indisponível.");
+        const alterada = await resetPasswordAndRevokeSessions(supabase, tokenHash, passwordHash);
+        if (!alterada) {
+          res.status(400).json({ error: "Token inválido ou expirado" });
+          return;
+        }
+        res.json({ success: true, message: "Senha alterada com sucesso!" });
+        return; // Nunca consumir token ou alterar senha por REST separadamente neste modo.
+      }
 
       const db = await getDb();
       if (db) {

@@ -30,6 +30,19 @@ describe("migrations financeiras — garantias de integridade", () => {
     expect(assinaturas).toContain("pagamentos_assinatura_user_assinatura_mes_uk");
   });
 
+  it("reaplica as quatro constraints de assinatura somente em transação", () => {
+    expect(assinaturas).toContain("INTEGRALMENTE em uma transação");
+    for (const constraint of [
+      "pagamentos_assinatura_assinatura_tenant_cliente_fk",
+      "pagamentos_assinatura_conta_caixa_tenant_fk",
+      "transacoes_caixa_pagamento_assinatura_tenant_fk",
+      "transacoes_caixa_pagamento_assinatura_tenant_check",
+    ]) {
+      expect(assinaturas).toContain(`DROP CONSTRAINT IF EXISTS ${constraint}`);
+      expect(assinaturas).toContain(`ADD CONSTRAINT ${constraint}`);
+    }
+  });
+
   it("calcula a segunda baixa parcial pelo saldo líquido, sem reaplicar encargos", () => {
     expect(recebimento).toContain("Parcela parcial possui saldo residual inválido");
     expect(recebimento).toContain("v_valor_total := v_valor_total_devido;");

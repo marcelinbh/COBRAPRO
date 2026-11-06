@@ -20,4 +20,6 @@ export const ENV = {
   facebookPixelId: "2748566625524880",
   // Liberação explícita e reversível: sem migration/preflight a baixa segue bloqueada.
   enableRpcRecebimentoParcela: process.env.ENABLE_RPC_RECEBIMENTO_PARCELA === "true",
+  // Ativar somente após a 0016; depois, não desligar para ressuscitar sessões antigas.
+  enableSessionRevocation: process.env.ENABLE_SESSION_REVOCATION === "true",
 };

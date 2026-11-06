@@ -23,7 +23,8 @@
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Consumir token de recuperação condicionalmente no banco antes de alterar a senha, bloqueando uso concorrente do mesmo link.
-- [ ] Revogar todas as sessões de uma conta após redefinição de senha. **Migration PostgreSQL `0016_revogacao_sessoes_reset_senha.sql` preparada: adiciona versão de sessão, trigger de defesa e RPC única para consumir token/trocar senha/revogar sessões. Exige preflight no Supabase COBRA PRO e rollout coordenado do backend; não foi aplicada.**
+- [ ] Ativar revogação de todas as sessões após redefinição de senha. **Migration PostgreSQL `0016_revogacao_sessoes_reset_senha.sql` preparada, mas não aplicada. Em 6/11 foi integrado o backend completo: emissão de JWT com snapshot de versão, validação estrita contra a conta persistida, proibição de bypass por prefixo cron e reset exclusivamente por RPC quando ativado. `ENABLE_SESSION_REVOCATION` fica desligada por padrão; exige preflight, aplicação/testes da 0016 e ativação coordenada. Após ativação não desligar a validação como rollback, pois isso pode revalidar sessões revogadas.**
+- [x] Validar 0014/0016/0017 atuais em PostgreSQL real descartável: 55 verificações, reaplicação, permissões do reset, rollback e concorrência aprovados. Corrigidos erro 42710 da 0014, nulabilidade de versão legada e índice/pedidos inválidos Kiwify. Runner em `tests/postgres-integrity/run.sh`; **banco produtivo não validado nem alterado**.
 - [x] Remover a chave padrão da Evolution do código e exigir variável criptografada na DigitalOcean.
 - [x] Remover artefatos compilados versionados e impedir que `dist/` volte ao repositório.
 - [x] Restringir uploads de logo a PNG/JPG/WEBP de até 2 MB, verificar assinatura do arquivo e eliminar a rota de upload inexistente.

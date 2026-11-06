@@ -43,3 +43,29 @@ O projeto ganhou runner finito reproduzível em `tests/postgres-receipt/run.sh`,
 A suíte de aplicação passou a **417 testes aprovados e 11 ignorados**, sem falhas. Esses resultados validam SQL executável e as regras do fixture local; não verificam o schema, RLS/triggers, saldos históricos ou transporte PostgREST de produção. Migrations produtivas e liberação da flag continuam pendentes.
 
 O lote anterior de comunicação foi publicado em `github/main` como `cb27976b3d97a0c5fc1e30e2b1f820a66f8dcdff`. O healthcheck de preview e produção respondeu JSON saudável; as três últimas execuções de lembretes consultadas (42261861187, 42200672145, 42153400242) terminaram com sucesso. Deploy do novo lote ainda exige confirmar a sessão e o commit no App Platform.
+
+## Confirmação após login DigitalOcean — 18h35 BRT
+
+O App Platform confirmou **Success / Live Deployment** para `06c37eb`, deployment `6c01ca1a-fa38-4561-b8be-1b6e515c3f0b`. Esta evidência substitui a pendência de login descrita anteriormente. Site e healthcheck JSON responderam HTTP 200; Evolution também respondeu HTTP 200. Detalhes em `reports/evidencias-producao-2026-11-06.md`.
+
+O painel mostra saldo em atraso de US$ 36,00 e prazo 14/11/2026 para pagamento, sujeito a suspensão. Nenhum pagamento foi executado.
+
+## Novo lote de sessão — validado localmente, ativação ainda pendente
+
+Todos os emissores passam a aceitar a versão capturada do usuário autenticado quando `ENABLE_SESSION_REVOCATION=true`. O JWT é comparado com a versão atual da conta antes do retorno do usuário; coluna ausente, token antigo sem versão, appId divergente, banco indisponível e prefixo cron não contornam o contrato. O login preserva o snapshot da mesma linha que forneceu a hash da senha, impedindo elevar uma autenticação com senha antiga durante um reset concorrente.
+
+No modo ativado, o reset usa **somente** `consume_password_reset_and_revoke_sessions`: consumo do token, troca de senha e incremento de versão pertencem à mesma transação. Nenhum fallback REST/Drizzle é executado quando a RPC estiver ausente, rejeitada ou com resposta inválida. O modo legado continua compatível com flag ausente/desligada. A flag não foi habilitada em produção.
+
+Validação deste lote: **471 testes aprovados, 11 ignorados**, 83 arquivos aprovados/3 ignorados; TypeScript, build e `git diff --check` aprovados. Os 11 testes ignorados continuam opt-in de ambiente, não evidência de banco produtivo.
+
+Ainda falta validar/aplicar a 0016 na base correta e ativar coordenadamente todas as instâncias. Após ativação, não desligar a validação de versão como rollback: sessões revogadas poderiam voltar a valer. O SQL Editor ainda exibiu conteúdo sem sincronizar com o executor; o conector continua autorizado somente para a outra referência. Não houve DDL produtivo nem liberação de recebimentos.
+
+## Migrations adicionais corrigidas e testadas — 18h50 BRT
+
+A validação independente detectou o erro real `42710` ao reaplicar a 0014, além de controles condicionais incompletos em 0016/0017. As correções foram incorporadas: reaplicação transacional das quatro FKs/checks de assinatura; NOT NULL/default explícitos para versão de sessão legada; índice Kiwify validado pela tabela/coluna/validade/formato; bloqueio também de relação homônima de outro tipo; e impedimento físico de novos pedidos NULL/vazios.
+
+O novo runner `tests/postgres-integrity/run.sh` executa **as migrations atuais do repositório**, não cópias candidatas. Resultado: **55/55 verificações aprovadas**, com 0014/0016/0017 executadas duas vezes em transação, rollback de catálogo/dados, ACL do reset, comparação de hash, expiração, camelCase/snake_case e duas corridas reais com espera por lock observada. Logs em `/tmp/cobrapro-integrity.9hvIvm/logs`; cluster encerrado com `STOP_EXIT=0`, `FINAL_STATUS=3`.
+
+A suíte de aplicação final passou a **474 testes aprovados e 11 ignorados**, sem falhas. `pnpm drizzle-kit generate` foi tentado, mas denunciou snapshots legados 0000–0007 malformados, embora encerrasse sem erro de shell. Não foi declarado sucesso de geração nem usado `db:push`; migrations PostgreSQL manuais continuaram avaliadas diretamente nos testes reais. Este lote não modifica o schema TypeScript. O histórico de snapshots exige saneamento separado, sem tentar aplicar migrations MySQL legadas no Supabase.
+
+Nenhuma dessas correções foi aplicada ao banco produtivo e nenhuma flag foi ligada. O sucesso do PostgreSQL sintético não equivale a pré-auditoria produtiva, saneamento dos saldos históricos ou autorização do projeto Supabase correto.
