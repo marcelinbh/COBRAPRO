@@ -7,6 +7,7 @@ import { SignJWT, jwtVerify } from "jose";
 import type { User } from "../../drizzle/schema";
 import * as db from "../db";
 import { ENV } from "./env";
+import { isSessionVersion, sessionVersionFromUser } from "../services/sessionRevocation";
 import type {
   ExchangeTokenRequest,
   ExchangeTokenResponse,
@@ -45,6 +46,7 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  sessionVersion?: number;
 };
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
@@ -196,11 +198,17 @@ class SDKServer {
     openId: string,
     options: { expiresInMs?: number; name?: string } = {}
   ): Promise<string> {
+    // OAuth autorizado usa exclusivamente uma identidade já persistida.
+    const user = ENV.enableSessionRevocation ? await db.getUserByOpenId(openId) : null;
+    if (ENV.enableSessionRevocation && (!user || user.openId !== openId)) {
+      throw ForbiddenError("User not found");
+    }
     return this.signSession(
       {
         openId,
         appId: ENV.appId,
         name: options.name || "",
+        ...(ENV.enableSessionRevocation ? { sessionVersion: sessionVersionFromUser(user!) } : {}),
       },
       options
     );
@@ -214,20 +222,28 @@ class SDKServer {
     const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
+    if (ENV.enableSessionRevocation && (
+      !isSessionVersion(payload.sessionVersion) || !ENV.appId || payload.appId !== ENV.appId
+      || payload.openId.startsWith(CRON_OPEN_ID_PREFIX)
+    )) {
+      throw new Error("Emissão de sessão versionada inválida.");
+    }
 
     return new SignJWT({
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name,
+      ...(ENV.enableSessionRevocation ? { sessionVersion: payload.sessionVersion } : {}),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
+      .setIssuedAt(Math.floor(issuedAt / 1000))
       .setExpirationTime(expirationSeconds)
       .sign(secretKey);
   }
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  ): Promise<SessionPayload | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -249,10 +265,16 @@ class SDKServer {
         return null;
       }
 
+      if (ENV.enableSessionRevocation && (
+        !isSessionVersion(payload.sessionVersion) || !ENV.appId || appId !== ENV.appId
+        || openId.startsWith(CRON_OPEN_ID_PREFIX)
+      )) return null;
+
       return {
         openId,
         appId,
         name,
+        ...(ENV.enableSessionRevocation ? { sessionVersion: payload.sessionVersion as number } : {}),
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -303,6 +325,16 @@ class SDKServer {
     const sessionUserId = session.openId;
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
+
+    if (ENV.enableSessionRevocation) {
+      if (!user || user.openId !== sessionUserId) throw ForbiddenError("Invalid session cookie");
+      try {
+        if (sessionVersionFromUser(user) !== session.sessionVersion) throw new Error("Revoked session");
+      } catch {
+        // Nunca sincronizar usuário OAuth nem converter coluna ausente em versão zero.
+        throw ForbiddenError("Invalid session cookie");
+      }
+    }
 
     // If user not in DB, sync from OAuth server automatically
     if (!user) {

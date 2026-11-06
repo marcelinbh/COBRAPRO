@@ -7,6 +7,8 @@ import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import type { Request, Response } from "express";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { ROLE_CADASTRO_PUBLICO } from "./authRole";
+import { ENV } from "./_core/env";
+import { sessionVersionFromUser } from "./services/sessionRevocation";
 
 export async function loginWithEmail(
   email: string,
@@ -85,8 +87,9 @@ export async function createSessionForUser(
   const sessionToken = await sdk.signSession(
     {
       openId: user.openId,
-      appId: process.env.VITE_APP_ID ?? "cobrapro",
+      appId: ENV.enableSessionRevocation ? ENV.appId : process.env.VITE_APP_ID ?? "cobrapro",
       name: user.name ?? user.email ?? "",
+      ...(ENV.enableSessionRevocation ? { sessionVersion: sessionVersionFromUser(user) } : {}),
     },
     { expiresInMs: ONE_YEAR_MS }
   );

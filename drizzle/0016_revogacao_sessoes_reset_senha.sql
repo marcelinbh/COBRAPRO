@@ -68,6 +68,11 @@ BEGIN
   END IF;
 END $$;
 
+-- ADD COLUMN IF NOT EXISTS não corrige nulabilidade/default de coluna legada.
+ALTER TABLE public.users
+  ALTER COLUMN session_version SET NOT NULL,
+  ALTER COLUMN session_version SET DEFAULT 0;
+
 ALTER TABLE public.users
   DROP CONSTRAINT IF EXISTS users_session_version_nonnegative;
 ALTER TABLE public.users

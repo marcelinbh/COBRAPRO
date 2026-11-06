@@ -14,6 +14,12 @@ describe("migration 0016 — revogação de sessões após reset", () => {
     expect(migration).toContain("CHECK (session_version >= 0)");
   });
 
+  it("corrige a coluna legada existente em vez de confiar somente em ADD IF NOT EXISTS", () => {
+    expect(migration).toContain("ALTER COLUMN session_version SET NOT NULL");
+    expect(migration).toContain("ALTER COLUMN session_version SET DEFAULT 0");
+    expect(migration.indexOf("session_version legado inválido")).toBeLessThan(migration.indexOf("ALTER COLUMN session_version SET NOT NULL"));
+  });
+
   it("incrementa a versão somente se a hash de senha realmente mudar", () => {
     expect(migration).toContain("revogar_sessoes_ao_alterar_senha");
     expect(migration).toContain("to_jsonb(OLD)");

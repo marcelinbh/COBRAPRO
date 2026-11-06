@@ -1,6 +1,7 @@
 -- CobraPro: integridade de assinaturas e recebimentos recorrentes.
 -- Execute SOMENTE após 0012 e após o preflight no projeto COBRA PRO.
 -- A migration não saneia inconsistências: toda divergência aborta o rollout.
+-- Execute o arquivo INTEGRALMENTE em uma transação (por exemplo, psql -1).
 
 -- O esquema histórico de 0009 não tinha tenant nos dois registros. A coluna é
 -- adicionada para compatibilidade, e só recebe inferência da assinatura dona.
@@ -113,6 +114,14 @@ ALTER TABLE public.pagamentos_assinatura
   DROP CONSTRAINT IF EXISTS pagamentos_assinatura_assinatura_fk;
 ALTER TABLE public.transacoes_caixa
   DROP CONSTRAINT IF EXISTS transacoes_caixa_pagamento_assinatura_fk;
+
+-- Reaplicação transacional: substituir somente as constraints desta migration.
+ALTER TABLE public.pagamentos_assinatura
+  DROP CONSTRAINT IF EXISTS pagamentos_assinatura_assinatura_tenant_cliente_fk,
+  DROP CONSTRAINT IF EXISTS pagamentos_assinatura_conta_caixa_tenant_fk;
+ALTER TABLE public.transacoes_caixa
+  DROP CONSTRAINT IF EXISTS transacoes_caixa_pagamento_assinatura_tenant_fk,
+  DROP CONSTRAINT IF EXISTS transacoes_caixa_pagamento_assinatura_tenant_check;
 
 ALTER TABLE public.pagamentos_assinatura
   ADD CONSTRAINT pagamentos_assinatura_assinatura_tenant_cliente_fk
