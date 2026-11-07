@@ -30,11 +30,22 @@ describe("migration 0016 — revogação de sessões após reset", () => {
   it("consome token, altera senha e devolve a versão na mesma função transacional", () => {
     expect(migration).toContain("consume_password_reset_and_revoke_sessions");
     expect(migration).toContain("UPDATE public.password_resets");
-    expect(migration).toContain("AND usado = false");
+    expect(migration).toContain("SET %I = true");
+    expect(migration).toContain("AND %I = false");
+    expect(migration).toContain("v_used_column, v_used_column, v_password_column, v_updated_column");
     expect(migration).toContain("AND expires_at > now()");
     expect(migration).toContain("SET %I = p_password_hash");
     expect(migration).toContain("RETURNING users.id, users.session_version");
     expect(migration).not.toContain("p_user_id");
+  });
+
+  it("exige uma única coluna de consumo booleana sem duplicar ou renomear dados", () => {
+    expect(migration).toContain("attname IN ('used', 'usado')");
+    expect(migration).toContain("coluna de consumo used/usado ausente ou ambígua");
+    expect(migration).toContain("atttypid = 'boolean'::regtype AND attnotnull");
+    expect(migration.indexOf("coluna de consumo used/usado ausente ou ambígua")).toBeLessThan(migration.indexOf("ADD COLUMN IF NOT EXISTS session_version"));
+    expect(migration).not.toMatch(/ADD COLUMN.*\b(?:used|usado)\b/i);
+    expect(migration).not.toMatch(/RENAME COLUMN/i);
   });
 
   it("não expõe a RPC de reset a usuários ou papéis públicos", () => {

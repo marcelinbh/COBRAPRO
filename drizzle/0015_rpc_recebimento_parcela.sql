@@ -30,13 +30,13 @@ BEGIN
       ('parcelas','valor_juros'), ('parcelas','valor_multa'), ('parcelas','valor_desconto'),
       ('parcelas','saldo_residual'), ('parcelas','multa_diaria_usada'), ('parcelas','data_vencimento'),
       ('parcelas','data_pagamento'), ('parcelas','status'), ('parcelas','conta_caixa_id'), ('parcelas','observacoes'),
-      ('contratos','id'), ('contratos','user_id'), ('contratos','status'),
+      ('contratos','id'), ('contratos','user_id'), ('contratos','cliente_id'), ('contratos','status'),
       ('clientes','id'), ('clientes','user_id'),
       ('contas_caixa','id'), ('contas_caixa','user_id'), ('contas_caixa','ativo'),
       ('transacoes_caixa','id'), ('transacoes_caixa','user_id'), ('transacoes_caixa','conta_caixa_id'),
       ('transacoes_caixa','tipo'), ('transacoes_caixa','categoria'), ('transacoes_caixa','valor'),
       ('transacoes_caixa','descricao'), ('transacoes_caixa','parcela_id'), ('transacoes_caixa','contrato_id'),
-      ('transacoes_caixa','cliente_id'), ('transacoes_caixa','data_transacao'),
+      ('transacoes_caixa','data_transacao'),
       ('operacoes_financeiras','id'), ('operacoes_financeiras','user_id'), ('operacoes_financeiras','tipo'),
       ('operacoes_financeiras','chave_idempotencia'), ('operacoes_financeiras','hash_requisicao'),
       ('operacoes_financeiras','status'), ('operacoes_financeiras','resultado'), ('operacoes_financeiras','concluida_em'),
@@ -61,13 +61,100 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto') THEN
     RAISE EXCEPTION 'RPC não instalada: extensão pgcrypto ausente.';
   END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_extension e JOIN pg_namespace n ON n.oid = e.extnamespace
+    WHERE e.extname = 'pgcrypto' AND n.nspname IN ('public', 'extensions')
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: pgcrypto deve estar em public ou extensions.';
+  END IF;
+
+  -- Tudo abaixo é somente leitura e precede qualquer DDL. Colunas aditivas
+  -- são inspecionadas via JSON: não inventar tenant/cliente/valores legados.
+  IF EXISTS (
+    SELECT 1 FROM public.parcelas p
+    LEFT JOIN public.contratos c ON c.id = p.contrato_id
+    LEFT JOIN public.clientes cl ON cl.id = p.cliente_id
+    WHERE p.user_id IS NULL OR p.contrato_id IS NULL OR p.numero_parcela IS NULL
+       OR c.id IS NULL OR cl.id IS NULL
+       OR c.user_id IS DISTINCT FROM p.user_id OR cl.user_id IS DISTINCT FROM p.user_id
+       OR p.cliente_id IS DISTINCT FROM c.cliente_id
+  ) OR EXISTS (
+    SELECT 1 FROM public.parcelas GROUP BY user_id, contrato_id, numero_parcela HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: parcelas com chave nula, duplicada ou vínculo de empresa/cliente divergente.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.parcelas p
+    WHERE p.status::text NOT IN ('pendente', 'paga', 'pago', 'atrasada', 'atrasado', 'cancelada', 'cancelado', 'parcial', 'vencendo_hoje')
+       OR (p.status::text = 'parcial' AND (p.saldo_residual IS NULL OR p.saldo_residual <= 0))
+       OR (p.status::text IN ('paga', 'pago') AND coalesce(p.saldo_residual, 0) <> 0)
+       OR p.data_vencimento IS NULL
+       OR coalesce(p.valor_original, (to_jsonb(p)->>'valor')::numeric) IS NULL
+       OR coalesce(p.valor_original, (to_jsonb(p)->>'valor')::numeric) <= 0
+  ) OR EXISTS (
+    SELECT 1 FROM public.contratos
+    WHERE status::text NOT IN ('ativo', 'quitado', 'atrasado', 'inadimplente', 'cancelado', 'renegociado')
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: estados ou valores legados inválidos; exige revisão aprovada.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.transacoes_caixa t
+    LEFT JOIN public.contas_caixa c ON c.id = t.conta_caixa_id
+    LEFT JOIN public.operacoes_financeiras o ON o.id::text = to_jsonb(t)->>'operacao_financeira_id'
+    WHERE t.user_id IS NULL OR c.id IS NULL OR c.user_id IS DISTINCT FROM t.user_id
+       OR (to_jsonb(t)->>'operacao_financeira_id' IS NOT NULL AND (o.id IS NULL OR o.user_id IS DISTINCT FROM t.user_id))
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: há lançamentos de Caixa sem tenant ou com vínculo de empresa divergente.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.transacoes_caixa t
+    LEFT JOIN public.parcelas p ON p.id = t.parcela_id
+    WHERE t.categoria::text = 'pagamento_parcela'
+      AND (t.tipo::text <> 'entrada' OR p.id IS NULL OR t.user_id IS DISTINCT FROM p.user_id
+        OR t.contrato_id IS DISTINCT FROM p.contrato_id
+        OR (to_jsonb(t)->>'cliente_id')::integer IS DISTINCT FROM p.cliente_id)
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: recebimento legado sem vínculo inequívoco de parcela/contrato/cliente; inferência exige aprovação separada.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.parcelas p
+    WHERE coalesce(p.valor_pago, 0) IS DISTINCT FROM (
+      SELECT coalesce(sum(t.valor), 0) FROM public.transacoes_caixa t
+      WHERE t.parcela_id = p.id AND t.user_id = p.user_id
+        AND t.tipo::text = 'entrada' AND t.categoria::text = 'pagamento_parcela'
+    )
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: valor pago de parcela diverge do livro-caixa.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.operacoes_financeiras
+    WHERE user_id IS NULL OR chave_idempotencia IS NULL OR status <> 'concluida' OR resultado IS NULL
+  ) OR EXISTS (
+    SELECT 1 FROM public.operacoes_financeiras GROUP BY user_id, chave_idempotencia HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: operações idempotentes legadas exigem revisão.';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.configuracoes
+    WHERE chave IN ('jurosMultaAutomatico', 'juros_multa_automatico', 'multaDiaria', 'multa_diaria', 'multaPadrao', 'multa_padrao')
+    GROUP BY user_id, CASE
+      WHEN chave IN ('jurosMultaAutomatico', 'juros_multa_automatico') THEN 'automatico'
+      WHEN chave IN ('multaDiaria', 'multa_diaria') THEN 'diaria'
+      ELSE 'percentual' END
+    HAVING count(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'RPC não instalada: configurações financeiras sinônimas/duplicadas.';
+  END IF;
 END $$;
 
 -- Vínculo imutável entre a operação idempotente e seu lançamento de Caixa.
 -- A empresa participa de todas as referências: IDs isolados não impedem que
 -- uma escrita futura ou legado apontem para dados de outra empresa.
 ALTER TABLE public.transacoes_caixa
-  ADD COLUMN IF NOT EXISTS operacao_financeira_id UUID;
+  ADD COLUMN IF NOT EXISTS operacao_financeira_id UUID,
+  ADD COLUMN IF NOT EXISTS cliente_id INTEGER;
+-- cliente_id permanece nullable. Nenhum backfill ou saneamento é executado;
+-- mesmo uma inferência inequívoca de recebimentos antigos exige aprovação.
 
 DO $$
 BEGIN
@@ -182,7 +269,7 @@ CREATE OR REPLACE FUNCTION public.rpc_registrar_pagamento_parcela(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public, pg_temp
+SET search_path = pg_catalog, extensions, public, pg_temp
 AS $$
 DECLARE
   v_parcela public.parcelas%ROWTYPE;
@@ -207,6 +294,12 @@ DECLARE
   v_status_novo TEXT;
   v_dias_atraso INTEGER := 0;
   v_hora_pagamento TIMESTAMPTZ;
+  v_data_pagamento public.parcelas.data_pagamento%TYPE;
+  v_data_transacao public.transacoes_caixa.data_transacao%TYPE;
+  v_status_parcela public.parcelas.status%TYPE;
+  v_status_quitado public.contratos.status%TYPE := 'quitado';
+  v_historico_user_id public.contrato_historico.user_id%TYPE;
+  v_numero_parcela INTEGER;
   v_resultado JSONB;
   v_transacao_id BIGINT;
   v_valor_pago_normalizado NUMERIC(15,2);
@@ -297,13 +390,13 @@ BEGIN
   SELECT c.status::text INTO v_contrato_status
   FROM public.contratos c
   WHERE c.id = v_parcela.contrato_id AND c.user_id = p_user_id;
-  IF v_contrato_status NOT IN ('ativo', 'inadimplente') THEN
+  IF v_contrato_status NOT IN ('ativo', 'atrasado', 'inadimplente') THEN
     RAISE EXCEPTION 'Contrato não está elegível para recebimento' USING ERRCODE = '23514';
   END IF;
-  IF v_parcela.status = 'paga' THEN
+  IF v_parcela.status::text IN ('paga', 'pago') THEN
     RAISE EXCEPTION 'Esta parcela já foi quitada' USING ERRCODE = '23505';
   END IF;
-  IF v_parcela.status NOT IN ('pendente', 'atrasada', 'vencendo_hoje', 'parcial') THEN
+  IF v_parcela.status::text NOT IN ('pendente', 'atrasada', 'atrasado', 'vencendo_hoje', 'parcial') THEN
     RAISE EXCEPTION 'Esta parcela não pode receber baixa no estado atual' USING ERRCODE = '23514';
   END IF;
 
@@ -366,7 +459,13 @@ BEGIN
     IF v_parcela.data_vencimento IS NULL THEN
       RAISE EXCEPTION 'Parcela possui vencimento inválido' USING ERRCODE = '23514';
     END IF;
-    v_valor_total_devido := round(coalesce(v_parcela.valor_original, 0) + coalesce(v_parcela.saldo_residual, 0), 2);
+    -- valor_original é nullable no schema real; valor é o principal obrigatório.
+    -- Não substituir principal desconhecido por zero nem alterar o legado.
+    v_valor_total_devido := coalesce(v_parcela.valor_original, (to_jsonb(v_parcela)->>'valor')::numeric);
+    IF v_valor_total_devido IS NULL OR v_valor_total_devido <= 0 THEN
+      RAISE EXCEPTION 'Parcela possui principal inválido' USING ERRCODE = '23514';
+    END IF;
+    v_valor_total_devido := round(v_valor_total_devido + coalesce(v_parcela.saldo_residual, 0), 2);
     -- DATE civil: multa só surge quando virar o dia seguinte em Brasília.
     v_dias_atraso := greatest(0, p_data_pagamento - v_parcela.data_vencimento);
     v_multa := CASE WHEN v_dias_atraso > 0 THEN round(v_valor_total_devido * v_multa_percentual / 100, 2) ELSE 0 END;
@@ -390,6 +489,23 @@ BEGIN
   v_saldo_residual := CASE WHEN v_status_novo = 'paga' THEN 0 ELSE round(v_valor_total - v_valor_pago_normalizado, 2) END;
   v_valor_pago_acumulado := round(coalesce(v_parcela.valor_pago, 0) + v_valor_pago_normalizado, 2);
   v_hora_pagamento := (p_data_pagamento::timestamp + time '12:00:00') AT TIME ZONE 'America/Sao_Paulo';
+  -- DATE não pode vir de truncamento de TIMESTAMPTZ na timezone da sessão.
+  -- Preserva também o fixture legado TIMESTAMPTZ, com meio-dia civil explícito.
+  IF pg_typeof(v_data_pagamento) = 'date'::regtype THEN
+    v_data_pagamento := p_data_pagamento;
+  ELSE
+    v_data_pagamento := v_hora_pagamento;
+  END IF;
+  IF pg_typeof(v_data_transacao) = 'date'::regtype THEN
+    v_data_transacao := p_data_pagamento;
+  ELSE
+    v_data_transacao := v_hora_pagamento;
+  END IF;
+  -- %TYPE aceita VARCHAR/TEXT produtivos e enums do fixture antigo, sem
+  -- impor os enums existentes a colunas que não os utilizam.
+  v_status_parcela := v_status_novo;
+  v_historico_user_id := p_user_id;
+  v_numero_parcela := coalesce(v_parcela.numero_parcela, (to_jsonb(v_parcela)->>'numero')::integer);
 
   UPDATE public.parcelas
   SET valor_pago = v_valor_pago_acumulado,
@@ -398,8 +514,8 @@ BEGIN
       valor_desconto = v_desconto,
       multa_diaria_usada = v_multa_diaria,
       saldo_residual = v_saldo_residual,
-      data_pagamento = v_hora_pagamento,
-      status = v_status_novo::public.status_parcela,
+      data_pagamento = v_data_pagamento,
+      status = v_status_parcela,
       conta_caixa_id = p_conta_caixa_id,
       observacoes = v_observacoes_normalizadas
   WHERE id = v_parcela.id AND user_id = p_user_id;
@@ -409,30 +525,30 @@ BEGIN
     parcela_id, contrato_id, cliente_id, operacao_financeira_id, data_transacao
   ) VALUES (
     p_user_id, p_conta_caixa_id, 'entrada', 'pagamento_parcela', v_valor_pago_normalizado,
-    format('Pagamento parcela #%s - Contrato #%s%s', v_parcela.numero_parcela, v_parcela.contrato_id,
+    format('Pagamento parcela #%s - Contrato #%s%s', v_numero_parcela, v_parcela.contrato_id,
       CASE WHEN v_saldo_residual > 0 THEN format(' (parcial, falta R$ %s)', to_char(v_saldo_residual, 'FM999999990.00')) ELSE '' END),
-    v_parcela.id, v_parcela.contrato_id, v_parcela.cliente_id, v_operacao.id, v_hora_pagamento
+    v_parcela.id, v_parcela.contrato_id, v_parcela.cliente_id, v_operacao.id, v_data_transacao
   ) RETURNING id INTO v_transacao_id;
 
   IF NOT EXISTS (
     SELECT 1 FROM public.parcelas
     WHERE contrato_id = v_parcela.contrato_id
       AND user_id = p_user_id
-      AND status IN ('pendente', 'atrasada', 'vencendo_hoje', 'parcial')
+      AND status::text NOT IN ('paga', 'pago', 'cancelada', 'cancelado')
   ) THEN
     UPDATE public.contratos
-    SET status = 'quitado'::public.status_contrato
+    SET status = v_status_quitado
     WHERE id = v_parcela.contrato_id AND user_id = p_user_id;
   END IF;
 
   INSERT INTO public.contrato_historico (user_id, contrato_id, tipo, descricao, valor_novo)
   VALUES (
-    p_user_id, v_parcela.contrato_id, 'pagamento',
+    v_historico_user_id, v_parcela.contrato_id, 'pagamento',
     CASE WHEN v_status_novo = 'paga'
-      THEN format('Parcela #%s quitada - R$ %s', v_parcela.numero_parcela, to_char(v_valor_pago_normalizado, 'FM999999990.00'))
-      ELSE format('Parcela #%s paga parcialmente - R$ %s (saldo pendente nesta parcela: R$ %s)', v_parcela.numero_parcela, to_char(v_valor_pago_normalizado, 'FM999999990.00'), to_char(v_saldo_residual, 'FM999999990.00'))
+      THEN format('Parcela #%s quitada - R$ %s', v_numero_parcela, to_char(v_valor_pago_normalizado, 'FM999999990.00'))
+      ELSE format('Parcela #%s paga parcialmente - R$ %s (saldo pendente nesta parcela: R$ %s)', v_numero_parcela, to_char(v_valor_pago_normalizado, 'FM999999990.00'), to_char(v_saldo_residual, 'FM999999990.00'))
     END,
-    to_char(v_valor_pago_normalizado, 'FM999999990.00')
+    v_valor_pago_normalizado
   );
 
   v_resultado := jsonb_build_object(

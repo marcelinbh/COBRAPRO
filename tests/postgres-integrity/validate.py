@@ -155,6 +155,64 @@ def gate_test(name, setup, migration, state='P0001'):
     return detail
 
 
+def native_reset_contract():
+    db = clone('native_used')
+    seed_reset(db, 410)
+    seed_reset(db, 411, expired=True)
+    ok(query(db, f"UPDATE password_resets SET used=true WHERE token='{token(411)}'"))
+    before = scalar(db, 'SELECT json_agg(p ORDER BY id)::text FROM password_resets p')
+    ok(apply(db, M16))
+    catalog_after = catalog(db)
+    ok(apply(db, M16))
+    equal(catalog(db), catalog_after)
+    equal(scalar(db, 'SELECT json_agg(p ORDER BY id)::text FROM password_resets p'), before)
+    equal(scalar(db, "SELECT count(*) FROM information_schema.columns WHERE table_name='password_resets' AND column_name='usado'"), '0')
+    equal(scalar(db, "SELECT udt_name||'|'||is_nullable||'|'||coalesce(column_default,'') FROM information_schema.columns WHERE table_name='password_resets' AND column_name='used'"), 'bool|NO|false')
+    equal(scalar(db, consume(410)), '1|1')
+    return {'contract': 'used', 'migration_twice': True, 'data_preserved': True,
+            'no_duplicate_column': True, 'reset': '1|1'}
+
+
+def legacy_reset_contract():
+    db = clone('legacy_usado')
+    ok(query(db, 'ALTER TABLE password_resets RENAME COLUMN used TO usado'))
+    seed_reset(db, 400)
+    seed_reset(db, 401, expired=True)
+    ok(query(db, f"UPDATE password_resets SET usado=true WHERE token='{token(401)}'"))
+    before = scalar(db, 'SELECT json_agg(p ORDER BY id)::text FROM password_resets p')
+    ok(apply(db, M16))
+    catalog_after = catalog(db)
+    ok(apply(db, M16))
+    equal(catalog(db), catalog_after)
+    equal(scalar(db, 'SELECT json_agg(p ORDER BY id)::text FROM password_resets p'), before)
+    equal(scalar(db, "SELECT count(*) FROM information_schema.columns WHERE table_name='password_resets' AND column_name='used'"), '0')
+    equal(scalar(db, consume(400)), '1|1')
+    equal(scalar(db, f"SELECT usado FROM password_resets WHERE token='{token(400)}'"), 't')
+    equal(scalar(db, consume(400)), '')
+    seed_reset(db, 402, expired=True)
+    equal(scalar(db, consume(402)), '')
+    equal(scalar(db, f"SELECT usado FROM password_resets WHERE token='{token(402)}'"), 'f')
+    seed_reset(db, 403)
+    user_before = scalar(db, 'SELECT "passwordHash"||\'|\'||session_version FROM users WHERE id=1')
+    ok(query(db, 'BEGIN; '+consume(403, 'hash-legacy-rollback-000000001')+'; ROLLBACK;'))
+    equal(scalar(db, 'SELECT "passwordHash"||\'|\'||session_version FROM users WHERE id=1'), user_before)
+    equal(scalar(db, f"SELECT usado FROM password_resets WHERE token='{token(403)}'"), 'f')
+    seed_reset(db, 404, uid=99999)
+    expect_error(query(db, consume(404)), '23503')
+    equal(scalar(db, f"SELECT usado FROM password_resets WHERE token='{token(404)}'"), 'f')
+    ok(query(db, 'ALTER TABLE users ADD CONSTRAINT local_fail_legacy CHECK ("passwordHash" <> \'hash-legacy-failure-000000001\')'))
+    seed_reset(db, 405)
+    expect_error(query(db, consume(405, 'hash-legacy-failure-000000001')), '23514')
+    equal(scalar(db, f"SELECT usado FROM password_resets WHERE token='{token(405)}'"), 'f')
+    equal(scalar(db, 'SELECT "passwordHash"||\'|\'||session_version FROM users WHERE id=1'), user_before)
+    seed_reset(db, 406)
+    detail = blocked_race(db, consume(406, 'hash-legacy-first-000000000001'), consume(406, 'hash-legacy-second-00000000001'), 'empty', 'legacy-reset-race')
+    equal(scalar(db, 'SELECT session_version FROM users WHERE id=1'), '2')
+    equal(scalar(db, 'SELECT "passwordHash" FROM users WHERE id=1'), 'hash-legacy-first-000000000001')
+    return {'contract': 'usado', 'migration_twice': True, 'data_preserved': True,
+            'rollback_expiry_replay_orphan_failure': True, 'race': detail}
+
+
 # CREATE DATABASE cannot occur in multi-statement transaction implied by psql -c.
 # Perform independent calls explicitly to avoid disguising fixture failures.
 def execute_suite():
@@ -204,7 +262,7 @@ def execute_suite():
         before=int(scalar(db,'SELECT session_version FROM users WHERE id=1'))
         output=ok(query(db,'SET ROLE service_role; '+consume(100)))
         assert f'1|{before+1}' in output, output
-        equal(scalar(db,f"SELECT usado FROM password_resets WHERE token='{token(100)}'"),'t')
+        equal(scalar(db,f"SELECT used FROM password_resets WHERE token='{token(100)}'"),'t')
         equal(scalar(db,'SELECT "passwordHash" FROM users WHERE id=1'),'nova-hash-local-000000000000001')
         return {'returned':output,'session_version':before+1}
     record('0016 service real reset consumes token and revokes atomically',valid_reset)
@@ -212,7 +270,7 @@ def execute_suite():
     def expired():
         seed_reset(db,101,expired=True)
         equal(scalar(db,consume(101)),'')
-        return equal(scalar(db,f"SELECT usado FROM password_resets WHERE token='{token(101)}'"),'f')
+        return equal(scalar(db,f"SELECT used FROM password_resets WHERE token='{token(101)}'"),'f')
     record('0016 expired token not consumed',expired)
     record('0016 nonexistent token returns no row', lambda: equal(scalar(db,consume(999)),''))
     def reset_rollback():
@@ -220,12 +278,12 @@ def execute_suite():
         before=scalar(db,'SELECT "passwordHash"||\'|\'||session_version FROM users WHERE id=1')
         ok(query(db,'BEGIN; '+consume(102,'hash-transacao-rollback-00000001')+'; ROLLBACK;'))
         equal(scalar(db,'SELECT "passwordHash"||\'|\'||session_version FROM users WHERE id=1'),before)
-        return equal(scalar(db,f"SELECT usado FROM password_resets WHERE token='{token(102)}'"),'f')
+        return equal(scalar(db,f"SELECT used FROM password_resets WHERE token='{token(102)}'"),'f')
     record('0016 explicit transaction rollback restores token hash version',reset_rollback)
     def orphan():
         seed_reset(db,103,uid=99999)
         detail=expect_error(query(db,consume(103)),'23503')
-        equal(scalar(db,f"SELECT usado FROM password_resets WHERE token='{token(103)}'"),'f')
+        equal(scalar(db,f"SELECT used FROM password_resets WHERE token='{token(103)}'"),'f')
         return detail
     record('0016 nonexistent user rollback preserves token',orphan)
     def failure_after_consume():
@@ -233,7 +291,7 @@ def execute_suite():
         before=scalar(db,'SELECT "passwordHash"||\'|\'||session_version FROM users WHERE id=1')
         ok(query(db,'ALTER TABLE users ADD CONSTRAINT local_fail_hash CHECK ("passwordHash" <> \'hash-forced-failure-0000000001\')'))
         detail=expect_error(query(db,consume(104,'hash-forced-failure-0000000001')),'23514')
-        equal(scalar(db,f"SELECT usado FROM password_resets WHERE token='{token(104)}'"),'f')
+        equal(scalar(db,f"SELECT used FROM password_resets WHERE token='{token(104)}'"),'f')
         equal(scalar(db,'SELECT "passwordHash"||\'|\'||session_version FROM users WHERE id=1'),before)
         ok(query(db,'ALTER TABLE users DROP CONSTRAINT local_fail_hash'))
         return detail
@@ -252,7 +310,12 @@ def execute_suite():
     record('0014 gate wrong cash tenant + DDL rollback',lambda: gate_test('gate14tenant','UPDATE pagamentos_assinatura SET conta_caixa_id=2 WHERE id=1',M14))
     record('0014 gate duplicate month + DDL rollback',lambda: gate_test('gate14dup',"INSERT INTO pagamentos_assinatura(assinatura_id,cliente_id,valor_pago,mes_referencia,conta_caixa_id) VALUES(1,1,100,'2026-01',1)",M14))
     record('0016 gate ambiguous hash columns + DDL rollback',lambda: gate_test('gate16amb','ALTER TABLE users ADD COLUMN password_hash text',M16))
-    record('0016 gate missing reset column + DDL rollback',lambda: gate_test('gate16missing','ALTER TABLE password_resets DROP COLUMN usado',M16))
+    record('0016 gate missing reset column + DDL rollback',lambda: gate_test('gate16missing','ALTER TABLE password_resets DROP COLUMN used',M16))
+    record('0016 gate ambiguous used/usado + DDL rollback',lambda: gate_test('gate16usedamb','ALTER TABLE password_resets ADD COLUMN usado boolean NOT NULL DEFAULT false',M16),'regression')
+    record('0016 gate nullable consumption column + DDL rollback',lambda: gate_test('gate16usednull','ALTER TABLE password_resets ALTER COLUMN used DROP NOT NULL',M16),'regression')
+    record('0016 gate nonboolean consumption column + DDL rollback',lambda: gate_test('gate16usedtype','ALTER TABLE password_resets ALTER COLUMN used DROP DEFAULT; ALTER TABLE password_resets ALTER COLUMN used TYPE text USING used::text',M16),'regression')
+    record('0016 native used twice preserves existing synthetic resets and catalog',native_reset_contract,'regression')
+    record('0016 legacy usado twice preserves data, rollback and real concurrency',legacy_reset_contract,'regression')
     record('0016 gate invalid legacy session version + rollback',lambda: gate_test('gate16negative','ALTER TABLE users ADD COLUMN session_version integer; UPDATE users SET session_version=-1',M16))
     record('0017 gate null existing order + rollback',lambda: gate_test('gate17null','INSERT INTO kiwify_webhooks(order_id) VALUES(NULL)',M17))
     record('0017 gate blank existing order + rollback',lambda: gate_test('gate17blank',"INSERT INTO kiwify_webhooks(order_id) VALUES('   ')",M17))

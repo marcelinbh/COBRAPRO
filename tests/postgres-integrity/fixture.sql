@@ -14,8 +14,9 @@ CREATE TABLE users (
 );
 CREATE TABLE password_resets (
  id serial PRIMARY KEY, user_id integer NOT NULL,
- token varchar(128) NOT NULL UNIQUE, expires_at timestamptz NOT NULL,
- usado boolean NOT NULL DEFAULT false, "createdAt" timestamptz NOT NULL DEFAULT now()
+ token varchar NOT NULL UNIQUE, expires_at timestamptz NOT NULL,
+ used boolean NOT NULL DEFAULT false, "createdAt" timestamptz
+ -- Contrato informado do inventário READ ONLY; dados abaixo são somente sintéticos.
 );
 CREATE TABLE clientes (id serial PRIMARY KEY, user_id integer, nome varchar(255) NOT NULL);
 CREATE TABLE contas_caixa (

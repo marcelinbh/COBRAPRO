@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { and, eq, gt } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { Express, NextFunction, Request, Response } from "express";
-import { passwordResets, users } from "../drizzle/schema";
+import { users } from "../drizzle/schema";
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { getDb, getSupabaseClientAsync } from "./db";
@@ -85,23 +85,66 @@ export function hashTokenDeRecuperacao(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
+type ColunaDeConsumo = "used" | "usado";
+type ResetDb = NonNullable<Awaited<ReturnType<typeof getDb>>>;
+
+/** Consulta só metadados, nunca tokens. Schema ausente/ambíguo falha fechado. */
+async function colunaDeConsumoNoPostgres(db: Pick<ResetDb, "execute">): Promise<ColunaDeConsumo> {
+  const columns = await db.execute<{ name: ColunaDeConsumo; valid: boolean }>(sql`
+    SELECT attname AS name, (atttypid = 'boolean'::regtype AND attnotnull) AS valid
+    FROM pg_catalog.pg_attribute
+    WHERE attrelid = to_regclass('public.password_resets')
+      AND attname IN ('used', 'usado') AND NOT attisdropped
+    LIMIT 2
+  `);
+  if (columns.length !== 1 || !columns[0].valid) {
+    throw new Error("Contrato de consumo de recuperação indisponível ou ambíguo.");
+  }
+  return columns[0].name;
+}
+
+/**
+ * Probes de projeção com LIMIT 0: nenhuma linha/token é lida. A compatibilidade
+ * é decidida ANTES de qualquer UPDATE, nunca repetindo uma mutação após erro.
+ * Falhas de permissão/transporte/cache não são interpretadas como coluna ausente.
+ */
+export async function colunaDeConsumoNoSupabase(supabase: any): Promise<ColunaDeConsumo> {
+  const presentes = await Promise.all((["used", "usado"] as const).map(async (column) => {
+    const { data, error } = await supabase.from("password_resets").select(column).limit(0);
+    if (!error && Array.isArray(data) && data.length === 0) return column;
+    if (error?.code === "42703") return null; // undefined_column na projeção somente
+    throw new Error("Contrato de consumo de recuperação indisponível.");
+  }));
+  const columns = presentes.filter((column): column is ColunaDeConsumo => column !== null);
+  if (columns.length !== 1) {
+    throw new Error("Contrato de consumo de recuperação indisponível ou ambíguo.");
+  }
+  return columns[0];
+}
+
 /**
  * Faz o compare-and-set do token no Supabase: somente a primeira chamada com
  * token válido, ainda não usado e não expirado recebe o usuário associado.
+ * Compatibilidade legada REST; NÃO é transação com a atualização de users.
+ * O modo versionado usa exclusivamente a RPC transacional abaixo.
  */
 export async function consumirTokenRecuperacaoNoSupabase(supabase: any, tokenHash: string, now: Date): Promise<number | null> {
+  const usedColumn = await colunaDeConsumoNoSupabase(supabase);
   const { data, error } = await supabase
     .from("password_resets")
-    .update({ usado: true })
+    .update({ [usedColumn]: true })
     .eq("token", tokenHash)
-    .eq("usado", false)
+    .eq(usedColumn, false)
     .gt("expires_at", now.toISOString())
     .select("user_id")
     .maybeSingle();
 
-  if (error) throw new Error(`Não foi possível consumir o token de recuperação: ${error.message}`);
-  const userId = data?.user_id ?? data?.userId;
-  return typeof userId === "number" ? userId : null;
+  if (error) throw new Error("Não foi possível consumir o token de recuperação.");
+  if (data === null) return null;
+  if (!Number.isSafeInteger(data?.user_id) || data.user_id <= 0) {
+    throw new Error("Resposta inválida do consumo de recuperação.");
+  }
+  return data.user_id;
 }
 
 // Helper: buscar usuário por email (Drizzle ou Supabase REST)
@@ -353,24 +396,29 @@ export function registerAuthRoutes(app: Express) {
 
       const db = await getDb();
       if (db) {
-        // Invalidar tokens anteriores do mesmo usuário
-        await db.update(passwordResets).set({ usado: true }).where(eq(passwordResets.userId, user.id));
-        // Inserir novo token
-        await db.insert(passwordResets).values({ userId: user.id, token: tokenHash, expiresAt });
+        await db.transaction(async (tx) => {
+          const usedColumn = sql.identifier(await colunaDeConsumoNoPostgres(tx));
+          await tx.execute(sql`UPDATE public.password_resets SET ${usedColumn} = true WHERE user_id = ${user.id}`);
+          await tx.execute(sql`
+            INSERT INTO public.password_resets (user_id, token, expires_at, ${usedColumn})
+            VALUES (${user.id}, ${tokenHash}, ${expiresAt}, false)
+          `);
+        });
       } else {
-        // Fallback: Supabase REST (usa snake_case conforme o banco)
+        // REST legado: resolver contrato sem ler linhas nem tentar UPDATE alternativo.
         const supabase = await getSupabaseClientAsync();
         if (!supabase) throw new Error("Persistência de token indisponível");
+        const usedColumn = await colunaDeConsumoNoSupabase(supabase);
         const { error: invalidarErro } = await supabase
           .from("password_resets")
-          .update({ usado: true })
+          .update({ [usedColumn]: true })
           .eq("user_id", user.id);
         if (invalidarErro) throw new Error("Não foi possível invalidar tokens anteriores");
-        // Omitir 'usado' no insert pois tem DEFAULT false no banco (evita erro de schema cache)
         const { error: insertErr } = await supabase.from("password_resets").insert({
           user_id: user.id,
           token: tokenHash,
           expires_at: expiresAt.toISOString(),
+          [usedColumn]: false,
         });
         if (insertErr) throw new Error("Não foi possível persistir token de recuperação");
       }
@@ -447,29 +495,27 @@ export function registerAuthRoutes(app: Express) {
 
       const db = await getDb();
       if (db) {
-        const resetsConsumidos = await db
-          .update(passwordResets)
-          .set({ usado: true })
-          .where(
-            and(
-              eq(passwordResets.token, tokenHash),
-              eq(passwordResets.usado, false),
-              gt(passwordResets.expiresAt, now)
-            )
-          )
-          .returning({ userId: passwordResets.userId });
+        const alterada = await db.transaction(async (tx) => {
+          const usedColumn = sql.identifier(await colunaDeConsumoNoPostgres(tx));
+          const resetsConsumidos = await tx.execute<{ user_id: number }>(sql`
+            UPDATE public.password_resets SET ${usedColumn} = true
+            WHERE token = ${tokenHash} AND ${usedColumn} = false AND expires_at > ${now}
+            RETURNING user_id
+          `);
+          const reset = resetsConsumidos[0];
+          if (!reset) return false;
 
-        const reset = resetsConsumidos[0];
-        if (!reset) {
+          const usuarioAtualizado = await tx.update(users)
+            .set({ passwordHash, updatedAt: now })
+            .where(eq(users.id, reset.user_id))
+            .returning({ id: users.id });
+          if (!usuarioAtualizado[0]) throw new Error("Usuário associado ao token não encontrado");
+          return true;
+        });
+        if (!alterada) {
           res.status(400).json({ error: "Token inválido ou expirado" });
           return;
         }
-
-        const usuarioAtualizado = await db.update(users)
-          .set({ passwordHash, updatedAt: now })
-          .where(eq(users.id, reset.userId))
-          .returning({ id: users.id });
-        if (!usuarioAtualizado[0]) throw new Error("Usuário associado ao token não encontrado");
       } else {
         // Fallback: Supabase REST
         const supabase = await getSupabaseClientAsync();
@@ -490,13 +536,14 @@ export function registerAuthRoutes(app: Express) {
           .select("id")
           .maybeSingle();
         if (usuarioErro || !usuarioAtualizado) {
-          throw new Error(usuarioErro?.message ?? "Usuário associado ao token não encontrado");
+          throw new Error("Não foi possível atualizar a senha de recuperação.");
         }
       }
 
       res.json({ success: true, message: "Senha alterada com sucesso!" });
-    } catch (err) {
-      console.error("[Auth] Reset-password error:", err);
+    } catch {
+      // Não registrar SQL, respostas de transporte ou hashes/tokens em exceções.
+      console.error("[Auth] Falha ao redefinir senha.");
       res.status(500).json({ error: "Erro interno. Tente novamente." });
     }
   });

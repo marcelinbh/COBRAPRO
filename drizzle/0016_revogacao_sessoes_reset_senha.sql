@@ -6,6 +6,7 @@ DO $$
 DECLARE
   v_password_column text;
   v_updated_column text;
+  v_used_column text;
 BEGIN
   IF to_regclass('public.users') IS NULL OR to_regclass('public.password_resets') IS NULL THEN
     RAISE EXCEPTION 'Migration bloqueada: users ou password_resets não existe.';
@@ -43,18 +44,26 @@ BEGIN
     RAISE EXCEPTION 'Migration bloqueada: schema de users possui colunas de atualização ambíguas.';
   END IF;
 
-  IF EXISTS (
-    SELECT 1 FROM pg_attribute
-    WHERE attrelid = 'public.password_resets'::regclass
-      AND attname IN ('user_id', 'token', 'expires_at', 'usado')
-      AND NOT attisdropped
-    GROUP BY attrelid
-    HAVING count(*) <> 4
-  ) OR (SELECT count(*) FROM pg_attribute
+  IF (SELECT count(*) FROM pg_attribute
         WHERE attrelid = 'public.password_resets'::regclass
-          AND attname IN ('user_id', 'token', 'expires_at', 'usado')
-          AND NOT attisdropped) <> 4 THEN
+          AND attname IN ('user_id', 'token', 'expires_at')
+          AND NOT attisdropped) <> 3 THEN
     RAISE EXCEPTION 'Migration bloqueada: password_resets não possui o contrato físico esperado.';
+  END IF;
+
+  -- Produção usa used; usado é compatibilidade legada, nunca uma coluna nova.
+  -- Duas colunas podem divergir: não escolher uma nem sincronizar dados.
+  IF (SELECT count(*) FROM pg_attribute
+      WHERE attrelid = 'public.password_resets'::regclass
+        AND attname IN ('used', 'usado') AND NOT attisdropped) <> 1 THEN
+    RAISE EXCEPTION 'Migration bloqueada: coluna de consumo used/usado ausente ou ambígua.';
+  END IF;
+  SELECT attname INTO v_used_column FROM pg_attribute
+  WHERE attrelid = 'public.password_resets'::regclass
+    AND attname IN ('used', 'usado') AND NOT attisdropped
+    AND atttypid = 'boolean'::regtype AND attnotnull;
+  IF v_used_column IS NULL THEN
+    RAISE EXCEPTION 'Migration bloqueada: coluna de consumo deve ser boolean NOT NULL.';
   END IF;
 END $$;
 
@@ -120,6 +129,7 @@ DO $$
 DECLARE
   v_password_column text;
   v_updated_column text;
+  v_used_column text;
 BEGIN
   SELECT attname INTO v_password_column
   FROM pg_attribute
@@ -131,6 +141,10 @@ BEGIN
   WHERE attrelid = 'public.users'::regclass
     AND attname IN ('updatedAt', 'updated_at')
     AND NOT attisdropped;
+
+  SELECT attname INTO v_used_column FROM pg_attribute
+  WHERE attrelid = 'public.password_resets'::regclass
+    AND attname IN ('used', 'usado') AND NOT attisdropped;
 
   EXECUTE format($sql$
     CREATE OR REPLACE FUNCTION public.consume_password_reset_and_revoke_sessions(
@@ -151,9 +165,9 @@ BEGIN
       END IF;
 
       UPDATE public.password_resets
-      SET usado = true
+      SET %I = true
       WHERE token = p_token_hash
-        AND usado = false
+        AND %I = false
         AND expires_at > now()
       RETURNING password_resets.user_id INTO v_user_id;
 
@@ -173,7 +187,7 @@ BEGIN
       END IF;
     END;
     $body$;
-  $sql$, v_password_column, v_updated_column);
+  $sql$, v_used_column, v_used_column, v_password_column, v_updated_column);
 END $$;
 
 REVOKE ALL ON FUNCTION public.consume_password_reset_and_revoke_sessions(text, text)

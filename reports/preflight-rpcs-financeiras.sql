@@ -70,14 +70,14 @@ WHERE coalesce(p.valor_pago, 0) > 0
 -- cliente de outra empresa, nem existir sem a parcela de origem.
 SELECT t.id, t.user_id AS transacao_user_id, t.parcela_id,
        p.user_id AS parcela_user_id, t.contrato_id, p.contrato_id AS parcela_contrato_id,
-       t.cliente_id, p.cliente_id AS parcela_cliente_id
+       to_jsonb(t)->>'cliente_id' AS transacao_cliente_id, p.cliente_id AS parcela_cliente_id
 FROM public.transacoes_caixa t
 LEFT JOIN public.parcelas p ON p.id = t.parcela_id
 WHERE t.categoria = 'pagamento_parcela'
   AND (p.id IS NULL
        OR t.user_id IS DISTINCT FROM p.user_id
        OR t.contrato_id IS DISTINCT FROM p.contrato_id
-       OR t.cliente_id IS DISTINCT FROM p.cliente_id);
+       OR to_jsonb(t)->>'cliente_id' IS DISTINCT FROM p.cliente_id::text);
 
 -- 6c. Estados que a RPC trata de modo especial devem obedecer seus invariantes.
 SELECT id, user_id, status, saldo_residual, valor_pago, data_vencimento

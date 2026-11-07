@@ -4,10 +4,15 @@ import json, os, pwd, subprocess, sys, time, uuid
 from pathlib import Path
 ROOT=Path(sys.argv[1]).resolve()
 assert ROOT.name.startswith('cobrapro-pg-test-') and ROOT.parent == Path('/tmp'), 'Only isolated temporary directory allowed'
+PROFILE=sys.argv[2] if len(sys.argv)>2 else 'legacy'
+assert PROFILE in ('legacy','prod')
+DB='rpc_validation' if PROFILE=='legacy' else 'rpc_validation_prod'
+EVIDENCE=ROOT/'evidence'/PROFILE
+EVIDENCE.mkdir(exist_ok=True)
 ENV={'PATH':'/usr/bin:/bin','LANG':'C.UTF-8'}
-BASE=['psql','-X','-qAt','-h',str(ROOT/'socket'),'-p','55432','-U',pwd.getpwuid(os.getuid()).pw_name,'-d','rpc_validation','-v','ON_ERROR_STOP=1','-v','VERBOSITY=verbose']
+BASE=['psql','-X','-qAt','-h',str(ROOT/'socket'),'-p','55432','-U',pwd.getpwuid(os.getuid()).pw_name,'-d',DB,'-v','ON_ERROR_STOP=1','-v','VERBOSITY=verbose']
 RESULTS=[]
-LOG=(ROOT/'evidence/tests-transcript.log').open('w')
+LOG=(EVIDENCE/'tests-transcript.log').open('w')
 def sql(query, error=None):
     p=subprocess.run(BASE+['-c',query],env=ENV,text=True,capture_output=True,timeout=20)
     LOG.write(f'COMMAND: {BASE!r} -c {query!r}\nEXIT: {p.returncode}\nSTDOUT:\n{p.stdout}STDERR:\n{p.stderr}\n');LOG.flush()
@@ -28,7 +33,10 @@ def call(pid,amount,k,**kwargs): return val(call_query(pid,amount,k,**kwargs))
 def error_call(code,pid,amount,k,**kwargs): sql(call_query(pid,amount,k,**kwargs),code)
 def seed(pid,tenant=1,client=None,due='2026-11-06',contract_status='ativo'):
     client=client or tenant
-    sql(f"INSERT INTO contratos(id,user_id,cliente_id,status,numero_parcelas) VALUES({pid},{tenant},{client},'{contract_status}',1); INSERT INTO parcelas(id,user_id,contrato_id,cliente_id,numero_parcela,valor_original,data_vencimento) VALUES({pid},{tenant},{pid},{client},1,100,'{due}');")
+    if PROFILE=='prod':
+        sql(f"INSERT INTO contratos(id,user_id,cliente_id,status,numero_parcelas,num_parcelas) VALUES({pid},{tenant},{client},'{contract_status}',1,1); INSERT INTO parcelas(id,user_id,contrato_id,cliente_id,numero,numero_parcela,valor,valor_original,data_vencimento) VALUES({pid},{tenant},{pid},{client},1,1,100,100,'{due}');")
+    else:
+        sql(f"INSERT INTO contratos(id,user_id,cliente_id,status,numero_parcelas) VALUES({pid},{tenant},{client},'{contract_status}',1); INSERT INTO parcelas(id,user_id,contrato_id,cliente_id,numero_parcela,valor_original,data_vencimento) VALUES({pid},{tenant},{pid},{client},1,100,'{due}');")
 def snap(pid):
     return val(f"SELECT jsonb_build_object('parcela',(SELECT to_jsonb(p) FROM parcelas p WHERE id={pid}),'contrato',(SELECT to_jsonb(c) FROM contratos c WHERE id={pid}),'caixa',(SELECT count(*) FROM transacoes_caixa WHERE parcela_id={pid}),'total',(SELECT coalesce(sum(valor),0) FROM transacoes_caixa WHERE parcela_id={pid}),'operacoes',(SELECT count(*) FROM operacoes_financeiras),'audit',(SELECT count(*) FROM auditoria_financeira),'historico',(SELECT count(*) FROM contrato_historico))")
 def test(name,fn):
@@ -96,9 +104,16 @@ def dates():
     assert civil==['2026-11-06','2026-11-07']
     seed(105);seed(106)
     a=call(105,100,key(105),date=civil[0],zone='Asia/Tokyo');b=call(106,103,key(106),date=civil[1],zone='UTC')
-    rows=val("SELECT jsonb_agg(jsonb_build_object('id',id,'juros',valor_juros,'multa',valor_multa,'civil',(data_pagamento AT TIME ZONE 'America/Sao_Paulo')::date,'utc',to_char(data_pagamento AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')) ORDER BY id) FROM parcelas WHERE id IN (105,106)")
-    assert rows[0]['juros']==0 and rows[0]['multa']==0 and rows[0]['utc']=='2026-11-06 15:00:00'
-    assert rows[1]['juros']==1 and rows[1]['multa']==2 and rows[1]['utc']=='2026-11-07 15:00:00'
+    if PROFILE=='prod':
+        rows=val("SELECT jsonb_agg(jsonb_build_object('id',id,'juros',valor_juros,'multa',valor_multa,'civil',data_pagamento) ORDER BY id) FROM parcelas WHERE id IN (105,106)")
+        assert rows[0]['civil']==civil[0] and rows[1]['civil']==civil[1]
+        caixa_dates=val("SELECT jsonb_agg(data_transacao ORDER BY parcela_id) FROM transacoes_caixa WHERE parcela_id IN (105,106)")
+        assert caixa_dates==civil
+    else:
+        rows=val("SELECT jsonb_agg(jsonb_build_object('id',id,'juros',valor_juros,'multa',valor_multa,'civil',(data_pagamento AT TIME ZONE 'America/Sao_Paulo')::date,'utc',to_char(data_pagamento AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS')) ORDER BY id) FROM parcelas WHERE id IN (105,106)")
+        assert rows[0]['utc']=='2026-11-06 15:00:00' and rows[1]['utc']=='2026-11-07 15:00:00'
+    assert rows[0]['juros']==0 and rows[0]['multa']==0
+    assert rows[1]['juros']==1 and rows[1]['multa']==2
     return {'utc_boundary_to_civil':civil,'rows':rows}
 test('multa_dia_vs_dia_seguinte_America_Sao_Paulo',dates)
 def rollback():
@@ -113,10 +128,10 @@ test('rollback_caixa_e_retry_mesma_chave',rollback)
 def composite_fks():
     op=sql('SELECT id FROM operacoes_financeiras WHERE user_id=1 LIMIT 1')
     before=sql('SELECT count(*) FROM transacoes_caixa')
-    sql(f"INSERT INTO transacoes_caixa(user_id,conta_caixa_id,tipo,categoria,valor,operacao_financeira_id) VALUES(2,2,'entrada','outros',1,'{op}')",'23505')
+    sql(f"INSERT INTO transacoes_caixa(user_id,conta_caixa_id,tipo,categoria,valor,descricao,data_transacao,operacao_financeira_id) VALUES(2,2,'entrada','outros',1,'fixture','2026-11-06','{op}')",'23505')
     unused=key(987654321)
-    sql(f"BEGIN; INSERT INTO operacoes_financeiras(id,user_id,tipo,chave_idempotencia,hash_requisicao,status) VALUES('{unused}',1,'ajuste_manual','{unused}','fixture','processando'); INSERT INTO transacoes_caixa(user_id,conta_caixa_id,tipo,categoria,valor,operacao_financeira_id) VALUES(2,2,'entrada','outros',1,'{unused}'); COMMIT",'23503')
-    sql("INSERT INTO transacoes_caixa(user_id,conta_caixa_id,tipo,categoria,valor) VALUES(1,2,'entrada','outros',1)",'23503')
+    sql(f"BEGIN; INSERT INTO operacoes_financeiras(id,user_id,tipo,chave_idempotencia,hash_requisicao,status) VALUES('{unused}',1,'ajuste_manual','{unused}','fixture','processando'); INSERT INTO transacoes_caixa(user_id,conta_caixa_id,tipo,categoria,valor,descricao,data_transacao,operacao_financeira_id) VALUES(2,2,'entrada','outros',1,'fixture','2026-11-06','{unused}'); COMMIT",'23503')
+    sql("INSERT INTO transacoes_caixa(user_id,conta_caixa_id,tipo,categoria,valor,descricao,data_transacao) VALUES(1,2,'entrada','outros',1,'fixture','2026-11-06')",'23503')
     assert before==sql('SELECT count(*) FROM transacoes_caixa')
     return {'duplicate_operation_first_rejected':'23505','foreign_unused_operation':'23503','foreign_account':'23503','no_inserted_rows':True}
 test('fks_compostas_escrita_direta',composite_fks)
@@ -170,13 +185,61 @@ test('concorrencia_chaves_diferentes_parciais',lambda:concurrent(110,[30,70],Fal
 test('concorrencia_chaves_diferentes_integral',lambda:concurrent(111,[100,100],False))
 sql("INSERT INTO contas_caixa(id,user_id,nome) VALUES(4,1,'Caixa A separado')")
 test('concorrencia_caixas_distintos_mesma_parcela',lambda:concurrent(112,[30,70],False,second_cash=4))
+if PROFILE=='prod':
+    def prod_catalog():
+        result=val("SELECT jsonb_build_object('pgcrypto_schema',(SELECT n.nspname FROM pg_extension e JOIN pg_namespace n ON n.oid=e.extnamespace WHERE e.extname='pgcrypto'),'pgcrypto_version',(SELECT extversion FROM pg_extension WHERE extname='pgcrypto'),'uuid_defaults',(SELECT count(*) FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('operacoes_financeiras','auditoria_financeira') AND column_name='id' AND column_default IS NOT NULL),'historico_user_type',(SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='contrato_historico' AND column_name='user_id'),'historico_valor_type',(SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name='contrato_historico' AND column_name='valor_novo'),'cliente_nullable',(SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='transacoes_caixa' AND column_name='cliente_id'),'tenant_nullable',(SELECT is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name='parcelas' AND column_name='user_id'),'triggers',(SELECT count(*) FROM pg_trigger WHERE tgrelid IN ('parcelas'::regclass,'contratos'::regclass,'transacoes_caixa'::regclass) AND NOT tgisinternal),'historico_integral',(SELECT jsonb_build_object('user_id',user_id,'valor_novo',valor_novo) FROM contrato_historico WHERE contrato_id=101 LIMIT 1))")
+        assert result=={'pgcrypto_schema':'extensions','pgcrypto_version':'1.3','uuid_defaults':0,'historico_user_type':'text','historico_valor_type':'numeric','cliente_nullable':'YES','tenant_nullable':'YES','triggers':0,'historico_integral':{'user_id':'1','valor_novo':100}}
+        return result
+    test('catalogo_prod_extensions_uuid_sem_default_historico_tipos',prod_catalog)
+    def overdue_prod():
+        seed(113,contract_status='atrasado');seed(114,contract_status='atrasado')
+        sql("UPDATE parcelas SET status='atrasado' WHERE id IN (113,114); UPDATE parcelas SET numero=2,numero_parcela=2 WHERE id=114; UPDATE parcelas SET contrato_id=113 WHERE id=114")
+        first=call(113,100,key(113));assert snap(113)['contrato']['status']=='atrasado'
+        second=call(114,100,key(114));assert snap(113)['contrato']['status']=='quitado'
+        return {'first':first,'second':second,'remaining_atrasado_prevents_premature_quitado':True}
+    test('status_atrasado_parcela_contrato_e_quitacao_total',overdue_prod)
+    def denied_states_prod():
+        codes=[]
+        for i,status in enumerate(['cancelada','cancelado','pago']):
+            pid=120+i;seed(pid);sql(f"UPDATE parcelas SET status='{status}' WHERE id={pid}");before=snap(pid)
+            code='23505' if status=='pago' else '23514'
+            error_call(code,pid,100,key(pid));assert before==snap(pid);codes.append({'status':status,'sqlstate':code})
+        for i,status in enumerate(['cancelado','renegociado']):
+            pid=123+i;seed(pid,contract_status=status);before=snap(pid)
+            error_call('23514',pid,100,key(pid));assert before==snap(pid);codes.append({'contract_status':status,'sqlstate':'23514'})
+        return codes
+    test('estados_reais_cancelado_pago_renegociado_bloqueados',denied_states_prod)
+    def nullable_links_prod():
+        seed(125)
+        for column in ['user_id','cliente_id']:
+            sql(f'UPDATE parcelas SET {column}=NULL WHERE id=125');before=snap(125)
+            error_call('42501',125,100,key(125));assert before==snap(125)
+            sql(f'UPDATE parcelas SET {column}=1 WHERE id=125')
+        return {'null_user_id':'42501','null_cliente_id':'42501','no_inference_no_mutation':True}
+    test('links_nullable_sem_inferencia_automatica',nullable_links_prod)
+    def fallback_principal_prod():
+        seed(126);sql('UPDATE parcelas SET valor_original=NULL WHERE id=126')
+        r=call(126,100,key(126));assert r['status']=='paga' and snap(126)['parcela']['valor_original'] is None
+        seed(127);sql('UPDATE parcelas SET valor_original=NULL,valor=0 WHERE id=127');before=snap(127)
+        error_call('23514',127,1,key(127));assert before==snap(127)
+        return {'fallback_valor':r,'valor_original_remains_null':True,'zero_principal':'23514'}
+    test('valor_original_nullable_usa_valor_sem_backfill',fallback_principal_prod)
+    def civil_extreme_zones_prod():
+        evidence=[]
+        for pid,zone in [(128,'Pacific/Kiritimati'),(129,'Etc/GMT+12')]:
+            seed(pid);r=call(pid,100,key(pid),zone=zone)
+            dates=val(f"SELECT jsonb_build_object('parcela',p.data_pagamento,'caixa',t.data_transacao) FROM parcelas p JOIN transacoes_caixa t ON t.parcela_id=p.id WHERE p.id={pid}")
+            assert dates=={'parcela':'2026-11-06','caixa':'2026-11-06'}
+            evidence.append({'zone':zone,'dates':dates,'success':r['success']})
+        return evidence
+    test('date_nao_trunca_timestamptz_em_timezones_extremos',civil_extreme_zones_prod)
 def invariants():
     result=val("SELECT jsonb_build_object('parcelas_caixa_divergentes',(SELECT count(*) FROM parcelas p WHERE coalesce(p.valor_pago,0)<>(SELECT coalesce(sum(t.valor),0) FROM transacoes_caixa t WHERE t.parcela_id=p.id AND t.user_id=p.user_id AND t.categoria='pagamento_parcela')),'operacoes_sem_caixa',(SELECT count(*) FROM operacoes_financeiras o WHERE o.status='concluida' AND NOT EXISTS(SELECT 1 FROM transacoes_caixa t WHERE t.operacao_financeira_id=o.id)),'operacoes_sem_auditoria',(SELECT count(*) FROM operacoes_financeiras o WHERE NOT EXISTS(SELECT 1 FROM auditoria_financeira a WHERE a.operacao_id=o.id)),'operacoes_nao_concluidas',(SELECT count(*) FROM operacoes_financeiras WHERE status<>'concluida'))")
     assert all(x==0 for x in result.values())
     return result
 test('invariantes_finais_ledger_operacao_auditoria',invariants)
 LOG.close()
-(ROOT/'evidence/test-results.json').write_text(json.dumps(RESULTS,indent=2,ensure_ascii=False)+'\n')
+(EVIDENCE/'test-results.json').write_text(json.dumps(RESULTS,indent=2,ensure_ascii=False)+'\n')
 passed=sum(r['pass'] for r in RESULTS)
 print(f'SUMMARY: {passed}/{len(RESULTS)} tests passed',flush=True)
 raise SystemExit(0 if passed==len(RESULTS) else 1)

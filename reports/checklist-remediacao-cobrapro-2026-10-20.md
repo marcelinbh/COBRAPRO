@@ -4,6 +4,17 @@
 **Regra solicitada:** correções Kiwify ficam por último.  
 **Objetivo:** eliminar primeiro riscos de tomada de conta, alteração/vazamento entre empresas e corrupção operacional/financeira.
 
+## Pré-auditoria produtiva de 6/11/2026 — acesso correto finalmente confirmado
+
+- [x] Confirmar via conector o projeto correto `oxvtmibrgjruldkouhhb`, sem executar SQL no outro projeto.
+- [x] Conter acesso direto público ao banco: migration `0018` aplicada em produção às 20h59 BRT; 29/29 tabelas com RLS, nenhuma acessível por `anon`/`authenticated` e backend `service_role` preservado. Teste PostgreSQL real de ACL, reaplicação e continuidade aprovado; dashboard autenticado recarregado sem alteração dos valores.
+- [x] Inventariar schema e inconsistências sem ler segredos ou alterar o Caixa; evidências em `reports/pre-auditoria-produtiva-2026-11-06.md`.
+- [ ] Sanear, com aprovação e evidência por registro, seis parcelas sem tenant/cliente, 12 entradas com tenant diferente da conta, três parcelas parciais sem residual e demais divergências de valor. **Não criar ajustes automáticos: as 18 diferenças de recebimentos versus Caixa incluem propriedade legada incorreta.**
+- [x] Revalidar 0015/0016 contra fixtures compatíveis com os tipos relevantes do catálogo produtivo: reset `used`/`usado`, datas DATE, status VARCHAR/CHECK e `pgcrypto` em `extensions`; preflight obrigatório antes/depois do DDL. Não equivale a teste financeiro na base real.
+- [x] Instalar somente a estrutura 0016 no projeto correto às 21h13 BRT: coluna/trigger/RPC/grants confirmados, 14 versões iniciais zero, sem consumo de token ou troca de senha.
+- [ ] Ativar as flags em operações separadas: revogação exige teste coordenado; recebimentos exigem saneamento aprovado. 0013/0014/0015/0017 continuam não aplicadas.
+- [ ] Provisionar com segurança a base PostgreSQL ausente da Blacklist e comprovar armazenamento privado; não liberar compartilhamento direto no banco. Kiwify ausente fica por último.
+
 ## Prioridade P0 — Contenção imediata
 
 - [x] Remover a rota pública de bootstrap administrativo (`/api/auth/seed-admin`).
@@ -23,8 +34,8 @@
 - [x] Limitar tentativas de login e recuperação por endereço/origem e e-mail, sem guardar esses dados em claro.
 - [x] Armazenar tokens de recuperação apenas como hash SHA-256 no banco de dados.
 - [x] Consumir token de recuperação condicionalmente no banco antes de alterar a senha, bloqueando uso concorrente do mesmo link.
-- [ ] Ativar revogação de todas as sessões após redefinição de senha. **Migration PostgreSQL `0016_revogacao_sessoes_reset_senha.sql` preparada, mas não aplicada. Em 6/11 foi integrado o backend completo: emissão de JWT com snapshot de versão, validação estrita contra a conta persistida, proibição de bypass por prefixo cron e reset exclusivamente por RPC quando ativado. `ENABLE_SESSION_REVOCATION` fica desligada por padrão; exige preflight, aplicação/testes da 0016 e ativação coordenada. Após ativação não desligar a validação como rollback, pois isso pode revalidar sessões revogadas.**
-- [x] Validar 0014/0016/0017 atuais em PostgreSQL real descartável: 55 verificações, reaplicação, permissões do reset, rollback e concorrência aprovados. Corrigidos erro 42710 da 0014, nulabilidade de versão legada e índice/pedidos inválidos Kiwify. Runner em `tests/postgres-integrity/run.sh`; **banco produtivo não validado nem alterado**.
+- [ ] Ativar revogação de todas as sessões após redefinição de senha. **Migration PostgreSQL `0016_revogacao_sessoes_reset_senha.sql` aplicada às 21h13 BRT no projeto correto e metadados/grants validados. O backend já tem emissão de JWT com snapshot de versão, validação estrita contra a conta persistida, proibição de bypass por prefixo cron e reset exclusivamente por RPC quando ativado. `ENABLE_SESSION_REVOCATION` segue desligada: falta ativação coordenada e teste com conta autorizada. Após ativação não desligar a validação como rollback, pois isso pode revalidar sessões revogadas.**
+- [x] Validar 0014/0016/0017 atuais em PostgreSQL real descartável: 60 verificações, reaplicação, contratos `used`/`usado`, permissões do reset, rollback e concorrência aprovados. Corrigidos erro 42710 da 0014, nulabilidade de versão legada e índice/pedidos inválidos Kiwify. Runner em `tests/postgres-integrity/run.sh`; **0014/0017 não aplicadas em produção; somente a estrutura 0016 foi instalada após preflight**.
 - [x] Remover a chave padrão da Evolution do código e exigir variável criptografada na DigitalOcean.
 - [x] Remover artefatos compilados versionados e impedir que `dist/` volte ao repositório.
 - [x] Restringir uploads de logo a PNG/JPG/WEBP de até 2 MB, verificar assinatura do arquivo e eliminar a rota de upload inexistente.
@@ -102,7 +113,7 @@
 
 ## Critério de publicação
 
-- [ ] `pnpm check`, testes direcionados e build aprovados.
+- [x] `pnpm check`, suite completa (507 testes aprovados, 11 opt-in ignorados), runners PostgreSQL e build aprovados em 6/11 às 21h11 BRT.
 - [ ] Checkpoint salvo antes de publicar.
 - [ ] Commit enviado ao GitHub.
 - [ ] Deploy concluído na DigitalOcean.
