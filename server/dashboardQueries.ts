@@ -31,3 +31,25 @@ export async function listarDashboard(
   }
   throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Limite de leitura do dashboard excedido; total incompleto não apresentado." });
 }
+
+/** A produção não possui FK parcelas.cliente_id: não depender de embed PostgREST. */
+export async function vincularClientesDashboard(supabase: any, parcelas: any[], userId: number): Promise<any[]> {
+  if (parcelas.length === 0) return [];
+  const ids = Array.from(new Set(parcelas.map(p => p.cliente_id)));
+  if (parcelas.length > 20 || ids.some(id => !Number.isInteger(id) || id <= 0)) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Parcelas com vínculo de cliente inválido; revisão necessária." });
+  }
+  const clientes = dadosDashboard(await supabase.from("clientes").select("id, nome, user_id")
+    .eq("user_id", userId).in("id", ids).limit(20));
+  const porId = new Map<number, any>();
+  for (const cliente of clientes) {
+    if (!ids.includes(cliente.id) || cliente.user_id !== userId || typeof cliente.nome !== "string" || !cliente.nome.trim() || porId.has(cliente.id)) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Resposta de clientes incompatível com a empresa; revisão necessária." });
+    }
+    porId.set(cliente.id, cliente);
+  }
+  if (porId.size !== ids.length) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Parcelas sem vínculo de cliente confirmado na empresa; revisão necessária." });
+  }
+  return parcelas.map(parcela => ({ ...parcela, clientes: { nome: porId.get(parcela.cliente_id).nome } }));
+}

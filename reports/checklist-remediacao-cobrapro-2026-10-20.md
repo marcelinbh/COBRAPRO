@@ -18,6 +18,9 @@
 - [x] Preparar matriz restrita somente leitura com 43 itens de revisão / 38 registros distintos, ficha de proposta/aprovação vazia e manifesto verificado, fora do Git e sem PII. Não é backup integral nem autorização de saneamento.
 - [x] Corrigir localmente base comum de carteira e calendário BRT do dashboard; residual inválido sinalizado sem inventar dívida e resumo independente do Caixa preservado. Suite final: 574 testes, 67 específicos também em Honolulu, TypeScript e build aprovados às 21h44 BRT. A publicação/smoke deste segundo lote é etapa separada.
 - [x] Preparar 0019 base Blacklist backend-only e validar 21 verificações PostgreSQL locais, inclusive teto transacional de fotos, concorrência e reaplicação. **Não aplicada em produção; storage privado, descarte/compensação dos objetos e elegibilidade seguem pendentes.**
+- [x] Publicar 89d8df78: deploy Success/Live confirmado às 21h52 BRT, saldo/contratos preservados e calendário/saúde de carteira carregados. O smoke identificou embed de clientes inválido nas listas; não declarar dashboard integralmente validado antes do ajuste seguinte.
+- [x] Corrigir localmente listas sem depender de FK `parcelas.cliente_id` ausente: consulta de cliente por IDs e tenant explícito, completude obrigatória, sem inferência/backfill. Suite completa, 69 regressões de dashboard em Honolulu, TypeScript/build aprovados às 21h54 BRT.
+- [ ] Confirmar publicação e smoke das listas de hoje/atrasadas após o ajuste de vínculo explícito.
 
 - [ ] Obter backup integral recuperável antes de saneamento. Painel do projeto correto confirmou às 21h28 BRT que o plano Free não inclui backups e o resumo exibe No backups; nenhum upgrade ou restauração iniciado. Exportação parcial não substitui backup e teste de recuperação.
 

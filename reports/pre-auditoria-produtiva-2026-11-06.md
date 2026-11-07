@@ -109,6 +109,10 @@ A migration local `0019_base_blacklist_backend_only.sql` cria as duas tabelas-ba
 
 Validação final encerrada às 21h44 BRT com `LOTE2_FINAL_VALIDATION_EXIT=0`: 88 arquivos/574 testes Vitest aprovados, três arquivos/11 integrações opt-in ignoradas; 67 testes de dashboard aprovados também com `TZ=Pacific/Honolulu`; TypeScript, build e diff-check aprovados. Guards, workflow WhatsApp, auth e migrations 0013/0015/0016/0018 permanecem iguais ao lote anterior. Nenhuma flag foi ativada, nenhum DDL produtivo adicional foi executado. A revisão e o smoke deste segundo deploy devem ser registrados depois de sua conclusão.
 
+O checkpoint/commit `89d8df78` foi publicado por push normal. O deploy `7fd59957-d6a8-4223-9200-06426dd3080e`, iniciado às 21h45min32s BRT, foi confirmado Success / Live Deployment às 21h52 BRT. O smoke autenticado preservou saldo e 17 contratos, passou a apresentar saúde calculada sobre total aberto (84,7%, sem saldo em dia negativo) e janela de 31/10 a 6/11. Health/site/Evolution retornaram 200. Isso não saneou divergências históricas.
+
+O mesmo smoke identificou falha nas listas: `dashboard.parcelasHoje` retornou 500 de consulta. Catálogo somente leitura confirmou três FKs em parcelas (conta/contrato/user), nenhuma para `cliente_id`; portanto o embed PostgREST `clientes!inner` não é suportado. O ajuste local consulta parcelas e depois clientes por IDs limitados e `user_id` explícito, verificando completude e propriedade, sem DDL/backfill e sem mostrar nome de outra empresa. Lista vazia não consulta cliente. A validação completa do ajuste terminou às 21h54 BRT com `LOTE3_VALIDATION_EXIT=0`, 69 regressões de dashboard também em Honolulu, TypeScript/build aprovados; publicação e smoke específicos ainda devem ser confirmados.
+
 ## Fontes e limites
 
 Fontes primárias: `supabase/list_projects`, `supabase/execute_sql` (information_schema, pg_catalog, contagens financeiras, ACLs), `supabase/apply_migration`, aplicativo `https://cobrapro.online/dashboard`, healthcheck `https://cobrapro.online/api/health`, Evolution `http://147.182.191.118:8080/`.

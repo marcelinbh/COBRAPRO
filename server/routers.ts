@@ -40,7 +40,7 @@ import { bloquearOperacaoFinanceiraNaoAtomica } from "./services/financialSafety
 import { dataCivilValida as dataCivilValidaRecebimento, registrarPagamentoParcelaAtomico } from "./services/recebimentoParcelaRpc";
 import { numeroDashboard, resumirCarteiraDashboard, saldoContaDashboard, STATUS_ABERTOS_DASHBOARD, valorAbertoDashboard, valorBaseDashboard } from "../shared/dashboardPortfolio";
 import { calendarioDashboard } from "./dashboardDates";
-import { dadosDashboard, exigirFonteDashboard, listarDashboard } from "./dashboardQueries";
+import { dadosDashboard, exigirFonteDashboard, listarDashboard, vincularClientesDashboard } from "./dashboardQueries";
 import { lerResumoCaixaDashboard } from "./dashboardLedger";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
@@ -277,9 +277,10 @@ const dashboardRouter = router({
     }
     const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const hoje = dataHojeBrasilia();
-    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status, clientes!inner(nome)')
-      .eq('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']).eq('user_id', ctx.user.id).eq('clientes.user_id', ctx.user.id).order('data_vencimento').limit(20);
-    return dadosDashboard(resultado).map((r: any) => ({ id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero_parcela, valorOriginal: String(valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor })), dataVencimento: r.data_vencimento, status: r.status, totalParcelas: 0 }));
+    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status')
+      .eq('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']).eq('user_id', ctx.user.id).order('data_vencimento').limit(20);
+    const registros = await vincularClientesDashboard(supabase, dadosDashboard(resultado), ctx.user.id);
+    return registros.map((r: any) => ({ id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes.nome, numeroParcela: r.numero_parcela, valorOriginal: String(valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor })), dataVencimento: r.data_vencimento, status: r.status, totalParcelas: 0 }));
   }),
 
   parcelasAtrasadas: protectedProcedure.query(async ({ ctx }) => {
@@ -301,9 +302,10 @@ const dashboardRouter = router({
       } catch (err) { throw err; }
     }
     const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
-    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status, clientes!inner(nome)')
-      .eq('status', 'atrasada').eq('user_id', ctx.user.id).eq('clientes.user_id', ctx.user.id).order('data_vencimento').limit(20);
-    return dadosDashboard(resultado).map((r: any) => {
+    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status')
+      .eq('status', 'atrasada').eq('user_id', ctx.user.id).order('data_vencimento').limit(20);
+    const registros = await vincularClientesDashboard(supabase, dadosDashboard(resultado), ctx.user.id);
+    return registros.map((r: any) => {
       const base = valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor });
       const { total, diasAtraso } = calcularJurosMora(base, new Date(dataCivilBrasiliaParaIso(r.data_vencimento)), new Date(dataCivilBrasiliaParaIso(dataHojeBrasilia())));
       return { id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero_parcela, valorOriginal: String(base), dataVencimento: r.data_vencimento, status: r.status, valorAtualizado: total, diasAtraso };

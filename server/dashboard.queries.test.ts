@@ -159,22 +159,37 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
   });
 
   it("joins REST restringem explicitamente tenant do cliente, mesmo com parcela própria", async () => {
-    const rest = fonteRest({ parcelas: [parcelaRest(), parcelaRest({ id: 2, clientes: { nome: "Alheio", user_id: 99 } }), parcelaRest({ id: 3, user_id: 99 })] });
+    const rest = fonteRest({ parcelas: [parcelaRest(), parcelaRest({ id: 3, user_id: 99 })], clientes: [{ id: 1, nome: "Sintético", user_id: 41 }, { id: 2, nome: "Alheio", user_id: 99 }] });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     const lista = await caller().parcelasHoje();
     expect(lista).toHaveLength(1);
     expect(lista[0]).toMatchObject({ id: 1, clienteNome: "Sintético", numeroParcela: 1, valorOriginal: "100" });
-    expect(rest.consultas[0].colunas).toContain("clientes!inner");
-    expect(rest.consultas[0].filtros).toContainEqual({ metodo: "eq", coluna: "clientes.user_id", valor: 41 });
+    expect(rest.consultas[0].colunas).not.toContain("clientes!");
+    const clientes = rest.consultas.find(q => q.tabela === "clientes")!;
+    expect(clientes.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
+    expect(clientes.filtros).toContainEqual({ metodo: "in", coluna: "id", valor: [1] });
+    expect(clientes.limite).toBe(20);
+  });
+
+  it("parcela própria com cliente de outra empresa falha sem expor nome nem inventar vínculo", async () => {
+    const rest = fonteRest({ parcelas: [parcelaRest({ cliente_id: 2 })], clientes: [{ id: 2, nome: "Alheio não expor", user_id: 99 }] });
+    mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    await expect(caller().parcelasHoje()).rejects.toThrow(/sem vínculo de cliente confirmado/);
+  });
+
+  it("falha na consulta separada de cliente não vira lista vazia de sucesso", async () => {
+    const rest = fonteRest({ parcelas: [parcelaRest()] }, q => q.tabela === "clientes");
+    mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    await expect(caller().parcelasHoje()).rejects.toThrow(/Falha na consulta/);
   });
 
   it("dias de atraso não avançam às 21h BRT, inclusive no segundo zero UTC", async () => {
-    const rest = fonteRest({ parcelas: [parcelaRest({ status: "atrasada", data_vencimento: "2026-11-05" }), parcelaRest({ id: 2, status: "atrasada", clientes: { nome: "Alheio", user_id: 99 } })] });
+    const rest = fonteRest({ parcelas: [parcelaRest({ status: "atrasada", data_vencimento: "2026-11-05" }), parcelaRest({ id: 2, user_id: 99, status: "atrasada" })], clientes: [{ id: 1, nome: "Sintético", user_id: 41 }] });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     const lista = await caller().parcelasAtrasadas();
     expect(lista).toHaveLength(1);
     expect(lista[0]).toMatchObject({ valorAtualizado: 100, diasAtraso: 1 });
-    expect(rest.consultas[0].filtros).toContainEqual({ metodo: "eq", coluna: "clientes.user_id", valor: 41 });
+    expect(rest.consultas.find(q => q.tabela === "clientes")?.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
   });
 
   it("paginação lê além de 1000 registros, sem truncar silenciosamente o total", async () => {
