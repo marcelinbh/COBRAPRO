@@ -37,7 +37,8 @@ export default function Relatorios() {
   const [filtroValorMax, setFiltroValorMax] = useState('');
   const [statusParcelasScope, setStatusParcelasScope] = useState<'periodo' | 'todas'>('todas');
 
-  const { data: kpis } = trpc.dashboard.kpis.useQuery();
+  const { data: kpis, isLoading: kpisLoading, isError: kpisFalhou } = trpc.dashboard.kpis.useQuery();
+  const { data: resumoCaixa, isLoading: caixaLoading, isError: caixaFalhou } = trpc.dashboard.resumoCaixa.useQuery(undefined, { enabled: kpisFalhou });
   const { data: contratos } = trpc.contratos.list.useQuery({});
   const { data: clientesData } = trpc.clientes.list.useQuery({});
   const [clienteSelecionado, setClienteSelecionado] = useState<string>('todos');
@@ -1019,16 +1020,17 @@ export default function Relatorios() {
           </CardTitle>
         </CardHeader>
         <CardContent>
+          {kpisFalhou && <p role="alert" className="mb-3 text-sm text-warning">Carteira indisponível para revisão; valores desconhecidos não são apresentados como zero. O capital é consultado separadamente.</p>}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { label: "Capital em Circulação", value: kpis?.capitalCirculacao ?? 0, color: "text-foreground" },
-              { label: "Total a Receber", value: kpis?.totalReceber ?? 0, color: "text-warning" },
-              { label: "Inadimplência Total", value: kpis?.totalInadimplente ?? 0, color: "text-primary" },
-              { label: "Juros Pendentes", value: kpis?.jurosPendentes ?? 0, color: "text-success" },
+              { label: "Capital em Circulação", value: kpisFalhou ? (caixaFalhou ? undefined : resumoCaixa?.capitalCirculacao) : kpis?.capitalCirculacao, color: "text-foreground" },
+              { label: "Total a Receber", value: kpisFalhou ? undefined : kpis?.totalReceber, color: "text-warning" },
+              { label: "Inadimplência Total", value: kpisFalhou ? undefined : kpis?.totalInadimplente, color: "text-primary" },
+              { label: "Juros Pendentes", value: kpisFalhou ? undefined : kpis?.jurosPendentes, color: "text-success" },
             ].map(k => (
               <div key={k.label} className="p-4 rounded-lg bg-muted/30 border border-border">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">{k.label}</div>
-                <div className={`font-display text-xl ${k.color}`}>{formatarMoeda(k.value)}</div>
+                <div className={`font-display text-xl ${k.color}`}>{k.value !== undefined ? formatarMoeda(k.value) : kpisLoading || (k.label === "Capital em Circulação" && kpisFalhou && caixaLoading) ? '...' : 'Indisponível'}</div>
               </div>
             ))}
           </div>

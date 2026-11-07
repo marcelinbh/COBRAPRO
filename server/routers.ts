@@ -38,6 +38,10 @@ import { candidatosTokenPortal, consumirLinkPortalNoSupabase, hashTokenPortal, n
 import { calcularDescontoCheque, dataChequeValida } from "./services/chequesFinanceiros";
 import { bloquearOperacaoFinanceiraNaoAtomica } from "./services/financialSafety";
 import { dataCivilValida as dataCivilValidaRecebimento, registrarPagamentoParcelaAtomico } from "./services/recebimentoParcelaRpc";
+import { numeroDashboard, resumirCarteiraDashboard, saldoContaDashboard, STATUS_ABERTOS_DASHBOARD, valorAbertoDashboard, valorBaseDashboard } from "../shared/dashboardPortfolio";
+import { calendarioDashboard } from "./dashboardDates";
+import { dadosDashboard, exigirFonteDashboard, listarDashboard } from "./dashboardQueries";
+import { lerResumoCaixaDashboard } from "./dashboardLedger";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -158,26 +162,29 @@ async function registrarHistorico(params: {
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 const dashboardRouter = router({
+  resumoCaixa: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    const fonte = db ? null : await getSupabaseClientAsync();
+    return lerResumoCaixaDashboard(db, fonte, ctx.user.id, dataHojeBrasilia());
+  }),
+
   kpis: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    const supabase = await getSupabaseClientAsync();
     
     if (db) {
       // Use Drizzle ORM if available
       const hojeStr = dataHojeBrasilia();
-      const inicioHoje = new Date(dataCivilBrasiliaParaIso(hojeStr));
-      const inicioAmanha = new Date(dataCivilBrasiliaParaIso(adicionarDiasData(hojeStr, 1)));
 
       const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativo, true), eq(contasCaixa.userId, ctx.user.id)));
       let saldoTotal = 0;
       for (const conta of contas) {
         const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
           .from(transacoesCaixa)
-          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada')));
+          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada'), eq(transacoesCaixa.userId, ctx.user.id)));
         const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
           .from(transacoesCaixa)
-          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida')));
-        saldoTotal += calcularSaldoAtual(conta.saldo, [
+          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida'), eq(transacoesCaixa.userId, ctx.user.id)));
+        saldoTotal += saldoContaDashboard(conta.saldo, [
           { tipo: 'entrada', valor: entradas[0]?.total },
           { tipo: 'saida', valor: saidas[0]?.total },
         ]);
@@ -185,101 +192,68 @@ const dashboardRouter = router({
 
       const capitalResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
         .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
-      const capitalCirculacao = parseFloat(capitalResult[0]?.total ?? '0');
+      const capitalCirculacao = numeroDashboard(capitalResult[0]?.total, 'capital');
 
-      const receberResult = await db.select({ total: sql<string>`COALESCE(SUM(CASE WHEN status = 'parcial' AND COALESCE(saldo_residual, 0) > 0 THEN saldo_residual ELSE valor_original + COALESCE(saldo_residual, 0) + COALESCE(valor_multa, 0) END), 0)` })
+      const parcelasData = await db.select({
+        status: parcelas.status, valorOriginal: parcelas.valorOriginal,
+        valor: sql<string>`valor`, saldoResidual: parcelas.saldoResidual,
+        valorMulta: parcelas.valorMulta, valorJuros: parcelas.valorJuros,
+        dataVencimento: parcelas.dataVencimento, clienteId: parcelas.clienteId,
+      })
         .from(parcelas).where(and(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']), eq(parcelas.userId, ctx.user.id)));
-      const totalReceber = parseFloat(receberResult[0]?.total ?? '0');
-
-      const inadResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(DISTINCT cliente_id)` })
-        .from(parcelas).where(and(eq(parcelas.status, 'atrasada'), eq(parcelas.userId, ctx.user.id)));
-      const totalInadimplente = parseFloat(inadResult[0]?.total ?? '0');
-      const qtdInadimplentes = inadResult[0]?.qtd ?? 0;
-
-      const jurosResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_juros), 0)` })
-        .from(parcelas).where(and(inArray(parcelas.status, ['atrasada', 'parcial']), eq(parcelas.userId, ctx.user.id)));
-      const jurosPendentes = parseFloat(jurosResult[0]?.total ?? '0');
-
-      const hojeResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_original), 0)`, qtd: sql<number>`COUNT(*)` })
-        .from(parcelas).where(and(
-          eq(sql`DATE(data_vencimento)`, hojeStr),
-          inArray(parcelas.status, ['pendente', 'vencendo_hoje']),
-          eq(parcelas.userId, ctx.user.id)
-        ));
-      const qtdVenceHoje = hojeResult[0]?.qtd ?? 0;
-      const valorVenceHoje = parseFloat(hojeResult[0]?.total ?? '0');
+      const carteira = resumirCarteiraDashboard(parcelasData, hojeStr);
 
       const recebidoResult = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
         .from(transacoesCaixa).where(and(
           eq(transacoesCaixa.tipo, 'entrada'),
           eq(transacoesCaixa.categoria, 'pagamento_parcela'),
-          gte(transacoesCaixa.dataTransacao, inicioHoje),
-          lt(transacoesCaixa.dataTransacao, inicioAmanha),
+          eq(sql`DATE(${transacoesCaixa.dataTransacao})`, hojeStr),
           eq(transacoesCaixa.userId, ctx.user.id)
         ));
-      const recebidoHoje = parseFloat(recebidoResult[0]?.total ?? '0');
+      const recebidoHoje = numeroDashboard(recebidoResult[0]?.total, 'recebimento');
 
       const contratosResult = await db.select({ qtd: sql<number>`COUNT(*)` })
         .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
-      const contratosAtivos = contratosResult[0]?.qtd ?? 0;
+      const contratosAtivos = numeroDashboard(contratosResult[0]?.qtd, 'quantidade de contratos');
 
       return {
-        saldoTotal, capitalCirculacao, totalReceber, totalInadimplente,
-        qtdInadimplentes, jurosPendentes, qtdVenceHoje, valorVenceHoje,
+        saldoTotal, capitalCirculacao, ...carteira,
         recebidoHoje, contratosAtivos
       };
     }
     
     // Fallback to Supabase REST API
-    if (!supabase) return { saldoTotal: 0, capitalCirculacao: 0, totalReceber: 0, totalInadimplente: 0, qtdInadimplentes: 0, jurosPendentes: 0, qtdVenceHoje: 0, valorVenceHoje: 0, recebidoHoje: 0, contratosAtivos: 0 };
+    const fonte = exigirFonteDashboard(await getSupabaseClientAsync());
     
     const hojeStr = dataHojeBrasilia();
 
     // Fetch data via Supabase REST (filtrado por user_id para isolamento entre contas)
     const userId = ctx.user.id;
-    const [contasRes, contratosRes, parcelasRes, transRes] = await Promise.all([
-      supabase.from('contas_caixa').select('id, saldo, ativo').eq('ativo', true).eq('user_id', userId),
-      supabase.from('contratos').select('valor_principal').eq('status', 'ativo').eq('user_id', userId),
-      supabase.from('parcelas').select('valor_original, valor_juros, valor_multa, saldo_residual, status, data_vencimento, numero_parcela, cliente_id').eq('user_id', userId),
-      supabase.from('transacoes_caixa').select('conta_caixa_id, valor, tipo, categoria, data_transacao').eq('user_id', userId)
+    const [contasData, contratosData, parcelasData, transacoes] = await Promise.all([
+      listarDashboard(fonte, 'contas_caixa', 'id, saldo, ativo', userId, q => q.eq('ativo', true)),
+      listarDashboard(fonte, 'contratos', 'valor_principal', userId, q => q.eq('status', 'ativo')),
+      listarDashboard(fonte, 'parcelas', 'valor, valor_original, valor_juros, valor_multa, saldo_residual, status, data_vencimento, cliente_id', userId, q => q.in('status', [...STATUS_ABERTOS_DASHBOARD])),
+      listarDashboard(fonte, 'transacoes_caixa', 'conta_caixa_id, valor, tipo, categoria, data_transacao', userId)
     ]);
 
     let saldoTotal = 0;
-    if (contasRes.data) {
-      for (const conta of contasRes.data) {
-        const transacoesConta = (transRes.data ?? []).filter((t: any) => t.conta_caixa_id === conta.id);
-        saldoTotal += calcularSaldoAtual(conta.saldo, transacoesConta);
-      }
+    for (const conta of contasData) {
+      const transacoesConta = transacoes.filter((t: any) => t.conta_caixa_id === conta.id);
+      saldoTotal += saldoContaDashboard(conta.saldo, transacoesConta);
     }
 
-    const capitalCirculacao = (contratosRes.data ?? []).reduce((s: number, c: any) => s + parseFloat(c.valor_principal ?? '0'), 0);
-    
-    const parcelasData = parcelasRes.data ?? [];
-    const totalReceber = parcelasData.reduce((s: number, p: any) => s + calcularValorAbertoParcela({
-      status: p.status,
-      valorOriginal: p.valor_original,
-      saldoResidual: p.saldo_residual,
-      valorMulta: p.valor_multa,
-    }), 0);
-    
-    const atrasadas = parcelasData.filter((p: any) => p.status === 'atrasada');
-    const totalInadimplente = atrasadas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
-    const qtdInadimplentes = new Set(atrasadas.map((p: any) => p.cliente_id)).size;
-    
-    const jurosPendentes = parcelasData.filter((p: any) => ['atrasada', 'parcial'].includes(p.status)).reduce((s: number, p: any) => s + parseFloat(p.valor_juros ?? '0'), 0);
-    
-    const venceHoje = parcelasData.filter((p: any) => p.data_vencimento?.startsWith(hojeStr) && ['pendente', 'vencendo_hoje'].includes(p.status));
-    const qtdVenceHoje = venceHoje.length;
-    const valorVenceHoje = venceHoje.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
-    
-    const transacoes = transRes.data ?? [];
-    const recebidoHoje = transacoes.filter((t: any) => t.tipo === 'entrada' && t.categoria === 'pagamento_parcela' && t.data_transacao?.startsWith(hojeStr)).reduce((s: number, t: any) => s + parseFloat(t.valor ?? '0'), 0);
-    
-    const contratosAtivos = (contratosRes.data ?? []).length;
+    const capitalCirculacao = contratosData.reduce((s: number, c: any) => s + numeroDashboard(c.valor_principal, 'capital'), 0);
+    const carteira = resumirCarteiraDashboard(parcelasData.map(p => ({
+      status: p.status, valor: p.valor, valorOriginal: p.valor_original,
+      saldoResidual: p.saldo_residual, valorMulta: p.valor_multa, valorJuros: p.valor_juros,
+      dataVencimento: p.data_vencimento, clienteId: p.cliente_id,
+    })), hojeStr);
+    const recebidoHoje = transacoes.filter((t: any) => t.tipo === 'entrada' && t.categoria === 'pagamento_parcela' && t.data_transacao === hojeStr)
+      .reduce((s: number, t: any) => s + Math.round(numeroDashboard(t.valor, 'recebimento') * 100), 0) / 100;
+    const contratosAtivos = contratosData.length;
 
     return {
-      saldoTotal, capitalCirculacao, totalReceber, totalInadimplente,
-      qtdInadimplentes, jurosPendentes, qtdVenceHoje, valorVenceHoje,
+      saldoTotal, capitalCirculacao, ...carteira,
       recebidoHoje, contratosAtivos
     };
   }),
@@ -292,19 +266,20 @@ const dashboardRouter = router({
         const rows = await db.select({
           id: parcelas.id, clienteId: parcelas.clienteId, clienteNome: clientes.nome,
           numeroParcela: parcelas.numeroParcela, valorOriginal: parcelas.valorOriginal,
+          valor: sql<string>`valor`,
           dataVencimento: parcelas.dataVencimento, status: parcelas.status,
-          totalParcelas: sql<number>`(SELECT COUNT(*) FROM parcelas p2 WHERE p2.contrato_id = ${parcelas.contratoId})`,
-        }).from(parcelas).innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
+          totalParcelas: sql<number>`(SELECT COUNT(*) FROM parcelas p2 WHERE p2.contrato_id = ${parcelas.contratoId} AND p2.user_id = ${ctx.user.id})`,
+        }).from(parcelas).innerJoin(clientes, and(eq(parcelas.clienteId, clientes.id), eq(clientes.userId, ctx.user.id)))
           .where(and(eq(sql`DATE(${parcelas.dataVencimento})`, hoje), inArray(parcelas.status, ['pendente', 'vencendo_hoje']), eq(parcelas.userId, ctx.user.id)))
           .orderBy(parcelas.dataVencimento).limit(20);
-        return rows;
-      } catch (err) { console.warn('[dashboard.parcelasHoje] Drizzle failed:', (err as Error).message); resetDb(); }
+        return rows.map(r => ({ ...r, valorOriginal: String(valorBaseDashboard(r)) }));
+      } catch (err) { throw err; }
     }
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return [];
+    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const hoje = dataHojeBrasilia();
-    const { data } = await supabase.from('parcelas').select('*, clientes(nome)').eq('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']).eq('user_id', ctx.user.id).order('data_vencimento').limit(20);
-    return (data ?? []).map((r: any) => ({ id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero, valorOriginal: r.valor_original, dataVencimento: r.data_vencimento, status: r.status, totalParcelas: 0 }));
+    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status, clientes!inner(nome)')
+      .eq('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']).eq('user_id', ctx.user.id).eq('clientes.user_id', ctx.user.id).order('data_vencimento').limit(20);
+    return dadosDashboard(resultado).map((r: any) => ({ id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero_parcela, valorOriginal: String(valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor })), dataVencimento: r.data_vencimento, status: r.status, totalParcelas: 0 }));
   }),
 
   parcelasAtrasadas: protectedProcedure.query(async ({ ctx }) => {
@@ -314,21 +289,24 @@ const dashboardRouter = router({
         const rows = await db.select({
           id: parcelas.id, clienteId: parcelas.clienteId, clienteNome: clientes.nome,
           numeroParcela: parcelas.numeroParcela, valorOriginal: parcelas.valorOriginal,
+          valor: sql<string>`valor`,
           dataVencimento: parcelas.dataVencimento, status: parcelas.status,
-        }).from(parcelas).innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
+        }).from(parcelas).innerJoin(clientes, and(eq(parcelas.clienteId, clientes.id), eq(clientes.userId, ctx.user.id)))
           .where(and(eq(parcelas.status, 'atrasada'), eq(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
         return rows.map(r => {
-          const { total, diasAtraso } = calcularJurosMora(parseFloat(r.valorOriginal), new Date(r.dataVencimento + 'T00:00:00'), new Date());
-          return { ...r, valorAtualizado: total, diasAtraso };
+          const base = valorBaseDashboard(r);
+          const { total, diasAtraso } = calcularJurosMora(base, new Date(dataCivilBrasiliaParaIso(r.dataVencimento)), new Date(dataCivilBrasiliaParaIso(dataHojeBrasilia())));
+          return { ...r, valorOriginal: String(base), valorAtualizado: total, diasAtraso };
         });
-      } catch (err) { console.warn('[dashboard.parcelasAtrasadas] Drizzle failed:', (err as Error).message); resetDb(); }
+      } catch (err) { throw err; }
     }
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return [];
-    const { data } = await supabase.from('parcelas').select('*, clientes(nome)').eq('status', 'atrasada').eq('user_id', ctx.user.id).order('data_vencimento').limit(20);
-    return (data ?? []).map((r: any) => {
-      const { total, diasAtraso } = calcularJurosMora(parseFloat(r.valor_original), new Date(r.data_vencimento + 'T00:00:00'), new Date());
-      return { id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero, valorOriginal: r.valor_original, dataVencimento: r.data_vencimento, status: r.status, valorAtualizado: total, diasAtraso };
+    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
+    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status, clientes!inner(nome)')
+      .eq('status', 'atrasada').eq('user_id', ctx.user.id).eq('clientes.user_id', ctx.user.id).order('data_vencimento').limit(20);
+    return dadosDashboard(resultado).map((r: any) => {
+      const base = valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor });
+      const { total, diasAtraso } = calcularJurosMora(base, new Date(dataCivilBrasiliaParaIso(r.data_vencimento)), new Date(dataCivilBrasiliaParaIso(dataHojeBrasilia())));
+      return { id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero_parcela, valorOriginal: String(base), dataVencimento: r.data_vencimento, status: r.status, valorAtualizado: total, diasAtraso };
     });
   }),
 
@@ -349,46 +327,35 @@ const dashboardRouter = router({
   }),
 
   precisaAtencao: protectedProcedure.query(async ({ ctx }) => {
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return { venceSemana: { qtd: 0, valor: 0 }, atrasados30: { qtd: 0, valor: 0 } };
+    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const userId = ctx.user.id;
-    const hoje = new Date();
-    const em7Dias = new Date(hoje); em7Dias.setDate(hoje.getDate() + 7);
-    const ha30Dias = new Date(hoje); ha30Dias.setDate(hoje.getDate() - 30);
-    const hojeStr = hoje.toISOString().split('T')[0];
-    const em7Str = em7Dias.toISOString().split('T')[0];
-    const ha30Str = ha30Dias.toISOString().split('T')[0];
-    const [semanaRes, atrasadosRes] = await Promise.all([
-      supabase.from('parcelas').select('valor_original, cliente_id').eq('user_id', userId)
-        .in('status', ['pendente','vencendo_hoje']).gte('data_vencimento', hojeStr).lte('data_vencimento', em7Str),
-      supabase.from('parcelas').select('valor_original, cliente_id').eq('user_id', userId)
-        .eq('status', 'atrasada').lte('data_vencimento', ha30Str)
+    const { hoje, em7Dias, ha30Dias } = calendarioDashboard();
+    const colunas = 'valor, valor_original, saldo_residual, valor_multa, status, data_vencimento, cliente_id';
+    const [semana, atrasados] = await Promise.all([
+      listarDashboard(supabase, 'parcelas', colunas, userId, q => q
+        .in('status', ['pendente','vencendo_hoje']).gte('data_vencimento', hoje).lte('data_vencimento', em7Dias)),
+      listarDashboard(supabase, 'parcelas', colunas, userId, q => q
+        .eq('status', 'atrasada').lte('data_vencimento', ha30Dias))
     ]);
-    const semana = semanaRes.data ?? [];
-    const atrasados = atrasadosRes.data ?? [];
+    const somarAbertos = (registros: any[]) => registros.reduce((s: number, p: any) => s + Math.round(valorAbertoDashboard({
+      status: p.status, valor: p.valor, valorOriginal: p.valor_original,
+      saldoResidual: p.saldo_residual, valorMulta: p.valor_multa, dataVencimento: p.data_vencimento,
+    }) * 100), 0) / 100;
     return {
-      venceSemana: { qtd: semana.length, valor: semana.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0) },
-      atrasados30: { qtd: new Set(atrasados.map((p: any) => p.cliente_id)).size, valor: atrasados.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0) }
+      venceSemana: { qtd: semana.length, valor: somarAbertos(semana) },
+      atrasados30: { qtd: new Set(atrasados.map((p: any) => p.cliente_id)).size, valor: somarAbertos(atrasados) }
     };
   }),
 
   tendenciaJuros: protectedProcedure.query(async ({ ctx }) => {
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return [];
+    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const userId = ctx.user.id;
     const meses: { mes: string; valor: number }[] = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date();
-      d.setMonth(d.getMonth() - i);
-      const ano = d.getFullYear();
-      const mes = d.getMonth() + 1;
-      const inicio = `${ano}-${String(mes).padStart(2,'0')}-01`;
-      const fim = new Date(ano, mes, 0).toISOString().split('T')[0];
-      const label = d.toLocaleString('pt-BR', { month: 'short' }).replace('.','');
-      const { data } = await supabase.from('transacoes_caixa').select('valor').eq('user_id', userId)
-        .eq('tipo', 'entrada').eq('categoria', 'pagamento_parcela').gte('data_transacao', inicio + 'T00:00:00').lte('data_transacao', fim + 'T23:59:59');
-      const total = (data ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor ?? '0'), 0);
-      meses.push({ mes: label, valor: total });
+    for (const { inicio, fim, mes } of calendarioDashboard().meses) {
+      const data = await listarDashboard(supabase, 'transacoes_caixa', 'valor', userId, q => q
+        .eq('tipo', 'entrada').eq('categoria', 'pagamento_parcela').gte('data_transacao', inicio).lte('data_transacao', fim));
+      const total = data.reduce((s: number, r: any) => s + Math.round(numeroDashboard(r.valor, 'recebimento') * 100), 0) / 100;
+      meses.push({ mes, valor: total });
     }
     return meses;
   }),
@@ -398,29 +365,20 @@ const dashboardRouter = router({
     if (db) {
       try {
         const dias: { dia: string; valor: number }[] = [];
-        for (let i = 6; i >= 0; i--) {
-          const now = new Date();
-          now.setDate(now.getDate() - i);
-          const dStr = now.toISOString().split('T')[0];
-          const diaLabel = `${dStr.slice(8, 10)}/${dStr.slice(5, 7)}`;
+        for (const { data, dia } of calendarioDashboard().dias) {
           const result = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` }).from(transacoesCaixa)
-            .where(and(eq(transacoesCaixa.tipo, 'entrada'), eq(sql`DATE(data_transacao)`, dStr), eq(transacoesCaixa.userId, ctx.user.id)));
-          dias.push({ dia: diaLabel, valor: parseFloat(result[0]?.total ?? '0') });
+            .where(and(eq(transacoesCaixa.tipo, 'entrada'), eq(sql`DATE(${transacoesCaixa.dataTransacao})`, data), eq(transacoesCaixa.userId, ctx.user.id)));
+          dias.push({ dia, valor: numeroDashboard(result[0]?.total, 'recebimento') });
         }
         return dias;
-      } catch (err) { console.warn('[dashboard.fluxoMensal] Drizzle failed:', (err as Error).message); resetDb(); }
+      } catch (err) { throw err; }
     }
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return [];
+    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const dias: { dia: string; valor: number }[] = [];
-    for (let i = 6; i >= 0; i--) {
-      const now = new Date();
-      now.setDate(now.getDate() - i);
-      const dStr = now.toISOString().split('T')[0];
-      const diaLabel = `${dStr.slice(8, 10)}/${dStr.slice(5, 7)}`;
-      const { data } = await supabase.from('transacoes_caixa').select('valor').eq('tipo', 'entrada').eq('user_id', ctx.user.id).gte('data_transacao', dStr + 'T00:00:00').lte('data_transacao', dStr + 'T23:59:59');
-      const total = (data ?? []).reduce((s: number, r: any) => s + parseFloat(r.valor ?? '0'), 0);
-      dias.push({ dia: diaLabel, valor: total });
+    for (const { data, dia } of calendarioDashboard().dias) {
+      const registros = await listarDashboard(supabase, 'transacoes_caixa', 'valor', ctx.user.id, q => q.eq('tipo', 'entrada').eq('data_transacao', data));
+      const total = registros.reduce((s: number, r: any) => s + Math.round(numeroDashboard(r.valor, 'recebimento') * 100), 0) / 100;
+      dias.push({ dia, valor: total });
     }
     return dias;
   }),

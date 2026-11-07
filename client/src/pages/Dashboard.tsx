@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import { trpc } from "@/lib/trpc";
 import { formatarMoeda } from "../../../shared/finance";
+import { saudeCarteiraDashboard } from "../../../shared/dashboardPortfolio";
 import {
   TrendingUp, TrendingDown, Wallet, Users, AlertTriangle,
   Clock, DollarSign, CalendarClock, ArrowUpRight, ArrowDownRight,
@@ -118,13 +119,13 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: meuKoletor } = trpc.cobradores.me.useQuery();
   const isKoletor = meuKoletor?.perfil === 'koletor';
-  const { data: kpis, isLoading: kpisLoading } = trpc.dashboard.kpis.useQuery();
-  const { data: parcelasHoje } = trpc.dashboard.parcelasHoje.useQuery();
-  const { data: atrasadas } = trpc.dashboard.parcelasAtrasadas.useQuery();
-  const { data: fluxoMensal } = trpc.dashboard.fluxoMensal.useQuery();
+  const { data: kpis, isLoading: kpisLoading, isError: kpisFalhou, error: kpisErro } = trpc.dashboard.kpis.useQuery();
+  const { data: parcelasHojeData, isLoading: hojeLoading, isError: hojeFalhou } = trpc.dashboard.parcelasHoje.useQuery();
+  const { data: atrasadasData, isLoading: atrasadasLoading, isError: atrasadasFalhou } = trpc.dashboard.parcelasAtrasadas.useQuery();
+  const { data: fluxoMensal, isLoading: fluxoLoading, isError: fluxoFalhou } = trpc.dashboard.fluxoMensal.useQuery();
   const { data: scoreData } = trpc.dashboard.scoreNegocio.useQuery();
-  const { data: atencao } = trpc.dashboard.precisaAtencao.useQuery();
-  const { data: tendencia } = trpc.dashboard.tendenciaJuros.useQuery();
+  const { data: atencao, isLoading: atencaoLoading, isError: atencaoFalhou } = trpc.dashboard.precisaAtencao.useQuery();
+  const { data: tendencia, isLoading: tendenciaLoading, isError: tendenciaFalhou } = trpc.dashboard.tendenciaJuros.useQuery();
   const relatorioDiarioMutation = trpc.whatsapp.relatorioDiario.useMutation({
     onSuccess: (data) => {
       window.open(data.whatsappUrl, '_blank');
@@ -135,10 +136,19 @@ export default function Dashboard() {
 
   const chartData = fluxoMensal ?? [];
   const tendenciaData = tendencia ?? [];
-
-  const taxaInadimplencia = kpis && kpis.capitalCirculacao > 0
-    ? ((kpis.totalInadimplente / kpis.capitalCirculacao) * 100).toFixed(1)
-    : '0.0';
+  const parcelasHoje = hojeFalhou ? undefined : parcelasHojeData;
+  const atrasadas = atrasadasFalhou ? undefined : atrasadasData;
+  const saude = kpis && !kpisFalhou ? saudeCarteiraDashboard(kpis.totalReceber, kpis.totalInadimplente) : null;
+  const taxaInadimplencia = saude ? saude.taxaInadimplencia.toFixed(1) : '—';
+  const kpisIndisponiveis = kpisFalhou || (!!kpis && !saude);
+  const { data: resumoCaixa, isLoading: caixaLoading, isError: caixaFalhou } = trpc.dashboard.resumoCaixa.useQuery(undefined, { enabled: kpisIndisponiveis });
+  const caixa = kpisIndisponiveis ? (caixaFalhou ? undefined : resumoCaixa) : kpis;
+  const moedaCaixa = (valor: number | undefined) => valor !== undefined ? formatarMoeda(valor) : (kpisIndisponiveis ? caixaFalhou ? 'Indisponível' : caixaLoading ? '...' : 'Indisponível' : kpisLoading ? '...' : 'Indisponível');
+  const numeroCaixa = (valor: number | undefined) => valor !== undefined ? String(valor) : (kpisIndisponiveis ? caixaFalhou ? 'Indisponível' : caixaLoading ? '...' : 'Indisponível' : kpisLoading ? '...' : 'Indisponível');
+  const moedaKpi = (valor: number | undefined) => kpisIndisponiveis ? 'Indisponível' : kpisLoading || valor === undefined ? '...' : formatarMoeda(valor);
+  const numeroKpi = (valor: number | undefined) => kpisIndisponiveis ? 'Indisponível' : kpisLoading || valor === undefined ? '...' : String(valor);
+  const moedaAtencao = (valor: number | undefined) => atencaoFalhou ? 'Indisponível' : atencaoLoading || valor === undefined ? '...' : formatarMoeda(valor);
+  const numeroAtencao = (valor: number | undefined) => atencaoFalhou ? '—' : atencaoLoading || valor === undefined ? '...' : String(valor);
 
   return (
     <div className="space-y-4">
@@ -147,10 +157,10 @@ export default function Dashboard() {
         <div className="min-w-0">
           <h1 className="font-display text-xl sm:text-3xl text-foreground tracking-wide">{t('dashboard.title')}</h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 hidden sm:block">
-            {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
           <p className="text-xs text-muted-foreground mt-0.5 sm:hidden">
-            {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+            {new Date().toLocaleDateString(i18n.language === 'es' ? 'es-ES' : 'pt-BR', { timeZone: 'America/Sao_Paulo', weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
         <div className="flex gap-1.5 shrink-0">
@@ -181,18 +191,24 @@ export default function Dashboard() {
         </div>
       )}
 
+      {!isKoletor && (kpisFalhou || (kpis && !saude)) && (
+        <p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-warning">
+          {kpisFalhou ? kpisErro?.message : 'Base da carteira inconsistente; revisão necessária.'} Valores e saúde da carteira não apresentados. O Caixa é conferido separadamente, sem recalcular dívidas.
+        </p>
+      )}
+
       {/* KPI Cards - ocultos para koletores */}
       {!isKoletor && <div className="grid grid-cols-3 md:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
-        <KPICard title={t('dashboard.balance')} value={kpisLoading ? "..." : formatarMoeda(kpis?.saldoTotal ?? 0)} icon={Wallet} variant="default" subtitle={t('dashboard.allAccounts')} />
-        <KPICard title={t('dashboard.capital')} value={kpisLoading ? "..." : formatarMoeda(kpis?.capitalCirculacao ?? 0)} icon={TrendingUp} variant="primary" subtitle={`${kpis?.contratosAtivos ?? 0} ${t('dashboard.activeContracts')}`} />
-        <KPICard title={t('dashboard.toReceive2')} value={kpisLoading ? "..." : formatarMoeda(kpis?.totalReceber ?? 0)} icon={DollarSign} variant="success" subtitle={t('dashboard.pendingInstallments')} />
-        <KPICard title={t('dashboard.delinquency')} value={kpisLoading ? "..." : formatarMoeda(kpis?.totalInadimplente ?? 0)} icon={AlertTriangle} variant="danger" subtitle={`${kpis?.qtdInadimplentes ?? 0} clientes · ${taxaInadimplencia}%`} />
-        <KPICard title={t('dashboard.interest')} value={kpisLoading ? "..." : formatarMoeda(kpis?.jurosPendentes ?? 0)} icon={TrendingDown} variant="warning" subtitle={t('dashboard.accumulated')} />
-        <KPICard title={t('dashboard.dueToday')} value={kpisLoading ? "..." : `${kpis?.qtdVenceHoje ?? 0}`} icon={CalendarClock} variant={kpis?.qtdVenceHoje ? "warning" : "default"} subtitle={formatarMoeda(kpis?.valorVenceHoje ?? 0)} />
+        <KPICard title={t('dashboard.balance')} value={moedaCaixa(caixa?.saldoTotal)} icon={Wallet} variant="default" subtitle={t('dashboard.allAccounts')} />
+        <KPICard title={t('dashboard.capital')} value={moedaCaixa(caixa?.capitalCirculacao)} icon={TrendingUp} variant="primary" subtitle={`${numeroCaixa(caixa?.contratosAtivos)} ${t('dashboard.activeContracts')}`} />
+        <KPICard title={t('dashboard.toReceive2')} value={moedaKpi(kpis?.totalReceber)} icon={DollarSign} variant="success" subtitle={t('dashboard.pendingInstallments')} />
+        <KPICard title={t('dashboard.delinquency')} value={moedaKpi(kpis?.totalInadimplente)} icon={AlertTriangle} variant="danger" subtitle={`${numeroKpi(kpis?.qtdInadimplentes)} clientes · ${taxaInadimplencia}%`} />
+        <KPICard title={t('dashboard.interest')} value={moedaKpi(kpis?.jurosPendentes)} icon={TrendingDown} variant="warning" subtitle={t('dashboard.accumulated')} />
+        <KPICard title={t('dashboard.dueToday')} value={numeroKpi(kpis?.qtdVenceHoje)} icon={CalendarClock} variant={!kpisFalhou && kpis?.qtdVenceHoje ? "warning" : "default"} subtitle={moedaKpi(kpis?.valorVenceHoje)} />
       </div>}
 
       {/* Barra de saúde financeira */}
-      {!isKoletor && kpis && kpis.capitalCirculacao > 0 && (
+      {!isKoletor && kpis && saude && kpis.totalReceber > 0 && (
         <Card className="border-border">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
@@ -200,12 +216,12 @@ export default function Dashboard() {
               <span className="text-xs text-muted-foreground">{t('dashboard.delinquencyRate')}: <span className={`font-bold ${parseFloat(taxaInadimplencia) > 15 ? 'text-primary' : parseFloat(taxaInadimplencia) > 8 ? 'text-warning' : 'text-success'}`}>{taxaInadimplencia}%</span></span>
             </div>
             <div className="flex gap-1 h-3 rounded-full overflow-hidden">
-              <div className="bg-success rounded-l-full transition-all" style={{ width: `${Math.max(0, 100 - parseFloat(taxaInadimplencia))}%` }} />
-              <div className="bg-primary rounded-r-full transition-all" style={{ width: `${Math.min(100, parseFloat(taxaInadimplencia))}%` }} />
+              <div className="bg-success rounded-l-full transition-all" style={{ width: `${100 - saude.taxaInadimplencia}%` }} />
+              <div className="bg-primary rounded-r-full transition-all" style={{ width: `${saude.taxaInadimplencia}%` }} />
             </div>
             <div className="flex justify-between mt-1.5">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <div className="w-2 h-2 rounded-full bg-success" /> {t('dashboard.onTime')}: {formatarMoeda((kpis.capitalCirculacao - kpis.totalInadimplente))}
+                <div className="w-2 h-2 rounded-full bg-success" /> {t('dashboard.onTime')}: {formatarMoeda(saude.emDia)}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <div className="w-2 h-2 rounded-full bg-primary" /> {t('dashboard.delinquent')}: {formatarMoeda(kpis.totalInadimplente)}
@@ -214,6 +230,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       )}
+      {!isKoletor && kpis && saude && kpis.totalReceber === 0 && <p className="text-xs text-muted-foreground">Sem valores em aberto na carteira.</p>}
 
       {/* Score do Negócio + Precisa de Atenção */}
       {!isKoletor && (
@@ -252,6 +269,7 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {atencaoFalhou && <p role="alert" className="text-sm text-warning">Não foi possível consultar os alertas financeiros.</p>}
               {/* Vence esta semana */}
               <div
                 className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20 cursor-pointer hover:border-warning/40 transition-colors"
@@ -263,11 +281,11 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="text-sm font-medium text-foreground">{t('dashboard.dueThisWeek')}</div>
-                    <div className="text-xs text-muted-foreground">{atencao?.venceSemana.qtd ?? 0} {t('dashboard.installmentsNext7Days')}</div>
+                    <div className="text-xs text-muted-foreground">{numeroAtencao(atencao?.venceSemana.qtd)} {t('dashboard.installmentsNext7Days')}</div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-warning">{formatarMoeda(atencao?.venceSemana.valor ?? 0)}</div>
+                  <div className="text-sm font-bold text-warning">{moedaAtencao(atencao?.venceSemana.valor)}</div>
                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
                 </div>
               </div>
@@ -283,11 +301,11 @@ export default function Dashboard() {
                   </div>
                   <div>
                     <div className="text-sm font-medium text-foreground">{t('dashboard.overdueMore30Days')}</div>
-                    <div className="text-xs text-muted-foreground">{atencao?.atrasados30.qtd ?? 0} {t('dashboard.clientsWithSeriousDelay')}</div>
+                    <div className="text-xs text-muted-foreground">{numeroAtencao(atencao?.atrasados30.qtd)} {t('dashboard.clientsWithSeriousDelay')}</div>
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-sm font-bold text-primary">{formatarMoeda(atencao?.atrasados30.valor ?? 0)}</div>
+                  <div className="text-sm font-bold text-primary">{moedaAtencao(atencao?.atrasados30.valor)}</div>
                   <ChevronRight className="h-3.5 w-3.5 text-muted-foreground ml-auto" />
                 </div>
               </div>
@@ -319,6 +337,7 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {fluxoFalhou ? <p role="alert" className="text-sm text-warning">Fluxo indisponível; valores não calculados.</p> : fluxoLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={chartData}>
                 <defs>
@@ -338,6 +357,7 @@ export default function Dashboard() {
                 <Area type="monotone" dataKey="valor" stroke="oklch(0.55 0.18 145)" strokeWidth={2} fill="url(#colorEntrada)" />
               </AreaChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
 
@@ -352,23 +372,23 @@ export default function Dashboard() {
             <div className="flex items-center justify-between p-3 rounded-lg bg-success/10 border border-success/20">
               <div>
                 <div className="text-xs text-muted-foreground">{t('dashboard.received')}</div>
-                <div className="font-display text-lg text-success">{formatarMoeda(kpis?.recebidoHoje ?? 0)}</div>
+                <div className="font-display text-lg text-success">{moedaCaixa(caixa?.recebidoHoje)}</div>
               </div>
               <ArrowUpRight className="h-5 w-5 text-success" />
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-primary/10 border border-primary/20">
               <div>
                 <div className="text-xs text-muted-foreground">{t('dashboard.dueToday')}</div>
-                <div className="font-display text-lg text-primary">{formatarMoeda(kpis?.valorVenceHoje ?? 0)}</div>
+                <div className="font-display text-lg text-primary">{moedaKpi(kpis?.valorVenceHoje)}</div>
               </div>
               <Clock className="h-5 w-5 text-primary" />
             </div>
             <div className="flex items-center justify-between p-3 rounded-lg bg-muted border border-border">
               <div>
                 <div className="text-xs text-muted-foreground">{t('dashboard.activeContracts2')}</div>
-                <div className="font-display text-lg text-foreground">{kpis?.contratosAtivos ?? 0}</div>
+                <div className="font-display text-lg text-foreground">{numeroCaixa(caixa?.contratosAtivos)}</div>
               </div>
-              <Users className="h-5 w-5 text-muted-foreground" />
+              <BarChart2 className="h-5 w-5 text-muted-foreground" />
             </div>
           </CardContent>
         </Card>
@@ -383,6 +403,7 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {tendenciaFalhou ? <p role="alert" className="text-sm text-warning">Tendência indisponível; valores não calculados.</p> : tendenciaLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={tendenciaData} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.01 240)" vertical={false} />
@@ -396,6 +417,7 @@ export default function Dashboard() {
                 <Bar dataKey="valor" fill="oklch(0.55 0.22 25)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       )}
@@ -408,7 +430,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-warning uppercase tracking-wide flex items-center gap-2">
                 <Clock className="h-4 w-4" />
-                {t('dashboard.dueTodayTitle')} ({parcelasHoje?.length ?? 0})
+                {t('dashboard.dueTodayTitle')} ({hojeFalhou ? '—' : parcelasHoje?.length ?? '...'})
               </CardTitle>
               <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => setLocation('/parcelas')}>
                 {t('dashboard.viewAll')} <ChevronRight className="h-3 w-3" />
@@ -416,6 +438,8 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
+            {hojeFalhou && <p role="alert" className="text-sm text-warning">Consulta de parcelas indisponível.</p>}
+            {hojeLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
             {parcelasHoje?.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">{t('common.noData')}</p>
             )}
@@ -440,7 +464,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium text-primary uppercase tracking-wide flex items-center gap-2">
                 <AlertTriangle className="h-4 w-4" />
-                {t('dashboard.overdueTitle')} ({atrasadas?.length ?? 0})
+                {t('dashboard.overdueTitle')} ({atrasadasFalhou ? '—' : atrasadas?.length ?? '...'})
               </CardTitle>
               <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => setLocation('/parcelas?status=atrasada')}>
                 {t('dashboard.viewAll')} <ChevronRight className="h-3 w-3" />
@@ -448,6 +472,8 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-2">
+            {atrasadasFalhou && <p role="alert" className="text-sm text-warning">Consulta de parcelas indisponível.</p>}
+            {atrasadasLoading && <p className="text-sm text-muted-foreground">Carregando...</p>}
             {atrasadas?.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-4">{t('common.noData')}</p>
             )}

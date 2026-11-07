@@ -8,6 +8,8 @@ O backend continua bloqueando mutações financeiras REST não atômicas. As mig
 
 A estrutura de reset de senha 0016 foi instalada separadamente, com a flag de validação de sessões ainda desligada. Ela não depende nem libera este saneamento.
 
+**Preservação ainda não resolvida:** o painel autenticado do projeto correto confirmou às 21h28 BRT que Free Plan does not include project backups e o resumo exibe No backups. Não foi contratado plano. Um backup externo recuperável ainda precisa ser apresentado ou produzido por canal seguro; não iniciar UPDATE financeiro apenas com a ficha parcial de revisão.
+
 ## Ordem operacional e critérios de saída
 
 | Etapa | Ação permitida nesta fase | Critério para avançar |
@@ -20,7 +22,7 @@ A estrutura de reset de senha 0016 foi instalada separadamente, com a flag de va
 | 6. Execução futura | Transação restrita com comparação dos valores antigos, auditoria e rollback | Quantidade exata de linhas, reconciliação antes/depois e zero surpresa no preflight |
 | 7. Liberação | Reavaliar 0013/0015 no projeto correto e executar fluxo sintético autorizado | RPC, idempotência, concorrência, datas de Brasília e Caixa comprovados antes da flag |
 
-Não fazer exportação pública de CPF, nomes, endereços, e-mails, fotos, tokens ou credenciais. O pacote restrito não deve ir para GitHub nem CDN pública. Nenhum backup/exportação dos dados reais foi realizado por este documento.
+Não fazer exportação pública de CPF, nomes, endereços, e-mails, fotos, tokens ou credenciais. O pacote restrito não deve ir para GitHub nem CDN pública. Em 6/11 às 21h22 BRT foi realizada uma exportação parcial somente dos campos financeiros/IDs afetados, preservada fora do Git com ficha CSV e hashes: 43 itens de revisão / 38 registros distintos. **Não é backup integral e não comprova restauração.**
 
 ## Grupos de revisão obrigatória
 
@@ -68,7 +70,7 @@ A coluna não existe antes da 0015. A migration a adiciona nullable, sem backfil
 | Aprovação | Responsável, data e aprovação explícita da proposta exata |
 | Validação | Resultado esperado do preflight e reconciliação após a operação |
 
-Não existe proposta aprovada de alteração por registro neste lote. Permanecem pendentes backup/exportação restritos, evidência original e revisão humana.
+Não existe proposta aprovada de alteração por registro neste lote. A ficha restrita está preparada e mantém propostas/aprovações vazias. Permanecem pendentes backup integral recuperável, comprovantes de origem, eventual complementação dos vínculos exportados e revisão humana; nenhum UPDATE foi realizado.
 
 ## Próximas frentes independentes
 

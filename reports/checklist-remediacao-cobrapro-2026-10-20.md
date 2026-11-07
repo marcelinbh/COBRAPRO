@@ -15,6 +15,12 @@
 - [ ] Ativar as flags em operações separadas: revogação exige teste coordenado; recebimentos exigem saneamento aprovado. 0013/0014/0015/0017 continuam não aplicadas.
 - [ ] Provisionar com segurança a base PostgreSQL ausente da Blacklist e comprovar armazenamento privado; não liberar compartilhamento direto no banco. Kiwify ausente fica por último.
 
+- [x] Preparar matriz restrita somente leitura com 43 itens de revisão / 38 registros distintos, ficha de proposta/aprovação vazia e manifesto verificado, fora do Git e sem PII. Não é backup integral nem autorização de saneamento.
+- [x] Corrigir localmente base comum de carteira e calendário BRT do dashboard; residual inválido sinalizado sem inventar dívida e resumo independente do Caixa preservado. Suite final: 574 testes, 67 específicos também em Honolulu, TypeScript e build aprovados às 21h44 BRT. A publicação/smoke deste segundo lote é etapa separada.
+- [x] Preparar 0019 base Blacklist backend-only e validar 21 verificações PostgreSQL locais, inclusive teto transacional de fotos, concorrência e reaplicação. **Não aplicada em produção; storage privado, descarte/compensação dos objetos e elegibilidade seguem pendentes.**
+
+- [ ] Obter backup integral recuperável antes de saneamento. Painel do projeto correto confirmou às 21h28 BRT que o plano Free não inclui backups e o resumo exibe No backups; nenhum upgrade ou restauração iniciado. Exportação parcial não substitui backup e teste de recuperação.
+
 ## Prioridade P0 — Contenção imediata
 
 - [x] Remover a rota pública de bootstrap administrativo (`/api/auth/seed-admin`).
@@ -59,7 +65,7 @@
 - [x] Criar regressões de autorização: conta A não cria veículo para cliente B, não apaga veículo/parcela B, não edita contrato B, não cria reserva financeira com IDs B e não remove foto de outro registro Blacklist.
 - [x] Escapar dados de negócio nos comprovantes e contratos HTML; limitar logo a URL HTTPS e fotos compartilhadas da Blacklist a JPEG/PNG/WEBP de até 2 MB com assinatura binária.
 - [x] Endurecer o Portal do Cliente: novas emissões armazenam somente hash do token, o acesso é de uso único por compare-and-set, respostas não entram em cache e parcelas são projetadas com campos mínimos.
-- [x] Conter enumeração e exposição da Blacklist compartilhada: busca somente CPF/CNPJ completo validado, DTO mascarado sem contato/endereço/valor/fotos, remoção de listagem geral e detalhes enumeráveis, fotos privadas somente para o autor e limite de cinco uploads no servidor.
+- [x] Conter enumeração na API da Blacklist compartilhada: busca somente CPF/CNPJ completo validado, DTO mascarado sem contato/endereço/valor/fotos, remoção de listagem geral e detalhes enumeráveis, URLs montadas somente para o autor. **Não comprova objeto privado no storage nem teto de fotos sob concorrência; tabelas-base também estão ausentes e esses itens continuam pendentes.**
 - [ ] Criar migration aditiva de índices e constraints por tenant; aplicar somente após verificar dados legados.
 
 ## Prioridade P2 — Caixa, parcelas e renovação
@@ -81,7 +87,7 @@
 - [ ] Criar restrição única por empresa, contrato e número de parcela. **Migration `0013_integridade_parcelas.sql` falha se houver chave nula/duplicada e confere que não ficou índice parcial ou homônimo divergente; aguarda auditoria de dados e execução no Supabase.**
 - [ ] Aplicar a migration `0014_integridade_assinaturas_financeiras.sql` após sua pré-auditoria: ela bloqueia chaves nulas, competência duplicada e vínculos de assinatura/cliente/caixa entre empresas, criando FKs compostas por tenant. A aplicação já exige conta de Caixa, valor integral e compensa falhas de Caixa; a unicidade/RPC no banco segue pendente da execução controlada no Supabase.
 - [x] Implantar conferência financeira somente leitura entre parcelas, despesas e livro-caixa; ela aponta ausência, valor divergente e provável duplicidade sem criar ajustes automáticos.
-- [x] Padronizar todos os fluxos financeiros pelo calendário `America/Sao_Paulo`.
+- [ ] Concluir calendário `America/Sao_Paulo` em todos os indicadores e fluxos. A multa diária e os cenários da RPC de recebimento têm regressões aprovadas; ainda há janelas UTC em consultas do dashboard e caminhos legados a revisar. Não declarar todos os calendários validados apenas pelos testes de recebimento.
 
 ## Prioridade P3 — WhatsApp e controle operacional
 
@@ -111,10 +117,10 @@
 - [ ] Aplicar `0017_integridade_webhook_kiwify.sql` depois de preflight no Supabase COBRA PRO. Ela bloqueia `order_id` vazio/duplicado e cria unicidade estrutural, necessária para garantir idempotência contra concorrência e replay. **Nenhum DDL foi aplicado ainda.**
 - [ ] Rotacionar a chave de serviço Supabase e `JWT_SECRET` por terem sido encontrados em artefatos históricos do repositório; apagar os arquivos atuais é apenas contenção, não invalida cópias/histórico/sessões existentes.
 
-## Critério de publicação
+## Critério de publicação — lote de segurança 07444cb
 
 - [x] `pnpm check`, suite completa (507 testes aprovados, 11 opt-in ignorados), runners PostgreSQL e build aprovados em 6/11 às 21h11 BRT.
-- [ ] Checkpoint salvo antes de publicar.
-- [ ] Commit enviado ao GitHub.
-- [ ] Deploy concluído na DigitalOcean.
-- [ ] Após deploy, teste no `cobrapro.online` com a conta real `koletor3`, sem criar dados financeiros fora de um fluxo de teste autorizado.
+- [x] Checkpoint `6a47d722` salvo antes de publicar, com conteúdo igual ao tree validado.
+- [x] Commit enviado ao GitHub por push normal como `07444cb`, preservando histórico remoto.
+- [x] Deploy DigitalOcean `048dc812-40dd-46d6-b969-673fce8b99fb` confirmado Success / Live Deployment às 21h24 BRT.
+- [x] Dashboard recarregado com sessão existente e valores preservados; health/site/Evolution HTTP 200; reset com token comprovadamente inexistente retorna 400, sem trocar senha. Não é validação de todas as operações financeiras, que continuam bloqueadas.
