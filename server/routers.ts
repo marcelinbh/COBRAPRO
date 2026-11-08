@@ -1816,6 +1816,7 @@ const contratosRouter = router({
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de contrato e de seus lançamentos financeiros');
       const db = await getDb();
       if (db) {
         try {
@@ -2912,6 +2913,9 @@ const caixaRouter = router({
       descricao: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (['pagamento_parcela', 'emprestimo_liberado', 'despesa_operacional', 'transferencia_conta'].includes(input.categoria)) {
+        bloquearOperacaoFinanceiraNaoAtomica('O lançamento manual de uma operação financeira vinculada');
+      }
       await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       const db = await getDb();
       if (db) {
@@ -2951,6 +2955,7 @@ const caixaRouter = router({
   removerTransacoesDuplicadasDespesa: protectedProcedure
     .input(z.object({ ids: z.array(z.number().int().positive()).min(1), manterId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de lançamentos de Caixa sem revisão e aprovação');
       const idsParaRemover = idsDuplicadosParaRemocao(input.ids, input.manterId);
       if (idsParaRemover.length === 0) return { success: true, removidas: 0 };
 

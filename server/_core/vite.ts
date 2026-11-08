@@ -9,10 +9,25 @@ export async function setupVite(app: Express, server: Server) {
   const { nanoid } = await import("nanoid");
   const { default: viteConfig } = await import("../../vite.config");
 
+  const projectRoot = path.resolve(import.meta.dirname, "../..");
+  const watchedRoots = ["client", "shared", "attached_assets"].map((directory) => path.join(projectRoot, directory));
   const serverOptions = {
+    ...viteConfig.server,
     middlewareMode: true,
     hmr: { server },
     allowedHosts: true as const,
+    watch: {
+      ...viteConfig.server?.watch,
+      ignored: (candidate: string) => {
+        const resolved = path.resolve(candidate);
+        // Chokidar must traverse ancestors to reach the allowed roots, but must
+        // not recurse through /proc, temporary databases or sibling workspaces.
+        return !watchedRoots.some((root) => resolved === root
+          || resolved.startsWith(`${root}${path.sep}`)
+          || root.startsWith(`${resolved}${path.sep}`)
+          || resolved === path.parse(root).root);
+      },
+    },
   };
 
   const vite = await createViteServer({

@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
+  getDb: vi.fn(),
   getSupabaseClientAsync: vi.fn(),
 }));
 
 vi.mock("./db", async (importOriginal) => {
   const original = await importOriginal<typeof import("./db")>();
-  return { ...original, getSupabaseClientAsync: mocks.getSupabaseClientAsync };
+  return { ...original, getDb: mocks.getDb, getSupabaseClientAsync: mocks.getSupabaseClientAsync };
 });
 
 import { appRouter } from "./routers";
@@ -38,6 +39,7 @@ async function expectSuspensa(operacao: Promise<unknown>) {
 describe("contenção de operações financeiras não atômicas", () => {
   afterEach(() => {
     ENV.enableRpcRecebimentoParcela = false;
+    mocks.getDb.mockReset();
     mocks.getSupabaseClientAsync.mockReset();
   });
 
@@ -52,6 +54,27 @@ describe("contenção de operações financeiras não atômicas", () => {
     await expectSuspensa(caller.parcelas.editarParcela({ parcelaId: 1, novoValor: 1 }));
     await expectSuspensa(caller.parcelas.deletarParcela({ parcelaId: 1 }));
   });
+
+  it("bloqueia exclusão de contratos e de supostas duplicidades antes de apagar o Caixa", async () => {
+    const caller = appRouter.createCaller(contextoAutenticado());
+    await expectSuspensa(caller.contratos.deletar({ id: 1 }));
+    await expectSuspensa(caller.caixa.removerTransacoesDuplicadasDespesa({ ids: [1, 2], manterId: 1 }));
+    expect(mocks.getDb).not.toHaveBeenCalled();
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
+
+  it.each(['pagamento_parcela', 'emprestimo_liberado', 'despesa_operacional', 'transferencia_conta'] as const)(
+    "não aceita categoria %s como atalho manual para uma operação vinculada",
+    async (categoria) => {
+      const caller = appRouter.createCaller(contextoAutenticado());
+      for (const habilitada of [false, true]) {
+        ENV.enableRpcRecebimentoParcela = habilitada;
+        await expectSuspensa(caller.caixa.registrarTransacao({ contaCaixaId: 1, tipo: 'entrada', categoria, valor: 1, descricao: 'Auditoria' }));
+      }
+      expect(mocks.getDb).not.toHaveBeenCalled();
+      expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+    },
+  );
 
   it("bloqueia despesas, cheques, venda de telefone e assinatura antes de mover Caixa", async () => {
     const caller = appRouter.createCaller(contextoAutenticado());
