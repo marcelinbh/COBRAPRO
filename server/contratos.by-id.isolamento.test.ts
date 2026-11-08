@@ -84,9 +84,10 @@ describe("contratos.byId - isolamento por empresa", () => {
       tipoTaxa: "mensal",
       numeroParcelas: 2,
       dataPrimeiraParcela: "2026-11-01",
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
     expect(db.select).not.toHaveBeenCalled();
-    expect(db.update).toHaveBeenCalledTimes(1);
+    expect(db.update).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
   });
 });

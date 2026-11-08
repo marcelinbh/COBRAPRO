@@ -1,0 +1,70 @@
+{
+  "source": "Metadados fornecidos pelo usuário; fixture sintética, não dump de produção",
+  "postgres_major": 17,
+  "notes": [
+    "Default de users.updatedAt não informado; fixture sem default, seed explícito. A RPC escreve o timestamp."
+  ],
+  "columns": {
+    "users.id": [
+      "integer",
+      true,
+      null
+    ],
+    "contas_caixa.id": [
+      "integer",
+      true,
+      "nextval('contas_caixa_id_seq'::regclass)"
+    ],
+    "users.updatedAt": [
+      "timestamp with time zone",
+      true,
+      null
+    ],
+    "contas_caixa.nome": [
+      "character varying(255)",
+      true,
+      null
+    ],
+    "contas_caixa.tipo": [
+      "character varying(20)",
+      true,
+      "'caixa'::character varying"
+    ],
+    "contas_caixa.ativo": [
+      "boolean",
+      true,
+      "true"
+    ],
+    "contas_caixa.saldo": [
+      "numeric(15,2)",
+      true,
+      "0"
+    ],
+    "users.nome_empresa": [
+      "character varying(255)",
+      false,
+      null
+    ],
+    "contas_caixa.user_id": [
+      "integer",
+      false,
+      null
+    ],
+    "contas_caixa.createdAt": [
+      "timestamp with time zone",
+      true,
+      "now()"
+    ],
+    "contas_caixa.updatedAt": [
+      "timestamp with time zone",
+      true,
+      "now()"
+    ],
+    "users.onboarding_completo": [
+      "boolean",
+      true,
+      "false"
+    ]
+  },
+  "tipo_check": "CHECK (((tipo)::text = ANY ((ARRAY['caixa'::character varying, 'banco'::character varying, 'digital'::character varying])::text[])))"
+}

@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { getSupabaseClientAsync } = vi.hoisted(() => ({ getSupabaseClientAsync: vi.fn() }));
 vi.mock("../db", () => ({ getSupabaseClientAsync }));
+vi.mock("../services/blacklistEntitlement", () => ({ requireBlacklistEntitlement: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("../storage", () => ({ storageGet: vi.fn(), storagePut: vi.fn() }));
-vi.mock("../uploadSecurity", () => ({ validarFotoBlacklist: vi.fn() }));
+vi.mock("../uploadSecurity", () => ({ validarFotoBlacklist: vi.fn(), MAX_BLACKLIST_FOTO_BYTES: 2 * 1024 * 1024 }));
 
 import { blacklistRouter } from "./blacklist";
 

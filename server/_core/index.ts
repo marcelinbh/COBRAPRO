@@ -8,6 +8,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerAuthRoutes } from "../authRoutes";
 import { registerWebhookRoutes } from "../webhookRoutes";
 import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
+import { registerBlackListPhotoRoutes } from "../blacklistPhotoRoutes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { sdk } from "./sdk";
@@ -65,6 +66,8 @@ async function startServer() {
   registerWebhookRoutes(app);
   // Webhook da Kiwify (vendas → criação de usuário + e-mail)
   registerKiwifyWebhookRoutes(app);
+  // Fotos da Blacklist são bytes privados, com sessão e elegibilidade revalidadas.
+  registerBlackListPhotoRoutes(app);
 
   // Liveness público: não autentica nem consulta dados de clientes. A rota é
   // deliberadamente leve para que App Platform, Cloudflare e monitoramento

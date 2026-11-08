@@ -12,6 +12,7 @@ import { Plus, Search, FileText, ChevronRight, Download } from "lucide-react";
 import { toast } from "sonner";
 import { formatarMoeda, formatarData, MODALIDADE_LABELS, STATUS_CONTRATO_LABELS } from "../../../shared/finance";
 import { gerarPdfContrato } from "@/lib/gerarPdfContrato";
+import { EmprestimoSeguroCriar } from "@/components/EmprestimoSeguroCriar";
 
 function BotaoPDF({ contratoId }: { contratoId: number }) {
   const { t } = useTranslation();
@@ -89,6 +90,7 @@ export default function Contratos() {
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroModalidade, setFiltroModalidade] = useState("todas");
+  const [criarSeguro, setCriarSeguro] = useState(false);
 
   const { data: contratos, isLoading } = trpc.contratos.list.useQuery({
     status: filtroStatus !== "todos" ? filtroStatus : undefined,
@@ -113,11 +115,13 @@ export default function Contratos() {
           <h1 className="font-display text-3xl text-foreground tracking-wide">CONTRATOS</h1>
           <p className="text-sm text-muted-foreground mt-1">{filtrados?.length ?? 0} contratos</p>
         </div>
-        <Button className="gap-2" onClick={() => setLocation('/contratos/novo')}>
+        <Button className="gap-2" onClick={() => setCriarSeguro(v => !v)}>
           <Plus className="h-4 w-4" />{t('common.newContract')}
         </Button>
       </div>
 
+      {criarSeguro && <EmprestimoSeguroCriar onSuccess={id => setLocation(`/parcelas?contratoId=${id}`)} />}
+      <p className="text-sm text-muted-foreground">Novos empréstimos: ciclo seguro mensal simples. Outras modalidades e renovação seguem explicitamente indisponíveis neste ciclo, não são substituídas silenciosamente. <button className="underline" onClick={() => setLocation('/contratos/novo')}>Consultar formulário anterior (criação financeira legada bloqueada)</button>.</p>
       {/* Filtros */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">

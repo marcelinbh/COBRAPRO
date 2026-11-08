@@ -63,6 +63,20 @@ describe("contenção de operações financeiras não atômicas", () => {
     expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
   });
 
+  it("bloqueia a criação e alterações financeiras legadas sem contornar o novo fluxo seguro", async () => {
+    const caller = appRouter.createCaller(contextoAutenticado());
+    await expectSuspensa(caller.contratos.create({
+      clienteId: 1, modalidade: 'mensal', valorPrincipal: 100, taxaJuros: 10,
+      numeroParcelas: 1, dataInicio: '2026-11-08', dataVencimentoPrimeira: '2026-12-08', contaCaixaId: 1,
+    }));
+    await expectSuspensa(caller.contratos.updateStatus({ id: 1, status: 'ativo' }));
+    await expectSuspensa(caller.contratos.updateStatus({ id: 1, status: 'cancelado' }));
+    await expectSuspensa(caller.contratos.editar({ id: 1, valorPrincipal: 100, taxaJuros: '10', tipoTaxa: 'mensal', numeroParcelas: 1 }));
+    await expectSuspensa(caller.contratos.editarJuros({ id: 1, novaTaxa: '20' }));
+    expect(mocks.getDb).not.toHaveBeenCalled();
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
+
   it.each(['pagamento_parcela', 'emprestimo_liberado', 'despesa_operacional', 'transferencia_conta'] as const)(
     "não aceita categoria %s como atalho manual para uma operação vinculada",
     async (categoria) => {
@@ -78,8 +92,8 @@ describe("contenção de operações financeiras não atômicas", () => {
 
   it("bloqueia despesas, cheques, venda de telefone e assinatura antes de mover Caixa", async () => {
     const caller = appRouter.createCaller(contextoAutenticado());
-    await expectSuspensa(caller.contasPagar.pagar({ id: 1, contaCaixaId: 1 }));
-    await expectSuspensa(caller.contasPagar.estornar({ id: 1 }));
+    await expectSuspensa(caller.contasPagar.pagar({ id: 1, contaCaixaId: 1, dataPagamento: '2026-11-08', idempotencyKey: '11111111-1111-4111-8111-111111111111' }));
+    await expectSuspensa(caller.contasPagar.estornar({ id: 1, dataEstorno: '2026-11-08', pagamentoOperationId: '22222222-2222-4222-8222-222222222222', motivo: 'Teste de bloqueio', idempotencyKey: '33333333-3333-4333-8333-333333333333' }));
     await expectSuspensa(caller.cheques.criar({
       clienteId: 1, emitente: "Auditoria", valorNominal: 1, dataVencimento: "2026-10-29",
       taxaDesconto: 1, tipoTaxa: "mensal", contaCaixaId: 1,

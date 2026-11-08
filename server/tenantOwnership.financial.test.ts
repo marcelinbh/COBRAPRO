@@ -81,8 +81,8 @@ describe("operações financeiras - validação de recursos por empresa", () => 
     const supabase = supabaseComRespostas({ clientes: { data: null, error: null } });
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
-    await expect(appRouter.createCaller(contexto(41)).contratos.create(contratoInput)).rejects.toMatchObject({ code: "NOT_FOUND" });
-    expect(supabase.filtros.clientes).toEqual(expect.arrayContaining([["id", 900], ["user_id", 41]]));
+    await expect(appRouter.createCaller(contexto(41)).contratos.create(contratoInput)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalledWith("contratos");
     expect(supabase.from).not.toHaveBeenCalledWith("parcelas");
     expect(supabase.from).not.toHaveBeenCalledWith("transacoes_caixa");
@@ -94,12 +94,13 @@ describe("operações financeiras - validação de recursos por empresa", () => 
 
     await expect(appRouter.createCaller(contexto(41)).contasPagar.criar({
       descricao: "Despesa de teste",
-      categoria: "servicos",
-      valor: 100,
+      categoria: "outros",
+      valor: "100.00",
       dataVencimento: "2026-10-22",
+      idempotencyKey: "19ed02d8-91a8-4b24-89c2-4b9b8f5e0d21",
       contaCaixaId: 800,
-    })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(supabase.filtros.contas_caixa).toEqual(expect.arrayContaining([["id", 800], ["user_id", 41]]));
+    } as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalledWith("contas_pagar");
   });
 
@@ -160,6 +161,7 @@ describe("operações financeiras - validação de recursos por empresa", () => 
     await expect(appRouter.createCaller(contexto(41)).contasPagar.pagar({
       id: 700,
       contaCaixaId: 800,
+      dataPagamento: "2026-10-22",
       idempotencyKey: "19ed02d8-91a8-4b24-89c2-4b9b8f5e0d21",
     })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(supabase.from).not.toHaveBeenCalled();
@@ -172,9 +174,9 @@ describe("operações financeiras - validação de recursos por empresa", () => 
     await expect(appRouter.createCaller(contexto(41)).contratos.editarJuros({
       id: 700,
       novaTaxa: "10",
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
-    expect(supabase.filtros.contratos).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalledWith("contrato_historico");
   });
 
@@ -185,9 +187,9 @@ describe("operações financeiras - validação de recursos por empresa", () => 
     await expect(appRouter.createCaller(contexto(41)).contratos.aplicarMulta({
       id: 700,
       multa: "5.00",
-    })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
 
-    expect(supabase.filtros.contratos).toEqual(expect.arrayContaining([["id", 700], ["user_id", 41]]));
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalledWith("parcelas");
     expect(supabase.from).not.toHaveBeenCalledWith("contrato_historico");
   });

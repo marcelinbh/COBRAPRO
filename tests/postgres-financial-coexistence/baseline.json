@@ -1,0 +1,3819 @@
+{
+  "functions": [
+    {
+      "proname": "ciclo_autorizar",
+      "args": "p_acao text, p_conta integer, p_contrato integer",
+      "types": "text, integer, integer",
+      "result": "void",
+      "lang": "sql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\n  INSERT INTO public.ciclo_autorizacoes(xid,pid,acao,conta_id,contrato_id)\n  VALUES(txid_current(),pg_backend_pid(),p_acao,p_conta,p_contrato)\n  ON CONFLICT(xid,pid) DO UPDATE SET acao=excluded.acao,conta_id=excluded.conta_id,contrato_id=excluded.contrato_id;\n",
+      "body_hash": "4d0e4fab1cee716b3eca5dbb261f36e47383276b9982dbc2c4629b7917348729",
+      "defaults": null
+    },
+    {
+      "proname": "ciclo_cotacao",
+      "args": "p_user integer, p_contrato integer, p_parcela integer",
+      "types": "integer, integer, integer",
+      "result": "jsonb",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\nDECLARE c public.contratos%ROWTYPE; p public.parcelas%ROWTYPE; s jsonb; enc jsonb;\n multa numeric; mora numeric; devido numeric; hoje date:=(statement_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date;\nBEGIN\n s:=public.ciclo_validar(p_user,p_contrato);\n SELECT * INTO STRICT c FROM public.contratos WHERE id=p_contrato;\n SELECT * INTO p FROM public.parcelas WHERE id=p_parcela AND contrato_id=p_contrato;\n IF NOT FOUND OR p.user_id IS DISTINCT FROM p_user THEN RAISE EXCEPTION 'Parcela indisponível' USING ERRCODE='42501'; END IF;\n IF NOT EXISTS(SELECT 1 FROM public.clientes WHERE id=c.cliente_id AND user_id=p_user)\n   OR NOT EXISTS(SELECT 1 FROM public.contas_caixa WHERE id=c.conta_caixa_id AND user_id=p_user AND ativo=true)\n   OR (c.koletor_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.koletores WHERE id=c.koletor_id AND user_id=p_user AND ativo=true))\n   OR EXISTS(SELECT 1 FROM public.transacoes_caixa WHERE conta_caixa_id=c.conta_caixa_id AND user_id IS DISTINCT FROM p_user) THEN\n   RAISE EXCEPTION 'Vínculos/conta indisponíveis' USING ERRCODE='42501'; END IF;\n IF c.status NOT IN('ativo','quitado') THEN RAISE EXCEPTION 'Contrato não elegível' USING ERRCODE='23514'; END IF;\n IF p.status='parcial' THEN\n   multa:=p.valor_multa; mora:=p.multa_diaria_usada; devido:=p.saldo_residual;\n   IF devido<=0 OR p.valor_pago<=0 OR p.valor_original+multa+mora-p.valor_pago<>devido OR p.valor_desconto<>0 THEN RAISE EXCEPTION 'Residual inconsistente' USING ERRCODE='23514'; END IF;\n ELSIF p.status='paga' THEN multa:=p.valor_multa; mora:=p.multa_diaria_usada; devido:=0;\n ELSIF p.status IN('pendente','atrasada','vencendo_hoje') AND p.valor_pago=0 THEN\n   enc:=public.ciclo_encargos(p.valor_original,c.multa_atraso,c.juros_mora_diario,p.data_vencimento,statement_timestamp());\n   multa:=(enc->>'multa')::numeric; mora:=(enc->>'mora')::numeric; devido:=p.valor_original+multa+mora;\n ELSE RAISE EXCEPTION 'Estado de parcela não elegível' USING ERRCODE='23514'; END IF;\n RETURN jsonb_build_object('elegivel',devido>0,'contratoId',p_contrato,'parcelaId',p_parcela,'contaCaixaId',c.conta_caixa_id,\n   'totalExigido',devido::numeric(15,2)::text,'multa',multa::numeric(15,2)::text,'mora',mora::numeric(15,2)::text,\n   'jurosEmbutidos',p.valor_juros::numeric(15,2)::text,'valorPagoAcumulado',p.valor_pago::numeric(15,2)::text,\n   'dataPagamento',hoje,'vencimento',p.data_vencimento,'status',p.status,\n   'estadoHash',encode(extensions.digest(s::text,'sha256'),'hex'),'regra','recebimento_defaults_brt_v1');\nEND;\n",
+      "body_hash": "2014f6ae985ced68bc9f5edb938763b3edbf021d0cde91406fb4746f9dee96ae",
+      "defaults": null
+    },
+    {
+      "proname": "ciclo_encargos",
+      "args": "p_original numeric, p_multa numeric, p_mora numeric, p_vencimento date, p_instante timestamp with time zone",
+      "types": "numeric, numeric, numeric, date, timestamp with time zone",
+      "result": "jsonb",
+      "lang": "sql",
+      "prosecdef": false,
+      "provolatile": "i",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\n SELECT jsonb_build_object('dias',greatest(0,(p_instante AT TIME ZONE 'America/Sao_Paulo')::date-p_vencimento),\n 'multa',CASE WHEN (p_instante AT TIME ZONE 'America/Sao_Paulo')::date>p_vencimento THEN round(p_original*p_multa/100,2) ELSE 0 END,\n 'mora',round(p_original*p_mora/100*greatest(0,(p_instante AT TIME ZONE 'America/Sao_Paulo')::date-p_vencimento),2));\n",
+      "body_hash": "d3487e4663c8d2a5f917cf1e61a9d00c4314de10e48c5c2db0da40155c227dd1",
+      "defaults": null
+    },
+    {
+      "proname": "ciclo_finalizar_criacao",
+      "args": "",
+      "types": "",
+      "result": "trigger",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\nDECLARE cid integer; s jsonb;\nBEGIN\n IF OLD.resultado IS NOT NULL THEN RAISE EXCEPTION 'Proveniência concluída imutável' USING ERRCODE='42501'; END IF;\n IF NEW.resultado IS NOT NULL THEN\n   cid:=(NEW.resultado->>'id')::int; s:=public.ciclo_validar(NEW.user_id,cid);\n   INSERT INTO public.ciclo_estados(contrato_id,user_id,snapshot,origem_completa) VALUES(cid,NEW.user_id,s,true);\n   DELETE FROM public.ciclo_autorizacoes WHERE xid=txid_current() AND pid=pg_backend_pid();\n END IF;\n RETURN NEW;\nEND;\n",
+      "body_hash": "876c462d273e641da7351f56fcd4608939c4c76d7a424d83774f913426974b3b",
+      "defaults": null
+    },
+    {
+      "proname": "ciclo_guardar",
+      "args": "",
+      "types": "",
+      "result": "trigger",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\nDECLARE oldj jsonb; newj jsonb; cid integer; aid integer; protegido boolean; autorizado boolean;\nBEGIN\n IF TG_OP<>'INSERT' THEN oldj:=to_jsonb(OLD); END IF;\n IF TG_OP<>'DELETE' THEN newj:=to_jsonb(NEW); END IF;\n IF TG_TABLE_NAME='contas_caixa' THEN\n   aid:=(oldj->>'id')::int; PERFORM pg_advisory_xact_lock(22022,aid);\n   IF EXISTS(SELECT 1 FROM public.emprestimos_rpc_origens o JOIN public.contratos c ON c.id=o.contrato_id WHERE c.conta_caixa_id=aid)\n     AND (TG_OP='DELETE' OR oldj->'user_id' IS DISTINCT FROM newj->'user_id' OR oldj->'saldo' IS DISTINCT FROM newj->'saldo') THEN\n     RAISE EXCEPTION 'Conta protegida: owner/saldo-base/exclusão imutáveis' USING ERRCODE='42501'; END IF;\n ELSIF TG_TABLE_NAME='transacoes_caixa' THEN\n   aid:=coalesce((newj->>'conta_caixa_id')::int,(oldj->>'conta_caixa_id')::int);\n   PERFORM pg_advisory_xact_lock(22022,aid);\n   IF TG_OP='UPDATE' AND (oldj->>'conta_caixa_id')::int IS DISTINCT FROM aid THEN PERFORM pg_advisory_xact_lock(22022,(oldj->>'conta_caixa_id')::int); END IF;\n   protegido:=EXISTS(SELECT 1 FROM public.emprestimos_rpc_origens o JOIN public.contratos c ON c.id=o.contrato_id WHERE c.conta_caixa_id IN(aid,(oldj->>'conta_caixa_id')::int) OR o.contrato_id IN((newj->>'contrato_id')::int,(oldj->>'contrato_id')::int))\n     OR EXISTS(SELECT 1 FROM public.parcelas p JOIN public.emprestimos_rpc_origens o ON o.contrato_id=p.contrato_id WHERE p.id IN((newj->>'parcela_id')::int,(oldj->>'parcela_id')::int));\n   autorizado:=EXISTS(SELECT 1 FROM public.ciclo_autorizacoes WHERE xid=txid_current() AND pid=pg_backend_pid() AND conta_id=aid\n     AND ((acao='criar' AND newj->>'tipo'='saida' AND newj->>'categoria'='emprestimo_liberado') OR (acao='receber' AND contrato_id=(newj->>'contrato_id')::int AND newj->>'tipo'='entrada' AND newj->>'categoria'='pagamento_parcela')));\n   IF protegido AND (TG_OP<>'INSERT' OR NOT autorizado) THEN RAISE EXCEPTION 'Livro protegido: somente RPC append-only' USING ERRCODE='42501'; END IF;\n ELSE\n   cid:=CASE WHEN TG_TABLE_NAME='contratos' THEN coalesce((newj->>'id')::int,(oldj->>'id')::int) ELSE coalesce((newj->>'contrato_id')::int,(oldj->>'contrato_id')::int) END;\n   protegido:=EXISTS(SELECT 1 FROM public.emprestimos_rpc_origens WHERE contrato_id IN(cid,(oldj->>'contrato_id')::int));\n   autorizado:=EXISTS(SELECT 1 FROM public.ciclo_autorizacoes WHERE xid=txid_current() AND pid=pg_backend_pid() AND acao='receber' AND contrato_id=cid);\n   IF protegido AND (TG_OP='DELETE' OR NOT autorizado OR (TG_TABLE_NAME='parcelas' AND TG_OP='INSERT')) THEN RAISE EXCEPTION 'Contrato/parcelas/trilha protegidos' USING ERRCODE='42501'; END IF;\n END IF;\n IF TG_OP='DELETE' THEN RETURN OLD; ELSE RETURN NEW; END IF;\nEND;\n",
+      "body_hash": "f120151dd3f4de11381b60a15402e05bdcb8187fed1cb40c536a8f1be8d7eb2e",
+      "defaults": null
+    },
+    {
+      "proname": "ciclo_imutavel",
+      "args": "",
+      "types": "",
+      "result": "trigger",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\nBEGIN RAISE EXCEPTION 'Proveniência/perna imutável' USING ERRCODE='42501'; END;\n",
+      "body_hash": "673632820324638377f46d8b4011c35249c59001ff878d03880cb586f728c434",
+      "defaults": null
+    },
+    {
+      "proname": "ciclo_snapshot",
+      "args": "p_contrato integer",
+      "types": "integer",
+      "result": "jsonb",
+      "lang": "sql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\n SELECT jsonb_build_object(\n 'contrato',(SELECT to_jsonb(c) FROM public.contratos c WHERE c.id=p_contrato),\n 'parcelas',coalesce((SELECT jsonb_agg(to_jsonb(p) ORDER BY p.numero,p.id) FROM public.parcelas p WHERE p.contrato_id=p_contrato),'[]'::jsonb),\n 'ledger',coalesce((SELECT jsonb_agg(to_jsonb(t) ORDER BY t.id) FROM public.transacoes_caixa t WHERE t.contrato_id=p_contrato OR t.parcela_id IN(SELECT id FROM public.parcelas WHERE contrato_id=p_contrato)),'[]'::jsonb),\n 'historico',coalesce((SELECT jsonb_agg(to_jsonb(h) ORDER BY h.id) FROM public.contrato_historico h WHERE h.contrato_id=p_contrato),'[]'::jsonb),\n 'origem',(SELECT to_jsonb(o) FROM public.emprestimos_rpc_origens o WHERE o.contrato_id=p_contrato));\n",
+      "body_hash": "5573383b340f3d434d9f68d1b450eddd1d32b1d236a705fc818a57f2ca6333bd",
+      "defaults": null
+    },
+    {
+      "proname": "ciclo_validar",
+      "args": "p_user integer, p_contrato integer",
+      "types": "integer, integer",
+      "result": "jsonb",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\nDECLARE o public.emprestimos_rpc_origens%ROWTYPE; op public.emprestimos_rpc_operacoes%ROWTYPE;\n c public.contratos%ROWTYPE; p public.parcelas%ROWTYPE; t public.transacoes_caixa%ROWTYPE;\n h public.contrato_historico%ROWTYPE; s jsonb; e public.ciclo_estados%ROWTYPE;\n n integer; i integer:=0; juros numeric; total numeric; ref numeric; jr numeric; vl numeric; jl numeric;\n ps jsonb; ids jsonb; histid bigint;\nBEGIN\n SELECT * INTO o FROM public.emprestimos_rpc_origens WHERE contrato_id=p_contrato;\n IF NOT FOUND OR o.user_id IS DISTINCT FROM p_user THEN RAISE EXCEPTION 'Origem 0021 indisponível' USING ERRCODE='42501'; END IF;\n SELECT * INTO STRICT op FROM public.emprestimos_rpc_operacoes WHERE id=o.operacao_id;\n SELECT * INTO STRICT c FROM public.contratos WHERE id=p_contrato;\n IF c.user_id IS DISTINCT FROM p_user OR op.user_id IS DISTINCT FROM p_user OR o.regra<>'mensal_simples_v1'\n   OR op.resultado IS NULL OR op.auditoria IS NULL OR op.concluida_em IS NULL\n   OR op.hash_payload<>encode(extensions.digest(op.payload::text,'sha256'),'hex')\n   OR op.auditoria->'payload' IS DISTINCT FROM op.payload OR op.auditoria->>'hashPayload' IS DISTINCT FROM op.hash_payload\n   OR op.auditoria->'resultado' IS DISTINCT FROM op.resultado OR op.auditoria->>'acao' IS DISTINCT FROM 'criacao_emprestimo'\n   OR op.auditoria->'jurosEmbutidos' IS DISTINCT FROM 'true'::jsonb THEN\n   RAISE EXCEPTION 'Proveniência/auditoria adulterada' USING ERRCODE='23514'; END IF;\n s:=public.ciclo_snapshot(p_contrato);\n SELECT * INTO e FROM public.ciclo_estados WHERE contrato_id=p_contrato;\n IF FOUND THEN\n   IF e.user_id IS DISTINCT FROM p_user OR e.snapshot IS DISTINCT FROM s THEN RAISE EXCEPTION 'Estado alterado fora da RPC' USING ERRCODE='23514'; END IF;\n   RETURN s;\n END IF;\n -- 0021 existente: NÃO confiar apenas na existência da origem. Cabeçalho e todas linhas\n -- devem ser exatamente iguais ao snapshot inicial (inclusive campos extras e timestamps).\n IF op.auditoria->'contrato' IS DISTINCT FROM s->'contrato' OR op.auditoria->'parcelas' IS DISTINCT FROM s->'parcelas' THEN\n   RAISE EXCEPTION '0021 sem snapshot completo exige estado inicial intacto' USING ERRCODE='23514'; END IF;\n n:=(op.payload->>'numeroParcelas')::integer;\n juros:=round((op.payload->>'valorPrincipal')::numeric*(op.payload->>'taxaJuros')::numeric/100*n,2);\n total:=(op.payload->>'valorPrincipal')::numeric+juros; ref:=round(total/n,2); jr:=round(juros/n,2);\n IF n NOT BETWEEN 1 AND 60 OR total>9999999999.99\n   OR op.payload->>'regra' IS DISTINCT FROM 'mensal_simples_v1' OR op.payload->>'encargos' IS DISTINCT FROM 'defaults_catalogo'\n   OR (op.payload->>'userId')::integer IS DISTINCT FROM p_user\n   OR c.cliente_id IS DISTINCT FROM (op.payload->>'clienteId')::integer\n   OR c.conta_caixa_id IS DISTINCT FROM (op.payload->>'contaCaixaId')::integer\n   OR c.modalidade IS DISTINCT FROM 'mensal' OR c.tipo_taxa IS DISTINCT FROM 'mensal'\n   OR c.valor_principal IS DISTINCT FROM (op.payload->>'valorPrincipal')::numeric\n   OR c.taxa_juros IS DISTINCT FROM (op.payload->>'taxaJuros')::numeric\n   OR c.num_parcelas IS DISTINCT FROM n OR c.numero_parcelas IS DISTINCT FROM n\n   OR c.total_contrato IS DISTINCT FROM total OR c.valor_parcela IS DISTINCT FROM ref\n   OR c.multa_atraso IS DISTINCT FROM 2::numeric OR c.juros_mora_diario IS DISTINCT FROM 0.033::numeric\n   OR c.data_inicio IS DISTINCT FROM (op.payload->>'dataInicio')::date\n   OR c.data_inicio IS DISTINCT FROM (op.payload->>'dataDesembolso')::date\n   OR c.data_vencimento_primeira IS DISTINCT FROM (op.payload->'vencimentos'->>0)::date\n   OR c.data_vencimento IS DISTINCT FROM (op.payload->'vencimentos'->>(n-1))::date\n   OR c.dia_vencimento IS DISTINCT FROM extract(day FROM c.data_vencimento_primeira)::int\n   OR c.descricao IS DISTINCT FROM op.payload->>'descricao' OR c.observacoes IS DISTINCT FROM op.payload->>'observacoes'\n   OR c.status IS DISTINCT FROM 'ativo' OR c.contrato_origem_id IS NOT NULL\n   OR c.\"createdAt\" IS DISTINCT FROM op.created_at OR c.\"updatedAt\" IS DISTINCT FROM op.created_at\n   OR jsonb_array_length(op.payload->'vencimentos') IS DISTINCT FROM n THEN\n   RAISE EXCEPTION 'Invariantes da criação divergentes' USING ERRCODE='23514'; END IF;\n FOR p IN SELECT * FROM public.parcelas WHERE contrato_id=p_contrato ORDER BY numero,id LOOP\n   i:=i+1; vl:=CASE WHEN i=n THEN total-ref*(n-1) ELSE ref END; jl:=CASE WHEN i=n THEN juros-jr*(n-1) ELSE jr END;\n   IF p.numero IS DISTINCT FROM i OR p.numero_parcela IS DISTINCT FROM i OR i>n\n     OR p.user_id IS DISTINCT FROM p_user OR p.cliente_id IS DISTINCT FROM c.cliente_id\n     OR p.koletor_id IS DISTINCT FROM c.koletor_id OR p.conta_caixa_id IS DISTINCT FROM c.conta_caixa_id\n     OR p.valor IS DISTINCT FROM vl OR p.valor_original IS DISTINCT FROM vl OR p.valor_juros IS DISTINCT FROM jl\n     OR vl<=0 OR jl<0 OR jl>vl OR p.valor_pago IS DISTINCT FROM 0::numeric OR p.saldo_residual IS DISTINCT FROM 0::numeric\n     OR p.valor_multa IS DISTINCT FROM 0::numeric OR p.valor_desconto IS DISTINCT FROM 0::numeric\n     OR p.multa_manual IS DISTINCT FROM 0::numeric OR p.multa_diaria_usada IS DISTINCT FROM 0::numeric\n     OR p.data_pagamento IS NOT NULL OR p.observacoes IS NOT NULL\n     OR p.\"createdAt\" IS DISTINCT FROM op.created_at OR p.\"updatedAt\" IS DISTINCT FROM op.created_at\n     OR p.data_vencimento IS DISTINCT FROM (op.payload->'vencimentos'->>(i-1))::date\n     OR p.data_vencimento<c.data_inicio\n     OR (n>1 AND extract(day FROM c.data_vencimento_primeira)>28)\n     OR p.data_vencimento IS DISTINCT FROM (c.data_vencimento_primeira+make_interval(months=>i-1))::date\n     OR p.status IS DISTINCT FROM (CASE WHEN p.data_vencimento<coalesce((op.auditoria->>'dataCivilCriacaoBrt')::date,(op.created_at AT TIME ZONE 'America/Sao_Paulo')::date) THEN 'atrasada' WHEN p.data_vencimento=coalesce((op.auditoria->>'dataCivilCriacaoBrt')::date,(op.created_at AT TIME ZONE 'America/Sao_Paulo')::date) THEN 'vencendo_hoje' ELSE 'pendente' END) THEN\n     RAISE EXCEPTION 'Parcelas iniciais divergentes' USING ERRCODE='23514'; END IF;\n END LOOP;\n IF i<>n OR (SELECT sum(valor_original) FROM public.parcelas WHERE contrato_id=p_contrato)<>total\n   OR (SELECT sum(valor_juros) FROM public.parcelas WHERE contrato_id=p_contrato)<>juros THEN RAISE EXCEPTION 'Somas divergentes' USING ERRCODE='23514'; END IF;\n ids:=(SELECT jsonb_agg(id ORDER BY numero,id) FROM public.parcelas WHERE contrato_id=p_contrato);\n IF op.resultado IS DISTINCT FROM jsonb_build_object('success',true,'repetida',false,'id',p_contrato,'operationId',op.id,\n   'parcelasIds',ids,'transacaoCaixaId',o.transacao_caixa_id::text,'valorParcela',ref::numeric(15,2)::text,\n   'totalContrato',total::numeric(15,2)::text,'jurosTotal',juros::numeric(15,2)::text,'numeroParcelas',n,\n   'dataDesembolso',c.data_inicio,'vencimentos',op.payload->'vencimentos','status','ativo','regra','mensal_simples_v1') THEN\n   RAISE EXCEPTION 'Resultado de criação divergente' USING ERRCODE='23514'; END IF;\n IF jsonb_array_length(s->'ledger')<>1 OR jsonb_array_length(s->'historico')<>1 THEN RAISE EXCEPTION 'Trilha extra/ausente' USING ERRCODE='23514'; END IF;\n SELECT * INTO STRICT t FROM public.transacoes_caixa WHERE id=o.transacao_caixa_id;\n histid:=(op.auditoria->>'historicoId')::bigint;\n SELECT * INTO STRICT h FROM public.contrato_historico WHERE id=histid;\n IF t.user_id IS DISTINCT FROM p_user OR t.conta_caixa_id IS DISTINCT FROM c.conta_caixa_id\n   OR t.contrato_id IS DISTINCT FROM p_contrato OR t.parcela_id IS NOT NULL\n   OR t.tipo IS DISTINCT FROM 'saida' OR t.categoria IS DISTINCT FROM 'emprestimo_liberado'\n   OR t.valor IS DISTINCT FROM c.valor_principal OR t.data_transacao IS DISTINCT FROM c.data_inicio\n   OR t.descricao IS DISTINCT FROM 'Empréstimo RPC - Contrato #'||p_contrato::text\n   OR t.\"createdAt\" IS DISTINCT FROM op.created_at OR o.created_at IS DISTINCT FROM op.created_at\n   OR h.contrato_id IS DISTINCT FROM p_contrato OR h.user_id IS DISTINCT FROM p_user::text\n   OR h.tipo IS DISTINCT FROM 'criacao' OR h.valor_novo IS DISTINCT FROM total OR h.valor_anterior IS NOT NULL\n   OR h.descricao IS DISTINCT FROM 'Criação atômica mensal_simples_v1' OR h.created_at IS DISTINCT FROM op.created_at THEN\n   RAISE EXCEPTION 'Débito/histórico de criação divergente' USING ERRCODE='23514'; END IF;\n RETURN s;\nEND;\n",
+      "body_hash": "d7c746affad83bf7200a5fe45577f746e2f16e662215efcdfa10e36915d67ea2",
+      "defaults": null
+    },
+    {
+      "proname": "despesas_rpc_executar",
+      "args": "p_user_id integer, p_chave_idempotencia uuid, p_tipo text, p_payload jsonb",
+      "types": "integer, uuid, text, jsonb",
+      "result": "jsonb",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ],
+      "prosrc": "\nDECLARE\n  v_op public.despesas_rpc_operacoes%ROWTYPE;\n  v_origem public.despesas_rpc_origens%ROWTYPE;\n  v_pg public.despesas_rpc_pagamentos%ROWTYPE;\n  v_d public.contas_pagar%ROWTYPE;\n  v_conta public.contas_caixa%ROWTYPE;\n  v_tx public.transacoes_caixa%ROWTYPE;\n  v_hash bytea; v_id uuid := pg_catalog.gen_random_uuid(); v_result jsonb;\n  v_antes jsonb; v_depois jsonb; v_saida jsonb; v_estorno jsonb;\n  v_valor numeric; v_conta_id integer; v_data date; v_vencimento date;\n  v_descricao text; v_categoria text; v_obs text; v_motivo text; v_pagamento_id uuid;\nBEGIN\n  IF p_user_id IS NULL OR p_user_id<=0 OR p_chave_idempotencia IS NULL\n     OR p_tipo IS NULL OR p_tipo NOT IN ('criar','pagar','estornar')\n     OR p_payload IS NULL OR jsonb_typeof(p_payload)<>'object' THEN\n    RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='Intenção inválida';\n  END IF;\n  -- A API interna não é executável por service_role: só wrappers tipados montam o payload.\n  IF p_tipo='criar' THEN\n    v_valor := (p_payload->>'valor')::numeric;\n    v_descricao := btrim(p_payload->>'descricao'); v_categoria := p_payload->>'categoria';\n    v_obs := p_payload->>'observacoes'; v_vencimento := (p_payload->>'dataVencimento')::date;\n    IF v_valor IS NULL OR v_valor::text IN ('NaN','Infinity','-Infinity') OR v_valor<=0\n       OR v_valor>9999999999999.99 OR scale(v_valor)>2\n       OR v_descricao IS NULL OR length(v_descricao) NOT BETWEEN 1 AND 255\n       OR v_categoria IS NULL OR v_categoria NOT IN ('aluguel','energia','agua','internet','telefone','salario','imposto','fornecedor','outros')\n       OR v_vencimento IS NULL OR NOT isfinite(v_vencimento)\n       OR v_vencimento NOT BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'\n       OR length(coalesce(v_obs,''))>10000 THEN\n      RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='Despesa inválida: valor positivo, escala 2, limite e data civil obrigatórios';\n    END IF;\n    p_payload := jsonb_set(jsonb_set(p_payload,'{valor}',to_jsonb(v_valor::numeric(15,2))),'{descricao}',to_jsonb(v_descricao));\n  ELSE\n    IF (p_payload->>'despesaId')::integer IS NULL OR (p_payload->>'despesaId')::integer<=0 THEN\n      RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='Despesa inválida';\n    END IF;\n    v_data := (p_payload->>'data')::date;\n    IF v_data IS NULL OR NOT isfinite(v_data) OR v_data NOT BETWEEN DATE '0001-01-01' AND DATE '9999-12-31' THEN\n      RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='Data civil obrigatória';\n    END IF;\n    IF p_tipo='pagar' THEN\n      v_conta_id := (p_payload->>'contaCaixaId')::integer;\n      IF v_conta_id IS NULL OR v_conta_id<=0 THEN RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='Conta inválida'; END IF;\n    ELSE\n      v_pagamento_id := (p_payload->>'pagamentoOperationId')::uuid; v_motivo := btrim(p_payload->>'motivo');\n      IF v_pagamento_id IS NULL OR v_motivo IS NULL OR length(v_motivo) NOT BETWEEN 1 AND 2000 THEN\n        RAISE EXCEPTION USING ERRCODE='22023', MESSAGE='Pagamento original e motivo obrigatórios';\n      END IF;\n      p_payload := jsonb_set(p_payload,'{motivo}',to_jsonb(v_motivo));\n    END IF;\n  END IF;\n  v_hash := extensions.digest(convert_to(jsonb_build_object('tipo',p_tipo,'userId',p_user_id,'payload',p_payload)::text,'UTF8'),'sha256');\n  -- Mesma ordem em todas as intenções: chave -> usuário -> despesa -> origem/pagamento\n  -- -> conta -> livro ordenado. Uma chave cobre TODOS os tipos de intenção do owner.\n  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_user_id::text||':'||p_chave_idempotencia::text,20));\n  PERFORM id FROM public.users WHERE id=p_user_id FOR KEY SHARE;\n  IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='Usuário inválido'; END IF;\n  SELECT * INTO v_op FROM public.despesas_rpc_operacoes WHERE user_id=p_user_id AND chave_idempotencia=p_chave_idempotencia;\n  IF FOUND THEN\n    IF v_op.tipo<>p_tipo OR v_op.hash_payload<>v_hash OR v_op.payload<>p_payload THEN\n      RAISE EXCEPTION USING ERRCODE='23505', MESSAGE='Chave reutilizada com payload diferente';\n    END IF;\n    RETURN v_op.resultado; -- confirmação persistida exata, inclusive após resposta perdida\n  END IF;\n  IF p_tipo='criar' THEN\n    INSERT INTO public.contas_pagar(descricao,categoria,valor,data_vencimento,status,recorrente,frequencia,\n      conta_caixa_id,data_pagamento,observacoes,user_id,\"createdAt\",\"updatedAt\")\n      VALUES(v_descricao,v_categoria,v_valor,v_vencimento,'pendente',false,NULL,NULL,NULL,v_obs,p_user_id,now(),now()) RETURNING * INTO v_d;\n    v_depois := to_jsonb(v_d);\n    INSERT INTO public.despesas_rpc_origens(despesa_id,user_id,operacao_id,snapshot) VALUES(v_d.id,p_user_id,v_id,v_depois);\n  ELSE\n    SELECT * INTO v_d FROM public.contas_pagar WHERE id=(p_payload->>'despesaId')::integer AND user_id=p_user_id FOR UPDATE;\n    IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='Despesa não encontrada'; END IF;\n    v_antes := to_jsonb(v_d);\n    SELECT * INTO v_origem FROM public.despesas_rpc_origens WHERE despesa_id=v_d.id AND user_id=p_user_id FOR UPDATE;\n    IF NOT FOUND THEN RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Despesa legada ou sem proveniência'; END IF;\n    IF NOT EXISTS (SELECT 1 FROM public.despesas_rpc_operacoes o WHERE o.id=v_origem.operacao_id\n      AND o.user_id=p_user_id AND o.tipo='criar' AND o.auditoria->'depois'=v_origem.snapshot\n      AND (o.resultado->>'despesaId')::integer=v_d.id\n      AND o.hash_payload=extensions.digest(convert_to(jsonb_build_object('tipo',o.tipo,'userId',o.user_id,'payload',o.payload)::text,'UTF8'),'sha256')) THEN\n      RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Proveniência adulterada';\n    END IF;\n    SELECT * INTO v_pg FROM public.despesas_rpc_pagamentos WHERE despesa_id=v_d.id FOR UPDATE;\n    IF p_tipo='pagar' THEN\n      IF FOUND OR v_d.status IS DISTINCT FROM 'pendente' OR v_antes IS DISTINCT FROM v_origem.snapshot THEN\n        RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Estado ou valor original da despesa alterado';\n      END IF;\n    ELSE\n      IF NOT FOUND OR v_pg.user_id<>p_user_id OR v_pg.operacao_id<>v_pagamento_id\n        OR v_pg.estorno_id IS NOT NULL OR v_d.status IS DISTINCT FROM 'pago'\n        OR v_antes IS DISTINCT FROM v_pg.despesa_snapshot\n        OR v_d.valor IS DISTINCT FROM (v_origem.snapshot->>'valor')::numeric\n        OR v_pg.valor IS DISTINCT FROM v_d.valor OR v_pg.conta_caixa_id IS DISTINCT FROM v_d.conta_caixa_id\n        OR v_pg.data_pagamento IS DISTINCT FROM v_d.data_pagamento OR v_data<v_pg.data_pagamento THEN\n        RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Pagamento não elegível para estorno';\n      END IF;\n      IF NOT EXISTS (SELECT 1 FROM public.despesas_rpc_operacoes o WHERE o.id=v_pg.operacao_id\n        AND o.user_id=p_user_id AND o.tipo='pagar' AND o.auditoria->'depois'=v_pg.despesa_snapshot\n        AND o.auditoria->'saida'=v_pg.saida_snapshot AND o.auditoria->'antes'=v_origem.snapshot\n        AND (o.resultado->>'transacaoSaidaId')::integer=v_pg.saida_id\n        AND o.hash_payload=extensions.digest(convert_to(jsonb_build_object('tipo',o.tipo,'userId',o.user_id,'payload',o.payload)::text,'UTF8'),'sha256')) THEN\n        RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Pagamento sem auditoria verificável';\n      END IF;\n      v_conta_id := v_pg.conta_caixa_id;\n    END IF;\n    SELECT * INTO v_conta FROM public.contas_caixa WHERE id=v_conta_id AND user_id=p_user_id FOR UPDATE;\n    IF NOT FOUND OR v_conta.ativo IS DISTINCT FROM true OR v_conta.saldo::text IN ('NaN','Infinity','-Infinity') THEN\n      RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='Conta indisponível para o owner';\n    END IF;\n    PERFORM t.id FROM public.transacoes_caixa t WHERE t.conta_caixa_id=v_conta_id ORDER BY t.id FOR SHARE;\n    IF EXISTS (SELECT 1 FROM public.transacoes_caixa WHERE conta_caixa_id=v_conta_id\n      AND (user_id IS DISTINCT FROM p_user_id OR valor::text IN ('NaN','Infinity','-Infinity') OR valor<=0\n           OR tipo NOT IN ('entrada','saida') OR NOT isfinite(data_transacao))) THEN\n      RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Livro da conta possui owner/valores inconsistentes';\n    END IF;\n    v_valor := v_d.valor;\n    IF p_tipo='pagar' THEN\n      INSERT INTO public.transacoes_caixa(conta_caixa_id,tipo,categoria,descricao,valor,data_transacao,user_id)\n        VALUES(v_conta_id,'saida','despesa_operacional','Pagamento: '||v_d.descricao,v_valor,v_data,p_user_id) RETURNING * INTO v_tx;\n      v_saida := to_jsonb(v_tx);\n      UPDATE public.contas_pagar SET status='pago',data_pagamento=v_data,conta_caixa_id=v_conta_id,\"updatedAt\"=now()\n        WHERE id=v_d.id RETURNING * INTO v_d;\n      v_depois := to_jsonb(v_d);\n      INSERT INTO public.despesas_rpc_pagamentos(despesa_id,user_id,operacao_id,conta_caixa_id,valor,data_pagamento,saida_id,saida_snapshot,despesa_snapshot)\n        VALUES(v_d.id,p_user_id,v_id,v_conta_id,v_valor,v_data,v_tx.id,v_saida,v_depois);\n      v_pagamento_id := v_id;\n    ELSE\n      SELECT * INTO v_tx FROM public.transacoes_caixa WHERE id=v_pg.saida_id FOR SHARE;\n      IF NOT FOUND OR to_jsonb(v_tx) IS DISTINCT FROM v_pg.saida_snapshot\n        OR v_tx.tipo<>'saida' OR v_tx.categoria IS DISTINCT FROM 'despesa_operacional'\n        OR v_tx.user_id IS DISTINCT FROM p_user_id OR v_tx.conta_caixa_id<>v_conta_id\n        OR v_tx.valor<>v_valor OR v_tx.data_transacao<>v_pg.data_pagamento\n        OR v_tx.contrato_id IS NOT NULL OR v_tx.parcela_id IS NOT NULL THEN\n        RAISE EXCEPTION USING ERRCODE='23514', MESSAGE='Saída original ausente ou alterada';\n      END IF;\n      v_saida := to_jsonb(v_tx);\n      INSERT INTO public.transacoes_caixa(conta_caixa_id,tipo,categoria,descricao,valor,data_transacao,user_id)\n        VALUES(v_conta_id,'entrada','despesa_operacional','Estorno: '||v_d.descricao,v_tx.valor,v_data,p_user_id) RETURNING * INTO v_tx;\n      v_estorno := to_jsonb(v_tx);\n      -- Preserva conta, valor e data de pagamento como evidência; não apaga saída.\n      UPDATE public.contas_pagar SET status='cancelado',\"updatedAt\"=now() WHERE id=v_d.id RETURNING * INTO v_d;\n      v_depois := to_jsonb(v_d);\n      UPDATE public.despesas_rpc_pagamentos SET operacao_estorno_id=v_id,estorno_id=v_tx.id,estorno_snapshot=v_estorno WHERE despesa_id=v_d.id;\n    END IF;\n  END IF;\n  v_result := jsonb_build_object('success',true,'acao',p_tipo,'operationId',v_id,'userId',p_user_id,\n    'chaveIdempotencia',p_chave_idempotencia,'despesaId',v_d.id,'status',v_d.status,'valor',v_d.valor::text,\n    'contaCaixaId',v_d.conta_caixa_id,'dataVencimento',v_d.data_vencimento,'dataPagamento',v_d.data_pagamento,\n    'dataEstorno',CASE WHEN p_tipo='estornar' THEN v_data ELSE NULL END,'pagamentoOperationId',v_pagamento_id,\n    'transacaoSaidaId',v_saida->>'id','transacaoEstornoId',v_estorno->>'id');\n  INSERT INTO public.despesas_rpc_operacoes(id,user_id,chave_idempotencia,tipo,payload,hash_payload,resultado,auditoria)\n    VALUES(v_id,p_user_id,p_chave_idempotencia,p_tipo,p_payload,v_hash,v_result,\n      jsonb_build_object('antes',v_antes,'depois',v_depois,'origemOperationId',CASE WHEN p_tipo='criar' THEN v_id ELSE v_origem.operacao_id END,\n        'saida',v_saida,'estorno',v_estorno,'motivo',v_motivo));\n  RETURN v_result;\nEND\n",
+      "body_hash": "2a66afef3714bc03d2e64e0ee338c42fe8eb9c9d6ec24da62df5b3e247f04e54",
+      "defaults": null
+    },
+    {
+      "proname": "rpc_cotar_emprestimo_prospectivo",
+      "args": "p_user_id integer, p_contrato_id integer, p_parcela_id integer",
+      "types": "integer, integer, integer",
+      "result": "jsonb",
+      "lang": "sql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\n SELECT public.ciclo_cotacao(p_user_id,p_contrato_id,p_parcela_id);\n",
+      "body_hash": "03f44f5198c9b8360458158aa07dd8961d6a58abfe86efdaacfca76ced6eed31",
+      "defaults": null
+    },
+    {
+      "proname": "rpc_criar_despesa_prospectiva",
+      "args": "p_user_id integer, p_descricao text, p_categoria text, p_valor numeric, p_data_vencimento date, p_observacoes text, p_chave_idempotencia uuid",
+      "types": "integer, text, text, numeric, date, text, uuid",
+      "result": "jsonb",
+      "lang": "sql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ],
+      "prosrc": " SELECT public.despesas_rpc_executar(p_user_id,p_chave_idempotencia,'criar',\n  jsonb_build_object('descricao',p_descricao,'categoria',p_categoria,'valor',p_valor,\n    'dataVencimento',p_data_vencimento,'observacoes',p_observacoes)) ",
+      "body_hash": "5ec9afba4e0fc002b2a35668fb051ddbeb4928b07ce5cbd9193de6ddc2ce0c2f",
+      "defaults": null
+    },
+    {
+      "proname": "rpc_criar_emprestimo",
+      "args": "p_user_id integer, p_chave_idempotencia uuid, p_cliente_id integer, p_conta_caixa_id integer, p_modalidade text, p_tipo_taxa text, p_valor_principal numeric, p_taxa_juros numeric, p_numero_parcelas integer, p_data_inicio date, p_data_desembolso date, p_vencimentos date[], p_descricao text, p_observacoes text",
+      "types": "integer, uuid, integer, integer, text, text, numeric, numeric, integer, date, date, date[], text, text",
+      "result": "jsonb",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 2,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\nDECLARE\n  v_payload JSONB;\n  v_hash TEXT;\n  v_op public.emprestimos_rpc_operacoes%ROWTYPE;\n  v_conta public.contas_caixa%ROWTYPE;\n  v_cliente public.clientes%ROWTYPE;\n  v_koletor public.koletores%ROWTYPE;\n  v_koletor_id INTEGER;\n  v_koletor_count INTEGER := 0;\n  v_contrato INTEGER;\n  v_parcela INTEGER;\n  v_caixa INTEGER;\n  v_historico public.contrato_historico.id%TYPE;\n  v_ids INTEGER[] := '{}';\n  v_juros NUMERIC;\n  v_total NUMERIC;\n  v_referencia NUMERIC;\n  v_juros_ref NUMERIC;\n  v_valor NUMERIC;\n  v_juros_linha NUMERIC;\n  v_soma NUMERIC := 0;\n  v_soma_juros NUMERIC := 0;\n  v_hoje DATE := (statement_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date;\n  v_status public.parcelas.status%TYPE;\n  v_resultado JSONB;\n  v_i INTEGER;\nBEGIN\n  IF p_user_id IS NULL OR p_user_id <= 0 OR p_chave_idempotencia IS NULL\n     OR p_cliente_id IS NULL OR p_cliente_id <= 0 OR p_conta_caixa_id IS NULL OR p_conta_caixa_id <= 0\n     OR p_modalidade IS DISTINCT FROM 'mensal' OR p_tipo_taxa IS DISTINCT FROM 'mensal'\n     OR p_numero_parcelas IS NULL OR p_numero_parcelas NOT BETWEEN 1 AND 60 THEN\n    RAISE EXCEPTION 'Apenas mensal simples, tipo mensal, N 1..60 e UUID obrigatório' USING ERRCODE = '22023';\n  END IF;\n  -- NUMERIC(5,2) real em contratos.taxa_juros: não aceitar quatro casas e truncar silenciosamente.\n  IF p_valor_principal IS NULL OR p_valor_principal::text IN ('NaN','Infinity','-Infinity')\n     OR p_valor_principal <= 0 OR p_valor_principal > 9999999999999.99\n     OR p_valor_principal <> round(p_valor_principal, 2)\n     OR p_taxa_juros IS NULL OR p_taxa_juros::text IN ('NaN','Infinity','-Infinity')\n     OR p_taxa_juros < 0 OR p_taxa_juros > 999.99 OR p_taxa_juros <> round(p_taxa_juros, 2) THEN\n    RAISE EXCEPTION 'Principal/taxa fora da precisão ou faixa' USING ERRCODE = '22023';\n  END IF;\n  IF p_data_inicio IS NULL OR NOT isfinite(p_data_inicio) OR p_data_inicio < DATE '1900-01-01'\n     OR p_data_inicio > DATE '9999-12-31' OR p_data_desembolso IS DISTINCT FROM p_data_inicio\n     OR p_vencimentos IS NULL OR array_ndims(p_vencimentos) IS DISTINCT FROM 1\n     OR array_lower(p_vencimentos, 1) IS DISTINCT FROM 1 OR cardinality(p_vencimentos) <> p_numero_parcelas THEN\n    RAISE EXCEPTION 'Agenda explícita e desembolso na data de início são obrigatórios' USING ERRCODE = '22023';\n  END IF;\n  FOR v_i IN 1..p_numero_parcelas LOOP\n    IF p_vencimentos[v_i] IS NULL OR NOT isfinite(p_vencimentos[v_i])\n       OR p_vencimentos[v_i] < p_data_inicio OR p_vencimentos[v_i] > DATE '9999-12-31'\n       OR (p_numero_parcelas > 1 AND extract(day FROM p_vencimentos[1]) > 28)\n       OR p_vencimentos[v_i] <> (p_vencimentos[1] + make_interval(months => v_i - 1))::date THEN\n      RAISE EXCEPTION 'Agenda mensal inválida; N>1 limitado a dias 1..28, sem clamp implícito' USING ERRCODE = '22023';\n    END IF;\n  END LOOP;\n  IF length(p_descricao) > 2000 OR length(p_observacoes) > 4000 THEN\n    RAISE EXCEPTION 'Texto excede limite' USING ERRCODE = '22023';\n  END IF;\n\n  v_juros := round(p_valor_principal * p_taxa_juros / 100 * p_numero_parcelas, 2);\n  v_total := p_valor_principal + v_juros;\n  v_referencia := round(v_total / p_numero_parcelas, 2);\n  v_juros_ref := round(v_juros / p_numero_parcelas, 2);\n  -- Histórico real é NUMERIC(12,2), menor que cabeçalho/parcelas NUMERIC(15,2).\n  IF v_total > 9999999999.99 THEN\n    RAISE EXCEPTION 'Total excede NUMERIC(12,2) do histórico' USING ERRCODE = '22023';\n  END IF;\n  -- Cada soma fecha na última linha; rejeitar qualquer amortização negativa/zero parcela.\n  FOR v_i IN 1..p_numero_parcelas LOOP\n    v_valor := CASE WHEN v_i = p_numero_parcelas THEN v_total - v_referencia * (p_numero_parcelas - 1) ELSE v_referencia END;\n    v_juros_linha := CASE WHEN v_i = p_numero_parcelas THEN v_juros - v_juros_ref * (p_numero_parcelas - 1) ELSE v_juros_ref END;\n    IF v_valor <= 0 OR v_juros_linha < 0 OR v_juros_linha > v_valor THEN\n      RAISE EXCEPTION 'Principal insuficiente para rateio positivo e conservativo' USING ERRCODE = '22023';\n    END IF;\n  END LOOP;\n  v_payload := jsonb_build_object(\n    'regra', 'mensal_simples_v1', 'userId', p_user_id, 'clienteId', p_cliente_id,\n    'contaCaixaId', p_conta_caixa_id, 'modalidade', p_modalidade, 'tipoTaxa', p_tipo_taxa,\n    'valorPrincipal', p_valor_principal::numeric(15,2)::text, 'taxaJuros', p_taxa_juros::numeric(5,2)::text,\n    'numeroParcelas', p_numero_parcelas, 'dataInicio', p_data_inicio, 'dataDesembolso', p_data_desembolso,\n    'vencimentos', to_jsonb(p_vencimentos), 'descricao', nullif(btrim(p_descricao), ''),\n    'observacoes', nullif(btrim(p_observacoes), ''), 'encargos', 'defaults_catalogo');\n  v_hash := encode(extensions.digest(v_payload::text, 'sha256'), 'hex');\n  INSERT INTO public.emprestimos_rpc_operacoes(user_id, chave_idempotencia, hash_payload, payload)\n    VALUES (p_user_id, p_chave_idempotencia, v_hash, v_payload)\n    ON CONFLICT (user_id, chave_idempotencia) DO NOTHING;\n  SELECT o.* INTO STRICT v_op FROM public.emprestimos_rpc_operacoes o\n    WHERE o.user_id = p_user_id AND o.chave_idempotencia = p_chave_idempotencia FOR UPDATE;\n  IF v_op.hash_payload <> v_hash THEN\n    RAISE EXCEPTION 'Chave de idempotência reutilizada com payload divergente' USING ERRCODE = '23505';\n  END IF;\n  IF v_op.resultado IS NOT NULL THEN\n    RETURN v_op.resultado || jsonb_build_object('repetida', true);\n  END IF;\n\n  -- Ordem para escritores futuros: operação -> conta -> cliente -> koletor.\n  -- 0022 e guardas de conta/ledger compartilham este lock prospectivo.\n  PERFORM pg_advisory_xact_lock(22022, p_conta_caixa_id);\n  SELECT c.* INTO v_conta FROM public.contas_caixa c WHERE c.id = p_conta_caixa_id FOR UPDATE;\n  IF NOT FOUND OR v_conta.user_id IS DISTINCT FROM p_user_id OR v_conta.ativo IS DISTINCT FROM true THEN\n    RAISE EXCEPTION 'Conta inválida para o tenant' USING ERRCODE = '42501';\n  END IF;\n  -- Examina TODOS os lançamentos da conta, inclusive owner NULL/externo; saldo-base nunca é reescrito.\n  IF EXISTS (SELECT 1 FROM public.transacoes_caixa t WHERE t.conta_caixa_id = p_conta_caixa_id AND t.user_id IS DISTINCT FROM p_user_id) THEN\n    RAISE EXCEPTION 'Conta com lançamento de owner divergente exige revisão' USING ERRCODE = '23514';\n  END IF;\n  SELECT c.* INTO v_cliente FROM public.clientes c WHERE c.id = p_cliente_id FOR UPDATE;\n  IF NOT FOUND OR v_cliente.user_id IS DISTINCT FROM p_user_id THEN\n    RAISE EXCEPTION 'Cliente inválido para o tenant' USING ERRCODE = '42501';\n  END IF;\n  -- Derivado, nunca aceito do navegador. Ambiguidade/inatividade não equivalem a ausência.\n  FOR v_koletor IN SELECT k.* FROM public.koletores k WHERE k.user_id = p_user_id ORDER BY k.id FOR UPDATE LOOP\n    v_koletor_count := v_koletor_count + 1;\n    IF v_koletor.ativo IS DISTINCT FROM true THEN\n      RAISE EXCEPTION 'Koletor inativo' USING ERRCODE = '42501';\n    END IF;\n    v_koletor_id := v_koletor.id;\n  END LOOP;\n  IF v_koletor_count > 1 THEN\n    RAISE EXCEPTION 'Koletor ambíguo' USING ERRCODE = '23514';\n  END IF;\n\n  -- Omitir multa_atraso/juros_mora_diario preserva os defaults reais, sem inventar zeros.\n  IF to_regprocedure('public.ciclo_autorizar(text,integer,integer)') IS NOT NULL THEN\n    PERFORM public.ciclo_autorizar('criar', p_conta_caixa_id, NULL);\n  END IF;\n  INSERT INTO public.contratos(user_id, cliente_id, koletor_id, modalidade, tipo_taxa,\n    valor_principal, taxa_juros, num_parcelas, numero_parcelas, valor_parcela, total_contrato,\n    data_inicio, data_vencimento_primeira, data_vencimento, dia_vencimento, conta_caixa_id,\n    descricao, observacoes, status)\n  VALUES(p_user_id, p_cliente_id, v_koletor_id, 'mensal', 'mensal', p_valor_principal, p_taxa_juros,\n    p_numero_parcelas, p_numero_parcelas, v_referencia, v_total, p_data_inicio, p_vencimentos[1],\n    p_vencimentos[p_numero_parcelas], extract(day FROM p_vencimentos[1])::integer, p_conta_caixa_id,\n    v_payload->>'descricao', v_payload->>'observacoes', 'ativo') RETURNING id INTO v_contrato;\n\n  FOR v_i IN 1..p_numero_parcelas LOOP\n    v_valor := CASE WHEN v_i = p_numero_parcelas THEN v_total - v_referencia * (p_numero_parcelas - 1) ELSE v_referencia END;\n    v_juros_linha := CASE WHEN v_i = p_numero_parcelas THEN v_juros - v_juros_ref * (p_numero_parcelas - 1) ELSE v_juros_ref END;\n    v_status := CASE WHEN p_vencimentos[v_i] < v_hoje THEN 'atrasada' WHEN p_vencimentos[v_i] = v_hoje THEN 'vencendo_hoje' ELSE 'pendente' END;\n    INSERT INTO public.parcelas(user_id, contrato_id, cliente_id, koletor_id, numero, numero_parcela,\n      valor, valor_original, valor_juros, valor_pago, valor_multa, valor_desconto, saldo_residual,\n      data_vencimento, data_pagamento, status, conta_caixa_id)\n    VALUES(p_user_id, v_contrato, p_cliente_id, v_koletor_id, v_i, v_i, v_valor, v_valor, v_juros_linha,\n      0, 0, 0, 0, p_vencimentos[v_i], NULL, v_status, p_conta_caixa_id) RETURNING id INTO v_parcela;\n    v_ids := array_append(v_ids, v_parcela);\n  END LOOP;\n  SELECT sum(p.valor_original), sum(p.valor_juros) INTO v_soma, v_soma_juros\n    FROM public.parcelas p WHERE p.contrato_id = v_contrato;\n  IF v_soma <> v_total OR v_soma_juros <> v_juros\n     OR (SELECT count(*) FROM public.parcelas p WHERE p.contrato_id = v_contrato) <> p_numero_parcelas THEN\n    RAISE EXCEPTION 'Invariante de parcelas violada' USING ERRCODE = '23514';\n  END IF;\n  INSERT INTO public.transacoes_caixa(user_id, conta_caixa_id, contrato_id, parcela_id, tipo, categoria, valor, descricao, data_transacao)\n    VALUES(p_user_id, p_conta_caixa_id, v_contrato, NULL, 'saida', 'emprestimo_liberado', p_valor_principal,\n      'Empréstimo RPC - Contrato #' || v_contrato::text, p_data_desembolso) RETURNING id INTO v_caixa;\n  INSERT INTO public.contrato_historico(user_id, contrato_id, tipo, descricao, valor_novo)\n    VALUES(p_user_id::text, v_contrato, 'criacao', 'Criação atômica mensal_simples_v1', v_total) RETURNING id INTO v_historico;\n  INSERT INTO public.emprestimos_rpc_origens(contrato_id, user_id, operacao_id, transacao_caixa_id, regra)\n    VALUES(v_contrato, p_user_id, v_op.id, v_caixa, 'mensal_simples_v1');\n\n  v_resultado := jsonb_build_object('success', true, 'repetida', false, 'id', v_contrato,\n    'operationId', v_op.id, 'parcelasIds', to_jsonb(v_ids), 'transacaoCaixaId', v_caixa::text,\n    'valorParcela', v_referencia::numeric(15,2)::text, 'totalContrato', v_total::numeric(15,2)::text,\n    'jurosTotal', v_juros::numeric(15,2)::text, 'numeroParcelas', p_numero_parcelas,\n    'dataDesembolso', p_data_desembolso, 'vencimentos', to_jsonb(p_vencimentos), 'status', 'ativo', 'regra', 'mensal_simples_v1');\n  UPDATE public.emprestimos_rpc_operacoes SET resultado = v_resultado, concluida_em = clock_timestamp(),\n    auditoria = jsonb_build_object('acao', 'criacao_emprestimo', 'hashPayload', v_hash, 'payload', v_payload,\n      'resultado', v_resultado, 'historicoId', v_historico::text, 'jurosEmbutidos', true,\n      'dataCivilCriacaoBrt', v_hoje,\n      'contrato', (SELECT to_jsonb(c) FROM public.contratos c WHERE c.id = v_contrato),\n      'parcelas', (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.numero) FROM public.parcelas p WHERE p.contrato_id = v_contrato))\n    WHERE id = v_op.id;\n  RETURN v_resultado;\nEND;\n",
+      "body_hash": "da42793f843737e74b52111a9e1db50d15a11f7f5bb1fc23d3257cc4df245d38",
+      "defaults": "NULL::text, NULL::text"
+    },
+    {
+      "proname": "rpc_estornar_despesa_prospectiva",
+      "args": "p_user_id integer, p_despesa_id integer, p_pagamento_operation_id uuid, p_data_estorno date, p_motivo text, p_chave_idempotencia uuid",
+      "types": "integer, integer, uuid, date, text, uuid",
+      "result": "jsonb",
+      "lang": "sql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ],
+      "prosrc": " SELECT public.despesas_rpc_executar(p_user_id,p_chave_idempotencia,'estornar',\n  jsonb_build_object('despesaId',p_despesa_id,'pagamentoOperationId',p_pagamento_operation_id,'data',p_data_estorno,'motivo',p_motivo)) ",
+      "body_hash": "21e8ef83b6e15bf4ea6b95da37d5c53066976398569a54caabc1e8f727b9ce52",
+      "defaults": null
+    },
+    {
+      "proname": "rpc_pagar_despesa_prospectiva",
+      "args": "p_user_id integer, p_despesa_id integer, p_conta_caixa_id integer, p_data_pagamento date, p_chave_idempotencia uuid",
+      "types": "integer, integer, integer, date, uuid",
+      "result": "jsonb",
+      "lang": "sql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 0,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ],
+      "prosrc": " SELECT public.despesas_rpc_executar(p_user_id,p_chave_idempotencia,'pagar',\n  jsonb_build_object('despesaId',p_despesa_id,'contaCaixaId',p_conta_caixa_id,'data',p_data_pagamento)) ",
+      "body_hash": "4141fda7c7b4710e9b8d5ad1e89ab6ff6beb1e273ecc59c3ee2ac582dfa942ac",
+      "defaults": null
+    },
+    {
+      "proname": "rpc_receber_emprestimo_prospectivo",
+      "args": "p_user_id integer, p_chave_idempotencia uuid, p_contrato_id integer, p_parcela_id integer, p_valor_recebido numeric, p_total_exigido numeric, p_data_pagamento date, p_estado_hash text, p_modo text, p_observacoes text",
+      "types": "integer, uuid, integer, integer, numeric, numeric, date, text, text, text",
+      "result": "jsonb",
+      "lang": "plpgsql",
+      "prosecdef": true,
+      "provolatile": "v",
+      "proparallel": "u",
+      "proisstrict": false,
+      "proleakproof": false,
+      "prokind": "f",
+      "pronargdefaults": 1,
+      "proconfig": [
+        "search_path=pg_catalog, pg_temp"
+      ],
+      "prosrc": "\nDECLARE v_payload jsonb; hash text; op public.ciclo_operacoes%ROWTYPE; c public.contratos%ROWTYPE; p public.parcelas%ROWTYPE;\n s jsonb; depois jsonb; q jsonb; conta integer; cx integer; hi bigint; residual numeric; pago numeric; v_resultado jsonb;\nBEGIN\n IF p_user_id IS NULL OR p_user_id<=0 OR p_chave_idempotencia IS NULL OR p_contrato_id IS NULL OR p_contrato_id<=0 OR p_parcela_id IS NULL OR p_parcela_id<=0\n   OR p_valor_recebido IS NULL OR p_valor_recebido::text IN('NaN','Infinity','-Infinity') OR p_valor_recebido<=0 OR p_valor_recebido<>round(p_valor_recebido,2) OR p_valor_recebido>9999999999.99\n   OR p_total_exigido IS NULL OR p_total_exigido::text IN('NaN','Infinity','-Infinity') OR p_total_exigido<=0 OR p_total_exigido<>round(p_total_exigido,2) OR p_total_exigido>9999999999.99\n   OR p_estado_hash IS NULL OR p_estado_hash !~ '^[0-9a-f]{64}$' OR p_modo IS NULL OR p_modo NOT IN('integral','parcial')\n   OR p_data_pagamento IS NULL OR NOT isfinite(p_data_pagamento) OR length(p_observacoes)>1000 THEN\n   RAISE EXCEPTION 'Intenção inválida: centavos, UUID, modo, estado e DATE obrigatórios' USING ERRCODE='22023'; END IF;\n v_payload:=jsonb_build_object('userId',p_user_id,'contratoId',p_contrato_id,'parcelaId',p_parcela_id,\n   'valorRecebido',p_valor_recebido::numeric(15,2)::text,'totalExigido',p_total_exigido::numeric(15,2)::text,\n   'dataPagamento',p_data_pagamento,'estadoHash',p_estado_hash,'modo',p_modo,'observacoes',nullif(btrim(p_observacoes),''),'regra','recebimento_defaults_brt_v1');\n hash:=encode(extensions.digest(v_payload::text,'sha256'),'hex');\n -- Sem origem não há reserva, FK não serve como prova de tenant.\n IF NOT EXISTS(SELECT 1 FROM public.emprestimos_rpc_origens WHERE contrato_id=p_contrato_id AND user_id=p_user_id) THEN RAISE EXCEPTION 'Origem 0021 indisponível' USING ERRCODE='42501'; END IF;\n INSERT INTO public.ciclo_operacoes(user_id,chave_idempotencia,hash_payload,contrato_id,parcela_id,payload)\n VALUES(p_user_id,p_chave_idempotencia,hash,p_contrato_id,p_parcela_id,v_payload) ON CONFLICT(user_id,chave_idempotencia) DO NOTHING;\n SELECT * INTO STRICT op FROM public.ciclo_operacoes WHERE user_id=p_user_id AND chave_idempotencia=p_chave_idempotencia FOR UPDATE;\n IF op.hash_payload<>hash THEN RAISE EXCEPTION 'UUID reutilizado com intenção divergente' USING ERRCODE='23505'; END IF;\n IF op.resultado IS NOT NULL THEN RETURN op.resultado||jsonb_build_object('repetida',true); END IF;\n SELECT conta_caixa_id INTO conta FROM public.contratos WHERE id=p_contrato_id;\n -- Ordem global: operação -> lock ledger/conta -> conta -> cliente -> koletor -> contrato -> parcelas IDs.\n PERFORM pg_advisory_xact_lock(22022,conta);\n PERFORM 1 FROM public.contas_caixa WHERE id=conta FOR UPDATE;\n SELECT * INTO STRICT c FROM public.contratos WHERE id=p_contrato_id;\n PERFORM 1 FROM public.clientes WHERE id=c.cliente_id FOR UPDATE;\n PERFORM 1 FROM public.koletores WHERE id=c.koletor_id FOR UPDATE;\n -- NO KEY UPDATE é exclusivo entre writers, mas compatível com KEY SHARE das FKs\n -- das reservas concorrentes. FOR UPDATE criaria upgrade deadlock antes da cotação.\n SELECT * INTO STRICT c FROM public.contratos WHERE id=p_contrato_id FOR NO KEY UPDATE;\n PERFORM 1 FROM public.parcelas WHERE contrato_id=p_contrato_id ORDER BY id FOR NO KEY UPDATE;\n PERFORM 1 FROM public.transacoes_caixa WHERE conta_caixa_id=conta OR contrato_id=p_contrato_id OR parcela_id IN(SELECT id FROM public.parcelas WHERE contrato_id=p_contrato_id) ORDER BY id FOR UPDATE;\n s:=public.ciclo_validar(p_user_id,p_contrato_id); q:=public.ciclo_cotacao(p_user_id,p_contrato_id,p_parcela_id);\n IF c.conta_caixa_id IS DISTINCT FROM conta OR q->>'estadoHash' IS DISTINCT FROM p_estado_hash OR (q->>'totalExigido')::numeric IS DISTINCT FROM p_total_exigido\n   OR (q->>'dataPagamento')::date IS DISTINCT FROM p_data_pagamento OR q->'elegivel' IS DISTINCT FROM 'true'::jsonb THEN\n   RAISE EXCEPTION 'Cotação/estado/data divergente; conferir antes de nova intenção' USING ERRCODE='40001'; END IF;\n IF (p_modo='integral' AND p_valor_recebido<>p_total_exigido) OR (p_modo='parcial' AND p_valor_recebido>=p_total_exigido) THEN\n   RAISE EXCEPTION 'Integral exige valor exato; parcial positivo menor, sem desconto' USING ERRCODE='22023'; END IF;\n SELECT * INTO STRICT p FROM public.parcelas WHERE id=p_parcela_id;\n residual:=p_total_exigido-p_valor_recebido; pago:=p.valor_pago+p_valor_recebido;\n INSERT INTO public.ciclo_estados(contrato_id,user_id,snapshot,origem_completa) VALUES(p_contrato_id,p_user_id,s,false) ON CONFLICT(contrato_id) DO NOTHING;\n PERFORM public.ciclo_autorizar('receber',conta,p_contrato_id);\n UPDATE public.parcelas SET valor_pago=pago,valor_multa=(q->>'multa')::numeric,multa_diaria_usada=(q->>'mora')::numeric,\n   valor_desconto=0,saldo_residual=residual,data_pagamento=p_data_pagamento,status=CASE WHEN residual=0 THEN 'paga' ELSE 'parcial' END,\"updatedAt\"=clock_timestamp()\n WHERE id=p_parcela_id;\n INSERT INTO public.transacoes_caixa(user_id,conta_caixa_id,contrato_id,parcela_id,tipo,categoria,valor,descricao,data_transacao)\n VALUES(p_user_id,conta,p_contrato_id,p_parcela_id,'entrada','pagamento_parcela',p_valor_recebido,'Recebimento prospectivo '||op.id::text,p_data_pagamento) RETURNING id INTO cx;\n INSERT INTO public.ciclo_pernas(operacao_id,user_id,transacao_id,snapshot) VALUES(op.id,p_user_id,cx,(SELECT to_jsonb(t) FROM public.transacoes_caixa t WHERE id=cx));\n UPDATE public.contratos SET status=CASE WHEN NOT EXISTS(SELECT 1 FROM public.parcelas WHERE contrato_id=p_contrato_id AND status IS DISTINCT FROM 'paga') THEN 'quitado' ELSE 'ativo' END,\"updatedAt\"=clock_timestamp() WHERE id=p_contrato_id;\n INSERT INTO public.contrato_historico(user_id,contrato_id,tipo,descricao,valor_anterior,valor_novo)\n VALUES(p_user_id::text,p_contrato_id,'pagamento','Recebimento prospectivo '||op.id::text,p.valor_pago,pago) RETURNING id INTO hi;\n depois:=public.ciclo_snapshot(p_contrato_id);\n UPDATE public.ciclo_estados SET snapshot=depois WHERE contrato_id=p_contrato_id;\n v_resultado:=jsonb_build_object('success',true,'repetida',false,'operationId',op.id,'contratoId',p_contrato_id,'parcelaId',p_parcela_id,\n  'transacaoCaixaId',cx::text,'contaCaixaId',conta,'valorRecebido',p_valor_recebido::numeric(15,2)::text,\n  'totalExigido',p_total_exigido::numeric(15,2)::text,'saldoResidual',residual::numeric(15,2)::text,'valorPagoAcumulado',pago::numeric(15,2)::text,\n  'status',CASE WHEN residual=0 THEN 'paga' ELSE 'parcial' END,'contratoStatus',(SELECT status FROM public.contratos WHERE id=p_contrato_id),\n  'dataPagamento',p_data_pagamento,'regra','recebimento_defaults_brt_v1');\n UPDATE public.ciclo_operacoes SET resultado=v_resultado,concluida_em=clock_timestamp(),auditoria=jsonb_build_object('hashPayload',hash,'payload',v_payload,'antes',s,'depois',depois,'cotacao',q,'pernaId',cx::text,'historicoId',hi::text,'resultado',v_resultado) WHERE id=op.id;\n DELETE FROM public.ciclo_autorizacoes WHERE xid=txid_current() AND pid=pg_backend_pid();\n RETURN v_resultado;\nEND;\n",
+      "body_hash": "59446e73faf55c1dce25c38d833182bd79f15551b1914550d588736773b6bf4f",
+      "defaults": "NULL::text"
+    }
+  ],
+  "tables": [
+    {
+      "relname": "ciclo_autorizacoes",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "xid",
+          "bigint",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          2,
+          "pid",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "acao",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          4,
+          "conta_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          5,
+          "contrato_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "constraints": [
+        [
+          "ciclo_autorizacoes_acao_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((acao = ANY (ARRAY['criar'::text, 'receber'::text])))"
+        ],
+        [
+          "ciclo_autorizacoes_conta_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (conta_id) REFERENCES contas_caixa(id) ON DELETE RESTRICT"
+        ],
+        [
+          "ciclo_autorizacoes_contrato_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (contrato_id) REFERENCES contratos(id) ON DELETE RESTRICT"
+        ],
+        [
+          "ciclo_autorizacoes_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (xid, pid)"
+        ]
+      ],
+      "indexes": [
+        [
+          "ciclo_autorizacoes_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX ciclo_autorizacoes_pkey ON public.ciclo_autorizacoes USING btree (xid, pid)"
+        ]
+      ]
+    },
+    {
+      "relname": "ciclo_estados",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "contrato_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "snapshot",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "origem_completa",
+          "boolean",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          5,
+          "created_at",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ]
+      ],
+      "constraints": [
+        [
+          "ciclo_estados_contrato_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (contrato_id) REFERENCES emprestimos_rpc_origens(contrato_id) ON DELETE RESTRICT"
+        ],
+        [
+          "ciclo_estados_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (contrato_id)"
+        ],
+        [
+          "ciclo_estados_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "indexes": [
+        [
+          "ciclo_estados_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX ciclo_estados_pkey ON public.ciclo_estados USING btree (contrato_id)"
+        ]
+      ]
+    },
+    {
+      "relname": "ciclo_operacoes",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "id",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          "gen_random_uuid()"
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "chave_idempotencia",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "hash_payload",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "contrato_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          6,
+          "parcela_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "payload",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          8,
+          "resultado",
+          "jsonb",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          9,
+          "auditoria",
+          "jsonb",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          10,
+          "concluida_em",
+          "timestamp with time zone",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "constraints": [
+        [
+          "ciclo_operacoes_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((((resultado IS NULL) AND (auditoria IS NULL) AND (concluida_em IS NULL)) OR ((resultado IS NOT NULL) AND (auditoria IS NOT NULL) AND (concluida_em IS NOT NULL))))"
+        ],
+        [
+          "ciclo_operacoes_contrato_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (contrato_id) REFERENCES emprestimos_rpc_origens(contrato_id) ON DELETE RESTRICT"
+        ],
+        [
+          "ciclo_operacoes_hash_payload_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((hash_payload ~ '^[0-9a-f]{64}$'::text))"
+        ],
+        [
+          "ciclo_operacoes_parcela_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (parcela_id) REFERENCES parcelas(id) ON DELETE RESTRICT"
+        ],
+        [
+          "ciclo_operacoes_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "ciclo_operacoes_user_id_chave_idempotencia_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (user_id, chave_idempotencia)"
+        ],
+        [
+          "ciclo_operacoes_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ],
+        [
+          "ciclo_operacoes_user_id_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (user_id, id)"
+        ]
+      ],
+      "indexes": [
+        [
+          "ciclo_operacoes_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX ciclo_operacoes_pkey ON public.ciclo_operacoes USING btree (id)"
+        ],
+        [
+          "ciclo_operacoes_user_id_chave_idempotencia_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX ciclo_operacoes_user_id_chave_idempotencia_key ON public.ciclo_operacoes USING btree (user_id, chave_idempotencia)"
+        ],
+        [
+          "ciclo_operacoes_user_id_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX ciclo_operacoes_user_id_id_key ON public.ciclo_operacoes USING btree (user_id, id)"
+        ]
+      ]
+    },
+    {
+      "relname": "ciclo_pernas",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "operacao_id",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "transacao_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "snapshot",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "constraints": [
+        [
+          "ciclo_pernas_operacao_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (operacao_id) REFERENCES ciclo_operacoes(id) ON DELETE RESTRICT"
+        ],
+        [
+          "ciclo_pernas_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (operacao_id)"
+        ],
+        [
+          "ciclo_pernas_transacao_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (transacao_id) REFERENCES transacoes_caixa(id) ON DELETE RESTRICT"
+        ],
+        [
+          "ciclo_pernas_transacao_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (transacao_id)"
+        ],
+        [
+          "ciclo_pernas_user_id_operacao_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id, operacao_id) REFERENCES ciclo_operacoes(user_id, id) ON DELETE RESTRICT"
+        ]
+      ],
+      "indexes": [
+        [
+          "ciclo_pernas_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX ciclo_pernas_pkey ON public.ciclo_pernas USING btree (operacao_id)"
+        ],
+        [
+          "ciclo_pernas_transacao_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX ciclo_pernas_transacao_id_key ON public.ciclo_pernas USING btree (transacao_id)"
+        ]
+      ]
+    },
+    {
+      "relname": "despesas_rpc_operacoes",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "id",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "chave_idempotencia",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "tipo",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "payload",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          6,
+          "hash_payload",
+          "bytea",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "resultado",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          8,
+          "auditoria",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          9,
+          "criado_em",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ]
+      ],
+      "constraints": [
+        [
+          "despesas_rpc_operacoes_auditoria_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((jsonb_typeof(auditoria) = 'object'::text) AND (auditoria ? 'depois'::text)))"
+        ],
+        [
+          "despesas_rpc_operacoes_hash_payload_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((octet_length(hash_payload) = 32))"
+        ],
+        [
+          "despesas_rpc_operacoes_payload_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((jsonb_typeof(payload) = 'object'::text))"
+        ],
+        [
+          "despesas_rpc_operacoes_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "despesas_rpc_operacoes_resultado_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((jsonb_typeof(resultado) = 'object'::text) AND ((resultado ->> 'success'::text) = 'true'::text)))"
+        ],
+        [
+          "despesas_rpc_operacoes_tipo_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((tipo = ANY (ARRAY['criar'::text, 'pagar'::text, 'estornar'::text])))"
+        ],
+        [
+          "despesas_rpc_operacoes_user_chave_uk",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (user_id, chave_idempotencia)"
+        ],
+        [
+          "despesas_rpc_operacoes_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+        ]
+      ],
+      "indexes": [
+        [
+          "despesas_rpc_operacoes_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_operacoes_pkey ON public.despesas_rpc_operacoes USING btree (id)"
+        ],
+        [
+          "despesas_rpc_operacoes_user_chave_uk",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_operacoes_user_chave_uk ON public.despesas_rpc_operacoes USING btree (user_id, chave_idempotencia)"
+        ]
+      ]
+    },
+    {
+      "relname": "despesas_rpc_origens",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "despesa_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "operacao_id",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "snapshot",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          5,
+          "criado_em",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ]
+      ],
+      "constraints": [
+        [
+          "despesas_rpc_origens_despesa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (despesa_id) REFERENCES contas_pagar(id) ON DELETE RESTRICT"
+        ],
+        [
+          "despesas_rpc_origens_operacao_id_fkey",
+          "f",
+          true,
+          true,
+          true,
+          "FOREIGN KEY (operacao_id) REFERENCES despesas_rpc_operacoes(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED"
+        ],
+        [
+          "despesas_rpc_origens_operacao_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (operacao_id)"
+        ],
+        [
+          "despesas_rpc_origens_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (despesa_id)"
+        ],
+        [
+          "despesas_rpc_origens_snapshot_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((jsonb_typeof(snapshot) = 'object'::text))"
+        ],
+        [
+          "despesas_rpc_origens_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+        ]
+      ],
+      "indexes": [
+        [
+          "despesas_rpc_origens_operacao_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_origens_operacao_id_key ON public.despesas_rpc_origens USING btree (operacao_id)"
+        ],
+        [
+          "despesas_rpc_origens_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_origens_pkey ON public.despesas_rpc_origens USING btree (despesa_id)"
+        ]
+      ]
+    },
+    {
+      "relname": "despesas_rpc_pagamentos",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "despesa_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "operacao_id",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "conta_caixa_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          5,
+          "valor",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          6,
+          "data_pagamento",
+          "date",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "saida_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          8,
+          "saida_snapshot",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          9,
+          "despesa_snapshot",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          10,
+          "operacao_estorno_id",
+          "uuid",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          11,
+          "estorno_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          12,
+          "estorno_snapshot",
+          "jsonb",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "constraints": [
+        [
+          "despesas_rpc_pagamentos_conta_caixa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (conta_caixa_id) REFERENCES contas_caixa(id) ON DELETE RESTRICT"
+        ],
+        [
+          "despesas_rpc_pagamentos_despesa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (despesa_id) REFERENCES despesas_rpc_origens(despesa_id) ON DELETE RESTRICT"
+        ],
+        [
+          "despesas_rpc_pagamentos_despesa_snapshot_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((jsonb_typeof(despesa_snapshot) = 'object'::text))"
+        ],
+        [
+          "despesas_rpc_pagamentos_estorno_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((((operacao_estorno_id IS NULL) AND (estorno_id IS NULL) AND (estorno_snapshot IS NULL)) OR ((operacao_estorno_id IS NOT NULL) AND (estorno_id IS NOT NULL) AND (estorno_snapshot IS NOT NULL) AND (jsonb_typeof(estorno_snapshot) = 'object'::text) AND (estorno_id <> saida_id))))"
+        ],
+        [
+          "despesas_rpc_pagamentos_estorno_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (estorno_id) REFERENCES transacoes_caixa(id) ON DELETE RESTRICT"
+        ],
+        [
+          "despesas_rpc_pagamentos_estorno_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (estorno_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_operacao_estorno_id_fkey",
+          "f",
+          true,
+          true,
+          true,
+          "FOREIGN KEY (operacao_estorno_id) REFERENCES despesas_rpc_operacoes(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED"
+        ],
+        [
+          "despesas_rpc_pagamentos_operacao_estorno_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (operacao_estorno_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_operacao_id_fkey",
+          "f",
+          true,
+          true,
+          true,
+          "FOREIGN KEY (operacao_id) REFERENCES despesas_rpc_operacoes(id) ON DELETE RESTRICT DEFERRABLE INITIALLY DEFERRED"
+        ],
+        [
+          "despesas_rpc_pagamentos_operacao_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (operacao_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (despesa_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_saida_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (saida_id) REFERENCES transacoes_caixa(id) ON DELETE RESTRICT"
+        ],
+        [
+          "despesas_rpc_pagamentos_saida_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (saida_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_saida_snapshot_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((jsonb_typeof(saida_snapshot) = 'object'::text))"
+        ],
+        [
+          "despesas_rpc_pagamentos_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT"
+        ],
+        [
+          "despesas_rpc_pagamentos_valor_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((valor > (0)::numeric) AND (valor <= 9999999999999.99)))"
+        ]
+      ],
+      "indexes": [
+        [
+          "despesas_rpc_pagamentos_estorno_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_pagamentos_estorno_id_key ON public.despesas_rpc_pagamentos USING btree (estorno_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_operacao_estorno_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_pagamentos_operacao_estorno_id_key ON public.despesas_rpc_pagamentos USING btree (operacao_estorno_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_operacao_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_pagamentos_operacao_id_key ON public.despesas_rpc_pagamentos USING btree (operacao_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_pagamentos_pkey ON public.despesas_rpc_pagamentos USING btree (despesa_id)"
+        ],
+        [
+          "despesas_rpc_pagamentos_saida_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX despesas_rpc_pagamentos_saida_id_key ON public.despesas_rpc_pagamentos USING btree (saida_id)"
+        ]
+      ]
+    },
+    {
+      "relname": "emprestimos_rpc_operacoes",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "id",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          "gen_random_uuid()"
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "chave_idempotencia",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "hash_payload",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "payload",
+          "jsonb",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          6,
+          "resultado",
+          "jsonb",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "auditoria",
+          "jsonb",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          8,
+          "created_at",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          9,
+          "concluida_em",
+          "timestamp with time zone",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "constraints": [
+        [
+          "emprestimos_rpc_operacoes_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((((resultado IS NULL) AND (concluida_em IS NULL) AND (auditoria IS NULL)) OR ((resultado IS NOT NULL) AND (concluida_em IS NOT NULL) AND (auditoria IS NOT NULL))))"
+        ],
+        [
+          "emprestimos_rpc_operacoes_hash_payload_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((hash_payload ~ '^[0-9a-f]{64}$'::text))"
+        ],
+        [
+          "emprestimos_rpc_operacoes_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "emprestimos_rpc_operacoes_user_id_chave_idempotencia_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (user_id, chave_idempotencia)"
+        ],
+        [
+          "emprestimos_rpc_operacoes_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ],
+        [
+          "emprestimos_rpc_operacoes_user_id_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (user_id, id)"
+        ]
+      ],
+      "indexes": [
+        [
+          "emprestimos_rpc_operacoes_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX emprestimos_rpc_operacoes_pkey ON public.emprestimos_rpc_operacoes USING btree (id)"
+        ],
+        [
+          "emprestimos_rpc_operacoes_user_id_chave_idempotencia_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX emprestimos_rpc_operacoes_user_id_chave_idempotencia_key ON public.emprestimos_rpc_operacoes USING btree (user_id, chave_idempotencia)"
+        ],
+        [
+          "emprestimos_rpc_operacoes_user_id_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX emprestimos_rpc_operacoes_user_id_id_key ON public.emprestimos_rpc_operacoes USING btree (user_id, id)"
+        ]
+      ]
+    },
+    {
+      "relname": "emprestimos_rpc_origens",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false,
+      "relkind": "r",
+      "relpersistence": "p",
+      "relispartition": false,
+      "columns": [
+        [
+          1,
+          "contrato_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "operacao_id",
+          "uuid",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "transacao_caixa_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          5,
+          "regra",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          6,
+          "created_at",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ]
+      ],
+      "constraints": [
+        [
+          "emprestimos_rpc_origens_contrato_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (contrato_id) REFERENCES contratos(id) ON DELETE RESTRICT"
+        ],
+        [
+          "emprestimos_rpc_origens_operacao_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (operacao_id)"
+        ],
+        [
+          "emprestimos_rpc_origens_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (contrato_id)"
+        ],
+        [
+          "emprestimos_rpc_origens_regra_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK ((regra = 'mensal_simples_v1'::text))"
+        ],
+        [
+          "emprestimos_rpc_origens_transacao_caixa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (transacao_caixa_id) REFERENCES transacoes_caixa(id) ON DELETE RESTRICT"
+        ],
+        [
+          "emprestimos_rpc_origens_transacao_caixa_id_key",
+          "u",
+          true,
+          false,
+          false,
+          "UNIQUE (transacao_caixa_id)"
+        ],
+        [
+          "emprestimos_rpc_origens_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ],
+        [
+          "emprestimos_rpc_origens_user_id_operacao_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id, operacao_id) REFERENCES emprestimos_rpc_operacoes(user_id, id)"
+        ]
+      ],
+      "indexes": [
+        [
+          "emprestimos_rpc_origens_operacao_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX emprestimos_rpc_origens_operacao_id_key ON public.emprestimos_rpc_origens USING btree (operacao_id)"
+        ],
+        [
+          "emprestimos_rpc_origens_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX emprestimos_rpc_origens_pkey ON public.emprestimos_rpc_origens USING btree (contrato_id)"
+        ],
+        [
+          "emprestimos_rpc_origens_transacao_caixa_id_key",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX emprestimos_rpc_origens_transacao_caixa_id_key ON public.emprestimos_rpc_origens USING btree (transacao_caixa_id)"
+        ]
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "relname": "ciclo_pernas",
+      "tgname": "ciclo_perna_imutavel",
+      "def": "CREATE TRIGGER ciclo_perna_imutavel BEFORE DELETE OR UPDATE ON public.ciclo_pernas FOR EACH ROW EXECUTE FUNCTION ciclo_imutavel()",
+      "tgenabled": "O",
+      "tgtype": 27,
+      "tgconstraint": 0,
+      "function": "ciclo_imutavel()"
+    },
+    {
+      "relname": "contas_caixa",
+      "tgname": "ciclo_conta",
+      "def": "CREATE TRIGGER ciclo_conta BEFORE DELETE OR UPDATE ON public.contas_caixa FOR EACH ROW EXECUTE FUNCTION ciclo_guardar()",
+      "tgenabled": "O",
+      "tgtype": 27,
+      "tgconstraint": 0,
+      "function": "ciclo_guardar()"
+    },
+    {
+      "relname": "contrato_historico",
+      "tgname": "ciclo_historico",
+      "def": "CREATE TRIGGER ciclo_historico BEFORE INSERT OR DELETE OR UPDATE ON public.contrato_historico FOR EACH ROW EXECUTE FUNCTION ciclo_guardar()",
+      "tgenabled": "O",
+      "tgtype": 31,
+      "tgconstraint": 0,
+      "function": "ciclo_guardar()"
+    },
+    {
+      "relname": "contratos",
+      "tgname": "ciclo_contrato",
+      "def": "CREATE TRIGGER ciclo_contrato BEFORE DELETE OR UPDATE ON public.contratos FOR EACH ROW EXECUTE FUNCTION ciclo_guardar()",
+      "tgenabled": "O",
+      "tgtype": 27,
+      "tgconstraint": 0,
+      "function": "ciclo_guardar()"
+    },
+    {
+      "relname": "emprestimos_rpc_operacoes",
+      "tgname": "ciclo_criacao_snapshot",
+      "def": "CREATE TRIGGER ciclo_criacao_snapshot AFTER UPDATE ON public.emprestimos_rpc_operacoes FOR EACH ROW EXECUTE FUNCTION ciclo_finalizar_criacao()",
+      "tgenabled": "O",
+      "tgtype": 17,
+      "tgconstraint": 0,
+      "function": "ciclo_finalizar_criacao()"
+    },
+    {
+      "relname": "emprestimos_rpc_origens",
+      "tgname": "ciclo_origem_imutavel",
+      "def": "CREATE TRIGGER ciclo_origem_imutavel BEFORE DELETE OR UPDATE ON public.emprestimos_rpc_origens FOR EACH ROW EXECUTE FUNCTION ciclo_imutavel()",
+      "tgenabled": "O",
+      "tgtype": 27,
+      "tgconstraint": 0,
+      "function": "ciclo_imutavel()"
+    },
+    {
+      "relname": "parcelas",
+      "tgname": "ciclo_parcela",
+      "def": "CREATE TRIGGER ciclo_parcela BEFORE INSERT OR DELETE OR UPDATE ON public.parcelas FOR EACH ROW EXECUTE FUNCTION ciclo_guardar()",
+      "tgenabled": "O",
+      "tgtype": 31,
+      "tgconstraint": 0,
+      "function": "ciclo_guardar()"
+    },
+    {
+      "relname": "transacoes_caixa",
+      "tgname": "ciclo_ledger",
+      "def": "CREATE TRIGGER ciclo_ledger BEFORE INSERT OR DELETE OR UPDATE ON public.transacoes_caixa FOR EACH ROW EXECUTE FUNCTION ciclo_guardar()",
+      "tgenabled": "O",
+      "tgtype": 31,
+      "tgconstraint": 0,
+      "function": "ciclo_guardar()"
+    }
+  ],
+  "base_tables": [
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "nextval('clientes_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "nome",
+          "character varying(255)",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          3,
+          "cpf_cnpj",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          4,
+          "telefone",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "whatsapp",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          6,
+          "email",
+          "character varying(320)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          7,
+          "chave_pix",
+          "character varying(255)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          8,
+          "tipo_chave_pix",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          9,
+          "endereco",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          10,
+          "cidade",
+          "character varying(100)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          11,
+          "estado",
+          "character varying(2)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          12,
+          "cep",
+          "character varying(9)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          13,
+          "observacoes",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          14,
+          "score",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          "100"
+        ],
+        [
+          15,
+          "foto_url",
+          "character varying(500)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          16,
+          "categoria",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          "'padrao'::character varying"
+        ],
+        [
+          17,
+          "qualificacao",
+          "character varying(10)",
+          false,
+          "",
+          "",
+          "default",
+          "'bom'::character varying"
+        ],
+        [
+          18,
+          "koletor_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          19,
+          "banco",
+          "character varying(100)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          20,
+          "agencia",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          21,
+          "numero_conta",
+          "character varying(30)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          22,
+          "ativo",
+          "boolean",
+          true,
+          "",
+          "",
+          null,
+          "true"
+        ],
+        [
+          23,
+          "rg",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          24,
+          "cnpj",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          25,
+          "instagram",
+          "character varying(100)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          26,
+          "facebook",
+          "character varying(255)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          27,
+          "profissao",
+          "character varying(100)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          28,
+          "numero",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          29,
+          "complemento",
+          "character varying(100)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          30,
+          "bairro",
+          "character varying(100)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          31,
+          "createdAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          32,
+          "updatedAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          33,
+          "sexo",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          34,
+          "estado_civil",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          35,
+          "nome_mae",
+          "character varying(255)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          36,
+          "nome_pai",
+          "character varying(255)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          37,
+          "data_nascimento",
+          "date",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          38,
+          "limite_credito",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          "0"
+        ],
+        [
+          39,
+          "limite_disponivel",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          "0"
+        ],
+        [
+          40,
+          "documentos_urls",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          41,
+          "user_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          42,
+          "is_referral",
+          "boolean",
+          false,
+          "",
+          "",
+          null,
+          "false"
+        ],
+        [
+          43,
+          "tipo_cliente",
+          "character varying(50)",
+          false,
+          "",
+          "",
+          "default",
+          "'emprestimo'::character varying"
+        ]
+      ],
+      "indexes": [
+        [
+          "clientes_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX clientes_pkey ON public.clientes USING btree (id)"
+        ],
+        [
+          "idx_clientes_user_id",
+          false,
+          true,
+          true,
+          "CREATE INDEX idx_clientes_user_id ON public.clientes USING btree (user_id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "clientes",
+      "constraints": [
+        [
+          "clientes_categoria_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((categoria)::text = ANY (ARRAY[('bronze'::character varying)::text, ('prata'::character varying)::text, ('ouro'::character varying)::text, ('prefeitura'::character varying)::text, ('padrao'::character varying)::text])))"
+        ],
+        [
+          "clientes_koletor_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (koletor_id) REFERENCES koletores(id)"
+        ],
+        [
+          "clientes_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "clientes_qualificacao_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((qualificacao)::text = ANY (ARRAY[('bom'::character varying)::text, ('medio'::character varying)::text, ('ruim'::character varying)::text])))"
+        ],
+        [
+          "clientes_tipo_chave_pix_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((tipo_chave_pix)::text = ANY (ARRAY[('cpf'::character varying)::text, ('cnpj'::character varying)::text, ('email'::character varying)::text, ('telefone'::character varying)::text, ('aleatoria'::character varying)::text])))"
+        ],
+        [
+          "clientes_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": false,
+      "relforcerowsecurity": false
+    },
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "nextval('contas_caixa_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "nome",
+          "character varying(255)",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          3,
+          "tipo",
+          "character varying(20)",
+          true,
+          "",
+          "",
+          "default",
+          "'caixa'::character varying"
+        ],
+        [
+          4,
+          "saldo",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          "0"
+        ],
+        [
+          5,
+          "ativo",
+          "boolean",
+          true,
+          "",
+          "",
+          null,
+          "true"
+        ],
+        [
+          6,
+          "createdAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          7,
+          "updatedAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          8,
+          "user_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "indexes": [
+        [
+          "contas_caixa_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX contas_caixa_pkey ON public.contas_caixa USING btree (id)"
+        ],
+        [
+          "idx_contas_caixa_user_id",
+          false,
+          true,
+          true,
+          "CREATE INDEX idx_contas_caixa_user_id ON public.contas_caixa USING btree (user_id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "contas_caixa",
+      "constraints": [
+        [
+          "contas_caixa_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "contas_caixa_tipo_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((tipo)::text = ANY (ARRAY[('caixa'::character varying)::text, ('banco'::character varying)::text, ('digital'::character varying)::text])))"
+        ],
+        [
+          "contas_caixa_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false
+    },
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "nextval('contas_pagar_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "descricao",
+          "character varying(255)",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          3,
+          "categoria",
+          "character varying(50)",
+          false,
+          "",
+          "",
+          "default",
+          "'outros'::character varying"
+        ],
+        [
+          4,
+          "valor",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          5,
+          "data_vencimento",
+          "date",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          6,
+          "data_pagamento",
+          "date",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "status",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          "'pendente'::character varying"
+        ],
+        [
+          8,
+          "recorrente",
+          "boolean",
+          false,
+          "",
+          "",
+          null,
+          "false"
+        ],
+        [
+          9,
+          "frequencia",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          10,
+          "conta_caixa_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          11,
+          "observacoes",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          12,
+          "createdAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          13,
+          "updatedAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          14,
+          "user_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "indexes": [
+        [
+          "contas_pagar_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX contas_pagar_pkey ON public.contas_pagar USING btree (id)"
+        ],
+        [
+          "idx_contas_pagar_user_id",
+          false,
+          true,
+          true,
+          "CREATE INDEX idx_contas_pagar_user_id ON public.contas_pagar USING btree (user_id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "contas_pagar",
+      "constraints": [
+        [
+          "contas_pagar_categoria_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((categoria)::text = ANY (ARRAY[('aluguel'::character varying)::text, ('energia'::character varying)::text, ('agua'::character varying)::text, ('internet'::character varying)::text, ('telefone'::character varying)::text, ('salario'::character varying)::text, ('imposto'::character varying)::text, ('fornecedor'::character varying)::text, ('outros'::character varying)::text])))"
+        ],
+        [
+          "contas_pagar_conta_caixa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (conta_caixa_id) REFERENCES contas_caixa(id)"
+        ],
+        [
+          "contas_pagar_frequencia_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((frequencia)::text = ANY (ARRAY[('mensal'::character varying)::text, ('semanal'::character varying)::text, ('quinzenal'::character varying)::text, ('anual'::character varying)::text])))"
+        ],
+        [
+          "contas_pagar_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "contas_pagar_status_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((status)::text = ANY (ARRAY[('pendente'::character varying)::text, ('pago'::character varying)::text, ('atrasado'::character varying)::text, ('cancelado'::character varying)::text])))"
+        ],
+        [
+          "contas_pagar_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false
+    },
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "bigint",
+          true,
+          "",
+          "",
+          null,
+          "nextval('contrato_historico_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "contrato_id",
+          "bigint",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "user_id",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          4,
+          "tipo",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "descricao",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          6,
+          "valor_anterior",
+          "numeric(12,2)",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "valor_novo",
+          "numeric(12,2)",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          8,
+          "created_at",
+          "timestamp with time zone",
+          false,
+          "",
+          "",
+          null,
+          "now()"
+        ]
+      ],
+      "indexes": [
+        [
+          "contrato_historico_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX contrato_historico_pkey ON public.contrato_historico USING btree (id)"
+        ],
+        [
+          "idx_contrato_historico_contrato",
+          false,
+          true,
+          true,
+          "CREATE INDEX idx_contrato_historico_contrato ON public.contrato_historico USING btree (contrato_id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "contrato_historico",
+      "constraints": [
+        [
+          "contrato_historico_contrato_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (contrato_id) REFERENCES contratos(id) ON DELETE CASCADE"
+        ],
+        [
+          "contrato_historico_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": false,
+      "relforcerowsecurity": false
+    },
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "nextval('contratos_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "cliente_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "koletor_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "modalidade",
+          "character varying(30)",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "valor_principal",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          6,
+          "taxa_juros",
+          "numeric(5,2)",
+          true,
+          "",
+          "",
+          null,
+          "0"
+        ],
+        [
+          7,
+          "num_parcelas",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "1"
+        ],
+        [
+          8,
+          "valor_parcela",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          9,
+          "total_contrato",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          10,
+          "data_inicio",
+          "date",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          11,
+          "data_vencimento",
+          "date",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          12,
+          "status",
+          "character varying(20)",
+          true,
+          "",
+          "",
+          "default",
+          "'ativo'::character varying"
+        ],
+        [
+          13,
+          "conta_caixa_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          14,
+          "observacoes",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          15,
+          "createdAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          16,
+          "updatedAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          17,
+          "tipo_taxa",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          "'mensal'::character varying"
+        ],
+        [
+          18,
+          "numero_parcelas",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          19,
+          "multa_atraso",
+          "numeric(8,4)",
+          false,
+          "",
+          "",
+          null,
+          "2.00"
+        ],
+        [
+          20,
+          "juros_mora_diario",
+          "numeric(8,4)",
+          false,
+          "",
+          "",
+          null,
+          "0.033"
+        ],
+        [
+          21,
+          "data_vencimento_primeira",
+          "date",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          22,
+          "dia_vencimento",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          23,
+          "descricao",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          24,
+          "contrato_origem_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          25,
+          "contrato_assinado",
+          "boolean",
+          false,
+          "",
+          "",
+          null,
+          "false"
+        ],
+        [
+          26,
+          "contrato_url",
+          "character varying(500)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          27,
+          "etiquetas",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          28,
+          "user_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "indexes": [
+        [
+          "contratos_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX contratos_pkey ON public.contratos USING btree (id)"
+        ],
+        [
+          "idx_contratos_user_id",
+          false,
+          true,
+          true,
+          "CREATE INDEX idx_contratos_user_id ON public.contratos USING btree (user_id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "contratos",
+      "constraints": [
+        [
+          "contratos_cliente_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (cliente_id) REFERENCES clientes(id)"
+        ],
+        [
+          "contratos_conta_caixa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (conta_caixa_id) REFERENCES contas_caixa(id)"
+        ],
+        [
+          "contratos_koletor_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (koletor_id) REFERENCES koletores(id)"
+        ],
+        [
+          "contratos_modalidade_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((modalidade)::text = ANY (ARRAY[('diario'::character varying)::text, ('semanal'::character varying)::text, ('quinzenal'::character varying)::text, ('mensal'::character varying)::text, ('tabela_price'::character varying)::text, ('reparcelamento'::character varying)::text, ('venda'::character varying)::text, ('cheque'::character varying)::text])))"
+        ],
+        [
+          "contratos_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "contratos_status_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((status)::text = ANY (ARRAY[('ativo'::character varying)::text, ('quitado'::character varying)::text, ('atrasado'::character varying)::text, ('cancelado'::character varying)::text, ('renegociado'::character varying)::text])))"
+        ],
+        [
+          "contratos_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": false,
+      "relforcerowsecurity": false
+    },
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "nextval('koletores_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "user_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "nome",
+          "character varying(255)",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          4,
+          "email",
+          "character varying(320)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "telefone",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          6,
+          "whatsapp",
+          "character varying(20)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          7,
+          "perfil",
+          "character varying(20)",
+          true,
+          "",
+          "",
+          "default",
+          "'koletor'::character varying"
+        ],
+        [
+          8,
+          "comissao_percentual",
+          "numeric(5,2)",
+          false,
+          "",
+          "",
+          null,
+          "0"
+        ],
+        [
+          9,
+          "ativo",
+          "boolean",
+          true,
+          "",
+          "",
+          null,
+          "true"
+        ],
+        [
+          10,
+          "observacoes",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          11,
+          "createdAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          12,
+          "updatedAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ]
+      ],
+      "indexes": [
+        [
+          "koletores_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX koletores_pkey ON public.koletores USING btree (id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "koletores",
+      "constraints": [
+        [
+          "koletores_perfil_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((perfil)::text = ANY (ARRAY[('admin'::character varying)::text, ('gerente'::character varying)::text, ('koletor'::character varying)::text])))"
+        ],
+        [
+          "koletores_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "koletores_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": false,
+      "relforcerowsecurity": false
+    },
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "nextval('parcelas_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "contrato_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "numero",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          4,
+          "valor",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          5,
+          "data_vencimento",
+          "date",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          6,
+          "data_pagamento",
+          "date",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "valor_pago",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          8,
+          "status",
+          "character varying(20)",
+          true,
+          "",
+          "",
+          "default",
+          "'pendente'::character varying"
+        ],
+        [
+          9,
+          "conta_caixa_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          10,
+          "observacoes",
+          "text",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          11,
+          "createdAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          12,
+          "updatedAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          13,
+          "cliente_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          14,
+          "koletor_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          15,
+          "numero_parcela",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          16,
+          "valor_original",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          17,
+          "valor_juros",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          "0.00"
+        ],
+        [
+          18,
+          "valor_multa",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          "0.00"
+        ],
+        [
+          19,
+          "valor_desconto",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          "0.00"
+        ],
+        [
+          20,
+          "multa_manual",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          "0.00"
+        ],
+        [
+          21,
+          "user_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          22,
+          "saldo_residual",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          "0.00"
+        ],
+        [
+          23,
+          "multa_diaria_usada",
+          "numeric(15,2)",
+          false,
+          "",
+          "",
+          null,
+          "0.00"
+        ]
+      ],
+      "indexes": [
+        [
+          "idx_parcelas_user_id",
+          false,
+          true,
+          true,
+          "CREATE INDEX idx_parcelas_user_id ON public.parcelas USING btree (user_id)"
+        ],
+        [
+          "parcelas_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX parcelas_pkey ON public.parcelas USING btree (id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "parcelas",
+      "constraints": [
+        [
+          "parcelas_conta_caixa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (conta_caixa_id) REFERENCES contas_caixa(id)"
+        ],
+        [
+          "parcelas_contrato_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (contrato_id) REFERENCES contratos(id)"
+        ],
+        [
+          "parcelas_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "parcelas_status_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((status)::text = ANY (ARRAY[('pendente'::character varying)::text, ('paga'::character varying)::text, ('pago'::character varying)::text, ('atrasada'::character varying)::text, ('atrasado'::character varying)::text, ('cancelada'::character varying)::text, ('cancelado'::character varying)::text, ('parcial'::character varying)::text, ('vencendo_hoje'::character varying)::text])))"
+        ],
+        [
+          "parcelas_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": false,
+      "relforcerowsecurity": false
+    },
+    {
+      "columns": [
+        [
+          1,
+          "id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          "nextval('transacoes_caixa_id_seq'::regclass)"
+        ],
+        [
+          2,
+          "conta_caixa_id",
+          "integer",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          3,
+          "tipo",
+          "character varying(10)",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          4,
+          "categoria",
+          "character varying(50)",
+          false,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          5,
+          "descricao",
+          "text",
+          true,
+          "",
+          "",
+          "default",
+          null
+        ],
+        [
+          6,
+          "valor",
+          "numeric(15,2)",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          7,
+          "data_transacao",
+          "date",
+          true,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          8,
+          "contrato_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          9,
+          "parcela_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ],
+        [
+          10,
+          "createdAt",
+          "timestamp with time zone",
+          true,
+          "",
+          "",
+          null,
+          "now()"
+        ],
+        [
+          11,
+          "user_id",
+          "integer",
+          false,
+          "",
+          "",
+          null,
+          null
+        ]
+      ],
+      "indexes": [
+        [
+          "idx_transacoes_caixa_user_id",
+          false,
+          true,
+          true,
+          "CREATE INDEX idx_transacoes_caixa_user_id ON public.transacoes_caixa USING btree (user_id)"
+        ],
+        [
+          "transacoes_caixa_pkey",
+          true,
+          true,
+          true,
+          "CREATE UNIQUE INDEX transacoes_caixa_pkey ON public.transacoes_caixa USING btree (id)"
+        ]
+      ],
+      "relkind": "r",
+      "relname": "transacoes_caixa",
+      "constraints": [
+        [
+          "transacoes_caixa_conta_caixa_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (conta_caixa_id) REFERENCES contas_caixa(id)"
+        ],
+        [
+          "transacoes_caixa_contrato_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (contrato_id) REFERENCES contratos(id)"
+        ],
+        [
+          "transacoes_caixa_parcela_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (parcela_id) REFERENCES parcelas(id)"
+        ],
+        [
+          "transacoes_caixa_pkey",
+          "p",
+          true,
+          false,
+          false,
+          "PRIMARY KEY (id)"
+        ],
+        [
+          "transacoes_caixa_tipo_check",
+          "c",
+          true,
+          false,
+          false,
+          "CHECK (((tipo)::text = ANY (ARRAY[('entrada'::character varying)::text, ('saida'::character varying)::text])))"
+        ],
+        [
+          "transacoes_caixa_user_id_fkey",
+          "f",
+          true,
+          false,
+          false,
+          "FOREIGN KEY (user_id) REFERENCES users(id)"
+        ]
+      ],
+      "relispartition": false,
+      "relpersistence": "p",
+      "relrowsecurity": true,
+      "relforcerowsecurity": false
+    }
+  ]
+}

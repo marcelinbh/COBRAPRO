@@ -1,0 +1,21 @@
+{
+  "kind": "integridade SHA256, n\u00e3o assinatura criptogr\u00e1fica de identidade",
+  "pg17_signature": "03420729c19bec74855438a1f1cd4dfdc6860d93c0b748ab7415dd7bf3dc1406",
+  "files": {
+    "drizzle/0024_onboarding_transacional.sql": "a2c3b56da3522c9ecf71be350a1b27e2d7fe56d9560e4b8b9d3ce43e5004db24",
+    "server/services/onboardingRpc.ts": "7cbe6cd86c2055bcefb70c21d8dc0f851f9bc779b7fdc39a9207183cd5df10dd",
+    "server/services/onboardingRpc.test.ts": "eb788ff941fb6249a52f708b177df3da58cfa5ec9e6704dc5c5d4999203d8b1c",
+    "tests/postgres-onboarding/fixture.sql": "f7728a39f3e42ab830d2aef6bc008ea047adcd03f2a912fd5eccfa6144177af0",
+    "tests/postgres-onboarding/run.sh": "73a3cf20075e950b5decec97530d5117af5691f1fdcc694c1e66f962fde79a8f",
+    "tests/postgres-onboarding/validate.py": "83a55820c22d3090d62638795b14c9a2e266bd1e262adf40b62b62d3bea89c8d",
+    "tests/postgres-onboarding/results-pg17.json": "b3dabb22cfbceea895886b7668f907901fba804142ad05ab4c0ba11f569dff9a",
+    "tests/postgres-onboarding/results-vitest.json": "5de34bc30b26f5e39a216699a8c85f7a17b3f33efc547773419f0ab7bfddf922",
+    "tests/postgres-onboarding/typescript-run.log": "27b70e8d55c5ed8eb066c8c7e3881fcefc698164a597f45874f2bddb30723655",
+    "tests/postgres-onboarding/pg17-run.log": "5cef69ed08d58b060a21284f6d370008b16315f96deec3e5a883f2247858d19f",
+    "tests/postgres-onboarding/vitest-run.log": "e02b5066e3b2a8aae0b921139b20458887b7df87bb496cd765fcc385ec78fb7e",
+    "tests/postgres-onboarding/metadata-producao-fixture.json": "89f796b3890a6fc5ca88737a5a8518b0369f5834f73dd18a44cc0a88e0211463",
+    "tests/postgres-onboarding/evidence/race_different-race.log": "909686eb25612ba95910216a6ee3a03d06d3dc524eb3c91095320fd1ef7e9ddf",
+    "tests/postgres-onboarding/evidence/race_same-race.log": "ed0958b9c652de1d356c6c7501734490940b9e4ae0b71c0c810be2823f30bde7",
+    "tests/postgres-onboarding/evidence/shutdown.log": "caf9d2bff02781ac405a447f3185d05a9316107221508f46c4f44fa44559088f"
+  }
+}

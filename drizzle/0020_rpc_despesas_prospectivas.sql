@@ -4,7 +4,7 @@ BEGIN;
 SELECT pg_catalog.pg_advisory_xact_lock(20261107, 20);
 
 DO $preflight$
-DECLARE r record; actual text; expected text;
+DECLARE r record; actual text; expected text; expected_array_cast text;
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='service_role')
      OR NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='anon')
@@ -44,18 +44,24 @@ BEGIN
   -- VARCHAR CHECK produtivo, não enums planejados. Categoria do Caixa NÃO tem CHECK no snapshot.
   CREATE TEMP TABLE despesas_rpc_check_modelo(status varchar(20),categoria varchar(50),frequencia varchar(20),tipo varchar(10)) ON COMMIT DROP;
   FOR r IN SELECT * FROM (VALUES
-    ('contas_pagar','contas_pagar_status_check', 'CHECK (status::text = ANY (ARRAY[''pendente''::character varying, ''pago''::character varying, ''atrasado''::character varying, ''cancelado''::character varying]::text[]))'),
-    ('contas_pagar','contas_pagar_categoria_check', 'CHECK (categoria::text = ANY (ARRAY[''aluguel''::character varying, ''energia''::character varying, ''agua''::character varying, ''internet''::character varying, ''telefone''::character varying, ''salario''::character varying, ''imposto''::character varying, ''fornecedor''::character varying, ''outros''::character varying]::text[]))'),
-    ('contas_pagar','contas_pagar_frequencia_check', 'CHECK (frequencia::text = ANY (ARRAY[''mensal''::character varying, ''semanal''::character varying, ''quinzenal''::character varying, ''anual''::character varying]::text[]))'),
-    ('transacoes_caixa','transacoes_caixa_tipo_check', 'CHECK (tipo::text = ANY (ARRAY[''entrada''::character varying, ''saida''::character varying]::text[]))')
-  ) x(tab,con,def) LOOP
+    ('contas_pagar','contas_pagar_status_check','status', 'CHECK (status::text = ANY (ARRAY[''pendente''::character varying, ''pago''::character varying, ''atrasado''::character varying, ''cancelado''::character varying]::text[]))'),
+    ('contas_pagar','contas_pagar_categoria_check','categoria', 'CHECK (categoria::text = ANY (ARRAY[''aluguel''::character varying, ''energia''::character varying, ''agua''::character varying, ''internet''::character varying, ''telefone''::character varying, ''salario''::character varying, ''imposto''::character varying, ''fornecedor''::character varying, ''outros''::character varying]::text[]))'),
+    ('contas_pagar','contas_pagar_frequencia_check','frequencia', 'CHECK (frequencia::text = ANY (ARRAY[''mensal''::character varying, ''semanal''::character varying, ''quinzenal''::character varying, ''anual''::character varying]::text[]))'),
+    ('transacoes_caixa','transacoes_caixa_tipo_check','tipo', 'CHECK (tipo::text = ANY (ARRAY[''entrada''::character varying, ''saida''::character varying]::text[]))')
+  ) x(tab,con,col,def) LOOP
     SELECT pg_catalog.pg_get_constraintdef(c.oid,false) INTO actual FROM pg_catalog.pg_constraint c
       WHERE c.conrelid=pg_catalog.to_regclass('public.'||r.tab) AND c.conname=r.con
         AND c.contype='c' AND c.convalidated AND NOT c.connoinherit;
     EXECUTE 'ALTER TABLE pg_temp.despesas_rpc_check_modelo ADD CONSTRAINT modelo '||r.def;
     SELECT pg_catalog.pg_get_constraintdef(oid,false) INTO expected FROM pg_catalog.pg_constraint
       WHERE conrelid='pg_temp.despesas_rpc_check_modelo'::regclass AND conname='modelo';
-    IF actual IS DISTINCT FROM expected THEN
+    -- O catálogo produtivo preserva cast do ARRAY inteiro; o modelo novo pode
+    -- distribuir o mesmo cast text nos elementos. Só estas duas strings exatas,
+    -- com coluna, operador e lista de valores fixos, são equivalentes aceitas.
+    expected_array_cast := pg_catalog.replace(pg_catalog.replace(r.def,
+      'CHECK ('||r.col||'::text = ANY (ARRAY[', 'CHECK ((('||r.col||')::text = ANY ((ARRAY['),
+      ']::text[]))', '])::text[])))');
+    IF actual IS DISTINCT FROM expected AND actual IS DISTINCT FROM expected_array_cast THEN
       RAISE EXCEPTION '0020: CHECK incompatível %.%: %',r.tab,r.con,actual;
     END IF;
     ALTER TABLE pg_temp.despesas_rpc_check_modelo DROP CONSTRAINT modelo;

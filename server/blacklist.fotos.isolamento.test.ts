@@ -4,6 +4,7 @@ import type { TrpcContext } from "./_core/context";
 const mocks = vi.hoisted(() => ({ getSupabaseClientAsync: vi.fn() }));
 
 vi.mock("./db", () => ({ getSupabaseClientAsync: mocks.getSupabaseClientAsync }));
+vi.mock("./services/blacklistEntitlement", () => ({ requireBlacklistEntitlement: vi.fn().mockResolvedValue(undefined) }));
 vi.mock("./storage", () => ({ storageGet: vi.fn(), storagePut: vi.fn() }));
 
 import { blacklistRouter } from "./routers/blacklist";
@@ -35,16 +36,14 @@ describe("blacklist.removerFoto - isolamento do registro", () => {
     const filtroRegistro = vi.fn(() => ({ eq: filtroDono }));
     const selectRegistro = vi.fn(() => ({ eq: filtroRegistro }));
 
-    const confirmarExclusaoFoto = vi.fn().mockResolvedValue({ data: null, error: null });
-    const selecionarFoto = vi.fn(() => ({ maybeSingle: confirmarExclusaoFoto }));
-    const filtrarFotoRegistro = vi.fn(() => ({ select: selecionarFoto }));
+    const confirmarFoto = vi.fn().mockResolvedValue({ data: null, error: null });
+    const filtrarFotoRegistro = vi.fn(() => ({ maybeSingle: confirmarFoto }));
     const filtrarFotoId = vi.fn(() => ({ eq: filtrarFotoRegistro }));
-    const apagarFoto = vi.fn(() => ({ eq: filtrarFotoId }));
-
+    const selectFoto = vi.fn(() => ({ eq: filtrarFotoId }));
     const supabase = {
       from: vi.fn((tabela: string) => tabela === "blacklist"
         ? { select: selectRegistro }
-        : { delete: apagarFoto }),
+        : { select: selectFoto }),
     };
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 

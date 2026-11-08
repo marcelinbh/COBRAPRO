@@ -147,6 +147,8 @@ BEGIN
   END IF;
 
   -- Ordem para escritores futuros: operação -> conta -> cliente -> koletor.
+  -- 0022 e guardas de conta/ledger compartilham este lock prospectivo.
+  PERFORM pg_advisory_xact_lock(22022, p_conta_caixa_id);
   SELECT c.* INTO v_conta FROM public.contas_caixa c WHERE c.id = p_conta_caixa_id FOR UPDATE;
   IF NOT FOUND OR v_conta.user_id IS DISTINCT FROM p_user_id OR v_conta.ativo IS DISTINCT FROM true THEN
     RAISE EXCEPTION 'Conta inválida para o tenant' USING ERRCODE = '42501';
@@ -172,6 +174,9 @@ BEGIN
   END IF;
 
   -- Omitir multa_atraso/juros_mora_diario preserva os defaults reais, sem inventar zeros.
+  IF to_regprocedure('public.ciclo_autorizar(text,integer,integer)') IS NOT NULL THEN
+    PERFORM public.ciclo_autorizar('criar', p_conta_caixa_id, NULL);
+  END IF;
   INSERT INTO public.contratos(user_id, cliente_id, koletor_id, modalidade, tipo_taxa,
     valor_principal, taxa_juros, num_parcelas, numero_parcelas, valor_parcela, total_contrato,
     data_inicio, data_vencimento_primeira, data_vencimento, dia_vencimento, conta_caixa_id,
@@ -214,6 +219,7 @@ BEGIN
   UPDATE public.emprestimos_rpc_operacoes SET resultado = v_resultado, concluida_em = clock_timestamp(),
     auditoria = jsonb_build_object('acao', 'criacao_emprestimo', 'hashPayload', v_hash, 'payload', v_payload,
       'resultado', v_resultado, 'historicoId', v_historico::text, 'jurosEmbutidos', true,
+      'dataCivilCriacaoBrt', v_hoje,
       'contrato', (SELECT to_jsonb(c) FROM public.contratos c WHERE c.id = v_contrato),
       'parcelas', (SELECT jsonb_agg(to_jsonb(p) ORDER BY p.numero) FROM public.parcelas p WHERE p.contrato_id = v_contrato))
     WHERE id = v_op.id;

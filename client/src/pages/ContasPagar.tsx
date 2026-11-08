@@ -1,468 +1,181 @@
-import { useTranslation } from 'react-i18next';
-import { useState } from "react";
-import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Receipt, Plus, Undo2 } from 'lucide-react';
+import { toast } from 'sonner';
 import {
-  Receipt, Plus, CheckCircle2, XCircle, AlertTriangle, Clock,
-  Building2, Users, Zap, FileText, ShoppingCart, Megaphone, Monitor, MoreHorizontal,
-  Trash2, Check, Undo2
-} from "lucide-react";
-import { formatarMoeda, formatarData } from "../../../shared/finance";
+  DespesasIntentStore, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload,
+  diaCivilBrt, dinheiroDespesa, moedaDespesa,
+  type AcaoDespesa, type IntencaoDespesaPersistida, type PayloadDespesa, type StorageDespesas,
+} from '../../../shared/despesasIntent';
 
-const CATEGORIA_LABELS: Record<string, string> = {
-  aluguel: "Aluguel",
-  salario: "Salário",
-  servicos: "Serviços",
-  impostos: "Impostos",
-  fornecedores: "Fornecedores",
-  marketing: "Marketing",
-  tecnologia: "Tecnologia",
-  outros: "Outros",
-};
-
-const CATEGORIA_ICONS: Record<string, React.ReactNode> = {
-  aluguel: <Building2 className="h-3.5 w-3.5" />,
-  salario: <Users className="h-3.5 w-3.5" />,
-  servicos: <Zap className="h-3.5 w-3.5" />,
-  impostos: <FileText className="h-3.5 w-3.5" />,
-  fornecedores: <ShoppingCart className="h-3.5 w-3.5" />,
-  marketing: <Megaphone className="h-3.5 w-3.5" />,
-  tecnologia: <Monitor className="h-3.5 w-3.5" />,
-  outros: <MoreHorizontal className="h-3.5 w-3.5" />,
-};
-
-const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  pendente: { label: "Pendente", color: "text-amber-400 bg-amber-400/10 border-amber-400/20", icon: <Clock className="h-3 w-3" /> },
-  paga: { label: "Paga", color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20", icon: <CheckCircle2 className="h-3 w-3" /> },
-  atrasada: { label: "Atrasada", color: "text-red-400 bg-red-400/10 border-red-400/20", icon: <AlertTriangle className="h-3 w-3" /> },
-  cancelada: { label: "Cancelada", color: "text-muted-foreground bg-muted/30 border-border", icon: <XCircle className="h-3 w-3" /> },
-};
+// Mesmo Provider e contrato do appRouter integrado pelo coordenador; sem fallback.
+const despesasTrpc = trpc;
+const categorias = { aluguel: 'Aluguel', energia: 'Energia', agua: 'Água', internet: 'Internet', telefone: 'Telefone', salario: 'Salário', imposto: 'Imposto', fornecedor: 'Fornecedor', outros: 'Outros' };
+const statuses = { pendente: 'Pendente', paga: 'Paga', atrasada: 'Atrasada', cancelada: 'Cancelada/estornada' };
+const freshForm = (): PayloadDespesa['criar'] => ({ descricao: '', categoria: 'outros', valor: '', dataVencimento: diaCivilBrt(), observacoes: '' });
+const dataLabel = (d: string | null) => d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('/') : 'Data requer conferência';
+const acoes: AcaoDespesa[] = ['criar', 'pagar', 'estornar'];
 
 export default function ContasPagar() {
-  const { t } = useTranslation();
-  const [filtroStatus, setFiltroStatus] = useState<string>("todos");
-  const [dialogAberto, setDialogAberto] = useState(false);
-  const [dialogPagarId, setDialogPagarId] = useState<number | null>(null);
-  const [dialogEstornarId, setDialogEstornarId] = useState<number | null>(null);
-  const [contaCaixaIdPagar, setContaCaixaIdPagar] = useState<string>("");
-  const [idempotencyKeyPagar, setIdempotencyKeyPagar] = useState("");
-
-  // Form state
-  const [form, setForm] = useState({
-    descricao: "",
-    categoria: "outros" as const,
-    valor: "",
-    dataVencimento: new Date().toISOString().split("T")[0],
-    recorrente: false,
-    periodicidade: "unica" as const,
-    observacoes: "",
-  });
-
+  // Usar apenas o id do contexto de sessão; não persistir resposta de auth/tokens.
+  const auth = trpc.auth.me.useQuery(undefined, { retry: false });
+  const userId = auth.data?.id;
+  const usuarioAtual = useRef(userId);
+  usuarioAtual.current = userId;
+  const [avisoStorage, setAvisoStorage] = useState('');
+  const [intencoes, setIntencoes] = useState<IntencaoDespesaPersistida[]>([]);
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
+  const [filtroStatus, setFiltroStatus] = useState('todos');
+  const [novo, setNovo] = useState(false);
+  const [pagarId, setPagarId] = useState<number | null>(null);
+  const [estornarId, setEstornarId] = useState<number | null>(null);
+  const [contaCaixaId, setContaCaixaId] = useState('');
+  const [motivo, setMotivo] = useState('');
+  const [form, setForm] = useState(freshForm);
+  const store = useMemo(() => {
+    if (!userId) return null;
+    let storage: StorageDespesas | null = null;
+    try { storage = window.sessionStorage; } catch { /* Store bloqueia recuperação incerta. */ }
+    return new DespesasIntentStore(userId, storage, message => { setAvisoStorage(message); toast.error(message); });
+  }, [userId]);
+  function sync(s = store) { setIntencoes(s ? acoes.map(a => s.get(a)).filter((v): v is IntencaoDespesaPersistida => !!v) : []); }
+  useEffect(() => { sync(store); }, [store]);
   const utils = trpc.useUtils();
-  const { data: resumo } = trpc.contasPagar.resumo.useQuery();
-  const { data: contas, isLoading } = trpc.contasPagar.listar.useQuery(
-    filtroStatus !== "todos" ? { status: filtroStatus as 'pendente' | 'paga' | 'atrasada' | 'cancelada' } : undefined
-  );
-  const { data: contasCaixa } = trpc.caixa.contas.useQuery();
+  const expensesUtils = despesasTrpc.useUtils();
+  const options = { enabled: !!userId, retry: false };
+  const resumo = despesasTrpc.contasPagar.resumo.useQuery(undefined, options);
+  const lista = despesasTrpc.contasPagar.listar.useQuery(filtroStatus === 'todos' ? undefined : { status: filtroStatus as 'pendente' | 'paga' | 'atrasada' | 'cancelada' }, options);
+  const capacidades = despesasTrpc.contasPagar.capacidades.useQuery(undefined, options);
+  const caixa = trpc.caixa.contas.useQuery(undefined, options);
+  const criar = despesasTrpc.contasPagar.criar.useMutation({ retry: false });
+  const pagar = despesasTrpc.contasPagar.pagar.useMutation({ retry: false });
+  const estornar = despesasTrpc.contasPagar.estornar.useMutation({ retry: false });
+  const habilitado = !!userId && capacidades.data?.prospectivasHabilitadas === true && !capacidades.isError;
+  const locked = (action: AcaoDespesa) => busy || intencoes.some(i => i.action === action) || !!store?.blocked(action);
+  const ativas = caixa.data?.filter(c => c.ativa !== false);
+  const despesaPagar = lista.data?.find(d => d.id === pagarId);
+  const despesaEstornar = lista.data?.find(d => d.id === estornarId);
 
-  const criarMutation = trpc.contasPagar.criar.useMutation({
-    onSuccess: () => {
-      utils.contasPagar.listar.invalidate();
-      utils.contasPagar.resumo.invalidate();
-      setDialogAberto(false);
-      setForm({ descricao: "", categoria: "outros", valor: "", dataVencimento: new Date().toISOString().split("T")[0], recorrente: false, periodicidade: "unica", observacoes: "" });
-      toast.success(t('toast_success.conta_a_pagar_registrada_com_sucesso'));
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
-
-  const pagarMutation = trpc.contasPagar.pagar.useMutation({
-    onSuccess: () => {
-      utils.contasPagar.listar.invalidate();
-      utils.contasPagar.resumo.invalidate();
-      utils.caixa.contas.invalidate();
-      utils.caixa.transacoes.invalidate();
-      utils.dashboard.kpis.invalidate();
-      setDialogPagarId(null);
-      toast.success(t('toast_success.conta_marcada_como_paga'));
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
-
-  const estornarMutation = trpc.contasPagar.estornar.useMutation({
-    onSuccess: () => {
-      utils.contasPagar.listar.invalidate();
-      utils.contasPagar.resumo.invalidate();
-      utils.caixa.contas.invalidate();
-      utils.caixa.transacoes.invalidate();
-      utils.dashboard.kpis.invalidate();
-      setDialogEstornarId(null);
-      toast.success("Despesa estornada e valor devolvido ao Caixa");
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
-
-  const cancelarMutation = trpc.contasPagar.cancelar.useMutation({
-    onSuccess: () => {
-      utils.contasPagar.listar.invalidate();
-      utils.contasPagar.resumo.invalidate();
-      toast.success(t('toast_success.conta_cancelada'));
-    },
-  });
-
-  const excluirMutation = trpc.contasPagar.excluir.useMutation({
-    onSuccess: () => {
-      utils.contasPagar.listar.invalidate();
-      utils.contasPagar.resumo.invalidate();
-      toast.success(t('toast_success.conta_excluída'));
-    },
-  });
-
-  function handleCriar() {
-    const valor = parseFloat(form.valor.replace(",", "."));
-    if (!form.descricao || !valor || !form.dataVencimento) {
-      toast.error(t('toast_error.preencha_todos_os_campos_obrigatórios'));
-      return;
+  async function enviar(intent: IntencaoDespesaPersistida, s: DespesasIntentStore) {
+    if (usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
+    inFlight.current = true; setBusy(true);
+    try {
+      const result = intent.action === 'criar' ? await criar.mutateAsync({ ...intent.payload, idempotencyKey: intent.idempotencyKey })
+        : intent.action === 'pagar' ? await pagar.mutateAsync({ ...intent.payload, idempotencyKey: intent.idempotencyKey })
+          : await estornar.mutateAsync({ ...intent.payload, idempotencyKey: intent.idempotencyKey });
+      // Adapter valida confirmação integral no servidor; UI também não aceita falso sucesso/chave trocada.
+      if (result.success !== true || result.acao !== intent.action || result.userId !== intent.userId || result.chaveIdempotencia.toLowerCase() !== intent.idempotencyKey.toLowerCase() || !result.operationId) throw new Error('Confirmação incompatível; requer conferência com a MESMA chave.');
+      s.confirmed(intent.action, intent.idempotencyKey);
+      if (usuarioAtual.current === intent.userId) {
+        setNovo(false); setPagarId(null); setEstornarId(null); setMotivo(''); setForm(freshForm());
+        toast.success(`${intent.action === 'criar' ? 'Despesa criada' : intent.action === 'pagar' ? 'Pagamento registrado' : 'Estorno registrado sem excluir a baixa'}. Operação ${result.operationId}`);
+      }
+      // Falha de atualização da consulta não altera o resultado já confirmado, nem dispara uma nova intenção.
+      void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate(), utils.dashboard.kpis.invalidate()]);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Resultado desconhecido';
+      if (usuarioAtual.current === intent.userId) toast.error(`${message} A intenção foi mantida: confira/reenvie a MESMA chave com o payload original. Não crie outra operação por timeout.`);
+    } finally {
+      s.release(intent.action); inFlight.current = false; setBusy(false);
+      if (usuarioAtual.current === intent.userId) sync(s);
     }
-    criarMutation.mutate({
-      descricao: form.descricao,
-      categoria: form.categoria,
-      valor,
-      dataVencimento: form.dataVencimento,
-      recorrente: form.recorrente,
-      periodicidade: form.periodicidade,
-      observacoes: form.observacoes || undefined,
-    });
+  }
+  function iniciar<A extends AcaoDespesa>(action: A, payload: PayloadDespesa[A]) {
+    if (!store || !habilitado || inFlight.current || locked(action)) return;
+    try {
+      const intent = store.begin(action, payload);
+      sync(store);
+      void enviar(intent, store);
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Intenção inválida.'); }
+  }
+  function novaDespesa() {
+    const valor = dinheiroDespesa(form.valor.replace(',', '.'));
+    const parsed = criarDespesaPayload.safeParse({ ...form, valor: valor ?? form.valor });
+    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+    iniciar('criar', parsed.data);
+  }
+  function baixa() {
+    if (!despesaPagar?.podePagar || !lista.data || lista.isError || caixa.isError || !ativas?.some(c => String(c.id) === contaCaixaId)) { toast.error('Despesa/conta não elegível; requer conferência.'); return; }
+    // Dia civil BRT calculado UMA vez ao formar a primeira intenção; retries usam o payload salvo.
+    const parsed = pagarDespesaPayload.safeParse({ id: despesaPagar.id, contaCaixaId: Number(contaCaixaId), dataPagamento: diaCivilBrt() });
+    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+    iniciar('pagar', parsed.data);
+  }
+  function devolucao() {
+    if (!despesaEstornar?.podeEstornar || !despesaEstornar.pagamentoOperationId || lista.isError) { toast.error('Pagamento original indisponível; requer conferência.'); return; }
+    const parsed = estornarDespesaPayload.safeParse({ id: despesaEstornar.id, pagamentoOperationId: despesaEstornar.pagamentoOperationId, dataEstorno: diaCivilBrt(), motivo });
+    if (!parsed.success) { toast.error(parsed.error.issues[0].message); return; }
+    iniciar('estornar', parsed.data);
   }
 
-  function handlePagar(id: number) {
-    if (!contaCaixaIdPagar) {
-      toast.error("Selecione a conta de Caixa que realizou o pagamento");
-      return;
-    }
-    const idempotencyKey = idempotencyKeyPagar || crypto.randomUUID();
-    if (!idempotencyKeyPagar) setIdempotencyKeyPagar(idempotencyKey);
-    pagarMutation.mutate({
-      id,
-      contaCaixaId: parseInt(contaCaixaIdPagar),
-      idempotencyKey,
-    });
-  }
-
-  return (
-    <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-red-500/10">
-            <Receipt className="h-6 w-6 text-red-400" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Contas a Pagar</h1>
-            <p className="text-sm text-muted-foreground">{t('accountsPayable.subtitle')}</p>
-          </div>
-        </div>
-        <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-          <DialogTrigger asChild>
-            <Button className="bg-red-600 hover:bg-red-700 text-white">
-              <Plus className="h-4 w-4 mr-2" />
-              Nova Conta
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card border-border max-w-md">
-            <DialogHeader>
-              <DialogTitle>Nova Conta a Pagar</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 py-2">
-              <div className="space-y-1.5">
-                <Label>Descrição *</Label>
-                <Input
-                  className="bg-background border-border"
-                  placeholder="Ex: Aluguel do escritório"
-                  value={form.descricao}
-                  onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label>Categoria *</Label>
-                  <Select value={form.categoria} onValueChange={(v) => setForm({ ...form, categoria: v as typeof form.categoria })}>
-                    <SelectTrigger className="bg-background border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(CATEGORIA_LABELS).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Valor (R$) *</Label>
-                  <Input
-                    className="bg-background border-border"
-                    placeholder="0,00"
-                    value={form.valor}
-                    onChange={(e) => setForm({ ...form, valor: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>Data de Vencimento *</Label>
-                <Input
-                  type="date"
-                  className="bg-background border-border"
-                  value={form.dataVencimento}
-                  onChange={(e) => setForm({ ...form, dataVencimento: e.target.value })}
-                />
-              </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/20 border border-border">
-                <div>
-                  <p className="text-sm font-medium">Conta Recorrente</p>
-                  <p className="text-xs text-muted-foreground">Repete automaticamente</p>
-                </div>
-                <Switch
-                  checked={form.recorrente}
-                  onCheckedChange={(v) => setForm({ ...form, recorrente: v })}
-                />
-              </div>
-              {form.recorrente && (
-                <div className="space-y-1.5">
-                  <Label>Periodicidade</Label>
-                  <Select value={form.periodicidade} onValueChange={(v) => setForm({ ...form, periodicidade: v as typeof form.periodicidade })}>
-                    <SelectTrigger className="bg-background border-border">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="semanal">Semanal</SelectItem>
-                      <SelectItem value="mensal">Mensal</SelectItem>
-                      <SelectItem value="anual">Anual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label>{t('accountsPayable.observations')}</Label>
-                <Textarea
-                  className="bg-background border-border resize-none"
-                  placeholder="Informações adicionais..."
-                  rows={2}
-                  value={form.observacoes}
-                  onChange={(e) => setForm({ ...form, observacoes: e.target.value })}
-                />
-              </div>
-              <Button
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-                onClick={handleCriar}
-                disabled={criarMutation.isPending}
-              >
-                {criarMutation.isPending ? "Salvando..." : "Salvar Conta"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">A Pagar</p>
-            <p className="text-xl font-bold text-amber-400">{formatarMoeda(resumo?.totalPendente ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{resumo?.qtdPendente ?? 0} contas</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Em Atraso</p>
-            <p className="text-xl font-bold text-red-400">{formatarMoeda(resumo?.totalAtrasado ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{resumo?.qtdAtrasado ?? 0} contas</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-card border-border">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Pagas (mês)</p>
-            <p className="text-xl font-bold text-emerald-400">{formatarMoeda(resumo?.totalPago ?? 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{resumo?.qtdPago ?? 0} contas</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex gap-2 flex-wrap">
-        {["todos", "pendente", "atrasada", "paga", "cancelada"].map((s) => (
-          <Button
-            key={s}
-            variant={filtroStatus === s ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFiltroStatus(s)}
-            className={filtroStatus === s ? "bg-primary text-primary-foreground" : "border-border"}
-          >
-            {s === "todos" ? "Todas" : STATUS_CONFIG[s]?.label ?? s}
-          </Button>
-        ))}
-      </div>
-
-      {/* Lista de contas */}
-      <div className="space-y-2">
-        {isLoading ? (
-          <div className="text-center py-8 text-muted-foreground">Carregando...</div>
-        ) : !contas || contas.length === 0 ? (
-          <Card className="bg-card border-border">
-            <CardContent className="py-12 text-center">
-              <Receipt className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-              <p className="text-muted-foreground">Nenhuma conta encontrada</p>
-              <p className="text-sm text-muted-foreground mt-1">Clique em {t('accountsPayable.newAccount')} para adicionar</p>
-            </CardContent>
-          </Card>
-        ) : (
-          contas.map((conta) => {
-            const statusCfg = STATUS_CONFIG[conta.status] ?? STATUS_CONFIG.pendente;
-            return (
-              <Card key={conta.id} className="bg-card border-border hover:border-border/80 transition-colors">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      <div className="p-2 rounded-lg bg-muted/30 shrink-0 mt-0.5">
-                        {CATEGORIA_ICONS[conta.categoria] ?? <MoreHorizontal className="h-3.5 w-3.5" />}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{conta.descricao}</p>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-xs text-muted-foreground">{CATEGORIA_LABELS[conta.categoria]}</span>
-                          <span className="text-xs text-muted-foreground">•</span>
-                          <span className="text-xs text-muted-foreground">
-                            Vence: {conta.dataVencimento ? new Date(conta.dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}
-                          </span>
-                          {conta.recorrente && (
-                            <>
-                              <span className="text-xs text-muted-foreground">•</span>
-                              <span className="text-xs text-blue-400">Recorrente ({conta.periodicidade})</span>
-                            </>
-                          )}
-                        </div>
-                        {conta.observacoes && (
-                          <p className="text-xs text-muted-foreground mt-1 truncate">{conta.observacoes}</p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2 shrink-0">
-                      <p className="font-bold text-base">{formatarMoeda(parseFloat(conta.valor))}</p>
-                      <Badge className={`text-xs border ${statusCfg.color} flex items-center gap-1`}>
-                        {statusCfg.icon}
-                        {statusCfg.label}
-                      </Badge>
-                    </div>
-                  </div>
-
-                  {/* Ações */}
-                  {(conta.status === "pendente" || conta.status === "atrasada") && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
-                      <Dialog open={dialogPagarId === conta.id} onOpenChange={(open) => {
-                        setDialogPagarId(open ? conta.id : null);
-                        setContaCaixaIdPagar(open && contasCaixa?.length === 1 ? String(contasCaixa[0].id) : "");
-                        if (open) setIdempotencyKeyPagar(crypto.randomUUID());
-                      }}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1">
-                            <Check className="h-3.5 w-3.5 mr-1.5" />
-                            Marcar como Paga
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-card border-border max-w-sm">
-                          <DialogHeader>
-                            <DialogTitle>Registrar Pagamento</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4 py-2">
-                            <p className="text-sm text-muted-foreground">{conta.descricao}</p>
-                            <p className="text-2xl font-bold">{formatarMoeda(parseFloat(conta.valor))}</p>
-                            <div className="space-y-1.5">
-                              <Label>Conta de Caixa *</Label>
-                              <Select value={contaCaixaIdPagar} onValueChange={setContaCaixaIdPagar}>
-                                <SelectTrigger className="bg-background border-border">
-                                  <SelectValue placeholder="Selecionar conta..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {contasCaixa?.map((c: { id: number; nome: string }) => (
-                                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <Button
-                              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                              onClick={() => handlePagar(conta.id)}
-                              disabled={!contaCaixaIdPagar || pagarMutation.isPending}
-                            >
-                              Confirmar Pagamento
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-border"
-                        onClick={() => cancelarMutation.mutate({ id: conta.id })}
-                      >
-                        <XCircle className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  )}
-                  {conta.status === "paga" && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
-                      <Dialog open={dialogEstornarId === conta.id} onOpenChange={(open) => setDialogEstornarId(open ? conta.id : null)}>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
-                            <Undo2 className="h-3.5 w-3.5 mr-1.5" />
-                            Estornar Pagamento
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="bg-card border-border max-w-sm">
-                          <DialogHeader><DialogTitle>Estornar despesa paga?</DialogTitle></DialogHeader>
-                          <div className="space-y-4 py-2">
-                            <p className="text-sm text-muted-foreground">
-                              O sistema criará uma entrada de {formatarMoeda(parseFloat(conta.valor))} na mesma conta de Caixa e manterá o histórico financeiro.
-                            </p>
-                            <div className="flex gap-2">
-                              <Button variant="outline" className="flex-1" onClick={() => setDialogEstornarId(null)}>Voltar</Button>
-                              <Button className="flex-1 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => estornarMutation.mutate({ id: conta.id })} disabled={estornarMutation.isPending}>
-                                {estornarMutation.isPending ? "Estornando..." : "Confirmar Estorno"}
-                              </Button>
-                            </div>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  )}
-                  {conta.status === "cancelada" && !conta.dataPagamento && (
-                    <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
-                        onClick={() => excluirMutation.mutate({ id: conta.id })}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                        Excluir
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            );
-          })
-        )}
-      </div>
+  return <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+    <div className="flex items-center justify-between gap-3">
+      <div><h1 className="text-2xl font-bold flex gap-2"><Receipt />Contas a Pagar</h1><p className="text-sm text-muted-foreground">Despesas novas no trilho atômico; histórico somente consulta.</p></div>
+      <Button disabled={!habilitado || locked('criar')} onClick={() => setNovo(true)}><Plus className="h-4 w-4 mr-2" />Nova despesa</Button>
     </div>
-  );
+    <p className="text-sm border rounded-lg p-3">Legado requer conferência. Edição, cancelamento, exclusão e recorrência estão indisponíveis. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
+    {auth.isError ? <p role="alert">Erro ao identificar a sessão. Nenhuma operação disponível.</p> : auth.isLoading ? <p role="status">Carregando sessão...</p> : !userId ? <p role="alert">Autentique-se para consultar despesas.</p> : null}
+    {userId && (capacidades.isError ? <p role="alert">Não foi possível verificar a disponibilidade do trilho. Escritas bloqueadas.</p> : capacidades.isLoading ? <p role="status">Verificando disponibilidade...</p> : !habilitado ? <p role="alert">Despesas prospectivas desabilitadas; nenhum lançamento será feito no legado.</p> : null)}
+    {avisoStorage && <p role="alert" className="text-amber-500 border p-3 rounded-lg break-words">{avisoStorage}</p>}
+    {intencoes.length > 0 && <section aria-label="Intenções a conferir" className="space-y-3 border border-amber-500 rounded-lg p-4">
+      <h2 className="font-semibold">Intenções mantidas para conferência/retry</h2>
+      <p className="text-sm">Uma falha não prova que houve rollback. Abaixo está o payload original; a data e o UUID não mudam após reload. Não existe descarte automático ou substituição por nova chave.</p>
+      {intencoes.filter(i => i.userId === userId).map(i => <div key={i.idempotencyKey} className="space-y-2">
+        <p className="text-sm break-all">{i.action} — UUID: {i.idempotencyKey}</p><pre className="text-xs whitespace-pre-wrap break-all bg-muted p-2">{JSON.stringify(i.payload, null, 2)}</pre>
+        <Button variant="outline" disabled={busy || !habilitado || !store} onClick={() => store && void enviar(i, store)}>Reenviar intenção original (mesma chave)</Button>
+      </div>)}
+    </section>}
+    <section aria-label="Resumo de despesas">
+      {resumo.isError ? <div role="alert">Resumo indisponível: {resumo.error.message} <Button variant="outline" onClick={() => void resumo.refetch()}>Tentar consulta</Button></div>
+        : resumo.isLoading || !resumo.data ? <p role="status">{userId ? 'Carregando resumo...' : 'Resumo indisponível sem sessão.'}</p>
+          : <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{[
+            ['A pagar', resumo.data.totalPendente, resumo.data.qtdPendente], ['Em atraso', resumo.data.totalAtrasado, resumo.data.qtdAtrasado], ['Pagas (mês BRT)', resumo.data.totalPago, resumo.data.qtdPago],
+          ].map(([label, total, qtd]) => <Card key={String(label)}><CardContent className="p-4"><p className="text-sm">{label}</p><p className="text-xl font-bold">{moedaDespesa(String(total))}</p><p className="text-xs">{qtd} contas</p></CardContent></Card>)}</div>}
+    </section>
+    <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
+    <section aria-label="Lista de despesas" className="space-y-3">
+      {lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
+        : lista.isLoading || !lista.data ? <p role="status">{userId ? 'Carregando despesas...' : 'Consulta indisponível sem sessão.'}</p>
+          : lista.data.length === 0 ? <p>Nenhuma conta encontrada para este filtro.</p>
+            : lista.data.map(d => <Card key={d.id}><CardContent className="p-4 space-y-2">
+              <div className="flex justify-between gap-3"><div><p className="font-semibold">{d.descricao}</p><p className="text-xs text-muted-foreground">#{d.id} · {categorias[d.categoria as keyof typeof categorias] ?? d.categoria} · Vence: {dataLabel(d.dataVencimento)}</p></div><div className="text-right"><p className="font-bold">{moedaDespesa(d.valor)}</p><Badge variant="outline">{statuses[d.status as keyof typeof statuses] ?? d.status}</Badge></div></div>
+              {d.observacoes && <p className="text-sm">{d.observacoes}</p>}
+              {d.recorrente && <p className="text-xs">Recorrência histórica ({d.periodicidade ?? 'não informada'}); geração indisponível.</p>}
+              {d.mensagemConferencia && <p className="text-sm text-amber-500">{d.mensagemConferencia}</p>}
+              {d.podePagar && <Button size="sm" disabled={!habilitado || locked('pagar')} onClick={() => { setPagarId(d.id); setContaCaixaId(ativas?.length === 1 ? String(ativas[0].id) : ''); }}>Registrar pagamento atômico</Button>}
+              {d.podeEstornar && <Button variant="outline" size="sm" disabled={!habilitado || locked('estornar')} onClick={() => { setEstornarId(d.id); setMotivo(''); }}><Undo2 className="h-4 w-4 mr-2" />Estornar pagamento original</Button>}
+            </CardContent></Card>)}
+    </section>
+    <Dialog open={novo} onOpenChange={v => { if (!busy) setNovo(v); }}><DialogContent><DialogHeader><DialogTitle>Nova despesa avulsa atômica</DialogTitle></DialogHeader>
+      <div className="space-y-3">
+        <Label htmlFor="despesa-descricao">Descrição</Label><Input id="despesa-descricao" disabled={locked('criar')} value={form.descricao} maxLength={255} onChange={e => setForm({ ...form, descricao: e.target.value })} />
+        <Label>Categoria</Label><Select disabled={locked('criar')} value={form.categoria} onValueChange={v => setForm({ ...form, categoria: v as PayloadDespesa['criar']['categoria'] })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{Object.entries(categorias).map(([v, label]) => <SelectItem key={v} value={v}>{label}</SelectItem>)}</SelectContent></Select>
+        <Label htmlFor="despesa-valor">Valor exato (R$)</Label><Input id="despesa-valor" inputMode="decimal" placeholder="100,01" disabled={locked('criar')} value={form.valor} onChange={e => setForm({ ...form, valor: e.target.value })} />
+        <Label htmlFor="despesa-vencimento">Data civil de vencimento</Label><Input id="despesa-vencimento" type="date" disabled={locked('criar')} value={form.dataVencimento} onChange={e => setForm({ ...form, dataVencimento: e.target.value })} />
+        <Label htmlFor="despesa-observacoes">Observações</Label><Textarea id="despesa-observacoes" disabled={locked('criar')} value={form.observacoes} maxLength={10000} onChange={e => setForm({ ...form, observacoes: e.target.value })} />
+        <p className="text-sm">Recorrência indisponível. Não há lançamentos automáticos.</p>
+        <Button disabled={!habilitado || locked('criar')} onClick={novaDespesa}>{busy ? 'Aguardando confirmação...' : 'Criar despesa atômica'}</Button>
+      </div>
+    </DialogContent></Dialog>
+    <Dialog open={pagarId !== null} onOpenChange={v => { if (!v && !busy) setPagarId(null); }}><DialogContent><DialogHeader><DialogTitle>Registrar pagamento</DialogTitle></DialogHeader>
+      <p>{despesaPagar?.descricao} — {despesaPagar ? moedaDespesa(despesaPagar.valor) : 'Requer conferência'}</p><p className="text-sm">A baixa utiliza o valor original, sem editar saldo-base. Data civil BRT fixada ao confirmar a primeira intenção.</p>
+      {caixa.isError ? <p role="alert">Erro ao consultar contas de Caixa. Não é lista vazia.</p> : caixa.isLoading || !caixa.data ? <p role="status">Carregando contas de Caixa...</p> : !ativas?.length ? <p>Nenhuma conta ativa disponível.</p> : <><Label>Conta de Caixa</Label><Select disabled={locked('pagar')} value={contaCaixaId} onValueChange={setContaCaixaId}><SelectTrigger><SelectValue placeholder="Selecionar conta" /></SelectTrigger><SelectContent>{ativas.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}</SelectContent></Select></>}
+      <Button onClick={baixa} disabled={!habilitado || locked('pagar') || !despesaPagar?.podePagar || lista.isError || caixa.isError || caixa.isLoading || !contaCaixaId}>Confirmar baixa integral</Button>
+    </DialogContent></Dialog>
+    <Dialog open={estornarId !== null} onOpenChange={v => { if (!v && !busy) setEstornarId(null); }}><DialogContent><DialogHeader><DialogTitle>Estornar baixa original (não excluir)</DialogTitle></DialogHeader>
+      <p className="text-sm">Entrada de {despesaEstornar ? moedaDespesa(despesaEstornar.valor) : 'valor requer conferência'} na mesma conta #{despesaEstornar?.contaCaixaId}. A saída original será preservada e não haverá novo pagamento desta obrigação.</p>
+      <p className="text-xs break-all">UUID original da baixa: {despesaEstornar?.pagamentoOperationId ?? 'Requer conferência'}</p><p className="text-xs">Saída original: {despesaEstornar?.transacaoSaidaId ?? 'Requer conferência'}</p>
+      <Label htmlFor="despesa-motivo">Motivo obrigatório</Label><Textarea id="despesa-motivo" disabled={locked('estornar')} value={motivo} maxLength={2000} onChange={e => setMotivo(e.target.value)} />
+      <Button onClick={devolucao} disabled={!habilitado || locked('estornar') || !despesaEstornar?.podeEstornar || lista.isError || !motivo.trim()}>Confirmar estorno do mesmo valor</Button>
+    </DialogContent></Dialog>
+  </div>;
 }

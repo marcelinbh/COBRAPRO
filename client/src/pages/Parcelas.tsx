@@ -19,6 +19,7 @@ import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 import { avisoDePendenciasPosPagamento } from "@/lib/pagamentoConfirmado";
 import { protegerValorDePlanilha } from "@/lib/spreadsheetSafety";
+import { EmprestimoSeguroReceber } from "@/components/EmprestimoSeguroReceber";
 // Excel e PDF são carregados sob demanda para reduzir o bundle inicial.
 
 // Templates padrão (mesmos do Cobra Fácil)
@@ -545,6 +546,7 @@ export default function Parcelas() {
         </div>
       </div>
 
+      <p className="text-sm text-muted-foreground">Recebimento disponível somente para novos empréstimos de proveniência RPC 0021 íntegra, com cotação SQL e conta original fixa. Legado, desconto e renovação permanecem bloqueados. Valores estimados da listagem não autorizam baixa; confirme exclusivamente a cotação do diálogo.</p>
       {/* Contador por Modalidade */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {modalidadeCount.map(m => (
@@ -699,6 +701,7 @@ export default function Parcelas() {
                       )}
                     </div>
 
+                    {parcela.status === 'paga' && <EmprestimoSeguroReceber contratoId={parcela.contratoId} parcelaId={parcela.id} onSuccess={() => refetch()} />}
                     {parcela.status !== 'paga' && (
                       <div className="flex gap-2">
                         {whatsappUrl && (
@@ -709,11 +712,10 @@ export default function Parcelas() {
                             </Button>
                           </a>
                         )}
-                        <PagamentoDialog
-                          parcela={parcela as any}
-                          contas={contas ?? []}
+                        <EmprestimoSeguroReceber
+                          contratoId={parcela.contratoId}
+                          parcelaId={parcela.id}
                           onSuccess={() => refetch()}
-                          configData={configData}
                         />
                       </div>
                     )}

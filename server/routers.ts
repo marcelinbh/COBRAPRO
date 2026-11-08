@@ -9,6 +9,8 @@ import { perfilRouter } from "./routers/perfil";
 import { relatorioDiarioRouter } from "./routers/relatorioDiario";
 import { notificacoesRouter } from "./routers/notificacoes";
 import { blacklistRouter } from "./routers/blacklist";
+import { contasPagarRouter as contasPagarProspectivasRouter } from "./routers/contasPagar";
+import { emprestimosProspectivosRouter } from "./routers/emprestimosProspectivos";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
@@ -42,6 +44,8 @@ import { numeroDashboard, resumirCarteiraDashboard, saldoContaDashboard, STATUS_
 import { calendarioDashboard } from "./dashboardDates";
 import { dadosDashboard, exigirFonteDashboard, listarDashboard, vincularClientesDashboard } from "./dashboardQueries";
 import { lerResumoCaixaDashboard } from "./dashboardLedger";
+import { statusCalendarioParcela } from "../shared/parcelasCalendar";
+import { onboardingCompleteSchema, criarOnboardingCompleteHandler } from "./services/onboardingRpc";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -1393,6 +1397,7 @@ const contratosRouter = router({
       jurosMoraDiario: z.number().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A criação legada de empréstimo; use o fluxo de empréstimos seguros');
       await validarClienteDoUsuario(ctx.user.id, input.clienteId);
       if (input.contaCaixaId) await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
       // Calcular valor da parcela
@@ -1661,6 +1666,7 @@ const contratosRouter = router({
   updateStatus: protectedProcedure
     .input(z.object({ id: z.number(), status: z.enum(['ativo', 'quitado', 'inadimplente', 'cancelado']) }))
      .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A alteração manual de status de contrato');
       if (input.status === 'quitado') {
         bloquearOperacaoFinanceiraNaoAtomica('A quitação manual de contrato');
       }
@@ -1859,6 +1865,7 @@ const contratosRouter = router({
       datasParcelasCustom: z.array(z.string()).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A edição financeira ou de calendário de contrato');
       const db = await getDb();
       if (db) {
         try {
@@ -1965,6 +1972,7 @@ const contratosRouter = router({
   editarJuros: protectedProcedure
     .input(z.object({ id: z.number(), novaTaxa: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A alteração manual de juros de contrato');
       const db = await getDb();
       if (db) {
         try {
@@ -2013,6 +2021,7 @@ const contratosRouter = router({
   aplicarMulta: protectedProcedure
     .input(z.object({ id: z.number(), multa: z.string() }))
     .mutation(async ({ ctx, input }) => {
+      bloquearOperacaoFinanceiraNaoAtomica('A aplicação manual de multa fora do recebimento auditado');
       const db = await getDb();
       const hoje = dataHojeBrasilia();
       if (db) {
@@ -2074,22 +2083,7 @@ const parcelasRouter = router({
 
       if (db) {
         try {
-          // Atualizar status das parcelas atrasadas
-          await db.update(parcelas)
-            .set({ status: 'atrasada' })
-            .where(and(
-              lt(sql`DATE(data_vencimento)`, hoje),
-              eq(parcelas.userId, ctx.user.id),
-              inArray(parcelas.status, ['pendente', 'vencendo_hoje'])
-            ));
-          await db.update(parcelas)
-            .set({ status: 'vencendo_hoje' })
-            .where(and(
-              eq(sql`DATE(data_vencimento)`, hoje),
-              eq(parcelas.userId, ctx.user.id),
-              eq(parcelas.status, 'pendente')
-            ));
-
+          // Consulta não altera dados: o calendário é derivado só na apresentação.
           const rows = await db.select({
             id: parcelas.id,
             contratoId: parcelas.contratoId,
@@ -2126,7 +2120,7 @@ const parcelasRouter = router({
               if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
             }
           } catch (_) { /* não é cobrador */ }
-          return rows.filter(r => {
+          return rows.map(r => ({ ...r, status: statusCalendarioParcela(r.status, r.dataVencimento, hoje) })).filter(r => {
             if (myKoletorId !== null) {
               // Verificar se a parcela pertence ao cobrador via contrato
               const contratoDoKoletor = rows.some(row => row.contratoId === r.contratoId && row.koletorId === myKoletorId);
@@ -2153,16 +2147,14 @@ const parcelasRouter = router({
         const { data: koletorData } = await supabase.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
         if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
       } catch (_) { /* não é cobrador */ }
-      // Atualizar status via REST
-      await supabase.from('parcelas').update({ status: 'atrasada' })
-        .lt('data_vencimento', hoje).eq('user_id', ctx.user.id).in('status', ['pendente', 'vencendo_hoje']);
-      await supabase.from('parcelas').update({ status: 'vencendo_hoje' })
-        .eq('data_vencimento', hoje).eq('user_id', ctx.user.id).eq('status', 'pendente');
+      // Nenhuma escrita em GET; filtros de status usam o dia civil de Brasília.
       let pQuery = supabase.from('parcelas')
         .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, saldo_residual, data_vencimento, data_pagamento, status, contratos(koletor_id)')
         .order('data_vencimento')
         .eq('user_id', ctx.user.id);
-      if (input?.status) pQuery = (pQuery as any).eq('status', input.status);
+      if (input?.status && ['pendente', 'vencendo_hoje', 'atrasada'].includes(input.status)) {
+        pQuery = pQuery.in('status', ['pendente', 'vencendo_hoje', 'atrasada']);
+      } else if (input?.status) pQuery = pQuery.eq('status', input.status);
       if (input?.clienteId) pQuery = (pQuery as any).eq('cliente_id', input.clienteId);
       if (input?.contratoId) pQuery = (pQuery as any).eq('contrato_id', input.contratoId);
       if (myKoletorId !== null) pQuery = (pQuery as any).eq('contratos.koletor_id', myKoletorId);
@@ -2171,6 +2163,7 @@ const parcelasRouter = router({
       if (pError) { console.error('[parcelas.list] REST error:', pError.message); return []; }
       const parcelasData = (pData || []).filter((p: any) => {
         if (myKoletorId !== null && p.contratos?.koletor_id !== myKoletorId) return false;
+        if (input?.status && statusCalendarioParcela(p.status, p.data_vencimento, hoje) !== input.status) return false;
         return true;
       });
       // Filtro de modalidade no REST (aplicado após buscar contratos)
@@ -2221,7 +2214,7 @@ const parcelasRouter = router({
         saldoResidual: r.saldo_residual,
         dataVencimento: r.data_vencimento,
         dataPagamento: r.data_pagamento,
-        status: r.status,
+        status: statusCalendarioParcela(r.status, r.data_vencimento, hoje),
         modalidade: contratosMap[r.contrato_id]?.modalidade ?? null,
         numeroParcelas: totalParcelasMap[r.contrato_id] ?? contratosMap[r.contrato_id]?.numero_parcelas ?? null,
         taxaJuros: contratosMap[r.contrato_id]?.taxa_juros ?? null,
@@ -4937,36 +4930,8 @@ const onboardingRouter = router({
     return { completo: !!row.onboarding_completo, nomeEmpresa: row.nome_empresa as string | null };
   }),
   complete: protectedProcedure
-    .input(z.object({
-      nomeEmpresa: z.string().min(1),
-      nomeConta: z.string().min(1).optional().default('Caixa Principal'),
-      tipoConta: z.enum(['caixa', 'banco', 'digital']).optional().default('caixa'),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB indisponível' });
-      // Atualizar onboarding do usuário
-      await supabase
-        .from('users')
-        .update({ onboarding_completo: true, nome_empresa: input.nomeEmpresa })
-        .eq('id', ctx.user.id);
-      // Criar conta de caixa inicial se não existir
-      const { data: contas } = await supabase
-        .from('contas_caixa')
-        .select('id')
-        .eq('user_id', ctx.user.id)
-        .limit(1);
-      if (!contas || contas.length === 0) {
-        await supabase.from('contas_caixa').insert({
-          user_id: ctx.user.id,
-          nome: input.nomeConta,
-          tipo: input.tipoConta,
-          saldo_inicial: 0,
-          ativa: true,
-        });
-      }
-      return { success: true };
-    }),
+    .input(onboardingCompleteSchema)
+    .mutation(criarOnboardingCompleteHandler(getSupabaseClientAsync)),
 });
 
 // ─── ADMIN ROUTER ──────────────────────────────────────────────────────────────────────────────
@@ -5090,7 +5055,8 @@ export const appRouter = router({
   configuracoes: configuracoesRouter,
   cobradores: cobradoresRouter,
   reparcelamento: reparcelamentoRouter,
-  contasPagar: contasPagarRouter,
+  contasPagar: contasPagarProspectivasRouter,
+  emprestimosProspectivos: emprestimosProspectivosRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,
   veiculos: veiculosRouter,

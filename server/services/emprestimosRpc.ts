@@ -143,8 +143,8 @@ export async function criarEmprestimoProspectivoAtomico(
   userId: number,
   input: EntradaEmprestimoProspectivo,
 ): Promise<ResultadoEmprestimoProspectivo> {
-  if (process.env.ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS !== "true") {
-    falhar("PRECONDITION_FAILED", "Criação prospectiva atômica indisponível. Não há fallback REST.");
+  if (process.env.ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS !== "true" || process.env.ENABLE_RPC_CICLO_EMPRESTIMOS_PROSPECTIVOS !== "true") {
+    falhar("PRECONDITION_FAILED", "Criação exige ciclo prospectivo de recebimento habilitado. Não há fallback REST.");
   }
   if (!Number.isInteger(userId) || userId <= 0 || userId > 2147483647) falhar("BAD_REQUEST", "Tenant do servidor inválido.");
   const parsed = entradaEmprestimoProspectivoSchema.safeParse(input);

@@ -4,6 +4,20 @@
 **Regra solicitada:** correções Kiwify ficam por último.  
 **Objetivo:** eliminar primeiro riscos de tomada de conta, alteração/vazamento entre empresas e corrupção operacional/financeira.
 
+## Liberação operacional de 8/11/2026 — em integração
+
+- [x] Renovar a captura privada de aplicação e comprovar duas restaurações PostgreSQL 17: 29 tabelas / 4.117 linhas idênticas; arquivos fora do Git.
+- [x] Ensaiar hashes finais 0019/0020/0021/0022/0023/0024/0025 na cópia restaurada sem modificar qualquer uma das 4.117 linhas legadas; ACL/RLS preservadas.
+- [x] Conter localmente criação/edição financeira antiga de contratos e multa manual; remover UPDATE da consulta de parcelas e derivar calendário só na apresentação. 24 testes direcionados aprovados.
+- [x] Concluir integração e validação completa: 1.091 testes aprovados, 11 opt-in ignorados, TypeScript e build aprovados; DDL aditiva instalada no projeto correto.
+- [x] Exercitar SQL produtivo sob service_role com dados sintéticos segregados: onboarding/criação/despesa/parcial/quitação/estorno e replay na mesma conta; ROLLBACK integral, zero operações de teste persistidas.
+- [ ] Concluir checkpoint/push/deploy/flags dos fluxos prospectivos; não habilitar o recebimento legado para contornar 0013/0015.
+- [ ] Confirmar assinantes SaaS elegíveis antes de liberar Blacklist: `assinaturas` atual é cobrança dos clientes, não acesso ao CobraPro. Nenhuma concessão automática.
+- [x] Instalar base/concessões Blacklist e congelar escrita pela 0026 até backend privado live; zero registros/fotos/grants e nenhum acesso anon/authenticated.
+- [ ] Concluir cópia durável fora do sandbox e preservação de Auth/Storage/objetos. Backup lógico de `public` não é backup total do projeto.
+
+Evidências e gates em `reports/liberacao-operacional-2026-11-08.md`. Não declarar liberação global antes dos testes e rollout.
+
 ## Pré-auditoria produtiva de 6/11/2026 — acesso correto finalmente confirmado
 
 - [x] Confirmar via conector o projeto correto `oxvtmibrgjruldkouhhb`, sem executar SQL no outro projeto.
@@ -20,7 +34,7 @@
 - [x] Preparar 0019 base Blacklist backend-only e validar 21 verificações PostgreSQL locais, inclusive teto transacional de fotos, concorrência e reaplicação. **Não aplicada em produção; storage privado, descarte/compensação dos objetos e elegibilidade seguem pendentes.**
 - [x] Publicar 89d8df78: deploy Success/Live confirmado às 21h52 BRT, saldo/contratos preservados e calendário/saúde de carteira carregados. O smoke identificou embed de clientes inválido nas listas; não declarar dashboard integralmente validado antes do ajuste seguinte.
 - [x] Corrigir localmente listas sem depender de FK `parcelas.cliente_id` ausente: consulta de cliente por IDs e tenant explícito, completude obrigatória, sem inferência/backfill. Suite completa, 69 regressões de dashboard em Honolulu, TypeScript/build aprovados às 21h54 BRT.
-- [ ] Confirmar publicação e smoke das listas de hoje/atrasadas após o ajuste de vínculo explícito.
+- [x] Confirmar publicação `0a3a986` e smoke das listas de hoje/atrasadas após o ajuste: Live em 6/11 às 22h01 BRT; endpoint hoje retornou lista vazia válida, lista de atrasadas carregou e valores de Caixa/contratos permaneceram iguais.
 
 - [ ] Obter backup integral recuperável antes de saneamento. Painel do projeto correto confirmou às 21h28 BRT que o plano Free não inclui backups e o resumo exibe No backups; nenhum upgrade ou restauração iniciado. Exportação parcial não substitui backup e teste de recuperação.
 

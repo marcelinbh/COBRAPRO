@@ -119,3 +119,6 @@ set_cookie_cdp.mjs
 
 # Resultado gerado pelo runner PostgreSQL descartável da Blacklist.
 tests/postgres-blacklist/result.json
+
+# Evidências de execução são privadas/temporárias; fixtures e baselines ficam versionados.
+tests/postgres-*/evidence/

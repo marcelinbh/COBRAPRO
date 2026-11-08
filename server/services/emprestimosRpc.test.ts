@@ -14,7 +14,10 @@ const result = () => ({
   valorParcela: "416.67", totalContrato: "1250.00", jurosTotal: "750.00", numeroParcelas: 3,
   dataDesembolso: "2026-01-01", vencimentos: entrada.vencimentos, status: "ativo", regra: "mensal_simples_v1",
 });
-beforeEach(() => vi.stubEnv("ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS", "true"));
+beforeEach(() => {
+  vi.stubEnv("ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS", "true");
+  vi.stubEnv("ENABLE_RPC_CICLO_EMPRESTIMOS_PROSPECTIVOS", "true");
+});
 afterEach(() => vi.unstubAllEnvs());
 
 describe("empréstimo prospectivo — cálculo e contrato", () => {

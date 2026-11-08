@@ -1,0 +1,424 @@
+{
+  "suite": "onboarding-transacional-0024",
+  "postgres_major": 17,
+  "passed": 46,
+  "failed": 0,
+  "results": [
+    {
+      "name": "isolated_socket_env_pg17",
+      "status": "PASS",
+      "detail": {
+        "postgres_major": 17,
+        "listen_addresses": "",
+        "private_socket": true,
+        "clean_environment": true
+      }
+    },
+    {
+      "name": "fixture_metadata_production_contract",
+      "status": "PASS",
+      "detail": {
+        "columns": 12,
+        "defaults_nullability_typmods_exact": true,
+        "tipo_check": "CHECK (((tipo)::text = ANY ((ARRAY['caixa'::character varying, 'banco'::character varying, 'digital'::character varying])::text[])))"
+      }
+    },
+    {
+      "name": "migration_reapply_hash_metadata_no_dml",
+      "status": "PASS",
+      "detail": {
+        "reapplications": 3,
+        "catalog_data_identical": true
+      }
+    },
+    {
+      "name": "first_use_replay_exact_conflicts_legacy_immutable",
+      "status": "PASS",
+      "detail": {
+        "account": 1001,
+        "exact_replay_without_write": true,
+        "three_payload_conflicts": true,
+        "financial_legacy_unchanged": true
+      }
+    },
+    {
+      "name": "deterministic_owner_active_account_no_balance_changes",
+      "status": "PASS",
+      "detail": {
+        "deterministic_min_active_id": 20,
+        "balances_timestamps_untouched": true,
+        "foreign_null_owner_not_adopted": true
+      }
+    },
+    {
+      "name": "inactive_preservation_and_completed_conflict",
+      "status": "PASS",
+      "detail": {
+        "incomplete_inactive_creates_explicit_new": true,
+        "completed_inactive_conflict_no_reactivation": true,
+        "completed_active_exact_no_update": true
+      }
+    },
+    {
+      "name": "validation_trim_unicode_types_named_parameters",
+      "status": "PASS",
+      "detail": {
+        "invalid_payloads_no_writes": 13,
+        "255_unicode_codepoints": true,
+        "all_types": true,
+        "unknown_named_owner_fails": true
+      }
+    },
+    {
+      "name": "service_role_rls_grants_safe_searchpath",
+      "status": "PASS",
+      "detail": {
+        "service_role_only_execute": true,
+        "table_grants_unchanged": true,
+        "rls_on": true,
+        "temp_public_shadowing_safe": true
+      }
+    },
+    {
+      "name": "account_saved_before_user_update",
+      "status": "PASS",
+      "detail": {
+        "user_completed_only_after_account_saved": true
+      }
+    },
+    {
+      "name": "rollback_insert_before_error",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "INSERT",
+        "table": "contas_caixa",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_insert_after_error",
+      "status": "PASS",
+      "detail": {
+        "timing": "AFTER",
+        "event": "INSERT",
+        "table": "contas_caixa",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_insert_suppressed",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "INSERT",
+        "table": "contas_caixa",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_insert_owner_tamper",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "INSERT",
+        "table": "contas_caixa",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_insert_balance_tamper",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "INSERT",
+        "table": "contas_caixa",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_insert_inactive_tamper",
+      "status": "PASS",
+      "detail": {
+        "timing": "AFTER",
+        "event": "INSERT",
+        "table": "contas_caixa",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_update_before_error",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "UPDATE",
+        "table": "users",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_update_after_error",
+      "status": "PASS",
+      "detail": {
+        "timing": "AFTER",
+        "event": "UPDATE",
+        "table": "users",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_update_suppressed",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "UPDATE",
+        "table": "users",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_update_id_tamper",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "UPDATE",
+        "table": "users",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_update_company_tamper",
+      "status": "PASS",
+      "detail": {
+        "timing": "BEFORE",
+        "event": "UPDATE",
+        "table": "users",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "rollback_update_account_tamper",
+      "status": "PASS",
+      "detail": {
+        "timing": "AFTER",
+        "event": "UPDATE",
+        "table": "users",
+        "all_business_rows_rolled_back": true
+      }
+    },
+    {
+      "name": "concurrent_identical_real_calls_one_account",
+      "status": "PASS",
+      "detail": {
+        "actual_lock_wait": true,
+        "same_account": 1001,
+        "account_count": 1,
+        "different_payload_conflict": false
+      }
+    },
+    {
+      "name": "concurrent_divergent_payload_preserves_winner",
+      "status": "PASS",
+      "detail": {
+        "actual_lock_wait": true,
+        "same_account": 1001,
+        "account_count": 1,
+        "different_payload_conflict": true
+      }
+    },
+    {
+      "name": "failclosed_homonym_body",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_homonym_names",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_wrong_signature",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_overload",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_security_invoker",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_unsafe_searchpath",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_hash_comment",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_hash_body",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_acl_anon",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_acl_public",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_acl_grant_option",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_owner",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_volatility",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_strictness",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_parallelism",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_cost",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_unknown_default_grant",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_leakproof",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_extra_config",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_table_homonym",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_schema_typmod",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "failclosed_schema_nullability",
+      "status": "PASS",
+      "detail": {
+        "installation_rejected_atomically": true,
+        "catalog_data_preserved": true
+      }
+    },
+    {
+      "name": "static_no_financial_legacy_dml",
+      "status": "PASS",
+      "detail": {
+        "no_ledger_client_existing_account_dml": true,
+        "only_one_insert_one_update_in_rpc": true
+      }
+    }
+  ],
+  "local_logs": "/tmp/cobrapro-onboarding.bErGIZ/logs",
+  "sha256_artifacts": {
+    "drizzle/0024_onboarding_transacional.sql": "a2c3b56da3522c9ecf71be350a1b27e2d7fe56d9560e4b8b9d3ce43e5004db24",
+    "server/services/onboardingRpc.ts": "7cbe6cd86c2055bcefb70c21d8dc0f851f9bc779b7fdc39a9207183cd5df10dd",
+    "server/services/onboardingRpc.test.ts": "eb788ff941fb6249a52f708b177df3da58cfa5ec9e6704dc5c5d4999203d8b1c",
+    "tests/postgres-onboarding/fixture.sql": "f7728a39f3e42ab830d2aef6bc008ea047adcd03f2a912fd5eccfa6144177af0",
+    "tests/postgres-onboarding/run.sh": "73a3cf20075e950b5decec97530d5117af5691f1fdcc694c1e66f962fde79a8f",
+    "tests/postgres-onboarding/validate.py": "83a55820c22d3090d62638795b14c9a2e266bd1e262adf40b62b62d3bea89c8d"
+  },
+  "sha256_result_signature": "03420729c19bec74855438a1f1cd4dfdc6860d93c0b748ab7415dd7bf3dc1406"
+}

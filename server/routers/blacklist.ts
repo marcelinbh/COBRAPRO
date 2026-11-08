@@ -1,10 +1,12 @@
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc";
+import { router, protectedProcedure, adminProcedure } from "../_core/trpc";
 import { getSupabaseClientAsync } from "../db";
-import { storageGet, storagePut } from "../storage";
-import { validarFotoBlacklist } from "../uploadSecurity";
+import { requireBlacklistEnabled, requireBlacklistEntitlement } from "../services/blacklistEntitlement";
+import {
+  BLACKLIST_MAX_BASE64, blacklistPhotoUrl, validatedBlacklistPhotoKey,
+  uploadPrivateBlacklistPhoto, removePrivateBlacklistPhoto, removePrivatePhotoReversibly,
+} from "../services/blacklistPrivateStorage";
 import { TRPCError } from "@trpc/server";
-import { randomUUID } from "node:crypto";
 import {
   documentoBlacklistValido,
   mascararDocumentoBlacklist,
@@ -18,6 +20,12 @@ const TIPOS_DIVIDA = ["emprestimo", "servico", "produto", "aluguel", "cheque", "
 const STATUS_BLACKLIST = ["ativo", "resolvido", "em_negociacao"] as const;
 const UFS = new Set(["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]);
 const MAX_FOTOS_POR_REGISTRO = 5;
+const subscriberProcedure = protectedProcedure.use(async ({ ctx, next }) => {
+  await requireBlacklistEntitlement(ctx.user);
+  return next({ ctx });
+});
+const documentoInput = z.string().max(20)
+  .refine(value => /^[\d.\-/\s]+$/.test(value) && documentoBlacklistValido(value), "Informe CPF ou CNPJ completo e válido");
 
 async function requireSupabase() {
   const supabase = await getSupabaseClientAsync();
@@ -31,7 +39,7 @@ function erroValidacao(message: string): never {
 
 function textoSeguro(valor: string | undefined, limite: number, campo: string): string | null {
   try {
-    return normalizarTextoBlacklist(valor, limite);
+    return normalizarTextoBlacklist(valor?.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/<[^>]*>/g, ""), limite);
   } catch {
     return erroValidacao(`${campo} excede o limite permitido`);
   }
@@ -63,7 +71,7 @@ function ufSegura(valor: string | undefined): string | null {
 function dataSegura(valor: string | undefined): string | null {
   const data = textoSeguro(valor, 10, "Data da ocorrência");
   if (!data) return null;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || Number.isNaN(Date.parse(`${data}T12:00:00Z`))) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || (Number.isNaN(Date.parse(`${data}T12:00:00Z`)) || new Date(`${data}T12:00:00Z`).toISOString().slice(0, 10) !== data)) {
     erroValidacao("Data da ocorrência inválida");
   }
   return data;
@@ -160,11 +168,26 @@ const dadosComuns = z.object({
 });
 
 export const blacklistRouter = router({
+  // Auditoria administrativa separada não concede entitlement nem acesso a fotos.
+  // Provisionamento de grants continua exclusivamente SQL humano aprovado.
+  auditarAcessos: adminProcedure
+    .input(z.object({ userId: z.number().int().positive(), offset: z.number().int().min(0).max(10_000).default(0) }))
+    .query(async ({ input }) => {
+      requireBlacklistEnabled();
+      const supabase = await requireSupabase();
+      const { data, error } = await supabase.from("blacklist_access_audit")
+        .select("id, user_id, actor_id, action, before_data, after_data, occurred_at")
+        .eq("user_id", input.userId).order("id", { ascending: false })
+        .range(input.offset, input.offset + 49);
+      if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Auditoria indisponível; validar concessões backend-only." });
+      return data ?? [];
+    }),
+
   // A Blacklist é compartilhada por requisito do produto, mas cada inclusão
   // recebe somente dados validados e a consulta pública retorna um DTO mínimo.
-  criar: protectedProcedure
+  criar: subscriberProcedure
     .input(dadosComuns.extend({
-      cpfCnpj: z.string().max(20).refine(documentoBlacklistValido, "Informe CPF ou CNPJ completo e válido"),
+      cpfCnpj: documentoInput,
       nome: z.string().max(255),
       motivo: z.string().max(2_000),
       tipoDivida: z.enum(TIPOS_DIVIDA).default("outros"),
@@ -185,8 +208,8 @@ export const blacklistRouter = router({
 
   // A busca compartilhada aceita somente documento completo; isso bloqueia
   // enumeração por nome, fragmentos de CPF/CNPJ e o antigo ILIKE '%%'.
-  consultar: protectedProcedure
-    .input(z.object({ busca: z.string().max(20).refine(documentoBlacklistValido, "Informe CPF ou CNPJ completo e válido") }))
+  consultar: subscriberProcedure
+    .input(z.object({ busca: documentoInput }))
     .query(async ({ input }) => {
       const supabase = await requireSupabase();
       const documento = normalizarDocumentoBlacklist(input.busca);
@@ -199,9 +222,33 @@ export const blacklistRouter = router({
       return (data ?? []).map(paraConsultaCompartilhada);
     }),
 
+  detalhe: subscriberProcedure
+    .input(z.object({ id: z.number().int().positive() }))
+    .query(async ({ ctx, input }) => {
+      const supabase = await requireSupabase();
+      const { data: registro, error } = await supabase.from("blacklist")
+        .select("id, cpf_cnpj, nome, cidade, estado, tipo_divida, status, cadastrado_por_user_id")
+        .eq("id", input.id).limit(1).maybeSingle();
+      if (error || !registro || (registro.cadastrado_por_user_id !== ctx.user.id
+        && !["ativo", "em_negociacao"].includes(registro.status))) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Registro não encontrado" });
+      }
+      const { data: photos, error: photosError } = await supabase.from("blacklist_fotos")
+        .select("id, blacklist_id, file_key, url").eq("blacklist_id", registro.id).limit(5);
+      if (photosError) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Fotos indisponíveis" });
+      const fotos = (photos ?? []).flatMap(photo => {
+        try {
+          if (photo.blacklist_id !== registro.id) return [];
+          validatedBlacklistPhotoKey(photo, { userId: registro.cadastrado_por_user_id, blacklistId: registro.id });
+          return [{ id: photo.id, url: blacklistPhotoUrl(photo.id) }];
+        } catch { return []; }
+      });
+      return { ...paraConsultaCompartilhada(registro), fotos };
+    }),
+
   // Registros próprios conservam os dados necessários para o autor editar e
-  // recebem URLs de download emitidas sob demanda; file_key nunca vai ao cliente.
-  listarMeus: protectedProcedure.query(async ({ ctx }) => {
+  // recebem somente rotas same-origin protegidas; referências privadas nunca vão ao cliente.
+  listarMeus: subscriberProcedure.query(async ({ ctx }) => {
     const supabase = await requireSupabase();
     const { data: registros, error } = await supabase.from("blacklist")
       .select("id, cpf_cnpj, nome, telefone, email, endereco, numero, complemento, bairro, cidade, estado, cep, motivo, tipo_divida, valor_divida, data_ocorrencia, status, observacoes, createdAt, updatedAt")
@@ -213,24 +260,25 @@ export const blacklistRouter = router({
     const ids = (registros ?? []).map((registro: any) => registro.id);
     const { data: fotos, error: fotosErro } = ids.length === 0
       ? { data: [], error: null }
-      : await supabase.from("blacklist_fotos").select("id, blacklist_id, file_key").in("blacklist_id", ids);
+      : await supabase.from("blacklist_fotos").select("id, blacklist_id, file_key, url").in("blacklist_id", ids).limit(500);
     if (fotosErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível carregar suas fotos" });
 
     const urlsPorRegistro = new Map<number, Array<{ id: number; url: string }>>();
     for (const foto of fotos ?? []) {
       try {
-        const { url } = await storageGet(foto.file_key);
+        validatedBlacklistPhotoKey(foto, { userId: ctx.user.id, blacklistId: foto.blacklist_id });
+        const url = blacklistPhotoUrl(foto.id);
         const lista = urlsPorRegistro.get(foto.blacklist_id) ?? [];
         lista.push({ id: foto.id, url });
         urlsPorRegistro.set(foto.blacklist_id, lista);
       } catch (erro) {
-        console.warn("[Blacklist] não foi possível emitir URL privada da foto", { fotoId: foto.id, erro: erro instanceof Error ? erro.message : "erro desconhecido" });
+        console.warn("[Blacklist] foto legada não exibida; migração aprovada necessária", { fotoId: foto.id });
       }
     }
     return (registros ?? []).map((registro: any) => paraRegistroProprio(registro, urlsPorRegistro.get(registro.id) ?? []));
   }),
 
-  atualizar: protectedProcedure
+  atualizar: subscriberProcedure
     .input(dadosComuns.extend({ id: z.number().int().positive(), status: z.enum(STATUS_BLACKLIST).optional() }))
     .mutation(async ({ ctx, input }) => {
       const supabase = await requireSupabase();
@@ -247,24 +295,27 @@ export const blacklistRouter = router({
       return { id: data.id };
     }),
 
-  deletar: protectedProcedure
+  deletar: subscriberProcedure
     .input(z.object({ id: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const supabase = await requireSupabase();
       const { data: proprio, error: proprioErro } = await supabase.from("blacklist")
         .select("id").eq("id", input.id).eq("cadastrado_por_user_id", ctx.user.id).maybeSingle();
       if (proprioErro || !proprio) throw new TRPCError({ code: "NOT_FOUND", message: "Registro não encontrado" });
-      const { error: fotosErro } = await supabase.from("blacklist_fotos").delete().eq("blacklist_id", input.id);
-      if (fotosErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível remover as fotos do registro" });
-      const { error } = await supabase.from("blacklist").delete().eq("id", input.id).eq("cadastrado_por_user_id", ctx.user.id);
-      if (error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível remover o registro" });
+      // RPC service_role da 0023 trava o pai e só exclui registro sem fotos.
+      // Fotos devem ser removidas reversivelmente antes; impede CASCADE órfão
+      // inclusive se um upload concorrente disputar o lock do pai na 0019.
+      const { data, error } = await supabase.rpc("blacklist_delete_empty_owned", { target_id: input.id, owner_id: ctx.user.id });
+      if (error?.code === "23514") throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Remova primeiro as fotos do registro para preservar a exclusão segura." });
+      if (error) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Exclusão segura indisponível. Validar migration 0023." });
+      if (data !== true) throw new TRPCError({ code: "NOT_FOUND", message: "Registro não encontrado" });
       return { sucesso: true };
     }),
 
-  adicionarFoto: protectedProcedure
+  adicionarFoto: subscriberProcedure
     .input(z.object({
       blacklistId: z.number().int().positive(),
-      fotoBase64: z.string().min(1),
+      fotoBase64: z.string().min(1).max(BLACKLIST_MAX_BASE64 + 32),
       mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -278,36 +329,62 @@ export const blacklistRouter = router({
       if (contagemErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível verificar as fotos" });
       if ((count ?? 0) >= MAX_FOTOS_POR_REGISTRO) erroValidacao(`Limite de ${MAX_FOTOS_POR_REGISTRO} fotos por registro atingido`);
 
-      const base64Data = input.fotoBase64.replace(/^data:[^;]+;base64,/, "");
-      let fotoValidada;
+      const scope = { userId: ctx.user.id, blacklistId: input.blacklistId };
+      const stored = await uploadPrivateBlacklistPhoto(scope, input.fotoBase64, input.mimeType);
+      let foto: { id: number } | null = null;
+      let dbError: { code?: string } | null = null;
       try {
-        fotoValidada = validarFotoBlacklist(base64Data, input.mimeType);
-      } catch (error) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: error instanceof Error ? error.message : "Foto inválida" });
+        const result = await supabase.from("blacklist_fotos")
+          .insert({ blacklist_id: input.blacklistId, url: stored.reference, file_key: stored.key })
+          .select("id").maybeSingle();
+        foto = result.data;
+        dbError = result.error;
+      } catch {
+        dbError = {};
       }
-      const fileKey = `blacklist/${input.blacklistId}/foto-${randomUUID()}.${fotoValidada.extensao}`;
-      const { url } = await storagePut(fileKey, fotoValidada.buffer, fotoValidada.contentType);
-      const { data: foto, error } = await supabase.from("blacklist_fotos")
-        .insert({ blacklist_id: input.blacklistId, url, file_key: fileKey })
-        .select("id").maybeSingle();
-      if (error || !foto) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível registrar a foto" });
+      if (!foto) {
+        // Timeout pode ter confirmado INSERT: verificar antes de remover objeto.
+        const confirmed = await supabase.from("blacklist_fotos").select("id")
+          .eq("blacklist_id", input.blacklistId).eq("file_key", stored.key).limit(1).maybeSingle();
+        if (confirmed.error) {
+          console.error("[Blacklist] upload com confirmação ambígua; reconciliar", { key: stored.key });
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Confirmação da foto pendente; contate o responsável antes de reenviar." });
+        }
+        if (confirmed.data) return { id: confirmed.data.id };
+        await removePrivateBlacklistPhoto(stored.key, scope);
+        throw new TRPCError({ code: dbError?.code === "23514" ? "BAD_REQUEST" : "INTERNAL_SERVER_ERROR", message: dbError?.code === "23514" ? "Limite de cinco fotos por registro atingido" : "Não foi possível registrar a foto; upload revertido." });
+      }
       return { id: foto.id };
     }),
 
-  removerFoto: protectedProcedure
+  removerFoto: subscriberProcedure
     .input(z.object({ fotoId: z.number().int().positive(), blacklistId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const supabase = await requireSupabase();
       const { data: proprio, error: proprioErro } = await supabase.from("blacklist")
         .select("id").eq("id", input.blacklistId).eq("cadastrado_por_user_id", ctx.user.id).maybeSingle();
       if (proprioErro || !proprio) throw new TRPCError({ code: "NOT_FOUND", message: "Registro não encontrado" });
-      const { data, error } = await supabase.from("blacklist_fotos").delete()
-        .eq("id", input.fotoId).eq("blacklist_id", input.blacklistId).select("id").maybeSingle();
-      if (error || !data) throw new TRPCError({ code: "NOT_FOUND", message: "Foto não encontrada neste registro" });
+      const { data: photo, error: photoError } = await supabase.from("blacklist_fotos")
+        .select("id, blacklist_id, file_key, url").eq("id", input.fotoId).eq("blacklist_id", input.blacklistId).maybeSingle();
+      if (photoError || !photo) throw new TRPCError({ code: "NOT_FOUND", message: "Foto não encontrada neste registro" });
+      const scope = { userId: ctx.user.id, blacklistId: input.blacklistId };
+      const key = validatedBlacklistPhotoKey(photo, scope);
+      await removePrivatePhotoReversibly(key, scope, async () => {
+        let result;
+        try {
+          result = await supabase.from("blacklist_fotos").delete().eq("id", input.fotoId)
+            .eq("blacklist_id", input.blacklistId).eq("file_key", photo.file_key).select("id").maybeSingle();
+        } catch { result = { error: true, data: null }; }
+        if (!result.error && result.data) return;
+        const confirmation = await supabase.from("blacklist_fotos").select("id")
+          .eq("id", input.fotoId).eq("blacklist_id", input.blacklistId).maybeSingle();
+        if (!confirmation.error && !confirmation.data) return;
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Exclusão não confirmada; foto restaurada para preservar os dados." });
+      });
       return { sucesso: true };
     }),
 
-  estatisticas: protectedProcedure.query(async () => {
+  estatisticas: subscriberProcedure.query(async () => {
     const supabase = await requireSupabase();
     const [total, ativos, resolvidos, emNegociacao] = await Promise.all([
       supabase.from("blacklist").select("id", { count: "exact", head: true }),

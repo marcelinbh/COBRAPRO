@@ -31,18 +31,20 @@ export default function Blacklist() {
   const [busca, setBusca] = useState("");
   const [buscaAtiva, setBuscaAtiva] = useState("");
 
-  const { data: stats } = trpc.blacklist.estatisticas.useQuery();
-  const { data: resultados, isLoading: buscando } = trpc.blacklist.consultar.useQuery(
+  const { data: stats, error: statsError } = trpc.blacklist.estatisticas.useQuery(undefined, { retry: false });
+  const { data: resultados, isLoading: buscando, error: buscaError } = trpc.blacklist.consultar.useQuery(
     { busca: buscaAtiva },
-    { enabled: documentoCompleto(buscaAtiva), retry: false }
+    { enabled: !!stats && !statsError && documentoCompleto(buscaAtiva), retry: false }
   );
 
   function handleBuscar(e: React.FormEvent) {
     e.preventDefault();
     const documento = busca.replace(/\D/g, "");
-    if (documentoCompleto(documento)) setBuscaAtiva(documento);
+    if (stats && !statsError && documentoCompleto(documento)) setBuscaAtiva(documento);
   }
 
+  const unavailable = statsError?.message;
+  const safeStats = statsError ? undefined : stats;
   const buscaInvalida = busca.trim().length > 0 && !documentoCompleto(busca);
 
   return (
@@ -56,15 +58,18 @@ export default function Blacklist() {
           </div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" asChild><Link href="/blacklist/meus">Meus Registros</Link></Button>
-          <Button className="bg-red-600 hover:bg-red-700" asChild><Link href="/blacklist/nova"><Plus className="h-4 w-4 mr-2" />Nova Inclusão</Link></Button>
+          {safeStats ? <><Button variant="outline" asChild><Link href="/blacklist/meus">Meus Registros</Link></Button>
+            <Button className="bg-red-600 hover:bg-red-700" asChild><Link href="/blacklist/nova"><Plus className="h-4 w-4 mr-2" />Nova Inclusão</Link></Button></>
+            : <><Button disabled variant="outline">Meus Registros</Button><Button disabled>Nova Inclusão</Button></>}
         </div>
       </div>
 
+      {unavailable && <div role="alert" className="rounded-lg border border-yellow-500/30 p-4"><p className="font-semibold">Blacklist indisponível</p><p className="text-sm text-muted-foreground">{unavailable}</p><p className="text-xs text-muted-foreground mt-2">Nenhuma consulta foi concluída. A liberação exige acesso de assinante confirmado e configuração privada aprovada.</p></div>}
+
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <Kpi icon={<Users className="h-5 w-5 text-red-500" />} label="Total Registros" value={stats?.total ?? 0} />
-        <Kpi icon={<AlertTriangle className="h-5 w-5 text-red-500" />} label="Inadimplentes" value={stats?.ativos ?? 0} valueClass="text-red-500" />
-        <Kpi icon={<CheckCircle className="h-5 w-5 text-green-500" />} label="Resolvidos" value={stats?.resolvidos ?? 0} valueClass="text-green-500" />
+        <Kpi icon={<Users className="h-5 w-5 text-red-500" />} label="Total Registros" value={safeStats?.total ?? null} />
+        <Kpi icon={<AlertTriangle className="h-5 w-5 text-red-500" />} label="Inadimplentes" value={safeStats?.ativos ?? null} valueClass="text-red-500" />
+        <Kpi icon={<CheckCircle className="h-5 w-5 text-green-500" />} label="Resolvidos" value={safeStats?.resolvidos ?? null} valueClass="text-green-500" />
       </div>
 
       <Card className="border-border/50">
@@ -78,19 +83,19 @@ export default function Blacklist() {
               inputMode="numeric"
               className="flex-1"
             />
-            <Button type="submit" disabled={!documentoCompleto(busca)} className="bg-red-600 hover:bg-red-700"><Search className="h-4 w-4 mr-2" />Consultar</Button>
+            <Button type="submit" disabled={!safeStats || !documentoCompleto(busca)} className="bg-red-600 hover:bg-red-700"><Search className="h-4 w-4 mr-2" />Consultar</Button>
           </form>
           <p className="text-xs text-muted-foreground mt-2">Por privacidade e segurança, a consulta exige CPF ou CNPJ completo e mostra dados mascarados.</p>
           {buscaInvalida && <p className="text-xs text-destructive mt-2">Informe os 11 dígitos do CPF ou os 14 dígitos do CNPJ.</p>}
 
-          {buscaAtiva && (
+          {buscaAtiva && safeStats && (
             <div className="mt-4 space-y-3">
-              {buscando ? <div className="text-center py-8 text-muted-foreground">Consultando...</div>
+              {buscaError ? <div role="alert" className="text-destructive text-sm">Consulta não concluída: {buscaError.message}</div> : buscando ? <div className="text-center py-8 text-muted-foreground">Consultando...</div>
                 : resultados && resultados.length > 0 ? <>
                   <p className="text-sm text-muted-foreground">{resultados.length} resultado(s) encontrado(s).</p>
                   {resultados.map((registro) => <BlacklistCard key={registro.id} registro={registro} />)}
                 </>
-                : <div className="text-center py-8"><CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" /><p className="text-lg font-semibold text-foreground">Nenhum registro ativo encontrado</p><p className="text-sm text-muted-foreground mt-1">O documento consultado não consta como inadimplente ou em negociação.</p></div>}
+                : resultados ? <div className="text-center py-8"><CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" /><p className="text-lg font-semibold text-foreground">Nenhum registro ativo encontrado</p><p className="text-sm text-muted-foreground mt-1">O documento consultado não consta como inadimplente ou em negociação.</p></div> : <p className="text-sm text-muted-foreground">Consulta ainda não concluída.</p>}
             </div>
           )}
 
@@ -106,8 +111,8 @@ export default function Blacklist() {
   );
 }
 
-function Kpi({ icon, label, value, valueClass = "" }: { icon: React.ReactNode; label: string; value: number; valueClass?: string }) {
-  return <Card className="border-border/50"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-muted">{icon}</div><div><p className="text-xs text-muted-foreground">{label}</p><p className={`text-2xl font-bold text-foreground ${valueClass}`}>{value}</p></div></div></CardContent></Card>;
+function Kpi({ icon, label, value, valueClass = "" }: { icon: React.ReactNode; label: string; value: number | null; valueClass?: string }) {
+  return <Card className="border-border/50"><CardContent className="p-4"><div className="flex items-center gap-3"><div className="p-2 rounded-lg bg-muted">{icon}</div><div><p className="text-xs text-muted-foreground">{label}</p><p className={`text-2xl font-bold text-foreground ${valueClass}`}>{value ?? "—"}</p></div></div></CardContent></Card>;
 }
 
 function BlacklistCard({ registro }: { registro: { id: number; nome: string; documentoMascarado: string; cidade: string | null; estado: string | null; tipoDivida: string; status: string } }) {
