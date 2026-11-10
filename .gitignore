@@ -123,3 +123,4 @@ tests/postgres-blacklist/result.json
 # Evidências de execução são privadas/temporárias; fixtures e baselines ficam versionados.
 tests/postgres-*/evidence/
 tests/postgres-kiwify-subscriptions/results-pg17.json
+tests/postgres-kiwify-subscriptions/results-pg17-run-*.json

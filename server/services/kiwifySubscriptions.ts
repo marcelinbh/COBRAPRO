@@ -4,6 +4,7 @@ import {
   type KiwifySale, type KiwifySalesReader,
 } from "./kiwifySalesClient";
 import type { BlacklistSubscriptionEvidence } from "./blacklistEntitlement";
+import type { KiwifyBuyerProvisioner, KiwifyInvitationState } from "./kiwifyBuyerProvisioning";
 
 export const KIWIFY_WEBHOOK_EVENTS = [
   "order_approved", "order_rejected", "order_refunded", "chargeback",
@@ -189,11 +190,12 @@ export type KiwifySubscriptionDependencies = {
   sales: KiwifySalesReader;
   users: KiwifyUserDirectory;
   ledger: KiwifyLedgerAdapter;
+  buyers?: KiwifyBuyerProvisioner;
   now?: () => number;
 };
 export type KiwifyProcessResult =
   | { outcome: "ignored"; reason: "non_grant_event" | "no_current_paid_period" | "product_not_allowed" | "user_not_unique" }
-  | { outcome: "consumed"; action: KiwifyLedgerAction; applied: boolean };
+  | { outcome: "consumed"; action: KiwifyLedgerAction; applied: boolean; invitation?: KiwifyInvitationState };
 
 async function uniqueUser(users: KiwifyUserDirectory, email: string): Promise<KiwifyServerUser | null> {
   const matches = await users.findUsersByNormalizedEmail(email);
@@ -210,8 +212,8 @@ function validateSale(sale: KiwifySale, orderId: string): void {
 }
 
 /** Caller MUST validate raw-body HMAC with existing handler BEFORE invoking.
- * No signature shortcut/boolean supplied by HTTP clients and no account/email
- * mutation capabilities exist in this service. Errors are redacted, no logging.
+ * No signature shortcut/boolean supplied by HTTP clients. Optional buyer RPC
+ * runs ONLY after full paid validation. Existing users are never mutated.
  */
 export function createKiwifySubscriptions(deps: KiwifySubscriptionDependencies) {
   const now = deps.now ?? Date.now;
@@ -228,8 +230,6 @@ export function createKiwifySubscriptions(deps: KiwifySubscriptionDependencies) 
         const sale = await deps.sales.getSale(event.orderId);
         validateSale(sale, event.orderId);
         if (!deps.sales.isProductAllowed(sale.productId)) return { outcome: "ignored", reason: "product_not_allowed" };
-        const user = await uniqueUser(deps.users, sale.customerEmail);
-        if (!user) return { outcome: "ignored", reason: "user_not_unique" };
         const current = now();
         if (!Number.isFinite(current)) throw new KiwifySubscriptionError("unavailable");
         let action: KiwifyLedgerAction;
@@ -259,12 +259,22 @@ export function createKiwifySubscriptions(deps: KiwifySubscriptionDependencies) 
           // Refused renewal alone does not erase an existing paid period.
           return { outcome: "ignored", reason: "non_grant_event" };
         }
+        const evidenceHash = createHash("sha256").update(authenticatedRawBody).digest("hex");
+        if (action === "paid_period" && deps.buyers) {
+          const buyer = await deps.buyers.provisionPaidBuyer(Object.freeze({ ...event,
+            productId: sale.productId, customerEmail: sale.customerEmail, saleStatus: sale.status,
+            action, receivedAt: new Date(current).toISOString(), evidenceHash }));
+          if (!userIdValid(buyer.userId) || typeof buyer.applied !== "boolean") throw new KiwifySubscriptionError("ledger_invalid");
+          return { outcome: "consumed", action, applied: buyer.applied,
+            ...(buyer.invitation === "not_needed" ? {} : { invitation: buyer.invitation }) };
+        }
+        const user = await uniqueUser(deps.users, sale.customerEmail);
+        if (!user) return { outcome: "ignored", reason: "user_not_unique" };
         const base = {
           ...event, userId: user.id, productId: sale.productId,
           customerEmail: sale.customerEmail, saleStatus: sale.status, action,
         };
         // Exact authenticated bytes, NOT normalized JSON; receivedAt never orders events.
-        const evidenceHash = createHash("sha256").update(authenticatedRawBody).digest("hex");
         const projection: KiwifyLedgerProjection = Object.freeze({ ...base,
           receivedAt: new Date(current).toISOString(), evidenceHash });
         const result = await deps.ledger.consume(projection);

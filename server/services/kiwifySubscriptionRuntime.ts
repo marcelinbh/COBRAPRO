@@ -10,6 +10,8 @@ import {
   type KiwifyUserDirectory, type KiwifyProcessResult,
 } from "./kiwifySubscriptions";
 import type { BlacklistSubscriptionEvidence } from "./blacklistEntitlement";
+import { createKiwifyBuyerProvisioning } from "./kiwifyBuyerProvisioning";
+import type { EmailParams, EmailDeliveryResult } from "../_core/email";
 
 /** Server-only structural subset: no Kiwify table access or write capability. */
 export type KiwifyRuntimeSupabase = KiwifyRpcClient & {
@@ -28,6 +30,7 @@ export type KiwifySubscriptionRuntimeOptions = {
   fetch?: typeof globalThis.fetch;
   now?: () => number;
   getSupabaseClient?: () => Promise<KiwifyRuntimeSupabase | null>;
+  sendEmail?: (params: EmailParams) => Promise<EmailDeliveryResult>;
 };
 
 function record(value: unknown): value is Record<string, unknown> {
@@ -154,7 +157,8 @@ export function createKiwifySubscriptionRuntime(options: KiwifySubscriptionRunti
     if (!service) {
       const sales = createKiwifySalesClient({ configuration: current, fetch: options.fetch, now: options.now });
       configuration = current;
-      service = createKiwifySubscriptions({ sales, users, now: options.now, ledger: {
+      service = createKiwifySubscriptions({ sales, users, now: options.now,
+        buyers: createKiwifyBuyerProvisioning({ client, sendEmail: options.sendEmail }), ledger: {
         readEvidenceForUser,
         async consume(projection) {
           let verified = projection;

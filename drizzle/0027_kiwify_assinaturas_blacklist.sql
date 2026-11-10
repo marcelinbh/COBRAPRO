@@ -330,6 +330,10 @@ BEGIN
       IF to_regtype('public.'||t) IS NOT NULL THEN RAISE EXCEPTION '0027 tipo homônimo: %',t; END IF;
       EXECUTE format('CREATE TABLE public.%I %s',t,ddl);
       EXECUTE format('COMMENT ON TABLE public.%I IS %L',t,'0027_kiwify_assinaturas_blacklist:v1:sha256='||encode(sha256(convert_to(ddl,'UTF8')),'hex'));
+      -- Supabase default ACL grants ALL (including PG17 MAINTAIN) to these roles.
+      -- Normalize ONLY this package's freshly created tables; never repair reapply drift
+      -- or revoke an unknown principal. Residual ACL below must still fail closed.
+      EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC,anon,authenticated,service_role',t);
       EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);
     END IF;
     IF NOT EXISTS(SELECT 1 FROM pg_class WHERE oid=to_regclass('public.'||t) AND relkind='r' AND relpersistence='p'

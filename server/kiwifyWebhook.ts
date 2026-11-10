@@ -249,12 +249,19 @@ export function registerKiwifyWebhookRoutes(app: Express) {
       return res.status(401).json({ error: "Assinatura inválida" });
     }
 
-    // Assinaturas nunca passam por reserva legada, criação de conta ou convite.
+    // Fluxo verificado nunca passa pela reserva/cadastro legados. A RPC aditiva
+    // provisiona só compradores paid validados; email vem exclusivamente do GET.
     // O runtime recebe EXATAMENTE os bytes autenticados, sem ler req.body.
     if (process.env.ENABLE_KIWIFY_SUBSCRIPTIONS === "true") {
       try {
         const result = await processVerifiedKiwifySubscription(rawBody);
         if (result.outcome === "consumed") {
+          if (result.invitation === "retryable" || result.invitation === "pending") {
+            return res.status(503).json({ error: "Convite pendente de aceite", retry: true });
+          }
+          if (result.invitation === "sending" || result.invitation === "unknown" || result.invitation === "blocked") {
+            return res.status(200).json({ received: true, needsReview: true });
+          }
           return res.status(200).json({ received: true });
         }
         if (result.outcome === "ignored") {

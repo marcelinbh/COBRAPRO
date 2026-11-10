@@ -52,6 +52,10 @@ function setup() {
     if (name === "rpc_kiwify_blacklist_access") return { data: access, error: null };
     if (name === "rpc_kiwify_blacklist_find_users") return { data: matches, error: null };
     if (name === "rpc_kiwify_blacklist_order_binding") return { data: binding, error: null };
+    if (name === "rpc_kiwify_buyer_provision") {
+      if (Array.isArray(matches) && matches.length > 1) return { data: null, error: { code: "23505" } };
+      return { data: { user_id: 7, email: USER.email, created: false, applied: true, invite_state: "not_needed" }, error: null };
+    }
     if (name === "rpc_kiwify_blacklist_consume") {
       const event = params.p_event as Record<string, unknown>;
       const financial = ["order_refunded", "chargeback"].includes(String(event.event_type))
@@ -231,7 +235,9 @@ describe("identity and second reads", () => {
   it.each([{ matches: [] }, { matches: [{ ...USER }, { id: 8, email: "USER@TEST.EXAMPLE" }] }])("email matches %j cannot identify a unique user", async ({ matches }) => {
     const s = setup(); s.setMatches(matches);
     await expect(s.runtime.resolveVerifiedKiwifyBlacklistEvidence(7)).resolves.toBeNull();
-    await expect(s.runtime.processVerifiedKiwifySubscription(raw())).resolves.toMatchObject({ reason: "user_not_unique" });
+    if (matches.length > 1) await expect(s.runtime.processVerifiedKiwifySubscription(raw())).rejects.toMatchObject({ code: "ledger_unavailable" });
+    else await expect(s.runtime.processVerifiedKiwifySubscription(raw())).resolves.toMatchObject({ action: "paid_period" });
+    expect(s.rpc).toHaveBeenCalledWith("rpc_kiwify_buyer_provision", { p_buyer: expect.objectContaining({ email: USER.email }) });
     expect(s.writes()).toHaveLength(0);
   });
 
@@ -371,7 +377,8 @@ describe("verified financial order binding and exact raw body contract", () => {
     const token = "mock-webhook-token"; const signature = createHmac("sha1", token).update(body).digest("hex");
     expect(assinaturaKiwifyEhValida(body, signature, token)).toBe(true);
     await s.runtime.processVerifiedKiwifySubscription(body);
-    expect(s.writes()[0][1]).toMatchObject({ p_event: { event_fingerprint: createHash("sha256").update(body).digest("hex") } });
+    expect(s.rpc.mock.calls.find(([name]) => name === "rpc_kiwify_buyer_provision")![1])
+      .toMatchObject({ p_buyer: { event: { event_fingerprint: createHash("sha256").update(body).digest("hex") } } });
     const before = s.fetchMock.mock.calls.length;
     if (assinaturaKiwifyEhValida(body, "invalid", token)) await s.runtime.processVerifiedKiwifySubscription(body);
     expect(s.fetchMock).toHaveBeenCalledTimes(before);
@@ -385,9 +392,10 @@ describe("verified financial order binding and exact raw body contract", () => {
 
   it("consume RPC missing schema cannot report grant or successful persistence", async () => {
     const s = setup(); const original = s.rpc.getMockImplementation()!;
-    s.rpc.mockImplementation(async (name, params) => name === "rpc_kiwify_blacklist_consume"
+    s.rpc.mockImplementation(async (name, params) => name === "rpc_kiwify_buyer_provision"
       ? { data: null, error: { code: "PGRST202", message: "secret pii" } } : original(name, params));
     await expect(s.runtime.processVerifiedKiwifySubscription(raw())).rejects.toMatchObject({ code: "ledger_unavailable" });
-    expect(s.from).not.toHaveBeenCalled(); expect(s.writes()).toHaveLength(1);
+    expect(s.from).not.toHaveBeenCalled(); expect(s.writes()).toHaveLength(0);
+    expect(s.rpc.mock.calls.filter(([name]) => name === "rpc_kiwify_buyer_provision")).toHaveLength(1);
   });
 });

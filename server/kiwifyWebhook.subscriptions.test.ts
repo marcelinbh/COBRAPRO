@@ -48,6 +48,9 @@ function realRuntime(options: { saleStatus?: string; notFound?: boolean } = {}) 
   const rpc = vi.fn(async (name: string, params: Record<string, unknown>) => {
     if (name === "rpc_kiwify_blacklist_find_users") return { data: [{ id: 7, email: "user@example.test" }], error: null };
     if (name === "rpc_kiwify_blacklist_order_binding") return { data: { subscription_id: "mock-subscription", user_id: 7, product_id: "mock-product" }, error: null };
+    if (name === "rpc_kiwify_buyer_provision") return { data: {
+      user_id: 7, email: "user@example.test", created: false, applied: true, invite_state: "not_needed",
+    }, error: null };
     if (name === "rpc_kiwify_blacklist_consume") {
       const event = params.p_event as Record<string, unknown>;
       const financial = event.verified_sale_status !== "paid";
@@ -187,14 +190,17 @@ describe("runtime real com transporte/RPC fictícios pelo handler autenticado", 
     expect(vi.mocked(console.error).mock.calls).toEqual([["[KiwifySubscriptions] unavailable"]]);
   });
   it("approved verificado persiste SHA256 dos bytes crus e ignora identidade do req.body", async () => {
+    mocks.hash.mockResolvedValue("$2b$12$" + "a".repeat(53));
     const s = realRuntime(); const rawBody = Buffer.from(JSON.stringify(payload(), null, 2) + "\n");
     const h = harness(); await h.run(signedRequest(rawBody));
     expect(h.res.status).toHaveBeenCalledWith(200); expect(h.res.json).toHaveBeenCalledWith({ received: true });
-    const calls = s.rpc.mock.calls.filter(([name]) => name === "rpc_kiwify_blacklist_consume"); expect(calls).toHaveLength(1);
-    const dto = calls[0][1].p_event;
-    expect(dto).toMatchObject({ user_id: 7, order_id: "mock-order", subscription_id: "mock-subscription", product_id: "mock-product",
+    const calls = s.rpc.mock.calls.filter(([name]) => name === "rpc_kiwify_buyer_provision"); expect(calls).toHaveLength(1);
+    const dto = (calls[0][1].p_buyer as { event: unknown }).event;
+    expect(dto).toMatchObject({ order_id: "mock-order", subscription_id: "mock-subscription", product_id: "mock-product",
       event_fingerprint: createHash("sha256").update(rawBody).digest("hex"), verified_sale_status: "paid" });
-    expect(JSON.stringify(dto)).not.toContain("example.test"); noLegacy(); expect(s.from).not.toHaveBeenCalled();
+    expect(JSON.stringify(dto)).not.toContain("example.test");
+    expect(mocks.db).not.toHaveBeenCalled(); expect(mocks.email).not.toHaveBeenCalled(); expect(mocks.hash).toHaveBeenCalledOnce();
+    expect(s.from).not.toHaveBeenCalled();
   });
   it.each([
     { event: "order_refunded", status: "refunded" }, { event: "chargeback", status: "chargedback" },
@@ -221,8 +227,10 @@ describe("runtime real com transporte/RPC fictícios pelo handler autenticado", 
     expect(h.res.status).toHaveBeenCalledWith(400); expect(s.fetchMock).not.toHaveBeenCalled(); expect(s.getSupabaseClient).not.toHaveBeenCalled(); noLegacy();
   });
   it("RPC ausente não volta à tabela kiwify_webhooks ausente nem cria conta", async () => {
+    mocks.hash.mockResolvedValue("$2b$12$" + "a".repeat(53));
     const s = realRuntime(); s.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202", message: "private user@example.test" } } as never);
-    const h = harness(); await h.run(signedRequest()); expect(h.res.status).toHaveBeenCalledWith(503); noLegacy();
+    const h = harness(); await h.run(signedRequest()); expect(h.res.status).toHaveBeenCalledWith(503);
+    expect(mocks.db).not.toHaveBeenCalled(); expect(mocks.email).not.toHaveBeenCalled(); expect(mocks.hash).toHaveBeenCalledOnce();
     expect(s.from).not.toHaveBeenCalled(); expect(vi.mocked(console.error).mock.calls).toEqual([["[KiwifySubscriptions] unavailable"]]);
   });
 });

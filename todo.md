@@ -1212,3 +1212,21 @@
 - [x] Registrar o envio diário e impedir duplicidade por conta e data
 - [x] Incluir o relatório diário na rotina autenticada de produção sem afetar os lembretes dos clientes
 - [x] Validar o envio em modo seguro e publicar a automação
+
+## Fase 67: Assinaturas Kiwify e cadastro transacional — 10/11/2026
+
+> Estado de liberação desta fase prevalece sobre itens históricos marcados como completos. Usuários existentes são manuais; não há comprovação de assinatura Kiwify deles e não foi autorizada concessão manual de Blacklist.
+
+- [x] Confirmar origem manual dos usuários e manter suas credenciais, papéis e saldos intactos.
+- [x] Confirmar destino do webhook do produto CobraPro e API OAuth com leitura de vendas.
+- [x] Preparar gate Kiwify sem inferir acesso por cadastro, papel admin ou concessão vitalícia.
+- [x] Completar localmente a criação automática de comprador novo apenas por venda paga confirmada na API (1.574 testes integrados aprovados; ativação ainda pendente).
+- [x] Persistir convite individual antes do envio, distinguir aceite de entrega e proteger reentrega concorrente.
+- [x] Validar migration de identidade no schema produtivo preservado e sob defaults de ACL Supabase (4.117 linhas intactas).
+- [x] Instalar migrations 0027/0028 aditivas sem criar compradores fictícios ou alterar contas existentes (10/11 15h19–15h20 BRT).
+- [ ] Renovar login DigitalOcean e configurar credenciais no backend de forma privada.
+- [ ] Configurar renovação, atraso, cancelamento, reembolso e chargeback no webhook (apenas compra aprovada estava selecionada).
+- [ ] Confirmar o tipo de cobrança que fornece assinatura e data de acesso documentadas; compra única não comprova assinatura vigente.
+- [ ] Habilitar o processamento após deploy e validar recebimento HMAC sem gravar vendas fictícias.
+- [ ] Liberar Blacklist e fotos privadas somente mediante vigência Kiwify comprovada.
+- [ ] Confirmar um primeiro pedido real de ponta a ponta antes de declarar o fluxo integral testado em produção.

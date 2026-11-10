@@ -82,15 +82,28 @@ def snapshot(db):
 def base_snapshot(db):
     return query("SELECT jsonb_build_array((SELECT jsonb_agg(to_jsonb(x) ORDER BY id) FROM public.users x),(SELECT jsonb_agg(to_jsonb(x)) FROM public.blacklist_access_grants x))",db=db)
 
+def default_acl(db='ready'):
+    return query("SELECT jsonb_agg(jsonb_build_array(defaclrole,defaclnamespace,defaclobjtype,defaclacl::text) ORDER BY defaclobjtype) FROM pg_default_acl",db=db)
+
 def catalog(db):
-    return query("SELECT jsonb_build_array((SELECT jsonb_agg(jsonb_build_array(relname,relacl::text,relrowsecurity,relforcerowsecurity,obj_description(oid,'pg_class')) ORDER BY relname) FROM pg_class WHERE relnamespace='public'::regnamespace),(SELECT jsonb_agg(jsonb_build_array(oid::regprocedure::text,pg_get_functiondef(oid),proacl::text,obj_description(oid,'pg_proc')) ORDER BY proname) FROM pg_proc WHERE pronamespace='public'::regnamespace),(SELECT jsonb_agg(jsonb_build_array(tgname,tgenabled,tgtype) ORDER BY tgname) FROM pg_trigger WHERE NOT tgisinternal))",db=db)
+    return query("SELECT jsonb_build_array((SELECT jsonb_agg(jsonb_build_array(relname,relacl::text,relrowsecurity,relforcerowsecurity,obj_description(oid,'pg_class')) ORDER BY relname) FROM pg_class WHERE relnamespace='public'::regnamespace),(SELECT jsonb_agg(jsonb_build_array(oid::regprocedure::text,pg_get_functiondef(oid),proacl::text,obj_description(oid,'pg_proc')) ORDER BY proname) FROM pg_proc WHERE pronamespace='public'::regnamespace),(SELECT jsonb_agg(jsonb_build_array(tgname,tgenabled,tgtype) ORDER BY tgname) FROM pg_trigger WHERE NOT tgisinternal),(SELECT jsonb_agg(jsonb_build_array(c.relname,a.attname,a.attacl::text) ORDER BY c.relname,a.attnum) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid WHERE c.relnamespace='public'::regnamespace AND a.attnum>0 AND NOT a.attisdropped),(SELECT jsonb_agg(jsonb_build_array(defaclrole,defaclnamespace,defaclobjtype,defaclacl::text) ORDER BY defaclobjtype) FROM pg_default_acl))",db=db)
 
 query('CREATE ROLE service_role NOLOGIN NOSUPERUSER BYPASSRLS; CREATE ROLE anon NOLOGIN NOSUPERUSER NOBYPASSRLS; CREATE ROLE authenticated NOLOGIN NOSUPERUSER NOBYPASSRLS; CREATE ROLE outsider NOLOGIN NOSUPERUSER NOBYPASSRLS;',db='postgres')
 query('CREATE DATABASE empty',db='postgres')
 query('CREATE DATABASE ready',db='postgres')
 fixture="CREATE TABLE public.users(id integer PRIMARY KEY,role text NOT NULL,email text); ALTER TABLE public.users ENABLE ROW LEVEL SECURITY; INSERT INTO public.users VALUES(1,'user','one@example.invalid'),(2,'admin','two@example.invalid'),(3,'user',NULL); CREATE TABLE public.blacklist_access_grants(user_id integer,lifetime boolean); INSERT INTO public.blacklist_access_grants VALUES(1,true),(2,true);"
 query(fixture,db='empty');query(fixture)
+supabase_defaults="ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,authenticated,service_role; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon,authenticated,service_role; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon,authenticated,service_role;"
+query(supabase_defaults,db='empty');query(supabase_defaults)
+defaults_before=default_acl()
+query("CREATE TABLE public.default_acl_probe(id integer); CREATE SEQUENCE public.default_acl_probe_seq; CREATE FUNCTION public.default_acl_probe_fn() RETURNS integer LANGUAGE sql AS $$ SELECT 1 $$")
+for role in ['anon','authenticated','service_role']:
+    assert query(f"SELECT has_table_privilege('{role}','public.default_acl_probe','SELECT') AND has_table_privilege('{role}','public.default_acl_probe','INSERT') AND has_table_privilege('{role}','public.default_acl_probe','MAINTAIN') AND has_sequence_privilege('{role}','public.default_acl_probe_seq','USAGE') AND has_function_privilege('{role}','public.default_acl_probe_fn()','EXECUTE')")=='t'
+query('DROP TABLE public.default_acl_probe; DROP SEQUENCE public.default_acl_probe_seq; DROP FUNCTION public.default_acl_probe_fn()')
+check('baseline ALTER DEFAULT PRIVILEGES public: ALL tables/sequences e EXECUTE functions para anon/authenticated/service_role comprovado')
+legacy_before=base_snapshot('ready')
 apply()
+assert default_acl()==defaults_before and legacy_before==base_snapshot('ready')
 assert query('SELECT count(*) FROM public.kiwify_blacklist_products')=='0'
 assert not gate()['eligible'] and not gate(2)['eligible']
 rpc(event(),error='42501')
@@ -117,6 +130,31 @@ for role in ['anon','authenticated','outsider','service_role']:
 assert query("SELECT count(*) FROM pg_class WHERE relname LIKE 'kiwify_blacklist_%' AND relkind='r' AND relrowsecurity")=='3'
 assert query("SELECT count(*) FROM pg_policy WHERE polrelid IN ('public.kiwify_blacklist_products'::regclass,'public.kiwify_blacklist_subscriptions'::regclass,'public.kiwify_blacklist_events'::regclass)")=='0'
 check('RLS zero policies; ACL bloqueia frontend/outsider e DML direto service_role')
+
+for role in ['anon','authenticated','service_role','outsider']:
+    for table in ['products','subscriptions','events']:
+        assert query(f"SELECT has_table_privilege('{role}','public.kiwify_blacklist_{table}','SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER,MAINTAIN') OR has_any_column_privilege('{role}','public.kiwify_blacklist_{table}','SELECT,INSERT,UPDATE,REFERENCES')")=='f'
+assert default_acl()==defaults_before
+check('fresh Supabase ALL tables inclusive MAINTAIN revogado, ACL residual zero, defaults e dados legados intactos')
+
+db=clone('fresh_public_grant_option',source='empty')
+query("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO PUBLIC; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,authenticated,service_role WITH GRANT OPTION; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO anon,authenticated,service_role WITH GRANT OPTION; CREATE TABLE public.unrelated_acl_probe(id integer); CREATE FUNCTION public.unrelated_acl_probe_fn() RETURNS integer LANGUAGE sql AS $$ SELECT 1 $$",db=db)
+unrelated_sql="SELECT jsonb_build_array((SELECT relacl::text FROM pg_class WHERE oid='public.unrelated_acl_probe'::regclass),(SELECT proacl::text FROM pg_proc WHERE oid='public.unrelated_acl_probe_fn()'::regprocedure))"
+unrelated_before=query(unrelated_sql,db=db);before,defaults=base_snapshot(db),default_acl(db)
+apply(db);cat=catalog(db);apply(db);apply(db)
+assert before==base_snapshot(db) and cat==catalog(db) and defaults==default_acl(db) and unrelated_before==query(unrelated_sql,db=db)
+assert query("SELECT count(*) FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a WHERE c.oid IN ('public.kiwify_blacklist_products'::regclass,'public.kiwify_blacklist_subscriptions'::regclass,'public.kiwify_blacklist_events'::regclass) AND a.grantee<>c.relowner",db=db)=='0'
+assert query("SELECT count(*) FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a WHERE p.pronamespace='public'::regnamespace AND p.proname LIKE 'rpc_kiwify_blacklist_%' AND (a.grantee=0 OR a.grantee NOT IN (p.proowner,'service_role'::regrole::oid) OR a.is_grantable)",db=db)=='0'
+check('fresh PUBLIC/grant options conhecidos removidos só do pacote; relações externas/defaults/users intactos e reapply 2x sem mudança')
+
+for object_type,error in [('TABLES','ACL residual'),('FUNCTIONS','função/hash/metadata/ACL')]:
+    db=clone('fresh_unknown_'+object_type.lower(),source='empty')
+    query(f'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON {object_type} TO outsider',db=db)
+    before,cat=base_snapshot(db),catalog(db)
+    apply(db,error);apply(db,error)
+    assert before==base_snapshot(db) and cat==catalog(db)
+    assert query("SELECT count(*) FROM pg_class WHERE relnamespace='public'::regnamespace AND relname IN ('kiwify_blacklist_products','kiwify_blacklist_subscriptions','kiwify_blacklist_events')",db=db)=='0'
+check('defaults de role extra em TABLES/FUNCTIONS continuam fail-closed 2x e rollback inteiro; não revoga outsider')
 
 # Each behavior test uses its own clone: NEVER repair/correct production-like table data.
 db=clone('paid')
@@ -236,6 +274,35 @@ apply(db);apply(db);assert before==snapshot(db) and cat==catalog(db)
 db=clone('paid_canceled');r=rpc(event(status='canceled'),db)
 assert r['eligible'] and r['outcome']=='paid_period'
 check('idempotência 2x com ledger populado; canceled com flags/período pago verdadeiro pode iniciar')
+
+acl_drifts=[]
+for table in ['products','subscriptions','events']:
+    for role in ['PUBLIC','anon','authenticated','service_role','outsider']:
+        acl_drifts.extend([
+            (f'{table}_{role.lower()}_table',f'GRANT SELECT,MAINTAIN ON public.kiwify_blacklist_{table} TO {role}','ACL'),
+            (f'{table}_{role.lower()}_column',f'GRANT SELECT(product_id) ON public.kiwify_blacklist_{table} TO {role}','ACL'),
+        ])
+for fn,arg in [('consume','jsonb'),('access','integer'),('order_binding','text'),('find_users','text')]:
+    acl_drifts.extend([
+        (f'{fn}_service_option',f'GRANT EXECUTE ON FUNCTION public.rpc_kiwify_blacklist_{fn}({arg}) TO service_role WITH GRANT OPTION','função'),
+        (f'{fn}_outsider',f'GRANT EXECUTE ON FUNCTION public.rpc_kiwify_blacklist_{fn}({arg}) TO outsider','função'),
+    ])
+for name,sql,error in acl_drifts:
+    db=clone('acl_drift_'+name,source='paid');query(sql,db=db)
+    before,cat=snapshot(db),catalog(db)
+    apply(db,error);apply(db,error)
+    assert before==snapshot(db) and cat==catalog(db)
+check('38 drifts ACL em ledger populado: 3 tabelas x PUBLIC/anon/authenticated/service_role/outsider, colunas, MAINTAIN e 4 RPCs grant option; reapply 2x nega sem revogar')
+
+db=clone('changed_defaults',source='paid')
+query('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO outsider; ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT EXECUTE ON FUNCTIONS TO outsider',db=db)
+before,cat=snapshot(db),catalog(db);apply(db);apply(db)
+assert before==snapshot(db) and cat==catalog(db)
+db=clone('plain_postgres_defaults',source='empty')
+query('ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon,authenticated,service_role; ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon,authenticated,service_role; ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE EXECUTE ON FUNCTIONS FROM anon,authenticated,service_role',db=db)
+before=base_snapshot(db);apply(db);cat=catalog(db);apply(db);apply(db)
+assert before==base_snapshot(db) and cat==catalog(db)
+check('defaults posteriores não alteram reapply existente; baseline PostgreSQL sem grants adicionais continua instalado e idempotente 2x')
 
 # Expanded reader contract. Only consume grants periods; no owner correction of eligible rows.
 db=clone('reader_fields');paid=event();assert rpc(paid,db)['eligible']
