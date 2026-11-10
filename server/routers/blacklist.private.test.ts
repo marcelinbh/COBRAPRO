@@ -17,7 +17,7 @@ function db(results: any[] = []) {
   const from = vi.fn(() => { const entry = builder(results.shift() ?? { data: null, error: null }); queries.push(entry); return entry.q; });
   const rpc = vi.fn().mockResolvedValue({ data: true, error: null }); mocks.client.mockResolvedValue({ from, rpc }); return { from, rpc, queries };
 }
-const grant = { userId: 7, status: "active" as const, validFrom: "2020-01-01T00:00:00Z", validUntil: "2099-01-01T00:00:00Z", source: "audited synthetic test" };
+const grant = { userId: 7, status: "active" as const, validFrom: "2020-01-01T00:00:00Z", validUntil: "2099-01-01T00:00:00Z", source: "kiwify:authenticated-webhook+verified-sale", lifetime: false };
 const operations = [
   ["criar", { cpfCnpj: "52998224725", nome: "Sintético", motivo: "Evidência sintética", tipoDivida: "outros" }],
   ["consultar", { busca: "52998224725" }], ["detalhe", { id: 10 }], ["listarMeus", undefined],
@@ -35,6 +35,14 @@ describe("Blacklist gates/ownership/storage", () => {
   it.each(operations)("%s usuário/admin sem concessão negado", async (method, input) => {
     configureBlacklistEntitlementResolver(async () => null); db(); const caller: any = blacklistRouter.createCaller({ ...ctx, user: { ...ctx.user, role: "admin" } });
     await expect(caller[method](input)).rejects.toMatchObject({ code: "FORBIDDEN" }); expect(mocks.client).not.toHaveBeenCalled();
+  });
+  it.each(operations)("%s admin com grant manual/vitalício negado antes de DB/storage", async (method, input) => {
+    for (const invalid of [{ ...grant, source: "blacklist_access_grants:0023" }, { ...grant, lifetime: true }, { ...grant, source: "users:registration" }]) {
+      configureBlacklistEntitlementResolver(async () => invalid); db();
+      const caller: any = blacklistRouter.createCaller({ ...ctx, user: { ...ctx.user, role: "admin" } });
+      await expect(caller[method](input)).rejects.toMatchObject({ code: "FORBIDDEN" });
+      expect(mocks.client).not.toHaveBeenCalled(); expect(mocks.upload).not.toHaveBeenCalled(); expect(mocks.remove).not.toHaveBeenCalled();
+    }
   });
   it("owner/create sanitiza evidencia e preserva cidade/estado/endereco", async () => {
     const t = db([{ data: { id: 10 }, error: null }]);

@@ -4,6 +4,8 @@ import type { Express, Request, Response } from "express";
 import { getSupabaseClientAsync } from "./db";
 import { enviarEmail, type EmailDeliveryResult } from "./_core/email";
 import { escapeHtml } from "./utils/html";
+import { processVerifiedKiwifySubscription } from "./services/kiwifySubscriptionRuntime";
+import { KiwifySubscriptionError } from "./services/kiwifySubscriptions";
 
 /** A Kiwify assina os bytes originais do corpo; nunca reserialize JSON para validar. */
 type RawBodyRequest = Request & { rawBody?: Buffer };
@@ -242,8 +244,38 @@ export function registerKiwifyWebhookRoutes(app: Express) {
     if (!token) return res.status(503).json({ error: "Webhook temporariamente indisponível" });
 
     const signature = req.query.signature;
-    if (!req.rawBody || !assinaturaKiwifyEhValida(req.rawBody, signature, token)) {
+    const rawBody = req.rawBody;
+    if (!rawBody || !assinaturaKiwifyEhValida(rawBody, signature, token)) {
       return res.status(401).json({ error: "Assinatura inválida" });
+    }
+
+    // Assinaturas nunca passam por reserva legada, criação de conta ou convite.
+    // O runtime recebe EXATAMENTE os bytes autenticados, sem ler req.body.
+    if (process.env.ENABLE_KIWIFY_SUBSCRIPTIONS === "true") {
+      try {
+        const result = await processVerifiedKiwifySubscription(rawBody);
+        if (result.outcome === "consumed") {
+          return res.status(200).json({ received: true });
+        }
+        if (result.outcome === "ignored") {
+          if (result.reason === "product_not_allowed" || result.reason === "non_grant_event") {
+            return res.status(200).json({ received: true, ignored: true });
+          }
+          if (result.reason === "user_not_unique" || result.reason === "no_current_paid_period") {
+            // ACK definitivo perderia um evento legítimo sem conta/evidência.
+            console.error("[KiwifySubscriptions] review_required");
+            return res.status(503).json({ error: "Evento requer conferência antes de confirmação", needsReview: true, retry: true });
+          }
+        }
+      } catch (error) {
+        if (error instanceof KiwifySubscriptionError && error.code === "invalid_payload") {
+          console.error("[KiwifySubscriptions] invalid_payload");
+          return res.status(400).json({ error: "Payload de pedido inválido" });
+        }
+        // Não registrar erro original, códigos arbitrários, payload ou PII.
+      }
+      console.error("[KiwifySubscriptions] unavailable");
+      return res.status(503).json({ error: "Webhook temporariamente indisponível", retry: true });
     }
 
     const payload = req.body as KiwifyPayload;

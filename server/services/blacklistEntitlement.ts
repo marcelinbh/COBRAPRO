@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
-import { getSupabaseClientAsync } from "../db";
+import { resolveVerifiedKiwifyBlacklistEvidence } from "./kiwifySubscriptionRuntime";
+import { parseKiwifySubscriptionUtc } from "./kiwifySubscriptions";
 
 export type BlacklistIdentity = { id: number; openId?: string; role?: string };
 
@@ -13,36 +14,22 @@ export type BlacklistSubscriptionEvidence = {
   status: "active" | "inactive" | "cancelled" | "expired";
   validUntil: string;
   source: string;
-  lifetime?: boolean;
-  validFrom?: string;
+  lifetime: boolean;
+  validFrom: string;
 };
 export type BlacklistEntitlementResolver = (
   userId: number,
 ) => Promise<BlacklistSubscriptionEvidence | null>;
 
-async function auditedGrantResolver(userId: number): Promise<BlacklistSubscriptionEvidence | null> {
-  const sb = await getSupabaseClientAsync();
-  if (!sb) throw new Error("Fonte de acesso indisponível");
-  const { data, error } = await sb.from("blacklist_access_grants")
-    .select("user_id, status, starts_at, ends_at, lifetime, evidence, granted_by")
-    .eq("user_id", userId).limit(1).maybeSingle();
-  if (error) throw new Error("Concessões indisponíveis: validar migration 0023");
-  if (!data || data.status !== "ativo" || !data.evidence?.trim() || !data.granted_by) return null;
-  return {
-    userId: data.user_id, status: "active", validFrom: data.starts_at,
-    validUntil: data.ends_at ?? "", lifetime: data.lifetime === true,
-    source: "blacklist_access_grants:0023",
-  };
-}
-
-let trustedResolver: BlacklistEntitlementResolver = auditedGrantResolver;
+let trustedResolver: BlacklistEntitlementResolver = resolveVerifiedKiwifyBlacklistEvidence;
 
 /** Composição backend após review da fonte e ACL; nunca expor via RPC/ENV público.
- * Não há provedor inventado nem fallback que torna usuários antigos assinantes.
+ * Não há fallback manual/vitalício/cadastro que torna usuários antigos assinantes.
  * Resolver é chamado a CADA operação (inclusive download), sem cache de elegibilidade.
+ * undefined restaura a fonte padrão Kiwify; não habilita grants legados.
  */
 export function configureBlacklistEntitlementResolver(resolver?: BlacklistEntitlementResolver): void {
-  trustedResolver = resolver ?? auditedGrantResolver;
+  trustedResolver = resolver ?? resolveVerifiedKiwifyBlacklistEvidence;
 }
 
 export function requireBlacklistEnabled(): void {
@@ -56,25 +43,27 @@ export async function requireBlacklistEntitlement(user: BlacklistIdentity | null
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Entre na sua conta para acessar a Blacklist." });
   }
   requireBlacklistEnabled();
-  if (!trustedResolver) {
-    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Blacklist indisponível: ainda não há fonte validada de assinatura atual." });
-  }
   let evidence: BlacklistSubscriptionEvidence | null;
   try {
     evidence = await trustedResolver(user.id);
   } catch {
     throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Não foi possível confirmar sua assinatura. Tente novamente mais tarde." });
   }
-  // Vitalício só quando explicitamente concedido/auditado; início sempre válido.
-  const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/;
-  const starts = typeof evidence?.validFrom === "string" && isoTimestamp.test(evidence.validFrom) ? Date.parse(evidence.validFrom) : NaN;
-  const expires = evidence && typeof evidence.validUntil === "string"
-    && isoTimestamp.test(evidence.validUntil)
-    ? Date.parse(evidence.validUntil) : NaN;
+  // Só o período finito da fonte exata Kiwify é prova. Datas do ledger/gate
+  // exigem UTC explícito e calendário real; Date.parse sozinho normaliza dias inválidos.
+  const isoTimestamp = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)$/;
+  const from = typeof evidence?.validFrom === "string" && isoTimestamp.test(evidence.validFrom)
+    ? parseKiwifySubscriptionUtc(evidence.validFrom) : null;
+  const until = typeof evidence?.validUntil === "string" && isoTimestamp.test(evidence.validUntil)
+    ? parseKiwifySubscriptionUtc(evidence.validUntil) : null;
+  const starts = from ? Date.parse(from) : NaN;
+  const expires = until ? Date.parse(until) : NaN;
+  const now = Date.now();
   if (!evidence || evidence.userId !== user.id || evidence.status !== "active"
-    || typeof evidence.source !== "string" || !evidence.source.trim()
-    || !Number.isFinite(starts) || starts > Date.now()
-    || (evidence.lifetime === true ? evidence.validUntil !== "" : !Number.isFinite(expires) || expires <= Date.now())) {
+    || evidence.source !== "kiwify:authenticated-webhook+verified-sale"
+    || evidence.lifetime !== false || !Number.isFinite(now)
+    || !Number.isFinite(starts) || starts > now
+    || !Number.isFinite(expires) || expires <= now || expires <= starts) {
     throw new TRPCError({ code: "FORBIDDEN", message: "A Blacklist exige assinatura atual comprovada. Consulte o responsável pelo seu plano." });
   }
 }

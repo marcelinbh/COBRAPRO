@@ -61,6 +61,7 @@ function harness(status = "email_pendente", duplicate = true, email = "cliente@e
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubEnv("KIWIFY_WEBHOOK_TOKEN", "teste-segredo");
+  vi.stubEnv("ENABLE_KIWIFY_SUBSCRIPTIONS", "false");
   mocks.email.mockResolvedValue(accepted);
 });
 afterEach(() => vi.unstubAllEnvs());

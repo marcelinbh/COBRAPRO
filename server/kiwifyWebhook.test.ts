@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getSupabaseClientAsync: vi.fn(),
@@ -32,9 +32,11 @@ describe("Webhook Kiwify seguro", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    process.env.KIWIFY_WEBHOOK_TOKEN = "kiwify-token-de-teste";
+    vi.stubEnv("KIWIFY_WEBHOOK_TOKEN", "kiwify-token-de-teste");
+    vi.stubEnv("ENABLE_KIWIFY_SUBSCRIPTIONS", "false");
     mocks.enviarEmail.mockResolvedValue(true);
   });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("valida o vetor HMAC-SHA1 oficial sobre os bytes originais", async () => {
     const { assinaturaKiwifyEhValida } = await import("./kiwifyWebhook");
@@ -45,7 +47,7 @@ describe("Webhook Kiwify seguro", () => {
   });
 
   it("falha fechado quando o segredo não está configurado", async () => {
-    delete process.env.KIWIFY_WEBHOOK_TOKEN;
+    vi.stubEnv("KIWIFY_WEBHOOK_TOKEN", undefined);
     const handler = await handlerKiwify();
     const res = resposta();
     await handler({ rawBody: Buffer.from("{}"), query: {}, body: {} }, res);
