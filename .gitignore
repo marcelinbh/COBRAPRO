@@ -124,3 +124,4 @@ tests/postgres-blacklist/result.json
 tests/postgres-*/evidence/
 tests/postgres-kiwify-subscriptions/results-pg17.json
 tests/postgres-kiwify-subscriptions/results-pg17-run-*.json
+tests/postgres-blacklist/private-reopen/evidence/

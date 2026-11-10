@@ -1,0 +1,42 @@
+[
+  {
+    "path": "drizzle/0029_reabrir_blacklist_backend_privado.sql",
+    "bytes": 23694,
+    "sha256": "cbf108ee849349ad48c8beb1987ce7fbc55ab9f367b3dff48e41e114c786f726"
+  },
+  {
+    "path": "drizzle/0030_resguardar_referencias_fotos_blacklist.sql",
+    "bytes": 8218,
+    "sha256": "3ff1d5ca0e40e2b719b1fee3617f9b2fd96484b1b89bf60a3537bd6e53cd52da"
+  },
+  {
+    "path": "regressionserver/migrations/blacklistPrivateReopen.test.ts",
+    "bytes": 5687,
+    "sha256": "951eeb07a95c4cbac155fddab0131da556c5a03c9ab10826d6799f4300cd47ee"
+  },
+  {
+    "path": "tests/postgres-blacklist/private-reopen/README.md",
+    "bytes": 2397,
+    "sha256": "78bbacbe4d80568261db083df569492c368e248b90d7a99f2dccc03838aaa038"
+  },
+  {
+    "path": "tests/postgres-blacklist/private-reopen/fixture.sql",
+    "bytes": 2202,
+    "sha256": "b00bbf99626bf847cc321998c7556d30babe9294454d074e35fc9d9c2942af60"
+  },
+  {
+    "path": "tests/postgres-blacklist/private-reopen/run.sh",
+    "bytes": 1688,
+    "sha256": "89bf86aaea8d81d284450d7912677ca616c08df6f08981fadf3dc6bfb9b4e41f"
+  },
+  {
+    "path": "tests/postgres-blacklist/private-reopen/validate.py",
+    "bytes": 18325,
+    "sha256": "64aeda1bf75b9d9e5fc96055f096bcc2e4ea7bfa2fd0276a62a3d8a50fa9a660"
+  },
+  {
+    "path": "tests/postgres-blacklist/private-reopen/vitest.config.ts",
+    "bytes": 603,
+    "sha256": "f37ea03def85a7c7c662a9587cb3b47fe0f848dd9ded549f5ec3dea9f90689b8"
+  }
+]

@@ -1224,9 +1224,10 @@
 - [x] Persistir convite individual antes do envio, distinguir aceite de entrega e proteger reentrega concorrente.
 - [x] Validar migration de identidade no schema produtivo preservado e sob defaults de ACL Supabase (4.117 linhas intactas).
 - [x] Instalar migrations 0027/0028 aditivas sem criar compradores fictícios ou alterar contas existentes (10/11 15h19–15h20 BRT).
-- [ ] Renovar login DigitalOcean e configurar credenciais no backend de forma privada.
-- [ ] Configurar renovação, atraso, cancelamento, reembolso e chargeback no webhook (apenas compra aprovada estava selecionada).
+- [x] Renovar login DigitalOcean e configurar credenciais cifradas somente no runtime do backend.
+- [x] Configurar e conferir a persistência de aprovação, renovação, atraso, cancelamento, reembolso e chargeback no webhook CobraPro.
 - [ ] Confirmar o tipo de cobrança que fornece assinatura e data de acesso documentadas; compra única não comprova assinatura vigente.
-- [ ] Habilitar o processamento após deploy e validar recebimento HMAC sem gravar vendas fictícias.
+- [x] Habilitar o processamento após deploy e validar HMAC real (400 para corpo sem pedido, 401 para assinatura incorreta; nenhuma compra ou mensagem).
+- [x] Instalar 0030/0029 e comprovar referência privada, RLS e ACL mínima exclusiva do backend; nenhuma concessão a usuário.
 - [ ] Liberar Blacklist e fotos privadas somente mediante vigência Kiwify comprovada.
 - [ ] Confirmar um primeiro pedido real de ponta a ponta antes de declarar o fluxo integral testado em produção.
