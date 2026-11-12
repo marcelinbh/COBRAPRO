@@ -1277,7 +1277,7 @@
 - [x] Publicar checkpoint/push normal `126fa45b`; execução DO `31a21ea0` live às 15h20. Backend autenticado recusa seis endpoints com 412; Caixa e relatórios bloqueiam certificado falso/PDF incompleto. Clientes/WhatsApp preservados; sem mutações.
 - [x] Corrigir localmente o estado concluído sem dados no dashboard: indisponibilidade explícita, retry manual somente leitura e fim do retry automático das cinco consultas certificadoras. Dez testes React e TypeScript aprovados.
 - [x] Certificar a suíte completa após o ajuste visual: 2.353 testes aprovados, 11 opt-in ignorados, TypeScript/build e diff check aprovados às 15h29.
-- [ ] Publicar o ajuste visual adicional e confirmar a apresentação real sem reticências nem gráfico de sucesso ausente.
+- [x] Publicar checkpoint/push normal `1484e5bf`; DO `43398ff0` live às 15h35min43. Bundle exato e UI autenticada às 15h36: banner de revisão, retry manual, KPIs/score/gráficos indisponíveis sem reticências permanentes. 159 regressões pós-push aprovadas; 12/2/6 e RLS 56/56/0 preservados.
 - [ ] Obter comprovação e aprovação por registro antes de sanear o legado ou anunciar liberação financeira irrestrita.
 
 Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O alerta DigitalOcean de US$ 36,00 em atraso, com prazo antes de 14/11, continua presente; nenhum pagamento foi iniciado.
