@@ -59,3 +59,9 @@ O workflow WhatsApp permaneceu em sucesso durante a publicação. Às 10h19, Git
 ## Continuidade de hospedagem
 
 O painel DigitalOcean mostra **US$ 36,00 em atraso**, pagamento até **14/11/2026** para evitar suspensão. Não foi iniciado pagamento, compra, alteração de plano ou reconfiguração de cobrança. Esse risco externo permanece separado da correção de código.
+
+## Atualização pós-hotfix — 12/11 às 10h46 BRT
+
+O hotfix `b7a2f29` entrou em produção às 10h38min29 (execução `6a9ffd5a-4de4-4a00-91e8-53c4562c546a`). O erro de coluna ausente foi eliminado; o smoke autenticado agora retorna **412/PRECONDITION_FAILED** para o Caixa da conta real, por inconsistência do livro, não mais 500 por schema. A leitura agregada confirmou **12 lançamentos com `user_id` diferente do proprietário da conta, distribuídos em duas contas**; tipos físicos são INTEGER, portanto não é falha de conversão string/número. Nenhum valor, registro ou proprietário foi alterado. A ficha mínima foi renovada fora do Git, sem e-mails/nomes/CPF e sem decisões preenchidas.
+
+A tela real manteve loading após as consultas; o ajuste seguinte desativa retentativas automáticas somente nas duas queries do Caixa e conserva o retry manual por origem. **2.280 testes**, 11 opt-in ignorados, TypeScript e build aprovados. Publicação desse ajuste e smoke da mensagem final ainda pendentes nesta edição. Não declarar uso irrestrito nem liberação financeira das duas contas inconsistentes.

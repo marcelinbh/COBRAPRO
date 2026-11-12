@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   contas: { data: [] as any, isLoading: false, isError: false, error: null as any, isFetching: false, refetch: vi.fn() },
   transacoes: { data: [] as any, isLoading: false, isError: false, error: null as any, isFetching: false, refetch: vi.fn() },
   queryTransacoes: vi.fn(), mutate: vi.fn(), invalidateContas: vi.fn(), invalidateTransacoes: vi.fn(),
+  queryOptions: vi.fn(),
   buttons: [] as any[],
   state: null as null | { cursor: number; values: any[] },
 }));
@@ -35,8 +36,8 @@ vi.mock("@/lib/trpc", () => ({ trpc: {
     contas: { invalidate: mocks.invalidateContas }, transacoes: { invalidate: mocks.invalidateTransacoes },
   } }),
   caixa: {
-    contas: { useQuery: () => mocks.contas },
-    transacoes: { useQuery: (input: any) => { mocks.queryTransacoes(input); return mocks.transacoes; } },
+    contas: { useQuery: (_input: any, options: any) => { mocks.queryOptions('contas', options); return mocks.contas; } },
+    transacoes: { useQuery: (input: any, options: any) => { mocks.queryTransacoes(input); mocks.queryOptions('transacoes', options); return mocks.transacoes; } },
     conferencia: { useQuery: () => ({ data: undefined, isFetching: false, error: null, refetch: vi.fn() }) },
     criarConta: { useMutation: () => ({ mutate: mocks.mutate, isPending: false }) },
     registrarTransacao: { useMutation: () => ({ mutate: mocks.mutate, isPending: false }) },
@@ -95,6 +96,12 @@ beforeEach(() => {
 afterEach(() => { mocks.state = null; vi.unstubAllGlobals(); });
 
 describe("Caixa operacional — componentes reais renderizados, sem browser/rede", () => {
+  it('consultas recusadas não ficam em retry automático; cada origem conserva retry manual', () => {
+    markup();
+    expect(mocks.queryOptions).toHaveBeenCalledWith('contas', { retry: false });
+    expect(mocks.queryOptions).toHaveBeenCalledWith('transacoes', { retry: false });
+  });
+
   it.each([false, true])("erro nas duas consultas, cache=%s: alerta, sem zero fictício ou dados antigos", cache => {
     Object.assign(mocks.contas, { data: cache ? [conta(1)] : [], isError: true, error: new Error("Falha sintética contas") });
     Object.assign(mocks.transacoes, { data: cache ? [transacao()] : [], isError: true, error: new Error("Falha sintética transações") });

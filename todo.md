@@ -1258,3 +1258,12 @@
 - [ ] Revisão humana dos dados antigos inconsistentes permanece independente e obrigatória; nenhum UPDATE financeiro automático.
 
 **Infraestrutura:** painel de 12/11 informa US$ 36,00 em atraso e risco de suspensão após 14/11. Nenhum pagamento foi realizado.
+
+## Fase 70: Smoke pós-hotfix do Caixa — 12/11/2026
+
+- [x] Hotfix de projeção física b7a2f29 publicado e live às 10h38min29, sem DDL/DML ou mudança de flags.
+- [x] Confirmar que o novo bloqueio é financeiro real (412): 12 transações com proprietário divergente em duas contas. Tipos INTEGER confirmados; nenhum ajuste feito.
+- [x] Renovar ficha restrita de revisão fora do Git, com valores exatos e hashes; 0 decisões/aprovações preenchidas.
+- [x] Desativar retry automático só nas leituras do Caixa, preservando retentativa manual; 2.280 testes, 11 opt-in ignorados, TypeScript e build aprovados.
+- [ ] Publicar o ajuste de retry e comprovar a apresentação final da recusa sem zero fictício ou loading permanente.
+- [ ] Resolver titularidade/divergências somente após análise e aprovação por registro; contas inconsistentes não estão liberadas para uso irrestrito.

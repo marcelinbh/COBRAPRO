@@ -411,11 +411,11 @@ export default function Caixa() {
   const {
     data: contas, isLoading: contasLoading, isError: contasIsError,
     error: contasError, isFetching: contasFetching, refetch: refetchContas,
-  } = trpc.caixa.contas.useQuery();
+  } = trpc.caixa.contas.useQuery(undefined, { retry: false });
   const {
     data: transacoes, isLoading: transacoesLoading, isError: transacoesIsError,
     error: transacoesError, isFetching: transacoesFetching, refetch: refetchTransacoes,
-  } = trpc.caixa.transacoes.useQuery({ contaCaixaId: contaSelecionada });
+  } = trpc.caixa.transacoes.useQuery({ contaCaixaId: contaSelecionada }, { retry: false });
 
   // Um refetch pode falhar mantendo data em cache. Esse cache não é sucesso atual.
   const contasFalha = contasIsError || !!contasError;
