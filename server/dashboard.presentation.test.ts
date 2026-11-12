@@ -115,4 +115,42 @@ describe("dashboard: apresentação sem browser", () => {
     expect(html).not.toContain("common.noData");
     expect(mocks.mutate).not.toHaveBeenCalled();
   });
+
+  it("consulta concluída sem dados não fica em reticências nem desenha gráficos de sucesso", () => {
+    for (const nome of ["kpis", "resumoCaixa", "fluxoMensal", "tendenciaJuros", "scoreNegocio"]) {
+      mocks.consultas[nome] = { data: undefined, isError: false, isLoading: false };
+    }
+    const html = renderizar();
+    expect(html).toContain("Consulta concluída sem dados financeiros; revisão necessária.");
+    expect(html).toContain("Tentar novamente");
+    expect(html).toContain("Fluxo indisponível");
+    expect(html).toContain("Tendência indisponível");
+    expect(html).toContain("Score indisponível");
+    expect(html).not.toContain("...");
+    expect(html).not.toContain("dashboard-chart-fluxo");
+    expect(html).not.toContain("dashboard-chart-tendencia");
+    expect(mocks.mutate).not.toHaveBeenCalled();
+  });
+
+  it("mantém placeholders apenas enquanto a consulta realmente carrega", () => {
+    for (const nome of ["kpis", "fluxoMensal", "tendenciaJuros", "scoreNegocio"]) {
+      mocks.consultas[nome] = { data: undefined, isError: false, isLoading: true };
+    }
+    const html = renderizar();
+    expect(html).toContain("Carregando...");
+    expect(html).toContain("...");
+    expect(html).not.toContain("Consulta concluída sem dados financeiros");
+    expect(html).not.toContain("Tentar novamente");
+    expect(html).not.toContain("dashboard-chart-fluxo");
+    expect(html).not.toContain("dashboard-chart-tendencia");
+  });
+
+  it("listas vazias confirmadas continuam válidas em vez de indisponíveis", () => {
+    const html = renderizar();
+    expect(html).toContain("dashboard-chart-fluxo");
+    expect(html).toContain("dashboard-chart-tendencia");
+    expect(html).not.toContain("Fluxo indisponível");
+    expect(html).not.toContain("Tendência indisponível");
+    expect(html).not.toContain("Consulta concluída sem dados financeiros");
+  });
 });

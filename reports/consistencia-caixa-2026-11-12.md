@@ -22,7 +22,7 @@ Certificação final realizada antes do checkpoint: **2.350 testes aprovados**, 
 
 A revisão independente em PostgreSQL 17 descartável confirmou recusa de criação, baixa, estorno, cotação, recebimento e renovação em conta contaminada, sem novas linhas financeiras. Contas limpas da mesma empresa e de outra empresa continuam funcionando isoladamente. Replay de confirmação histórica não produz nova perna. Onboarding cadastral não é certificado de integridade financeira e não remove essas barreiras.
 
-## Estado produtivo revalidado às 15h10 BRT
+## Estado produtivo revalidado às 15h10 e 15h20 BRT
 
 Consulta agregada no Supabase autorizado `oxvtmibrgjruldkouhhb`, sem leitura de dados pessoais e sem qualquer escrita:
 
@@ -39,7 +39,13 @@ Essas contagens **não saneiam** divergências de valor, residual ou duplicidade
 
 ## Publicação e aceitação operacional
 
-O código está certificado para checkpoint e push normal. A conclusão do rollout e o smoke autenticado da revisão publicada são etapas posteriores à gravação deste relatório; o status final de entrega registra seus resultados externos. Não se deve confundir build local ou flags habilitadas com sucesso de operação financeira real.
+O hotfix foi commitado, salvo em checkpoint `126fa45b` e enviado ao GitHub por fast-forward. A revisão `126fa45b8e6384d8207163e2508d25857f051c03` foi confirmada **Success / Live Deployment** na DigitalOcean às 15h20 BRT, execução `31a21ea0-0170-4a6b-a304-7c92cf476f4f`, iniciada às 15h14min25. O checkout exato consta nos logs; o frontend publicado corresponde ao build certificado `index-mvy4YHx0.js`. Health CobraPro e raiz Evolution responderam HTTP 200.
+
+O smoke autenticado confirmou `412/PRECONDITION_FAILED` em `caixa.contas`, `dashboard.resumoCaixa`, KPIs, fluxo, tendência e score da conta divergente, sem totais monetários nessas respostas. Caixa apresenta saldo indisponível e retentativa manual; relatórios recusam ledger/fluxo e bloqueiam PDF incompleto. A carteira que tem leitura própria válida pode continuar visível, sem certificar o Caixa. Clientes carregaram normalmente. As quatro capacidades financeiras existentes foram conferidas; cotações com IDs inexistentes foram recusadas, sem mutação. A tentativa com caminho incorreto de capacidade das despesas foi corrigida para `contasPagar.capacidades`; não era falha de aplicação.
+
+**Ajuste visual adicional encontrado no pós-push:** quando o hook conclui sem dados e sem `isError`, parte do dashboard mantinha reticências ou gráfico vazio. Foi corrigido localmente para indisponibilidade explícita, retentativa manual somente leitura e ausência de retry automático nas cinco consultas certificadoras. Dez testes React direcionados aprovados. Certificação completa às 15h29: **2.353 testes aprovados**, 11 opt-in ignorados, 137 arquivos aprovados/3 ignorados; TypeScript, build e diff check aprovados. Checkpoint e rollout desse ajuste ainda são etapas posteriores a este registro; o status externo final informa a revisão efetivamente publicada. Não se deve confundir build local ou flags habilitadas com sucesso de operação financeira real.
+
+WhatsApp foi revalidado conectado às 15h28: três dos cinco avisos anteriores ativos, no vencimento ativo e agenda às 18h50 BRT. A fila consultada tem zero pendente/enviando/falha/ambígua e nenhum último envio; isso não prova entrega real. Workflow existente ativo e sua última execução agendada visível, iniciada às 09h36 BRT, teve sucesso. Nenhuma mensagem, disparo de workflow, QR ou configuração foi alterado neste smoke.
 
 O critério de aceite é: contas íntegras mantêm os fluxos transacionais habilitados; contas divergentes não exibem números falsamente certificados nem recebem novas operações inseguras. **Liberação irrestrita de todas as contas não foi aprovada por este relatório.** Nenhum lançamento antigo foi corrigido ou apagado.
 

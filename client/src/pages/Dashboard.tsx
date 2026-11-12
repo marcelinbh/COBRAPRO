@@ -119,13 +119,13 @@ export default function Dashboard() {
   const [, setLocation] = useLocation();
   const { data: meuKoletor } = trpc.cobradores.me.useQuery();
   const isKoletor = meuKoletor?.perfil === 'koletor';
-  const { data: kpis, isLoading: kpisLoading, isError: kpisFalhou, error: kpisErro } = trpc.dashboard.kpis.useQuery();
+  const { data: kpis, isLoading: kpisLoading, isError: kpisFalhou, error: kpisErro, refetch: conferirKpis } = trpc.dashboard.kpis.useQuery(undefined, { retry: false });
   const { data: parcelasHojeData, isLoading: hojeLoading, isError: hojeFalhou } = trpc.dashboard.parcelasHoje.useQuery();
   const { data: atrasadasData, isLoading: atrasadasLoading, isError: atrasadasFalhou } = trpc.dashboard.parcelasAtrasadas.useQuery();
-  const { data: fluxoMensal, isLoading: fluxoLoading, isError: fluxoFalhou } = trpc.dashboard.fluxoMensal.useQuery();
-  const { data: scoreData, isLoading: scoreLoading, isError: scoreFalhou, error: scoreErro } = trpc.dashboard.scoreNegocio.useQuery();
+  const { data: fluxoMensal, isLoading: fluxoLoading, isError: fluxoFalhou, refetch: conferirFluxo } = trpc.dashboard.fluxoMensal.useQuery(undefined, { retry: false });
+  const { data: scoreData, isLoading: scoreLoading, isError: scoreFalhou, error: scoreErro, refetch: conferirScore } = trpc.dashboard.scoreNegocio.useQuery(undefined, { retry: false });
   const { data: atencao, isLoading: atencaoLoading, isError: atencaoFalhou } = trpc.dashboard.precisaAtencao.useQuery();
-  const { data: tendencia, isLoading: tendenciaLoading, isError: tendenciaFalhou } = trpc.dashboard.tendenciaJuros.useQuery();
+  const { data: tendencia, isLoading: tendenciaLoading, isError: tendenciaFalhou, refetch: conferirTendencia } = trpc.dashboard.tendenciaJuros.useQuery(undefined, { retry: false });
   const relatorioDiarioMutation = trpc.whatsapp.relatorioDiario.useMutation({
     onSuccess: (data) => {
       window.open(data.whatsappUrl, '_blank');
@@ -140,13 +140,15 @@ export default function Dashboard() {
   const atrasadas = atrasadasFalhou ? undefined : atrasadasData;
   const saude = kpis && !kpisFalhou ? saudeCarteiraDashboard(kpis.totalReceber, kpis.totalInadimplente) : null;
   const taxaInadimplencia = saude ? saude.taxaInadimplencia.toFixed(1) : '—';
-  const kpisIndisponiveis = kpisFalhou || (!!kpis && !saude);
-  const { data: resumoCaixa, isLoading: caixaLoading, isError: caixaFalhou } = trpc.dashboard.resumoCaixa.useQuery(undefined, { enabled: kpisIndisponiveis });
+  const kpisIndisponiveis = kpisFalhou || (!kpisLoading && !kpis) || (!!kpis && !saude);
+  const fluxoIndisponivel = fluxoFalhou || (!fluxoLoading && !Array.isArray(fluxoMensal));
+  const tendenciaIndisponivel = tendenciaFalhou || (!tendenciaLoading && !Array.isArray(tendencia));
+  const { data: resumoCaixa, isLoading: caixaLoading, isError: caixaFalhou, refetch: conferirCaixa } = trpc.dashboard.resumoCaixa.useQuery(undefined, { enabled: kpisIndisponiveis, retry: false });
   const caixa = kpisIndisponiveis ? (caixaFalhou ? undefined : resumoCaixa) : kpis;
   const moedaCaixa = (valor: number | undefined) => valor !== undefined ? formatarMoeda(valor) : (kpisIndisponiveis ? caixaFalhou ? 'Indisponível' : caixaLoading ? '...' : 'Indisponível' : kpisLoading ? '...' : 'Indisponível');
   const numeroCaixa = (valor: number | undefined) => valor !== undefined ? String(valor) : (kpisIndisponiveis ? caixaFalhou ? 'Indisponível' : caixaLoading ? '...' : 'Indisponível' : kpisLoading ? '...' : 'Indisponível');
-  const moedaKpi = (valor: number | undefined) => kpisIndisponiveis ? 'Indisponível' : kpisLoading || valor === undefined ? '...' : formatarMoeda(valor);
-  const numeroKpi = (valor: number | undefined) => kpisIndisponiveis ? 'Indisponível' : kpisLoading || valor === undefined ? '...' : String(valor);
+  const moedaKpi = (valor: number | undefined) => kpisIndisponiveis ? 'Indisponível' : kpisLoading ? '...' : valor === undefined ? 'Indisponível' : formatarMoeda(valor);
+  const numeroKpi = (valor: number | undefined) => kpisIndisponiveis ? 'Indisponível' : kpisLoading ? '...' : valor === undefined ? 'Indisponível' : String(valor);
   const moedaAtencao = (valor: number | undefined) => atencaoFalhou ? 'Indisponível' : atencaoLoading || valor === undefined ? '...' : formatarMoeda(valor);
   const numeroAtencao = (valor: number | undefined) => atencaoFalhou ? '—' : atencaoLoading || valor === undefined ? '...' : String(valor);
 
@@ -191,10 +193,13 @@ export default function Dashboard() {
         </div>
       )}
 
-      {!isKoletor && (kpisFalhou || (kpis && !saude)) && (
-        <p role="alert" className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-warning">
-          {kpisFalhou ? kpisErro?.message : 'Base da carteira inconsistente; revisão necessária.'} Valores e saúde da carteira não apresentados. O Caixa é conferido separadamente, sem recalcular dívidas.
-        </p>
+      {!isKoletor && kpisIndisponiveis && (
+        <div role="alert" className="rounded-lg border border-warning/30 bg-warning/5 p-3 text-sm text-warning space-y-2">
+          <p>{kpisFalhou ? kpisErro?.message : !kpis ? 'Consulta concluída sem dados financeiros; revisão necessária.' : 'Base da carteira inconsistente; revisão necessária.'} Valores e saúde da carteira não apresentados. O Caixa é conferido separadamente, sem recalcular dívidas.</p>
+          <Button size="sm" variant="outline" onClick={() => {
+            void conferirKpis(); void conferirCaixa(); void conferirFluxo(); void conferirTendencia(); void conferirScore();
+          }}>Tentar novamente</Button>
+        </div>
       )}
 
       {/* KPI Cards - ocultos para koletores */}
@@ -345,7 +350,7 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {fluxoFalhou ? <p role="alert" className="text-sm text-warning">Fluxo indisponível; valores não calculados.</p> : fluxoLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
+            {fluxoIndisponivel ? <p role="alert" className="text-sm text-warning">Fluxo indisponível; valores não calculados.</p> : fluxoLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ResponsiveContainer width="100%" height={180}>
               <AreaChart data={chartData}>
                 <defs>
@@ -411,7 +416,7 @@ export default function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {tendenciaFalhou ? <p role="alert" className="text-sm text-warning">Tendência indisponível; valores não calculados.</p> : tendenciaLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
+            {tendenciaIndisponivel ? <p role="alert" className="text-sm text-warning">Tendência indisponível; valores não calculados.</p> : tendenciaLoading ? <p className="text-sm text-muted-foreground">Carregando...</p> : (
             <ResponsiveContainer width="100%" height={160}>
               <BarChart data={tendenciaData} barSize={28}>
                 <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.01 240)" vertical={false} />
