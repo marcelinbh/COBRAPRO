@@ -48,8 +48,10 @@ describe("Cálculos Financeiros — CobraPro", () => {
     });
 
     it("calcula multa e juros com 30 dias de atraso", () => {
-      const vencimento = new Date("2025-01-01");
-      const hoje = new Date("2025-01-31");
+      const vencimento = "2025-01-01";
+      // Referência é instante de pagamento, não DATE: à meia-noite UTC ainda
+      // seria 30/01 em Brasília. Meio-dia BRT representa o dia pretendido.
+      const hoje = new Date("2025-01-31T15:00:00Z");
       // A multa é configurável; neste cenário, multa única de 2% e R$0,33/dia.
       const { diasAtraso, juros, multa, total } = calcularJurosMora(1000, vencimento, hoje, 0.33, 2);
       expect(diasAtraso).toBe(30);

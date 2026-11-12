@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { toast } from "sonner";
 import { cicloRpc, chaveIntencao, guardarIntencao, lerIntencao, dinheiroIntencao, escopoFinanceiroAtual, type IntencaoPersistida } from "./EmprestimoSeguroRpc";
 import type { CotacaoEmprestimoProspectivo, EntradaRecebimentoProspectivo, ResultadoRecebimentoProspectivo } from "../../../server/services/cicloEmprestimosRpc";
+import { assertRecoveryEvidence, canCloseRejectedIntent, recoveryRequest, type RecoveryEvidence } from "../../../shared/financialIntentRecovery";
 
 export function EmprestimoSeguroReceber({ contratoId, parcelaId, onSuccess }: { contratoId: number; parcelaId: number; onSuccess: () => void }) {
   const { data: user } = trpc.auth.me.useQuery();
@@ -15,6 +16,8 @@ export function EmprestimoSeguroReceber({ contratoId, parcelaId, onSuccess }: { 
   const [erro, setErro] = useState("");
   const [pendente, setPendente] = useState<IntencaoPersistida<EntradaRecebimentoProspectivo> | null>(null);
   const ref = useRef<IntencaoPersistida<EntradaRecebimentoProspectivo> | null>(null);
+  const flight = useRef(false);
+  const [recovery, setRecovery] = useState<RecoveryEvidence>();
   const key = user ? chaveIntencao(user.id, "receber", parcelaId) : "";
   const escopo = key ? `${key}:contrato:${contratoId}` : "";
   const escopoAtual = useRef(escopo);
@@ -22,6 +25,7 @@ export function EmprestimoSeguroReceber({ contratoId, parcelaId, onSuccess }: { 
   const [escopoDaTela, setEscopoDaTela] = useState("");
   useEffect(() => {
     ref.current = null; setPendente(null);
+    flight.current = false; setRecovery(undefined);
     setEscopoDaTela(escopo); setErro(""); setCotacao(null); setValor(""); setModo("integral"); setBusy(false); setOpen(false);
     if (!key) return;
     try {
@@ -32,13 +36,17 @@ export function EmprestimoSeguroReceber({ contratoId, parcelaId, onSuccess }: { 
   }, [key, escopo, contratoId, parcelaId]);
   async function consultar() {
     if (!escopoFinanceiroAtual(escopoAtual, escopo) || escopoDaTela !== escopo) return;
+    if (ref.current || flight.current) return;
+    flight.current = true;
     setBusy(true); setErro("");
     try { const q = await cicloRpc.cotar.query({ contratoId, parcelaId }); if (!escopoFinanceiroAtual(escopoAtual, escopo)) return; setCotacao(q); setValor(q.totalExigido); }
     catch (e) { if (escopoFinanceiroAtual(escopoAtual, escopo)) setErro(`${(e as Error).message} Apenas proveniência 0021 íntegra é elegível. Recebimento legado permanece suspenso, sem alternativa REST.`); }
-    finally { if (escopoFinanceiroAtual(escopoAtual, escopo)) setBusy(false); }
+    finally { if (escopoFinanceiroAtual(escopoAtual, escopo)) { flight.current = false; setBusy(false); } }
   }
   async function enviar() {
     if (!escopoFinanceiroAtual(escopoAtual, escopo) || escopoDaTela !== escopo || busy) return;
+    if (flight.current || recovery?.status === "not_executed") return;
+    flight.current = true;
     setBusy(true);
     try {
       let p = ref.current;
@@ -58,7 +66,31 @@ export function EmprestimoSeguroReceber({ contratoId, parcelaId, onSuccess }: { 
       toast.success(`Recebimento confirmado: ${r.valorRecebido}; residual ${r.saldoResidual}; operação ${r.operationId}.`);
       onSuccess();
     } catch (e) { if (escopoFinanceiroAtual(escopoAtual, escopo)) setErro(`${(e as Error).message} Não presuma rollback: conserve e confira o mesmo UUID/payload antes de iniciar nova intenção.`); }
-    finally { if (escopoFinanceiroAtual(escopoAtual, escopo)) setBusy(false); }
+    finally { if (escopoFinanceiroAtual(escopoAtual, escopo)) { flight.current = false; setBusy(false); } }
+  }
+  async function reconciliar() {
+    const p = ref.current;
+    if (!p || !user || flight.current || !escopoFinanceiroAtual(escopoAtual, escopo)) return;
+    flight.current = true; setBusy(true);
+    try {
+      const request = recoveryRequest("emprestimo_receber", p.payload);
+      const r = assertRecoveryEvidence(await cicloRpc.reconciliar.mutate(request), user.id, request);
+      if (!escopoFinanceiroAtual(escopoAtual, escopo) || ref.current?.payload.idempotencyKey !== p.payload.idempotencyKey) return;
+      setRecovery(r); setErro("");
+      if (r.status === "confirmed") {
+        const confirmed = { ...p, confirmacao: r.result };
+        guardarIntencao(sessionStorage, key, confirmed); ref.current = confirmed; setPendente(confirmed); onSuccess();
+      }
+    } catch (e) { if (escopoFinanceiroAtual(escopoAtual, escopo)) setErro(`${(e as Error).message} Não execução NÃO comprovada. Sem descarte; mantenha UUID/payload para conferência/retry.`); }
+    finally { if (escopoFinanceiroAtual(escopoAtual, escopo)) { flight.current = false; setBusy(false); } }
+  }
+  function recotarRejeitada() {
+    const p = ref.current;
+    if (!p || !user || flight.current || !canCloseRejectedIntent(recovery, user.id, recoveryRequest("emprestimo_receber", p.payload))) return;
+    try {
+      sessionStorage.removeItem(key); ref.current = null; setPendente(null); setRecovery(undefined);
+      setCotacao(null); setValor(""); setModo("integral"); setErro(""); void consultar();
+    } catch { setErro("Armazenamento não liberado; intenção preservada. Não inicie outra operação."); }
   }
   function prepararNovoParcial() {
     if (!pendente?.confirmacao) return;
@@ -77,6 +109,8 @@ export function EmprestimoSeguroReceber({ contratoId, parcelaId, onSuccess }: { 
           <p>Intenção preservada: <code className="text-xs">{pendente.payload.idempotencyKey}</code></p>
           <pre className="text-xs overflow-auto">{JSON.stringify(pendente.payload, null, 2)}</pre>
           {pendente.confirmacao && <><p>Confirmado:</p><pre className="text-xs overflow-auto">{JSON.stringify(pendente.confirmacao, null, 2)}</pre><Button variant="outline" onClick={prepararNovoParcial}>Receber próximo parcial após confirmação</Button></>}
+          {!pendente.confirmacao && <Button variant="outline" disabled={busy} onClick={reconciliar}>Reconciliar UUID e estado SQL (pode encerrar sem execução)</Button>}
+          {recovery?.status === "not_executed" && <><p role="status">Não execução comprovada. UUID bloqueado para POST atrasado; nenhuma baixa feita por esta intenção.</p><Button disabled={busy} onClick={recotarRejeitada}>Recotar após não execução comprovada</Button></>}
         </> : cotacao && <>
           <p>Conta original #{cotacao.contaCaixaId}. Data civil SQL BRT: {cotacao.dataPagamento}. Vencimento: {cotacao.vencimento}.</p>
           <p>Exigido: {cotacao.totalExigido}. Multa: {cotacao.multa}; mora: {cotacao.mora}. Juros embutidos {cotacao.jurosEmbutidos} já inclusos, não somados novamente.</p>
@@ -85,7 +119,7 @@ export function EmprestimoSeguroReceber({ contratoId, parcelaId, onSuccess }: { 
           <label>Valor realmente recebido<Input value={valor} disabled={modo === "integral" || busy} onChange={e => setValor(e.target.value)} /></label>
           <Button variant="outline" disabled={busy} onClick={consultar}>Atualizar cotação SQL antes de confirmar</Button>
         </>}
-        <Button disabled={busy || !key || (!pendente && (!cotacao?.elegivel || !!erro))} onClick={enviar}>{busy ? "Conferindo..." : pendente ? "Conferir/repetir UUID e payload preservados" : "Confirmar valor recebido"}</Button>
+        <Button disabled={busy || !key || recovery?.status === "not_executed" || (!pendente && (!cotacao?.elegivel || !!erro))} onClick={enviar}>{busy ? "Conferindo..." : pendente ? "Conferir/repetir UUID e payload preservados" : "Confirmar valor recebido"}</Button>
         <p className="text-xs text-muted-foreground">Timeout ou reload não gera chave nova. Se a cotação mudar após envio, confira a intenção existente e o histórico; não há reset automático ou promessa de rollback.</p>
       </div>
     </DialogContent></Dialog>

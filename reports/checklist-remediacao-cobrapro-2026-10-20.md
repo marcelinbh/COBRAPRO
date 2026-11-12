@@ -4,6 +4,22 @@
 **Regra solicitada:** correções Kiwify ficam por último.  
 **Objetivo:** eliminar primeiro riscos de tomada de conta, alteração/vazamento entre empresas e corrupção operacional/financeira.
 
+## Atualização operacional — 12/11/2026
+
+> Esta seção prevalece sobre os estados históricos abaixo. Kiwify/ofertas ficam fora do lote atual. Acesso manual Blacklist das14 contas concedidas e deploy5dbf966 permanecem preservados. Dados antigos inconsistentes não foram saneados por suposição.
+
+- [x] Caixa em centavos exatos e mesma base de relatórios, paginação completa, confirmação de gravação de clientes e validação de novos documentos.
+- [x] Calendário BRT nos fluxos revisados, consultas somente leitura e fim do timer que escrevia globalmente em parcelas.
+- [x] Montar seletor de origem, recuperação autoritativa de UUID e renovação sem duplicar principal ou gerar comprovante fictício.
+- [x] Concluir testes integrados:2.218 aprovados,11 opt-in ignorados,TypeScript ebuild; testes PostgreSQL de coexistência, drift, role gerenciada, renovação, legado eworker.
+- [x] Aplicar0031/0033/0034 no Supabase correto às09h54–09h55:56 tabelas públicas comRLS,0 acesso anon/authenticated,14 usuários/1235 parcelas/1152 lançamentos preservados.
+- [x] Smoke segregado sobservice_role comROLLBACK: recebimentos, renovação,replay,despesas/estorno,prova privada,fence;zero registros sintéticos persistidos e nenhum envio externo.
+- [ ] Checkpoint/push/deploy e flags de runtime `ENABLE_RPC_RENOVACAO_PROSPECTIVA` e `ENABLE_RPC_RECEBIMENTO_LEGADO_VALIDADO`; smoke autenticado da revisão exata.
+- [ ] Aprovação humana por registro dos dados antigos divergentes. Recebimento legado só libera mensal integral financeiramente virgem e reconciliado; outras escritas inseguras continuam bloqueadas.
+- [ ] Preservação offsite de backup e cobertura integral deAuth/Storage/infraestrutura; cópia lógica privada restaurada não é backup total do projeto.
+
+**Hospedagem:** painelDO em12/11 exibeUS$36,00 em atraso e pagamento até14/11 para evitar suspensão. Nenhum pagamento/upgrade foi iniciado. Evidências em `reports/liberacao-operacional-2026-11-12.md`.
+
 ## Liberação operacional de 8/11/2026 — em integração
 
 - [x] Renovar a captura privada de aplicação e comprovar duas restaurações PostgreSQL 17: 29 tabelas / 4.117 linhas idênticas; arquivos fora do Git.

@@ -2,6 +2,7 @@
 import { useTranslation } from 'react-i18next';
 import { textoSeguroParaPlanilha } from "@/lib/spreadsheetSafety";
 import { useState, useCallback, useRef, useEffect } from "react";
+import { clienteCreateInput, clienteUpdateInput, clienteTextoOpcional, clienteCorrespondeBusca } from "@shared/clientesInput";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -289,29 +290,50 @@ function NovoClienteModal({ open, onClose, onSuccess, clienteEditar }: NovoClien
 
   const handleSalvar = () => {
     if (!nome.trim()) { toast.error(t('toast_error.nome_é_obrigatório')); setAba("dados"); return; }
+    const opcional = (value: string) => clienteTextoOpcional(value, isEdit);
     const payload = {
       nome,
-      cpfCnpj: cpf || undefined,
-      cnpj: cnpj || undefined,
-      rg: rg || undefined,
-      email: email || undefined,
-      telefone: telefone || undefined,
-      instagram: instagram || undefined,
-      facebook: facebook || undefined,
-      profissao: profissao || undefined,
+      cpfCnpj: opcional(cpf),
+      cnpj: opcional(cnpj),
+      rg: opcional(rg),
+      email: opcional(email),
+      telefone: opcional(telefone),
+      instagram: opcional(instagram),
+      facebook: opcional(facebook),
+      profissao: opcional(profissao),
       tipoCliente,
       isReferral,
-      observacoes: observacoes || undefined,
-      fotoUrl: fotoUrl || undefined,
+      ativo,
+      observacoes: opcional(observacoes),
+      fotoUrl: opcional(fotoUrl),
       documentosUrls: JSON.stringify(documentos),
-      cep: cep || undefined,
-      endereco: endereco || undefined,
-      numero: numero || undefined,
-      complemento: complemento || undefined,
-      bairro: bairro || undefined,
-      cidade: cidade || undefined,
-      estado: estado || undefined,
+      cep: opcional(cep),
+      endereco: opcional(endereco),
+      numero: opcional(numero),
+      complemento: opcional(complemento),
+      bairro: opcional(bairro),
+      cidade: opcional(cidade),
+      estado: opcional(estado),
     };
+    // Não exigir saneamento de um campo legado intocado para editar outro campo.
+    // Apagar um valor anterior continua enviando '', enquanto omissão não altera o dado.
+    if (isEdit) {
+      for (const [key, value] of Object.entries(payload)) {
+        const anterior = clienteEditar[key];
+        if (value === anterior || (value === "" && anterior == null)) {
+          delete (payload as Record<string, unknown>)[key];
+        }
+      }
+    }
+    const validacao = isEdit
+      ? clienteUpdateInput.safeParse({ id: clienteEditar.id, ...payload })
+      : clienteCreateInput.safeParse(payload);
+    if (!validacao.success) {
+      const issue = validacao.error.issues[0];
+      setAba(["estado", "cidade", "cep", "endereco", "numero", "complemento", "bairro"].includes(String(issue.path[0])) ? "endereco" : "dados");
+      toast.error(issue.message);
+      return;
+    }
     if (isEdit) {
       updateMutation.mutate({ id: clienteEditar.id, ...payload });
     } else {
@@ -664,7 +686,7 @@ export default function Clientes() {
   const [showNovoModal, setShowNovoModal] = useState(false);
   const [clienteEditar, setClienteEditar] = useState<any>(null);
 
-  const { data: clientesData, isLoading } = trpc.clientes.list.useQuery();
+  const { data: clientesData, isLoading, isError, isFetching, refetch } = trpc.clientes.list.useQuery();
   const clientes = Array.isArray(clientesData) ? clientesData : (clientesData as any)?.clientes ?? [];
   const utils = trpc.useUtils();
 
@@ -682,9 +704,7 @@ export default function Clientes() {
   });
 
   const filteredClientes = (clientes as any[]).filter((c: any) => {
-    const buscaOk = c.nome?.toLowerCase().includes(busca.toLowerCase()) ||
-      c.cpfCnpj?.includes(busca) ||
-      c.telefone?.includes(busca);
+    const buscaOk = clienteCorrespondeBusca(c, busca);
     const tipoOk = filtroTipo === "todos" || c.tipoCliente === filtroTipo;
     const indicadoOk = filtroIndicado === "todos" ||
       (filtroIndicado === "sim" && c.isReferral) ||
@@ -738,15 +758,15 @@ export default function Clientes() {
           <p className="text-sm text-muted-foreground mt-1">{t('clientes.subtitle')}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="gap-2" onClick={exportarCSV}>
+          <Button variant="outline" className="gap-2" onClick={exportarCSV} disabled={isError || isLoading}>
             <Download className="h-4 w-4" />
             {t('clients.exportCSV')}
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => setShowImportModal(true)}>
+          <Button variant="outline" className="gap-2" onClick={() => setShowImportModal(true)} disabled={isError || isLoading}>
             <Upload className="h-4 w-4" />
             {t('clients.importCSV')}
           </Button>
-          <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }}>
+          <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }} disabled={isError || isLoading}>
             <Plus className="h-4 w-4" />
             {t('clients.newClient')}
           </Button>
@@ -786,7 +806,7 @@ export default function Clientes() {
           </SelectContent>
         </Select>
         <div className="flex items-center text-xs text-muted-foreground whitespace-nowrap">
-          {filteredClientes.length} clientes
+          {isError ? "Consulta indisponível" : isLoading ? t('common.loading') : `${filteredClientes.length} clientes`}
         </div>
       </div>
 
@@ -811,7 +831,18 @@ export default function Clientes() {
                   <td colSpan={7} className="px-6 py-4 text-center text-muted-foreground">{t('clients.loadingClients')}</td>
                 </tr>
               )}
-              {!isLoading && filteredClientes.length === 0 && (
+              {isError && (
+                <tr>
+                  <td colSpan={7} className="px-6 py-8 text-center" role="alert">
+                    <AlertCircle className="h-10 w-10 text-destructive mx-auto mb-3" />
+                    <p className="text-muted-foreground">Não foi possível carregar os clientes. Tente novamente.</p>
+                    <Button variant="outline" className="mt-4" onClick={() => void refetch()} disabled={isFetching}>
+                      {isFetching ? "Tentando novamente..." : "Tentar novamente"}
+                    </Button>
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !isError && filteredClientes.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-8 text-center">
                     <User className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
@@ -822,7 +853,7 @@ export default function Clientes() {
                   </td>
                 </tr>
               )}
-              {filteredClientes.map((cliente: any) => (
+              {!isError && filteredClientes.map((cliente: any) => (
                 <tr
                   key={cliente.id}
                   className="border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
@@ -883,7 +914,7 @@ export default function Clientes() {
 
       {/* Modal Novo/Editar Cliente */}
       <NovoClienteModal
-        open={showNovoModal}
+        open={showNovoModal && !isError}
         onClose={() => setShowNovoModal(false)}
         onSuccess={() => utils.clientes.list.invalidate()}
         clienteEditar={clienteEditar}
@@ -919,7 +950,7 @@ export default function Clientes() {
       </Dialog>
 
       {/* Modal de Importação CSV */}
-      <Dialog open={showImportModal} onOpenChange={(open) => { if (!open) { setShowImportModal(false); setImportResultado(null); } }}>
+      <Dialog open={showImportModal && !isError} onOpenChange={(open) => { if (!open) { setShowImportModal(false); setImportResultado(null); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Importar Clientes via CSV</DialogTitle>
@@ -998,6 +1029,7 @@ export default function Clientes() {
   );
 
   async function processarCSV(file: File) {
+    if (isError) { toast.error("Consulte a lista novamente antes de importar clientes."); return; }
     setImportando(true);
     try {
       const text = await file.text();

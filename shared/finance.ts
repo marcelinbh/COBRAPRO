@@ -1,20 +1,33 @@
 // Helpers financeiros compartilhados entre frontend e backend
 const TIME_ZONE_BRASILIA = "America/Sao_Paulo";
 
-function dataCivilBrasilia(value: Date | string): string {
-  if (typeof value === "string") return value.slice(0, 10);
-  // Datas de vencimento históricas chegam como YYYY-MM-DDT00:00:00.
-  // Nesse caso preservamos a data civil original, sem deslocá-la para o dia anterior no fuso BRT.
-  if (value.getUTCHours() === 0 && value.getUTCMinutes() === 0 && value.getUTCSeconds() === 0) {
-    return value.toISOString().slice(0, 10);
-  }
+/** Converte um instante para o dia de Brasília, inclusive à meia-noite UTC. */
+export function dataHojeBrasilia(value: Date = new Date()): string {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: TIME_ZONE_BRASILIA, year: "numeric", month: "2-digit", day: "2-digit",
   }).formatToParts(value).filter(p => p.type !== "literal").map(p => [p.type, p.value]));
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-function diferencaDiasCivis(inicio: string, fim: string): number {
+/** DATE não é um instante. A compatibilidade de meia-noite vale só para vencimento. */
+export function dataVencimentoCivil(value: Date | string): string {
+  if (typeof value === "string" && /^\d{4}-\d{2}-\d{2}(?:T00:00:00(?:\.000)?Z?)?$/.test(value)) {
+    const civil = value.slice(0, 10);
+    const parsed = new Date(`${civil}T00:00:00Z`);
+    if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== civil) {
+      throw new RangeError("Data de vencimento inválida");
+    }
+    return civil;
+  }
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (!Number.isFinite(date.getTime())) throw new RangeError("Data de vencimento inválida");
+  if (date.getUTCHours() === 0 && date.getUTCMinutes() === 0 && date.getUTCSeconds() === 0 && date.getUTCMilliseconds() === 0) {
+    return date.toISOString().slice(0, 10);
+  }
+  return dataHojeBrasilia(date);
+}
+
+export function diferencaDiasCivis(inicio: string, fim: string): number {
   return Math.round((new Date(`${fim}T12:00:00Z`).getTime() - new Date(`${inicio}T12:00:00Z`).getTime()) / 86_400_000);
 }
 
@@ -28,21 +41,21 @@ function diferencaDiasCivis(inicio: string, fim: string): number {
  *
  * @param valorOriginal - Valor da parcela sem juros/multa
  * @param dataVencimento - Data de vencimento da parcela
- * @param dataPagamento - Data do pagamento (ou data atual para cálculo)
+ * @param dataPagamento - Instante do pagamento (ou relógio atual), convertido sempre para Brasília
  * @param multaDiariaReais - Valor em R$ por dia de atraso (padrão: 0 = sem multa diária)
  * @param multaAtrasoPercentual - % de multa única no 1º dia (padrão: 0)
  */
 export function calcularJurosMora(
   valorOriginal: number,
-  dataVencimento: Date,
+  dataVencimento: Date | string,
   dataPagamento: Date,
   multaDiariaReais: number = 0,
   multaAtrasoPercentual: number = 0
 ): { juros: number; multa: number; total: number; diasAtraso: number } {
   // A multa só nasce à 00:00 do dia seguinte ao vencimento em Brasília.
   // Comparar DATEs civis evita que UTC/servidor antecipe a cobrança às 21h BRT.
-  const vencimento = dataCivilBrasilia(dataVencimento);
-  const pagamento = dataCivilBrasilia(dataPagamento);
+  const vencimento = dataVencimentoCivil(dataVencimento);
+  const pagamento = dataHojeBrasilia(dataPagamento);
   const diasAtraso = Math.max(0, diferencaDiasCivis(vencimento, pagamento));
 
   if (diasAtraso === 0) {
@@ -150,7 +163,9 @@ export function calcularValorAbertoParcela(parcela: {
   saldoResidual?: number | string | null | undefined;
   valorMulta?: number | string | null | undefined;
 }): number {
-  if (parcela.status === "paga") return 0;
+  // A antecessora renovada conserva o principal apenas como histórico de
+  // transferência. Sua obrigação corrente está exclusivamente na sucessora.
+  if (["paga", "pago", "renovada", "cancelada", "cancelado"].includes(parcela.status)) return 0;
 
   const paraNumero = (valor: number | string | null | undefined) => {
     const numero = typeof valor === "number" ? valor : Number(valor ?? 0);
@@ -187,12 +202,15 @@ export function formatarData(data: Date | string | null | undefined): string {
 export function getStatusParcela(
   status: string,
   dataVencimento: Date | string
-): 'paga' | 'atrasada' | 'vencendo_hoje' | 'pendente' | 'parcial' {
+): 'paga' | 'atrasada' | 'vencendo_hoje' | 'pendente' | 'parcial' | 'renovada' | 'cancelada' {
   if (status === 'paga') return 'paga';
   if (status === 'parcial') return 'parcial';
+  if (status === 'renovada') return 'renovada';
+  if (status === 'pago') return 'paga';
+  if (status === 'cancelada' || status === 'cancelado') return 'cancelada';
 
-  const hoje = dataCivilBrasilia(new Date());
-  const vencimento = dataCivilBrasilia(dataVencimento);
+  const hoje = dataHojeBrasilia();
+  const vencimento = dataVencimentoCivil(dataVencimento);
   if (vencimento < hoje) return 'atrasada';
   if (vencimento === hoje) return 'vencendo_hoje';
   return 'pendente';

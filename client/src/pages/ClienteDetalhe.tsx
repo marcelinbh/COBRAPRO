@@ -52,7 +52,7 @@ export default function ClienteDetalhe() {
   const [abaAtiva, setAbaAtiva] = useState("resumo");
 
   const utils = trpc.useUtils();
-  const { data: cliente, isLoading } = trpc.clientes.byId.useQuery({ id: clienteId });
+  const { data: cliente, isLoading, isError, isFetching, refetch } = trpc.clientes.byId.useQuery({ id: clienteId });
   const { data: contratos } = trpc.clientes.contratosByCliente.useQuery({ clienteId });
   const { data: parcelas } = trpc.parcelas.list.useQuery({ clienteId });
 
@@ -151,6 +151,21 @@ export default function ClienteDetalhe() {
         <div className="h-8 w-48 bg-muted rounded" />
         <div className="h-48 bg-card border border-border rounded-xl" />
         <div className="h-64 bg-card border border-border rounded-xl" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center py-16" role="alert">
+        <AlertTriangle className="h-10 w-10 text-destructive mx-auto mb-3" />
+        <p className="text-muted-foreground">Não foi possível carregar o cliente. Tente novamente.</p>
+        <Button variant="outline" className="mt-4" onClick={() => void refetch()} disabled={isFetching}>
+          {isFetching ? "Tentando novamente..." : "Tentar novamente"}
+        </Button>
+        <Button variant="ghost" className="mt-4 ml-2" onClick={() => setLocation("/clientes")}>
+          Voltar para Clientes
+        </Button>
       </div>
     );
   }

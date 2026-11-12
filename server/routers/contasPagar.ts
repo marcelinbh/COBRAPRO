@@ -6,6 +6,8 @@ import { getSupabaseClientAsync } from "../db";
 import { dataHojeBrasilia } from "../services/businessDate";
 import { criarDespesaAtomica, pagarDespesaAtomica, estornarDespesaAtomica } from "../services/despesasRpc";
 import { criarDespesaInput, pagarDespesaInput, estornarDespesaInput, dinheiroDespesa, dataCivilDespesa } from "../../shared/despesasIntent";
+import { financialIntentRecoveryInput } from "../../shared/financialIntentRecovery";
+import { reconcileFinancialIntent } from "../services/financialIntentRecovery";
 
 const expenseColumns = 'id, descricao, categoria, valor::text, data_vencimento, data_pagamento, status, recorrente, frequencia, conta_caixa_id, observacoes, user_id, createdAt, updatedAt';
 const ledgerColumns = 'id::text, conta_caixa_id, tipo, categoria, descricao, valor::text, data_transacao, contrato_id, parcela_id, createdAt, user_id';
@@ -197,6 +199,10 @@ export const contasPagarRouter = router({
     return { totalPendente: pendente.total, qtdPendente: pendente.qtd, totalAtrasado: atrasado.total, qtdAtrasado: atrasado.qtd, totalPago: pago.total, qtdPago: pago.qtd };
   }),
   capacidades: protectedProcedure.query(() => ({ prospectivasHabilitadas: process.env.ENABLE_RPC_DESPESAS_PROSPECTIVAS === 'true', recorrencia: false as const })),
+  reconciliar: protectedProcedure.input(financialIntentRecoveryInput).mutation(async ({ ctx, input }) => {
+    if (!input.family.startsWith('despesa_')) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Família divergente.' });
+    return reconcileFinancialIntent(await fonte(true), ctx.user.id, input);
+  }),
   criar: protectedProcedure.input(criarDespesaInput).mutation(async ({ ctx, input }) => criarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, descricao: input.descricao, categoria: input.categoria, valor: input.valor, dataVencimento: input.dataVencimento, observacoes: input.observacoes })),
   pagar: protectedProcedure.input(pagarDespesaInput).mutation(async ({ ctx, input }) => pagarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, despesaId: input.id, contaCaixaId: input.contaCaixaId, dataPagamento: input.dataPagamento })),
   estornar: protectedProcedure.input(estornarDespesaInput).mutation(async ({ ctx, input }) => estornarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, despesaId: input.id, pagamentoOperationId: input.pagamentoOperationId, dataEstorno: input.dataEstorno, motivo: input.motivo })),

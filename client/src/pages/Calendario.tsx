@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChevronLeft, ChevronRight, Calendar, List, LayoutGrid, X, MessageCircle, CheckCircle } from "lucide-react";
-import { formatarMoeda } from "../../../shared/finance";
+import { dataHojeBrasilia, dataVencimentoCivil, formatarData, formatarMoeda } from "../../../shared/finance";
+import { statusCalendarioParcela } from "../../../shared/parcelasCalendar";
 import { useLocation } from "wouter";
 import { toast } from "sonner";
 
@@ -16,11 +17,49 @@ const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julh
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Parcela = any;
 
+export function chaveCalendario(ano: number, mes: number, dia: number): string {
+  return `${ano}-${String(mes + 1).padStart(2, "0")}-${String(dia).padStart(2, "0")}`;
+}
+
+export function agruparParcelasCalendario(parcelas: Parcela[]): Map<string, Parcela[]> {
+  const map = new Map<string, Parcela[]>();
+  parcelas.forEach(p => {
+    // DATE inválido não deve deslocar uma parcela para um dia inventado.
+    try {
+      const key = dataVencimentoCivil(p.dataVencimento);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(p);
+    } catch { /* Sem vencimento civil válido, não incluir na agenda. */ }
+  });
+  return map;
+}
+
+export function semanaCalendario(hoje: string, offset = 0): Date[] {
+  // Dates internos representam apenas dias civis; usar exclusivamente getters UTC.
+  const inicio = new Date(`${hoje}T12:00:00Z`);
+  inicio.setUTCDate(inicio.getUTCDate() - inicio.getUTCDay() + offset * 7);
+  return Array.from({ length: 7 }, (_, i) => {
+    const dia = new Date(inicio);
+    dia.setUTCDate(dia.getUTCDate() + i);
+    return dia;
+  });
+}
+
+export function mensagemCalendario(parcela: Parcela, hoje = dataHojeBrasilia()): string {
+  const vencimento = dataVencimentoCivil(parcela.dataVencimento);
+  const data = formatarData(vencimento);
+  const descricao = vencimento < hoje ? `está em atraso (vencimento: ${data})` :
+    vencimento === hoje ? `vence hoje (${data})` : `vence em ${data}`;
+  // A agenda não tem cotação autoritativa: não informar original/residual como total.
+  return `Olá ${parcela.clienteNome || 'cliente'}, lembrete: sua parcela ${parcela.numeroParcela}/${parcela.totalParcelas ?? parcela.numeroParcelas} ${descricao}. O total e eventuais encargos devem ser confirmados na cotação atual antes do pagamento.`;
+}
+
 export default function Calendario() {
   const { t } = useTranslation();
-  const hoje = new Date();
-  const [mes, setMes] = useState(hoje.getMonth());
-  const [ano, setAno] = useState(hoje.getFullYear());
+  const hoje = dataHojeBrasilia();
+  const [anoHoje, mesHoje, diaHoje] = hoje.split("-").map(Number);
+  const [mes, setMes] = useState(mesHoje - 1);
+  const [ano, setAno] = useState(anoHoje);
   const [modo, setModo] = useState<"mensal" | "semanal" | "lista">("mensal");
   const [semanaOffset, setSemanaOffset] = useState(0);
   const [filtroKoletor, setFiltroKoletor] = useState<string>("todos");
@@ -37,43 +76,27 @@ export default function Calendario() {
   // Filtrar por cobrador
   const parcelas = useMemo(() => {
     if (!parcelasRaw) return [];
-    if (filtroKoletor === "todos") return parcelasRaw;
     const koletorId = parseInt(filtroKoletor);
-    return parcelasRaw.filter((p: Parcela) => p.koletorId === koletorId);
-  }, [parcelasRaw, filtroKoletor]);
+    return parcelasRaw
+      .filter((p: Parcela) => filtroKoletor === "todos" || p.koletorId === koletorId)
+      .map((p: Parcela) => {
+        try {
+          return { ...p, status: statusCalendarioParcela(p.status, dataVencimentoCivil(p.dataVencimento), hoje) };
+        } catch { return p; }
+      });
+  }, [parcelasRaw, filtroKoletor, hoje]);
 
   // Agrupar parcelas por dia
-  const parcelasPorDia = useMemo(() => {
-    const map = new Map<string, Parcela[]>();
-    parcelas.forEach((p: Parcela) => {
-      const d = new Date(p.dataVencimento);
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(p);
-    });
-    return map;
-  }, [parcelas]);
+  const parcelasPorDia = useMemo(() => agruparParcelasCalendario(parcelas), [parcelas]);
 
   // Gerar dias do mês
-  const primeiroDia = new Date(ano, mes, 1).getDay();
-  const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+  const primeiroDia = new Date(Date.UTC(ano, mes, 1)).getUTCDay();
+  const diasNoMes = new Date(Date.UTC(ano, mes + 1, 0)).getUTCDate();
   const dias: (number | null)[] = [...Array(primeiroDia).fill(null), ...Array.from({ length: diasNoMes }, (_, i) => i + 1)];
   while (dias.length % 7 !== 0) dias.push(null);
 
   // Semana atual
-  const inicioSemana = useMemo(() => {
-    const d = new Date(hoje);
-    d.setDate(d.getDate() - d.getDay() + semanaOffset * 7);
-    return d;
-  }, [semanaOffset]);
-
-  const diasSemana = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(inicioSemana);
-      d.setDate(d.getDate() + i);
-      return d;
-    });
-  }, [inicioSemana]);
+  const diasSemana = useMemo(() => semanaCalendario(hoje, semanaOffset), [hoje, semanaOffset]);
 
   const navMes = (delta: number) => {
     let novoMes = mes + delta;
@@ -85,7 +108,7 @@ export default function Calendario() {
   };
 
   const getDiaInfo = (diaNum: number, mesNum = mes, anoNum = ano) => {
-    const key = `${anoNum}-${mesNum}-${diaNum}`;
+    const key = chaveCalendario(anoNum, mesNum, diaNum);
     const ps = parcelasPorDia.get(key) ?? [];
     const atrasadas = ps.filter(p => p.status === 'atrasada').length;
     const vencendo = ps.filter(p => p.status === 'vencendo_hoje').length;
@@ -95,22 +118,21 @@ export default function Calendario() {
     return { ps, atrasadas, vencendo, pendentes, pagas, total };
   };
 
-  const getDiaInfoFromDate = (date: Date) => getDiaInfo(date.getDate(), date.getMonth(), date.getFullYear());
+  const getDiaInfoFromDate = (date: Date) => getDiaInfo(date.getUTCDate(), date.getUTCMonth(), date.getUTCFullYear());
 
   const isHoje = (dia: number, mesNum = mes, anoNum = ano) =>
-    dia === hoje.getDate() && mesNum === hoje.getMonth() && anoNum === hoje.getFullYear();
+    dia === diaHoje && mesNum === mesHoje - 1 && anoNum === anoHoje;
 
   // Resumo do mês
-  const parcelasMes = parcelas.filter((p: Parcela) => {
-    const d = new Date(p.dataVencimento);
-    return d.getMonth() === mes && d.getFullYear() === ano;
-  });
+  const parcelasMes = Array.from(parcelasPorDia.entries())
+    .filter(([data]) => data.startsWith(chaveCalendario(ano, mes, 1).slice(0, 7) + "-"))
+    .flatMap(([, ps]) => ps);
   const totalMes = parcelasMes.reduce((sum: number, p: Parcela) => sum + parseFloat(p.valorOriginal), 0);
   const recebidoMes = parcelasMes.filter((p: Parcela) => p.status === 'paga').reduce((sum: number, p: Parcela) => sum + parseFloat(p.valorPago ?? p.valorOriginal), 0);
 
   // Parcelas do dia selecionado
   const parcelasDiaSelecionado = diaSelecionado
-    ? (parcelasPorDia.get(`${ano}-${mes}-${diaSelecionado}`) ?? [])
+    ? (parcelasPorDia.get(chaveCalendario(ano, mes, diaSelecionado)) ?? [])
     : [];
 
   const statusBadge = (status: string) => {
@@ -121,7 +143,7 @@ export default function Calendario() {
   };
 
   const abrirWhatsApp = (parcela: Parcela) => {
-    const msg = `Olá ${parcela.clienteNome || 'cliente'}, sua parcela ${parcela.numeroParcela}/${parcela.totalParcelas} de ${formatarMoeda(parseFloat(parcela.valorOriginal))} vence hoje. Por favor, efetue o pagamento.`;
+    const msg = mensagemCalendario(parcela);
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
@@ -303,7 +325,7 @@ export default function Calendario() {
                   </Button>
                   <div className="text-center">
                     <CardTitle className="font-display text-lg tracking-wide">
-                      {diasSemana[0].getDate()}/{diasSemana[0].getMonth() + 1} — {diasSemana[6].getDate()}/{diasSemana[6].getMonth() + 1}/{diasSemana[6].getFullYear()}
+                      {diasSemana[0].getUTCDate()}/{diasSemana[0].getUTCMonth() + 1} — {diasSemana[6].getUTCDate()}/{diasSemana[6].getUTCMonth() + 1}/{diasSemana[6].getUTCFullYear()}
                     </CardTitle>
                     {semanaOffset !== 0 && (
                       <Button variant="link" size="sm" className="text-xs h-5 p-0" onClick={() => setSemanaOffset(0)}>
@@ -321,7 +343,7 @@ export default function Calendario() {
                   {diasSemana.map((date, i) => {
                     const { ps, atrasadas, vencendo, pendentes, pagas, total } = getDiaInfoFromDate(date);
                     const temParcelas = ps.length > 0;
-                    const isHojeDate = date.toDateString() === hoje.toDateString();
+                    const isHojeDate = date.toISOString().slice(0, 10) === hoje;
                     const corDia = atrasadas > 0 ? 'border-destructive/40 bg-destructive/5' :
                       vencendo > 0 ? 'border-warning/40 bg-warning/5' :
                       pendentes > 0 ? 'border-border bg-muted/20' :
@@ -333,16 +355,16 @@ export default function Calendario() {
                         key={i}
                         onClick={() => {
                           if (temParcelas) {
-                            setMes(date.getMonth());
-                            setAno(date.getFullYear());
-                            setDiaSelecionado(date.getDate());
+                            setMes(date.getUTCMonth());
+                            setAno(date.getUTCFullYear());
+                            setDiaSelecionado(date.getUTCDate());
                           }
                         }}
                         className={`min-h-[120px] p-2 rounded-lg border transition-all cursor-pointer hover:border-primary/30 ${corDia} ${isHojeDate ? 'ring-2 ring-primary' : ''}`}
                       >
                         <div className={`text-xs font-medium mb-1 ${isHojeDate ? 'text-primary' : 'text-foreground'}`}>
                           <div>{DIAS_SEMANA[i]}</div>
-                          <div className="text-base">{date.getDate()}</div>
+                          <div className="text-base">{date.getUTCDate()}</div>
                         </div>
                         {temParcelas && (
                           <div className="space-y-1 mt-2">
@@ -398,7 +420,7 @@ export default function Calendario() {
                             {dia}
                           </div>
                           <div>
-                            <div className="text-sm font-medium">{DIAS_SEMANA[new Date(ano, mes, dia).getDay()]}, {dia} de {MESES[mes]}</div>
+                            <div className="text-sm font-medium">{DIAS_SEMANA[new Date(Date.UTC(ano, mes, dia)).getUTCDay()]}, {dia} de {MESES[mes]}</div>
                             <div className="text-xs text-muted-foreground">{ps.length} parcela{ps.length > 1 ? 's' : ''}</div>
                           </div>
                         </div>
@@ -440,7 +462,7 @@ export default function Calendario() {
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium">
-                    {DIAS_SEMANA[new Date(ano, mes, diaSelecionado).getDay()]}, {diaSelecionado} de {MESES[mes]}
+                    {DIAS_SEMANA[new Date(Date.UTC(ano, mes, diaSelecionado)).getUTCDay()]}, {diaSelecionado} de {MESES[mes]}
                   </CardTitle>
                   <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setDiaSelecionado(null)}>
                     <X className="h-3 w-3" />
@@ -459,7 +481,7 @@ export default function Calendario() {
                       const pendentes = parcelasDiaSelecionado.filter((p: Parcela) => p.status !== 'paga');
                       pendentes.forEach((p: Parcela, idx: number) => {
                         setTimeout(() => {
-                          const msg = `Olá ${p.clienteNome || 'cliente'}, sua parcela ${p.numeroParcela}/${p.totalParcelas} de ${formatarMoeda(parseFloat(p.valorOriginal))} vence hoje. Por favor, efetue o pagamento. Obrigado!`;
+                          const msg = mensagemCalendario(p);
                           window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
                         }, idx * 500);
                       });

@@ -19,9 +19,9 @@ import {
 } from 'lucide-react';
 import { formatarMoeda, formatarData } from '../../../shared/finance';
 import { trpc } from '@/lib/trpc';
-import { gerarComprovantePDF } from '@/lib/gerarComprovante';
 import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
+import { RecebimentoValidado } from '@/components/RecebimentoValidado';
 
 export default function EmprestimoDetalhes() {
   const { t } = useTranslation();
@@ -169,7 +169,14 @@ export default function EmprestimoDetalhes() {
   const totalComAtraso = emprestimo.parcelasComAtraso?.[0]?.totalComAtraso ?? 0;
   const isAtrasado = diasAtraso > 0;
   const isQuitado = emprestimo.status === 'quitado';
-  const parcela = emprestimo.todasParcelas?.find((p: any) => p.status !== 'paga') ?? emprestimo.todasParcelas?.[0];
+  const parcela = emprestimo.todasParcelas?.find((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)) ?? emprestimo.todasParcelas?.find((p: any) => ['paga', 'pago'].includes(p.status));
+  const atualizarFinanceiro = () => {
+    void refetch();
+    void utils.contratos.listComParcelas.invalidate();
+    void utils.dashboard.invalidate();
+    void utils.caixa.invalidate();
+    void utils.parcelas.invalidate();
+  };
   const saldoParcial = parcela?.status === 'parcial' ? parseFloat(String(parcela.saldo_residual ?? '0')) : 0;
   const valorOriginalParcela = parcela
     ? (saldoParcial > 0 ? saldoParcial : parseFloat(String(parcela.valor_original ?? '0')))
@@ -244,29 +251,9 @@ export default function EmprestimoDetalhes() {
   };
 
   const handleGerarComprovante = async () => {
-    setGerandoPDF(true);
-    try {
-      const parcelaPaga = emprestimo.todasParcelas?.find((p: any) => p.status === 'paga') || emprestimo.todasParcelas?.[0];
-      await gerarComprovantePDF({
-        clienteNome: emprestimo.clienteNome,
-        contratoId: emprestimo.id,
-        parcelaNumero: parcelaPaga?.numero_parcela ?? 1,
-        valorOriginal: parcelaPaga?.valor_original ?? emprestimo.valorPrincipal,
-        juros: parcelaPaga?.valor_juros ?? 0,
-        valorPago: parcelaPaga?.valor_pago ?? parcelaPaga?.valor_original ?? emprestimo.valorPrincipal,
-        dataPagamento: parcelaPaga?.data_pagamento ?? new Date().toISOString(),
-        modalidade: emprestimo.modalidade,
-        nomeEmpresa: config?.nomeEmpresa || 'CobraPro',
-        logoUrl: config?.logoUrl || undefined,
-        enderecoEmpresa: config?.enderecoEmpresa || undefined,
-        telefoneEmpresa: config?.telefoneEmpresa || undefined,
-      });
-      toast.success(t('toast_success.comprovante_gerado'));
-    } catch {
-      toast.error(t('toast_error.erro_ao_gerar_comprovante'));
-    } finally {
-      setGerandoPDF(false);
-    }
+    // A ficha não carrega prova de recebimento durável por operação. Status
+    // ou primeiro registro não permitem inventar valor, data ou pagamento.
+    toast.info('Comprovante indisponível nesta ficha sem prova financeira por operação. Consulte a confirmação auditada em Receber / conferir.');
   };
 
   return (
@@ -486,12 +473,13 @@ export default function EmprestimoDetalhes() {
                             <td className="px-3 py-2 text-right text-foreground">{formatarMoeda(p.valor_original)}</td>
                             <td className="px-3 py-2 text-center">
                               <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
-                                {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
+                                {p.status === 'renovada' ? 'Renovada: principal transferido' : p.status === 'parcial' ? 'Parcial' : ['cancelada', 'cancelado'].includes(p.status) ? 'Cancelada' : ['paga', 'pago'].includes(p.status) ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
                               </Badge>
                             </td>
                             <td className="px-3 py-2 text-center">
                               {p.status !== 'paga' && (
                                 <button
+                                  disabled
                                   onClick={() => setParcelaEditando({
                                     id: p.id,
                                     valor: String(parseFloat(p.valor_original).toFixed(2)),
@@ -505,21 +493,7 @@ export default function EmprestimoDetalhes() {
                               )}
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {p.status !== 'paga' && (
-                                <button
-                                  onClick={() => {
-                                    setParcelaPagando({ id: p.id, numero: p.numero_parcela, valor: parseFloat(p.valor_original) });
-                                    setValorPagIndividual(parseFloat(p.valor_original).toFixed(2));
-                                    setContaPagIndividual('');
-                                    setIdempotencyKeyParcela(crypto.randomUUID());
-                                  }}
-                                  className="px-2 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium transition-colors flex items-center gap-1"
-                                  title="Pagar esta parcela"
-                                >
-                                  <DollarSign className="h-3 w-3" />
-                                  Pagar
-                                </button>
-                              )}
+                              <RecebimentoValidado contratoId={emprestimo.id} parcelaId={p.id} permitirRenovacao onSuccess={atualizarFinanceiro} />
                             </td>
                           </tr>
                         )
@@ -532,6 +506,8 @@ export default function EmprestimoDetalhes() {
                 <div className="mt-3">
                   {!showNovaParcela ? (
                     <button
+                      disabled
+                      title="Adicionar parcelas manualmente está bloqueado. Use o fluxo de renovação validado."
                       onClick={() => setShowNovaParcela(true)}
                       className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
                     >
@@ -610,16 +586,11 @@ export default function EmprestimoDetalhes() {
 
       {/* Botões de Ação */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-6 border-t border-border">
-        <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" size="sm" onClick={() => { setValorCustomPagar(''); setContaCaixaId(''); setPagamentoRealizado(null); setModalPagar(true); }} disabled={isQuitado}>
-          <DollarSign className="h-4 w-4" /> Pagar
-        </Button>
-        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorCustomJuros(''); setContaCaixaId(''); setModalPagarJuros(true); }} disabled={isQuitado}>
-          <TrendingUp className="h-4 w-4" /> Pagar Juros
-        </Button>
-        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
+        {parcela && <RecebimentoValidado contratoId={emprestimo.id} parcelaId={parcela.id} permitirRenovacao onSuccess={atualizarFinanceiro} />}
+        <Button disabled title="Edição financeira manual bloqueada para preservar a auditoria." className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
           <Edit2 className="h-4 w-4" /> Editar Juros
         </Button>
-        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorMulta(''); setModalMulta(true); }} disabled={isQuitado}>
+        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorMulta(''); setModalMulta(true); }} disabled title="Encargos são conferidos na cotação financeira; não há multa manual neste fluxo.">
           <AlertTriangle className="h-4 w-4" /> Aplicar Multa
         </Button>
         {emprestimo.clienteWhatsapp && (
@@ -636,7 +607,7 @@ export default function EmprestimoDetalhes() {
           <FileText className="h-4 w-4" />
           {gerandoPDF ? 'Gerando...' : 'Comprovante'}
         </Button>
-        <Button className="gap-2" variant="destructive" size="sm" onClick={() => setModalDeletar(true)}>
+        <Button disabled title="Exclusão financeira sem estorno auditado está bloqueada." className="gap-2" variant="destructive" size="sm" onClick={() => setModalDeletar(true)}>
           <Trash2 className="h-4 w-4" /> Deletar
         </Button>
       </div>
@@ -662,18 +633,7 @@ export default function EmprestimoDetalhes() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 gap-1.5" onClick={() => {
-                  gerarComprovantePDF({
-                    clienteNome: emprestimo.clienteNome,
-                    contratoId: emprestimo.id,
-                    parcelaNumero: pagamentoRealizado.parcelaNum,
-                    valorOriginal: valorOriginalParcela,
-                    juros: valorJurosParcela,
-                    valorPago: pagamentoRealizado.valorPago,
-                    dataPagamento: new Date().toISOString(),
-                    modalidade: emprestimo.modalidade,
-                  });
-                }}>
+                <Button variant="outline" className="flex-1 gap-1.5" onClick={handleGerarComprovante}>
                   <Download className="h-3.5 w-3.5" /> Comprovante PDF
                 </Button>
                 <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setModalPagar(false); }}>{t('common.close')}</Button>

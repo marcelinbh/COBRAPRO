@@ -15,6 +15,7 @@ import {
   diaCivilBrt, dinheiroDespesa, moedaDespesa,
   type AcaoDespesa, type IntencaoDespesaPersistida, type PayloadDespesa, type StorageDespesas,
 } from '../../../shared/despesasIntent';
+import { assertRecoveryEvidence, canCloseRejectedIntent, type RecoveryEvidence } from '../../../shared/financialIntentRecovery';
 
 // Mesmo Provider e contrato do appRouter integrado pelo coordenador; sem fallback.
 const despesasTrpc = trpc;
@@ -32,6 +33,7 @@ export default function ContasPagar() {
   usuarioAtual.current = userId;
   const [avisoStorage, setAvisoStorage] = useState('');
   const [intencoes, setIntencoes] = useState<IntencaoDespesaPersistida[]>([]);
+  const [recovery, setRecovery] = useState<Record<string, RecoveryEvidence>>({});
   const [busy, setBusy] = useState(false);
   const inFlight = useRef(false);
   const [filtroStatus, setFiltroStatus] = useState('todos');
@@ -48,7 +50,7 @@ export default function ContasPagar() {
     return new DespesasIntentStore(userId, storage, message => { setAvisoStorage(message); toast.error(message); });
   }, [userId]);
   function sync(s = store) { setIntencoes(s ? acoes.map(a => s.get(a)).filter((v): v is IntencaoDespesaPersistida => !!v) : []); }
-  useEffect(() => { sync(store); }, [store]);
+  useEffect(() => { sync(store); setRecovery({}); }, [store]);
   const utils = trpc.useUtils();
   const expensesUtils = despesasTrpc.useUtils();
   const options = { enabled: !!userId, retry: false };
@@ -59,6 +61,7 @@ export default function ContasPagar() {
   const criar = despesasTrpc.contasPagar.criar.useMutation({ retry: false });
   const pagar = despesasTrpc.contasPagar.pagar.useMutation({ retry: false });
   const estornar = despesasTrpc.contasPagar.estornar.useMutation({ retry: false });
+  const reconciliacao = despesasTrpc.contasPagar.reconciliar.useMutation({ retry: false });
   const habilitado = !!userId && capacidades.data?.prospectivasHabilitadas === true && !capacidades.isError;
   const locked = (action: AcaoDespesa) => busy || intencoes.some(i => i.action === action) || !!store?.blocked(action);
   const ativas = caixa.data?.filter(c => c.ativa !== false);
@@ -66,6 +69,7 @@ export default function ContasPagar() {
   const despesaEstornar = lista.data?.find(d => d.id === estornarId);
 
   async function enviar(intent: IntencaoDespesaPersistida, s: DespesasIntentStore) {
+    if (recovery[intent.idempotencyKey]?.status === 'not_executed') return;
     if (usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
     inFlight.current = true; setBusy(true);
     try {
@@ -88,6 +92,30 @@ export default function ContasPagar() {
       s.release(intent.action); inFlight.current = false; setBusy(false);
       if (usuarioAtual.current === intent.userId) sync(s);
     }
+  }
+  async function reconciliar(intent: IntencaoDespesaPersistida, s: DespesasIntentStore) {
+    if (usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
+    inFlight.current = true; setBusy(true);
+    try {
+      const request = { family: `despesa_${intent.action}` as const, idempotencyKey: intent.idempotencyKey, payload: intent.payload };
+      const r = assertRecoveryEvidence(await reconciliacao.mutateAsync(request), intent.userId, request);
+      if (usuarioAtual.current !== intent.userId) return;
+      setRecovery(prev => ({ ...prev, [intent.idempotencyKey]: r }));
+      if (r.status === 'confirmed') {
+        s.confirmed(intent.action, intent.idempotencyKey);
+        toast.success('Operação original confirmada na reconciliação; nenhuma nova operação enviada.');
+        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate()]);
+      }
+    } catch (e) { if (usuarioAtual.current === intent.userId) toast.error(`${(e as Error).message} Não execução NÃO comprovada; nenhum descarte permitido.`); }
+    finally { s.release(intent.action); inFlight.current = false; if (usuarioAtual.current === intent.userId) { setBusy(false); sync(s); } }
+  }
+  function encerrarRejeitada(intent: IntencaoDespesaPersistida) {
+    if (!store || inFlight.current || usuarioAtual.current !== intent.userId) return;
+    try {
+      store.closeRejected(intent.action, recovery[intent.idempotencyKey]);
+      setNovo(false); setPagarId(null); setEstornarId(null); setContaCaixaId(''); setMotivo(''); sync(store);
+      toast.success('Intenção comprovadamente não executada encerrada. Selecione explicitamente os dados da próxima operação.');
+    } catch (e) { toast.error((e as Error).message); }
   }
   function iniciar<A extends AcaoDespesa>(action: A, payload: PayloadDespesa[A]) {
     if (!store || !habilitado || inFlight.current || locked(action)) return;
@@ -131,7 +159,9 @@ export default function ContasPagar() {
       <p className="text-sm">Uma falha não prova que houve rollback. Abaixo está o payload original; a data e o UUID não mudam após reload. Não existe descarte automático ou substituição por nova chave.</p>
       {intencoes.filter(i => i.userId === userId).map(i => <div key={i.idempotencyKey} className="space-y-2">
         <p className="text-sm break-all">{i.action} — UUID: {i.idempotencyKey}</p><pre className="text-xs whitespace-pre-wrap break-all bg-muted p-2">{JSON.stringify(i.payload, null, 2)}</pre>
-        <Button variant="outline" disabled={busy || !habilitado || !store} onClick={() => store && void enviar(i, store)}>Reenviar intenção original (mesma chave)</Button>
+        <Button variant="outline" disabled={busy || !habilitado || !store || recovery[i.idempotencyKey]?.status === 'not_executed'} onClick={() => store && void enviar(i, store)}>Reenviar intenção original (mesma chave)</Button>
+        <Button variant="outline" disabled={busy || !habilitado || !store} onClick={() => store && void reconciliar(i, store)}>Reconciliar UUID no servidor (pode encerrar sem execução)</Button>
+        {canCloseRejectedIntent(recovery[i.idempotencyKey], i.userId, { family: `despesa_${i.action}`, idempotencyKey: i.idempotencyKey, payload: i.payload }) && <><p role="status">Não execução comprovada; UUID bloqueado no servidor contra POST atrasado.</p><Button disabled={busy} onClick={() => encerrarRejeitada(i)}>Encerrar após não execução comprovada e escolher outra operação</Button></>}
       </div>)}
     </section>}
     <section aria-label="Resumo de despesas">

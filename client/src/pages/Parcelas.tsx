@@ -15,42 +15,42 @@ import { toast } from "sonner";
 import {
   Search, MessageCircle, CheckCircle, Clock, AlertTriangle, Filter, Download, FileSpreadsheet, FileText, ArrowLeft
 } from "lucide-react";
-import { formatarMoeda, formatarData, calcularJurosMora } from "../../../shared/finance";
+import { formatarMoeda, formatarData, calcularJurosMora, dataHojeBrasilia, dataVencimentoCivil, diferencaDiasCivis } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 import { avisoDePendenciasPosPagamento } from "@/lib/pagamentoConfirmado";
 import { protegerValorDePlanilha } from "@/lib/spreadsheetSafety";
-import { EmprestimoSeguroReceber } from "@/components/EmprestimoSeguroReceber";
+import { RecebimentoValidado } from "@/components/RecebimentoValidado";
 // Excel e PDF são carregados sob demanda para reduzir o bundle inicial.
 
 // Templates padrão (mesmos do Cobra Fácil)
 const TEMPLATE_ATRASO = `⚠️ *Atenção {CLIENTE}* ━━━━━━━━━━━━━━━━
 🚨 *PARCELA EM ATRASO*
-💵 *Valor:* {VALOR}
+💵 *Valor original (referência, não cotação):* {VALOR}
 📊 *{PARCELA}*
 📅 *Vencimento:* {DATA}
 ⏰ *Dias em Atraso:* {DIAS_ATRASO}
-💸 *Multa:* {MULTA}
-💸 *Juros:* {JUROS}
-💰 *Total a Pagar:* {TOTAL}
+O total, o saldo após pagamentos parciais e eventuais encargos devem ser confirmados na cotação atual antes do pagamento.
 {PIX}
 {FECHAMENTO}
 {ASSINATURA}`;
 
 const TEMPLATE_VENCE_HOJE = `🟡 *Olá {CLIENTE}!* ━━━━━━━━━━━━━━━━
 📅 *SUA PARCELA VENCE HOJE!*
-💵 *Valor:* {VALOR}
+💵 *Valor original (referência, não cotação):* {VALOR}
 📊 *{PARCELA}*
 ⏰ *Vencimento:* {DATA}
+O total, o saldo após pagamentos parciais e eventuais encargos devem ser confirmados na cotação atual antes do pagamento.
 {PIX}
 {FECHAMENTO}
 {ASSINATURA}`;
 
 const TEMPLATE_ANTECIPADA = `🟢 *Olá {CLIENTE}!* ━━━━━━━━━━━━━━━━
 📋 *LEMBRETE DE PARCELA*
-💵 *Valor:* {VALOR}
+💵 *Valor original (referência, não cotação):* {VALOR}
 📊 *{PARCELA}*
 📅 *Vencimento:* {DATA}
 ⏳ *Faltam:* {DIAS_PARA_VENCER} dias
+O total, o saldo após pagamentos parciais e eventuais encargos devem ser confirmados na cotação atual antes do pagamento.
 {PIX}
 {FECHAMENTO}
 {ASSINATURA}`;
@@ -60,7 +60,7 @@ function gerarMensagemCobranca(
   numeroParcela: number,
   numeroParcelas: number,
   valorOriginal: string,
-  dataVencimento: Date,
+  dataVencimento: Date | string,
   diasAtraso: number,
   juros: number,
   multa: number,
@@ -69,18 +69,22 @@ function gerarMensagemCobranca(
   assinatura = '',
   fechamento = 'Regularize hoje e evite mais juros!'
 ): string {
-  const hoje = new Date();
-  const diasParaVencer = Math.max(0, Math.ceil((dataVencimento.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24)));
+  const hoje = dataHojeBrasilia();
+  const vencimento = dataVencimentoCivil(dataVencimento);
+  const diferenca = diferencaDiasCivis(hoje, vencimento);
+  const diasParaVencer = Math.max(0, diferenca);
   let template = TEMPLATE_ANTECIPADA;
-  if (diasAtraso > 0) template = TEMPLATE_ATRASO;
-  else if (diasAtraso === 0) template = TEMPLATE_VENCE_HOJE;
+  if (vencimento < hoje) template = TEMPLATE_ATRASO;
+  else if (vencimento === hoje) template = TEMPLATE_VENCE_HOJE;
+  const fechamentoCivil = vencimento > hoje && fechamento === 'Regularize hoje e evite mais juros!'
+    ? 'Este é um lembrete do vencimento futuro.' : fechamento;
   const pixMsg = chavePix ? `🔑 *PIX:* \`${chavePix}\`` : '';
   return template
     .replace(/{CLIENTE}/g, nome)
     .replace(/{VALOR}/g, formatarMoeda(valorOriginal))
     .replace(/{PARCELA}/g, `Parcela ${numeroParcela}/${numeroParcelas}`)
-    .replace(/{DATA}/g, formatarData(dataVencimento))
-    .replace(/{DIAS_ATRASO}/g, String(diasAtraso))
+    .replace(/{DATA}/g, formatarData(vencimento))
+    .replace(/{DIAS_ATRASO}/g, String(Math.max(0, -diferenca)))
     .replace(/{DIAS_PARA_VENCER}/g, String(diasParaVencer))
     .replace(/{MULTA}/g, formatarMoeda(multa))
     .replace(/{JUROS}/g, formatarMoeda(juros))
@@ -91,7 +95,7 @@ function gerarMensagemCobranca(
     .replace(/{PARCELAS_STATUS}/g, '')
     .replace(/{PIX}/g, pixMsg)
     .replace(/{ASSINATURA}/g, assinatura ? `💼 *${assinatura}*` : '')
-    .replace(/{FECHAMENTO}/g, fechamento ? `✅ ${fechamento}` : '')
+    .replace(/{FECHAMENTO}/g, fechamentoCivil ? `✅ ${fechamentoCivil}` : '')
     .trim();
 }
 
@@ -103,8 +107,11 @@ function StatusBadge({ status }: { status: string }) {
     atrasada: { label: t('parcelas.overdue'), className: "bg-primary/15 text-primary border-primary/30", icon: AlertTriangle },
     vencendo_hoje: { label: t('installments.dueToday'), className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
     parcial: { label: t('parcelas.partial'), className: "bg-warning/15 text-warning border-warning/30", icon: Clock },
+    renovada: { label: "Renovada: principal transferido", className: "bg-muted text-muted-foreground border-border", icon: Clock },
+    cancelada: { label: "Cancelada", className: "bg-muted text-muted-foreground border-border", icon: Clock },
+    cancelado: { label: "Cancelada", className: "bg-muted text-muted-foreground border-border", icon: Clock },
   };
-  const s = map[status] ?? map.pendente;
+  const s = map[status] ?? { label: status, className: "bg-muted text-muted-foreground border-border", icon: Clock };
   const Icon = s.icon;
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${s.className}`}>
@@ -546,7 +553,7 @@ export default function Parcelas() {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">Recebimento disponível somente para novos empréstimos de proveniência RPC 0021 íntegra, com cotação SQL e conta original fixa. Legado, desconto e renovação permanecem bloqueados. Valores estimados da listagem não autorizam baixa; confirme exclusivamente a cotação do diálogo.</p>
+      <p className="text-sm text-muted-foreground">Recebimento disponível somente para novos empréstimos de proveniência RPC 0021 íntegra, com cotação SQL e conta original fixa. Legado, desconto e renovação permanecem bloqueados. Valores originais da listagem não são totais atualizados nem saldos após pagamentos parciais; confirme exclusivamente a cotação do diálogo. Cobrar nesta listagem está bloqueado porque não há cotação autoritativa vinculada à mensagem. Lembretes manuais sem total no calendário permanecem disponíveis.</p>
       {/* Contador por Modalidade */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {modalidadeCount.map(m => (
@@ -651,7 +658,7 @@ export default function Parcelas() {
             parcela.numeroParcela,
             parcela.numeroParcelas,
             parcela.valorOriginal,
-            new Date(parcela.dataVencimento),
+            parcela.dataVencimento,
             diasAtraso,
             jurosCalc,
             multaCalc,
@@ -686,7 +693,7 @@ export default function Parcelas() {
                         )}
                       </div>
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        Parcela {parcela.numeroParcela}/{parcela.numeroParcelas} · Vence: {formatarData(parcela.dataVencimento)}
+                        Parcela {parcela.numeroParcela}/{parcela.numeroParcelas} · Vencimento: {formatarData(dataVencimentoCivil(parcela.dataVencimento))}
                       </div>
                     </div>
                   </div>
@@ -694,25 +701,23 @@ export default function Parcelas() {
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right hidden sm:block">
                       <div className={`font-semibold text-sm ${diasAtraso > 0 ? 'text-primary' : 'text-foreground'}`}>
-                        {diasAtraso > 0 ? formatarMoeda(totalAtualizado) : formatarMoeda(parcela.valorOriginal)}
+                        {formatarMoeda(parcela.valorOriginal)}
                       </div>
-                      {diasAtraso > 0 && (
-                        <div className="text-xs text-muted-foreground line-through">{formatarMoeda(parcela.valorOriginal)}</div>
-                      )}
+                      <div className="text-xs text-muted-foreground">Valor original · sem cotação</div>
                     </div>
 
-                    {parcela.status === 'paga' && <EmprestimoSeguroReceber contratoId={parcela.contratoId} parcelaId={parcela.id} onSuccess={() => refetch()} />}
+                    {parcela.status === 'paga' && <RecebimentoValidado contratoId={parcela.contratoId} parcelaId={parcela.id} onSuccess={() => refetch()} />}
                     {parcela.status !== 'paga' && (
                       <div className="flex gap-2">
                         {whatsappUrl && (
-                          <a href={whatsappUrl} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}>
-                            <Button size="sm" variant="outline" className="gap-1 h-7 text-xs border-success/30 text-success hover:bg-success/10">
+                          <span title="Cobrança bloqueada: a listagem não tem cotação autoritativa atual para validar total, encargos e saldo parcial.">
+                            <Button disabled size="sm" variant="outline" className="gap-1 h-7 text-xs border-success/30 text-success">
                               <MessageCircle className="h-3 w-3" />
-                              <span className="hidden sm:inline">Cobrar</span>
+                              <span className="hidden sm:inline">Cobrar bloqueado</span>
                             </Button>
-                          </a>
+                          </span>
                         )}
-                        <EmprestimoSeguroReceber
+                        <RecebimentoValidado
                           contratoId={parcela.contratoId}
                           parcelaId={parcela.id}
                           onSuccess={() => refetch()}

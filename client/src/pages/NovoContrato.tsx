@@ -17,8 +17,28 @@ import { toast } from "sonner";
 import { ArrowLeft, Calculator, CheckCircle, Info, ChevronsUpDown, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatarMoeda, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, MODALIDADE_LABELS } from "../../../shared/finance";
+import { EmprestimoSeguroCriar } from "@/components/EmprestimoSeguroCriar";
 
 export default function NovoContrato() {
+  const [, setLocation] = useLocation();
+  const params = new URLSearchParams(window.location.search);
+  const modalidade = params.get('modalidade'), tipoTaxa = params.get('tipoTaxa');
+  const suportado = (!modalidade || modalidade === 'mensal') && (!tipoTaxa || tipoTaxa === 'mensal');
+  return <div className="space-y-4 max-w-3xl">
+    <Button variant="outline" onClick={() => setLocation('/contratos')}>Voltar aos contratos</Button>
+    <h1 className="text-2xl font-semibold">Novo empréstimo — fluxo seguro</h1>
+    <p>Criação legada permanece bloqueada. Nenhum valor, agenda, cliente ou parâmetro de simulador/venda é convertido ou aplicado automaticamente.</p>
+    {suportado ? <>
+      {params.size > 0 && <p role="status">Preencha e confira explicitamente os campos mensais abaixo; parâmetros do atalho não foram importados.</p>}
+      <EmprestimoSeguroCriar onSuccess={() => setLocation('/contratos')} />
+    </> : <>
+      <p role="alert">Modalidade/taxa não suportada neste ciclo: {modalidade ?? 'não informada'} / {tipoTaxa ?? 'não informada'}. Price, diário, semanal, quinzenal, bullet, venda, cheque e reparcelamento estão indisponíveis. Não há conversão silenciosa para mensal.</p>
+      <a className="underline" href="/contratos/novo">Iniciar explicitamente outro empréstimo mensal sem os parâmetros anteriores</a>
+    </>}
+  </div>;
+}
+// Retido somente para referência: não exportado, não montado por nenhuma rota.
+function NovoContratoLegadoIndisponivel() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();

@@ -1231,3 +1231,29 @@
 - [x] Instalar 0030/0029 e comprovar referência privada, RLS e ACL mínima exclusiva do backend; nenhuma concessão a usuário.
 - [ ] Liberar Blacklist e fotos privadas somente mediante vigência Kiwify comprovada.
 - [ ] Confirmar um primeiro pedido real de ponta a ponta antes de declarar o fluxo integral testado em produção.
+
+## Fase 68: Acesso manual previamente autorizado — estado de 10/11
+
+> A decisão operacional posterior substitui o gate exclusivamente Kiwify da fase 67 para as 14 contas existentes com concessão vitalícia auditada. O lote 5dbf966 foi publicado e implantado. Não há concessão automática para cadastros futuros. Kiwify, ofertas e decisões comerciais ficam suspensas conforme a orientação mais recente; este lote não as altera.
+
+## Fase 69: Confiabilidade e liberação operacional — 12/11/2026
+
+> Esta fase prevalece sobre declarações históricas amplas de conclusão. Nenhum ajuste automático de Caixa, tenant ou parcela antiga é autorizado. Uso seguro não significa aceitar registros divergentes nem liberar mutações REST antigas.
+
+- [x] Acumular o Caixa em centavos exatos; detectar leituras incompletas, duplicadas ou entre empresas.
+- [x] Corrigir criação/edição de clientes, confirmar gravação e validar dígitos de novos documentos sem adulterar documentos antigos omitidos.
+- [x] Unificar relatórios e PDFs com o ledger, datas civis de Brasília, paginação completa e erro explícito em vez de zero fictício.
+- [x] Remover a escrita financeira global em timer e as escritas em consultas; preservar status renovada e a conservação de principal.
+- [x] Integrar seletor de recebimento por proveniência, cotação segura, proteção contra troca de sessão e recuperação de intenção somente com prova de não execução.
+- [x] Preparar 0031/0033/0034, compatibilizar somente o CHECK produtivo equivalente e a instalação gerenciada; preflights e fontes desconhecidas continuam recusados.
+- [x] Corrigir worker WhatsApp e revalidar 40 cenários PostgreSQL/SDK; preservar QR e workflow existente, sem enviar mensagem real.
+- [x] Ligar confirmação WhatsApp aos dois recebimentos validados, com prova durável/dedup e sem transformar falha de fila em falha financeira.
+- [x] Tree final certificado às10h05:2.218 testes aprovados,11 opt-in ignorados,135 arquivos aprovados,TypeScript ebuild aprovados; sem credenciais ou snapshots no Git.
+- [x] Compatibilizar instalação com postgres não-superuser do Supabase, preservar preflight estrito e repetir ensaio conjunto no snapshot certificado.
+- [x] Instalar hashes finais 0031/0033/0034 em 12/11 às09h54–09h55;56 tabelas comRLS,0 acesso público direto e contagens de usuários/parcelas/Caixa preservadas.
+- [x] Smoke financeiro real segregado com rollback: criação, parcial/integral, despesa/estorno, renovação/replay, legado/prova privada e fence contra execução do UUID encerrado. Zero registros de teste persistidos ou comunicações externas.
+- [ ] Checkpoint, commit/push normal, deploy DigitalOcean com revisão exata e apenas duas flags novas.
+- [ ] Smoke autenticado das leituras, capacidades, cotação e estados de recusa; comprovar operações sintéticas com rollback, sem comunicação externa.
+- [ ] Revisão humana dos dados antigos inconsistentes permanece independente e obrigatória; nenhum UPDATE financeiro automático.
+
+**Infraestrutura:** painel de 12/11 informa US$ 36,00 em atraso e risco de suspensão após 14/11. Nenhum pagamento foi realizado.

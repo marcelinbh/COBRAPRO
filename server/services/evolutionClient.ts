@@ -1,6 +1,13 @@
 import { ENV } from "../_core/env";
 
-export type EvolutionState = "open" | "connecting" | "close" | "missing" | "unavailable" | "unauthorized" | "error";
+export type EvolutionState =
+  | "open"
+  | "connecting"
+  | "close"
+  | "missing"
+  | "unavailable"
+  | "unauthorized"
+  | "error";
 
 export type EvolutionResult<T = Record<string, unknown>> = {
   ok: boolean;
@@ -26,7 +33,10 @@ const REQUEST_TIMEOUT_MS = 12_000;
 function getConfig() {
   const url = ENV.evolutionApiUrl.replace(/\/$/, "");
   const apiKey = ENV.evolutionApiKey;
-  if (!url || !apiKey) throw new Error("Integração Evolution API não configurada. Verifique os segredos do ambiente.");
+  if (!url || !apiKey)
+    throw new Error(
+      "Integração Evolution API não configurada. Verifique os segredos do ambiente."
+    );
   return { url, apiKey };
 }
 
@@ -35,12 +45,20 @@ function getConfig() {
  * produção quando o token está configurado: a prévia local nunca registra
  * callbacks em produção e o token não é retornado ao navegador.
  */
-async function configurarWebhookDeEntrega(instanceName: string): Promise<EvolutionResult | null> {
+async function configurarWebhookDeEntrega(
+  instanceName: string
+): Promise<EvolutionResult | null> {
   if (!ENV.isProduction || !ENV.evolutionWebhookToken) return null;
 
-  const baseUrl = (process.env.PUBLIC_APP_URL ?? "https://cobrapro.online").replace(/\/$/, "");
+  const baseUrl = (
+    process.env.PUBLIC_APP_URL ?? "https://cobrapro.online"
+  ).replace(/\/$/, "");
   if (!/^https:\/\//i.test(baseUrl)) {
-    return { ok: false, errorCode: "WEBHOOK_URL", errorMessage: "A URL pública do webhook deve usar HTTPS" };
+    return {
+      ok: false,
+      errorCode: "WEBHOOK_URL",
+      errorMessage: "A URL pública do webhook deve usar HTTPS",
+    };
   }
 
   return request("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
@@ -61,36 +79,59 @@ export function instanceNameForUser(userId: number): string {
 }
 
 export function normalizarTelefoneWhatsApp(telefone: string): string {
-  let digits = telefone.replace(/\D/g, "").replace(/^55(?=55)/, "");
-  if (!digits.startsWith("55")) digits = `55${digits}`;
-  if (digits.length < 12 || digits.length > 13) throw new Error("Número de WhatsApp brasileiro inválido");
+  let digits = telefone.replace(/\D/g, "");
+  if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
+  if (!/^55[1-9]\d\d{8,9}$/.test(digits))
+    throw new Error("Número de WhatsApp brasileiro inválido");
   return digits;
 }
 
-function extractProviderError(value: unknown): { code?: string; message?: string } {
+function extractProviderError(value: unknown): {
+  code?: string;
+  message?: string;
+} {
   if (!value || typeof value !== "object") return {};
   const body = value as Record<string, unknown>;
-  const message = [body.message, body.error, body.response?.toString()].find(v => typeof v === "string") as string | undefined;
-  const code = [body.code, body.statusCode, body.status].find(v => typeof v === "string" || typeof v === "number");
+  const message = [body.message, body.error, body.response?.toString()].find(
+    v => typeof v === "string"
+  ) as string | undefined;
+  const code = [body.code, body.statusCode, body.status].find(
+    v => typeof v === "string" || typeof v === "number"
+  );
   return { code: code ? String(code) : undefined, message };
 }
 
 function normalizarEstado(value: unknown, httpStatus?: number): EvolutionState {
   if (httpStatus === 401 || httpStatus === 403) return "unauthorized";
   if (httpStatus === 404) return "missing";
-  const raw = String((value as any)?.instance?.state ?? (value as any)?.state ?? "").toLowerCase();
+  const raw = String(
+    (value as any)?.instance?.state ?? (value as any)?.state ?? ""
+  ).toLowerCase();
   if (raw === "open") return "open";
-  if (["connecting", "qrcode", "qr", "pairing"].includes(raw)) return "connecting";
+  if (["connecting", "qrcode", "qr", "pairing"].includes(raw))
+    return "connecting";
   if (["close", "closed", "disconnected"].includes(raw)) return "close";
   return httpStatus && httpStatus >= 500 ? "unavailable" : "missing";
 }
 
-async function request<T = Record<string, unknown>>(method: string, path: string, body?: unknown): Promise<EvolutionResult<T>> {
+async function request<T = Record<string, unknown>>(
+  method: string,
+  path: string,
+  body?: unknown
+): Promise<EvolutionResult<T>> {
   let config: { url: string; apiKey: string };
   try {
     config = getConfig();
   } catch (error) {
-    return { ok: false, state: "unavailable", errorCode: "CONFIG", errorMessage: error instanceof Error ? error.message : "Evolution API não configurada" };
+    return {
+      ok: false,
+      state: "unavailable",
+      errorCode: "CONFIG",
+      errorMessage:
+        error instanceof Error
+          ? error.message
+          : "Evolution API não configurada",
+    };
   }
 
   try {
@@ -102,7 +143,11 @@ async function request<T = Record<string, unknown>>(method: string, path: string
     });
     const raw = await response.text();
     let data: T | Record<string, unknown> = {};
-    try { data = raw ? JSON.parse(raw) : {}; } catch { data = { message: raw.slice(0, 300) }; }
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      data = { message: raw.slice(0, 300) };
+    }
     const providerError = extractProviderError(data);
     const state = normalizarEstado(data, response.status);
     if (!response.ok || providerError.code === "error") {
@@ -117,24 +162,36 @@ async function request<T = Record<string, unknown>>(method: string, path: string
     }
     return { ok: true, httpStatus: response.status, state, data: data as T };
   } catch (error) {
-    const timeout = error instanceof DOMException && error.name === "TimeoutError";
+    const timeout =
+      error instanceof DOMException && error.name === "TimeoutError";
     return {
       ok: false,
       state: "unavailable",
       errorCode: timeout ? "TIMEOUT" : "NETWORK",
-      errorMessage: timeout ? "A Evolution API demorou para responder" : "Não foi possível conectar à Evolution API",
+      errorMessage: timeout
+        ? "A Evolution API demorou para responder"
+        : "Não foi possível conectar à Evolution API",
     };
   }
 }
 
 function qrFrom(data: any): string | null {
-  return data?.base64 ?? data?.qrcode?.base64 ?? data?.qrcode ?? data?.qrCode ?? null;
+  return (
+    data?.base64 ?? data?.qrcode?.base64 ?? data?.qrcode ?? data?.qrCode ?? null
+  );
 }
 
-export async function getConnectionSnapshot(userId: number): Promise<EvolutionConnectionSnapshot> {
+export async function getConnectionSnapshot(
+  userId: number
+): Promise<EvolutionConnectionSnapshot> {
   const instanceName = instanceNameForUser(userId);
-  const response = await request("GET", `/instance/connectionState/${encodeURIComponent(instanceName)}`);
-  const state = response.ok ? normalizarEstado(response.data, response.httpStatus) : (response.state ?? "error");
+  const response = await request(
+    "GET",
+    `/instance/connectionState/${encodeURIComponent(instanceName)}`
+  );
+  const state = response.ok
+    ? normalizarEstado(response.data, response.httpStatus)
+    : (response.state ?? "error");
   return {
     instanceName,
     state,
@@ -147,19 +204,34 @@ export async function getConnectionSnapshot(userId: number): Promise<EvolutionCo
 }
 
 /** Cria somente a instância inexistente; nunca apaga uma sessão em conexão. */
-export async function ensureConnection(userId: number): Promise<EvolutionConnectionSnapshot> {
+export async function ensureConnection(
+  userId: number
+): Promise<EvolutionConnectionSnapshot> {
   const existing = await getConnectionSnapshot(userId);
   if (existing.state === "open") {
     const webhook = await configurarWebhookDeEntrega(existing.instanceName);
     return webhook?.ok === false
-      ? { ...existing, errorCode: webhook.errorCode, errorMessage: `WhatsApp conectado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}` }
+      ? {
+          ...existing,
+          errorCode: webhook.errorCode,
+          errorMessage: `WhatsApp conectado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}`,
+        }
       : existing;
   }
-  if (existing.state === "unavailable" || existing.state === "unauthorized") return existing;
+  if (existing.state === "unavailable" || existing.state === "unauthorized")
+    return existing;
   // A sessão de pareamento já existe: solicitar apenas um QR renovado, sem recriá-la.
   if (existing.state === "connecting") {
-    const refreshed = await request<any>("GET", `/instance/connect/${encodeURIComponent(existing.instanceName)}`);
-    if (!refreshed.ok) return { ...existing, errorCode: refreshed.errorCode, errorMessage: refreshed.errorMessage };
+    const refreshed = await request<any>(
+      "GET",
+      `/instance/connect/${encodeURIComponent(existing.instanceName)}`
+    );
+    if (!refreshed.ok)
+      return {
+        ...existing,
+        errorCode: refreshed.errorCode,
+        errorMessage: refreshed.errorMessage,
+      };
     return { ...existing, qrCode: qrFrom(refreshed.data) };
   }
 
@@ -169,50 +241,160 @@ export async function ensureConnection(userId: number): Promise<EvolutionConnect
     integration: "WHATSAPP-BAILEYS",
   });
   if (!created.ok && created.httpStatus !== 409) {
-    return { ...existing, state: created.state ?? "error", errorCode: created.errorCode, errorMessage: created.errorMessage };
+    return {
+      ...existing,
+      state: created.state ?? "error",
+      errorCode: created.errorCode,
+      errorMessage: created.errorMessage,
+    };
   }
 
   const qrCode = created.ok ? qrFrom(created.data) : null;
   if (qrCode) {
     const webhook = await configurarWebhookDeEntrega(existing.instanceName);
     if (webhook?.ok === false) {
-      return { ...existing, state: "connecting", qrCode, configured: true, errorCode: webhook.errorCode, errorMessage: `QR Code gerado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}` };
+      return {
+        ...existing,
+        state: "connecting",
+        qrCode,
+        configured: true,
+        errorCode: webhook.errorCode,
+        errorMessage: `QR Code gerado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}`,
+      };
     }
     return { ...existing, state: "connecting", qrCode, configured: true };
   }
 
-  const connected = await request<any>("GET", `/instance/connect/${encodeURIComponent(existing.instanceName)}`);
+  const connected = await request<any>(
+    "GET",
+    `/instance/connect/${encodeURIComponent(existing.instanceName)}`
+  );
   if (!connected.ok) {
-    return { ...existing, state: connected.state ?? "error", errorCode: connected.errorCode, errorMessage: connected.errorMessage };
+    return {
+      ...existing,
+      state: connected.state ?? "error",
+      errorCode: connected.errorCode,
+      errorMessage: connected.errorMessage,
+    };
   }
   const webhook = await configurarWebhookDeEntrega(existing.instanceName);
   if (webhook?.ok === false) {
-    return { ...existing, state: "connecting", qrCode: qrFrom(connected.data), configured: true, errorCode: webhook.errorCode, errorMessage: `QR Code gerado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}` };
+    return {
+      ...existing,
+      state: "connecting",
+      qrCode: qrFrom(connected.data),
+      configured: true,
+      errorCode: webhook.errorCode,
+      errorMessage: `QR Code gerado, mas o rastreio de entrega não foi configurado: ${webhook.errorMessage}`,
+    };
   }
-  return { ...existing, state: "connecting", qrCode: qrFrom(connected.data), configured: true };
+  return {
+    ...existing,
+    state: "connecting",
+    qrCode: qrFrom(connected.data),
+    configured: true,
+  };
 }
 
-export async function disconnectInstance(userId: number): Promise<EvolutionResult> {
-  return request("DELETE", `/instance/logout/${encodeURIComponent(instanceNameForUser(userId))}`);
+export async function disconnectInstance(
+  userId: number
+): Promise<EvolutionResult> {
+  return request(
+    "DELETE",
+    `/instance/logout/${encodeURIComponent(instanceNameForUser(userId))}`
+  );
 }
 
 export async function deleteInstance(userId: number): Promise<EvolutionResult> {
-  return request("DELETE", `/instance/delete/${encodeURIComponent(instanceNameForUser(userId))}`);
+  return request(
+    "DELETE",
+    `/instance/delete/${encodeURIComponent(instanceNameForUser(userId))}`
+  );
 }
 
-export async function enviarMensagemEvolution(userId: number, telefone: string, mensagem: string): Promise<{ ok: boolean; providerMessageId?: string; erro?: string; erroCodigo?: string }> {
+export type ResultadoEnvioEvolution = {
+  ok: boolean;
+  providerMessageId?: string;
+  erro?: string;
+  erroCodigo?: string;
+  disposition: "aceito" | "nao_solicitado" | "incerto";
+};
+
+export async function enviarMensagemEvolution(
+  userId: number,
+  telefone: string,
+  mensagem: string,
+  antesDoPost?: () => Promise<boolean>
+): Promise<ResultadoEnvioEvolution> {
   let number: string;
-  try { number = normalizarTelefoneWhatsApp(telefone); } catch (error) {
-    return { ok: false, erroCodigo: "INVALID_PHONE", erro: error instanceof Error ? error.message : "Número inválido" };
+  try {
+    number = normalizarTelefoneWhatsApp(telefone);
+  } catch (error) {
+    return {
+      ok: false,
+      disposition: "nao_solicitado",
+      erroCodigo: "INVALID_PHONE",
+      erro: error instanceof Error ? error.message : "Número inválido",
+    };
   }
   const status = await getConnectionSnapshot(userId);
-  if (!status.connected) return { ok: false, erroCodigo: status.errorCode ?? "DISCONNECTED", erro: status.errorMessage ?? "WhatsApp desconectado" };
+  if (!status.connected)
+    return {
+      ok: false,
+      disposition: "nao_solicitado",
+      erroCodigo: status.errorCode ?? "DISCONNECTED",
+      erro: "WhatsApp indisponível antes da solicitação de envio",
+    };
 
-  const response = await request<any>("POST", `/message/sendText/${encodeURIComponent(status.instanceName)}`, {
-    number,
-    textMessage: { text: mensagem.slice(0, 4_000) },
-  });
-  if (!response.ok) return { ok: false, erroCodigo: response.errorCode, erro: response.errorMessage ?? "Falha no envio pela Evolution API" };
+  if (antesDoPost) {
+    try {
+      if (!(await antesDoPost()))
+        return {
+          ok: false,
+          disposition: "nao_solicitado",
+          erroCodigo: "REVALIDATION",
+          erro: "Envio cancelado pela revalidação",
+        };
+    } catch {
+      return {
+        ok: false,
+        disposition: "nao_solicitado",
+        erroCodigo: "REVALIDATION_UNAVAILABLE",
+        erro: "Não foi possível revalidar antes do envio",
+      };
+    }
+  }
+  const response = await request<any>(
+    "POST",
+    `/message/sendText/${encodeURIComponent(status.instanceName)}`,
+    {
+      number,
+      textMessage: { text: mensagem.slice(0, 4_000) },
+    }
+  );
+  // Mesmo HTTP 5xx/4xx pode ocorrer após aceite interno; sem contrato de
+  // idempotência/rejeição comprovado, jamais autoriza reenvio automático.
+  if (!response.ok)
+    return {
+      ok: false,
+      disposition:
+        response.errorCode === "CONFIG" ? "nao_solicitado" : "incerto",
+      erroCodigo: response.errorCode,
+      erro: "Resultado do envio incerto; requer reconciliação manual",
+    };
   const data: any = response.data;
-  return { ok: true, providerMessageId: data?.key?.id ?? data?.message?.key?.id ?? data?.id };
+  const providerMessageId = data?.key?.id ?? data?.message?.key?.id ?? data?.id;
+  if (
+    typeof providerMessageId !== "string" ||
+    !providerMessageId.trim() ||
+    providerMessageId.length > 256
+  ) {
+    return {
+      ok: false,
+      disposition: "incerto",
+      erroCodigo: "ACCEPTANCE_WITHOUT_ID",
+      erro: "Resposta sem vínculo rastreável; requer reconciliação manual",
+    };
+  }
+  return { ok: true, disposition: "aceito", providerMessageId };
 }

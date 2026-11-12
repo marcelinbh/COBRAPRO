@@ -41,7 +41,7 @@ function sqlDaCondicao(condicao: unknown) {
 function bancoParaAtualizacao(condicoes: unknown[]) {
   const where = vi.fn((condicao: unknown) => {
     condicoes.push(condicao);
-    return Promise.resolve({});
+    return { returning: vi.fn(() => Promise.resolve([{ id: 900 }])) };
   });
   const set = vi.fn(() => ({ where }));
   return { update: vi.fn(() => ({ set })) };

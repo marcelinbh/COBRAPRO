@@ -1,0 +1,28 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cotarRenovacaoProspectiva, renovarProspectivoAtomico, renovacaoProspectivaEntradaSchema,
+  renovacaoProspectivaNormalizarCotacao, renovacaoProspectivaNormalizarResultado, type EntradaRenovacaoProspectiva } from "./renovacaoProspectivaRpc";
+export const input: EntradaRenovacaoProspectiva = { idempotencyKey: "11111111-1111-4111-8111-111111111111", contratoId: 1, parcelaId: 2,
+ valorRecebido: "50.00", totalExigido: "50.00", dataPagamento: "2026-11-10", estadoHash: "a".repeat(64), cotacaoHash: "b".repeat(64) };
+export const result = () => ({ success: true, repetida: false, operationId: "22222222-2222-4222-8222-222222222222", contratoId: 1, parcelaId: 2,
+ sucessoraId: 3, transacaoCaixaId: "4", contaCaixaId: 5, valorRecebido: "50.00", totalExigido: "50.00", jurosPagos: "50.00", multaPaga: "0.00", moraPaga: "0.00",
+ principalPago: "0.00", principalAntes: "1000.00", principalDepois: "1000.00", status: "renovada", contratoStatus: "ativo", novoTotal: "1050.00",
+ novoJuros: "50.00", novoVencimento: "2026-12-10", dataPagamento: input.dataPagamento, estadoHash: input.estadoHash, cotacaoHash: input.cotacaoHash, regra: "renovacao_juros_mensal_brt_v1" });
+export const quote = () => ({ elegivel: true, contratoId: 1, parcelaId: 2, contaCaixaId: 5, jurosEmbutidos: "50.00", multa: "0.00", mora: "0.00", totalExigido: "50.00",
+ principalAntes: "1000.00", principalDepois: "1000.00", principalPago: "0.00", novoJuros: "50.00", novoTotal: "1050.00", novoVencimento: "2026-12-10",
+ vencimento: "2026-11-10", dataPagamento: input.dataPagamento, expiraEm: "2026-11-11T00:00:00-03:00", estadoHash: input.estadoHash, cotacaoHash: input.cotacaoHash,
+ regra: "renovacao_juros_mensal_brt_v1" });
+beforeEach(() => { for (const f of ["ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS", "ENABLE_RPC_CICLO_EMPRESTIMOS_PROSPECTIVOS", "ENABLE_RPC_RENOVACAO_PROSPECTIVA"]) vi.stubEnv(f, "true"); });
+afterEach(() => vi.unstubAllEnvs());
+describe("renovacaoProspectiva serviço", () => {
+ it.each(["ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS", "ENABLE_RPC_CICLO_EMPRESTIMOS_PROSPECTIVOS", "ENABLE_RPC_RENOVACAO_PROSPECTIVA"])("flag %s exigida antes RPC", async f => {
+  vi.stubEnv(f, undefined); const rpc=vi.fn(); await expect(renovarProspectivoAtomico({rpc},1,input)).rejects.toMatchObject({code:"PRECONDITION_FAILED"}); expect(rpc).not.toHaveBeenCalled();
+ });
+ it("cotação autoritativa única RPC, tenant separado", async () => {const rpc=vi.fn().mockResolvedValue({data:quote(),error:null});expect(await cotarRenovacaoProspectiva({rpc},77,{contratoId:1,parcelaId:2})).toEqual(quote());expect(rpc).toHaveBeenCalledWith("rpc_cotar_renovacao_prospectiva",{p_user_id:77,p_contrato_id:1,p_parcela_id:2});});
+ it("uma mutação atômica sem prova browser/conta/arredondamento", async () => {const rpc=vi.fn().mockResolvedValue({data:result(),error:null});expect(await renovarProspectivoAtomico({rpc},77,input)).toEqual(result());expect(rpc).toHaveBeenCalledTimes(1);expect(rpc.mock.calls[0][1]).toMatchObject({p_user_id:77,p_valor_recebido:"50.00",p_cotacao_hash:input.cotacaoHash});});
+ it.each([{userId:1},{contaCaixaId:5},{provaId:"a"},{principalPago:"0.00"},{desconto:"0.00"},{valorRecebido:"0.01"},{valorRecebido:"0.001"},{valorRecebido:50},{valorRecebido:"NaN"},{dataPagamento:"2026-02-31"},{estadoHash:"x"},{cotacaoHash:"x"},{idempotencyKey:"x"}])("entrada estrita %j", async patch => {const rpc=vi.fn();await expect(renovarProspectivoAtomico({rpc},1,{...input,...patch} as any)).rejects.toMatchObject({code:"BAD_REQUEST"});expect(rpc).not.toHaveBeenCalled();});
+ it.each([{status:"paga"},{contratoStatus:"quitado"},{principalPago:"0.01"},{principalDepois:"999.99"},{jurosPagos:"49.99"},{multaPaga:"0.01"},{moraPaga:"0.01"},{novoTotal:"1049.99"},{novoJuros:"49.99"},{sucessoraId:2},{parcelaId:9},{cotacaoHash:"c".repeat(64)},{dataPagamento:"2026-11-09"},{transacaoCaixaId:"2147483648"},{extra:true}])("prova adulterada não confirma %j", patch => {expect(()=>renovacaoProspectivaNormalizarResultado({...result(),...patch},input)).toThrow();});
+ it.each([{elegivel:false},{principalPago:"0.01"},{principalDepois:"999.99"},{jurosEmbutidos:"49.99"},{multa:"0.01"},{novoTotal:"1049.99"},{novoVencimento:"2026-11-10"},{expiraEm:"2026-11-12T00:00:00-03:00"},{parcelaId:9},{extra:true}])("cotação adulterada bloqueada %j", patch => {expect(()=>renovacaoProspectivaNormalizarCotacao({...quote(),...patch},{contratoId:1,parcelaId:2})).toThrow();});
+ it.each([["22023","BAD_REQUEST"],["22008","BAD_REQUEST"],["23514","CONFLICT"],["23505","CONFLICT"],["40001","CONFLICT"],["40P01","CONFLICT"],["42501","NOT_FOUND"],["PGRST202","PRECONDITION_FAILED"],["42883","PRECONDITION_FAILED"],["42P01","PRECONDITION_FAILED"],["XX000","INTERNAL_SERVER_ERROR"]])("erro SQL fechado %s",async(code,expected)=>{const rpc=vi.fn().mockResolvedValue({data:null,error:{code}});await expect(renovarProspectivoAtomico({rpc},1,input)).rejects.toMatchObject({code:expected});expect(rpc).toHaveBeenCalledTimes(1);});
+ it("timeout preserva UUID e payload no retry",async()=>{const rpc=vi.fn().mockRejectedValueOnce(new Error("timeout")).mockResolvedValue({data:{...result(),repetida:true},error:null});await expect(renovarProspectivoAtomico({rpc},1,input)).rejects.toThrow(/rollback/);expect((await renovarProspectivoAtomico({rpc},1,input)).repetida).toBe(true);expect(rpc.mock.calls[0]).toEqual(rpc.mock.calls[1]);});
+ it("schema valor exato somente",()=>{expect(renovacaoProspectivaEntradaSchema.safeParse(input).success).toBe(true);expect(renovacaoProspectivaEntradaSchema.safeParse({...input,valorRecebido:"0.01"}).success).toBe(false);});
+});

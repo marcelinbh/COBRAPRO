@@ -123,7 +123,7 @@ export default function Dashboard() {
   const { data: parcelasHojeData, isLoading: hojeLoading, isError: hojeFalhou } = trpc.dashboard.parcelasHoje.useQuery();
   const { data: atrasadasData, isLoading: atrasadasLoading, isError: atrasadasFalhou } = trpc.dashboard.parcelasAtrasadas.useQuery();
   const { data: fluxoMensal, isLoading: fluxoLoading, isError: fluxoFalhou } = trpc.dashboard.fluxoMensal.useQuery();
-  const { data: scoreData } = trpc.dashboard.scoreNegocio.useQuery();
+  const { data: scoreData, isLoading: scoreLoading, isError: scoreFalhou, error: scoreErro } = trpc.dashboard.scoreNegocio.useQuery();
   const { data: atencao, isLoading: atencaoLoading, isError: atencaoFalhou } = trpc.dashboard.precisaAtencao.useQuery();
   const { data: tendencia, isLoading: tendenciaLoading, isError: tendenciaFalhou } = trpc.dashboard.tendenciaJuros.useQuery();
   const relatorioDiarioMutation = trpc.whatsapp.relatorioDiario.useMutation({
@@ -243,21 +243,29 @@ export default function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col items-center gap-3">
-              <ScoreCircle score={scoreData?.score ?? 0} />
+              {scoreFalhou ? <p role="alert" className="text-sm text-warning">Score indisponível; revisão necessária. {scoreErro?.message}</p>
+                : scoreLoading ? <p className="text-sm text-muted-foreground">Carregando score...</p>
+                : !scoreData ? <p className="text-sm text-warning">Score indisponível.</p>
+                : scoreData.score === null ? <p className="text-sm text-muted-foreground">Sem base financeira para score (leitura vazia confirmada).</p>
+                : <ScoreCircle score={scoreData.score} />}
+              {!scoreFalhou && !scoreLoading && scoreData && (
               <div className="w-full space-y-1.5">
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{t('dashboard.received')}</span>
-                  <span className="text-success font-medium">{(scoreData?.taxaRecebimento ?? 0).toFixed(1)}%</span>
+                  <span className="text-muted-foreground">Recebido / base histórica</span>
+                  <span className="text-success font-medium">{scoreData.taxaRecebimento === null ? '—' : `${scoreData.taxaRecebimento.toFixed(1)}%`}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{t('dashboard.delinquency')}</span>
-                  <span className="text-primary font-medium">{(scoreData?.inadimplencia ?? 0).toFixed(1)}%</span>
+                  <span className="text-muted-foreground">Atraso / mesma base histórica</span>
+                  <span className="text-primary font-medium">{scoreData.inadimplencia === null ? '—' : `${scoreData.inadimplencia.toFixed(1)}%`}</span>
                 </div>
                 <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">{t('dashboard.received')}</span>
-                  <span className="text-foreground font-medium">{formatarMoeda(scoreData?.totalRecebido ?? 0)}</span>
+                  <span className="text-muted-foreground">Recebido no ledger (histórico)</span>
+                  <span className="text-foreground font-medium">{formatarMoeda(scoreData.totalRecebido)}</span>
                 </div>
+                <p className="text-xs text-muted-foreground">Denominador: {formatarMoeda(scoreData.denominador)} = recebido + aberto validado. Referência: {scoreData.dataReferencia} (Brasília).</p>
+                <p className="text-xs text-muted-foreground">{scoreData.base}</p>
               </div>
+              )}
             </CardContent>
           </Card>
 

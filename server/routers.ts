@@ -11,6 +11,8 @@ import { notificacoesRouter } from "./routers/notificacoes";
 import { blacklistRouter } from "./routers/blacklist";
 import { contasPagarRouter as contasPagarProspectivasRouter } from "./routers/contasPagar";
 import { emprestimosProspectivosRouter } from "./routers/emprestimosProspectivos";
+import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
+import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
@@ -87,21 +89,27 @@ async function marcarContaPagaComCompatibilidade(supabase: any, id: number, user
   return resultado;
 }
 
-async function listarTransacoesCaixaDoUsuario(supabase: any, userId: number): Promise<any[]> {
+async function listarTransacoesCaixaDoUsuario(supabase: any, userId: number, contaIds: number[]): Promise<any[]> {
+  if (contaIds.length === 0) return [];
   const todas: any[] = [];
   const tamanhoPagina = 1000;
   for (let pagina = 0; pagina < 100; pagina++) {
     const inicio = pagina * tamanhoPagina;
     const { data, error } = await supabase.from('transacoes_caixa')
-      .select('conta_caixa_id, tipo, valor')
-      .eq('user_id', userId)
+      .select('id,conta_caixa_id,tipo,valor,user_id')
+      .in('conta_caixa_id', contaIds)
+      .order('id', { ascending: true })
       .range(inicio, inicio + tamanhoPagina - 1);
-    if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-    const lote = data ?? [];
-    todas.push(...lote);
-    if (lote.length < tamanhoPagina) break;
+    if (error || !Array.isArray(data)) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar o livro-caixa completo.' });
+    if (data.some((row: any) => row.user_id !== userId || !contaIds.includes(row.conta_caixa_id)
+      || !Number.isSafeInteger(row.id) || row.id <= 0 || row.valor === null || row.valor === undefined
+      || (row.tipo !== 'entrada' && row.tipo !== 'saida'))) {
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'O livro-caixa desta conta possui vínculo ou valor que exige revisão.' });
+    }
+    todas.push(...data);
+    if (data.length < tamanhoPagina) return todas;
   }
-  return todas;
+  throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'O livro-caixa excede o limite de leitura segura; saldo não calculado parcialmente.' });
 }
 
 /** Limite intencional da conferência manual, para não sobrecarregar a API. */
@@ -166,6 +174,13 @@ async function registrarHistorico(params: {
 
 // ─── DASHBOARD ───────────────────────────────────────────────────────────────
 const dashboardRouter = router({
+  relatorioFinanceiro: protectedProcedure
+    .input(z.object({ inicio: z.string(), fim: z.string(), modalidade: z.string().optional(), clienteId: z.number().int().positive().optional() }))
+    .query(async ({ ctx, input }) => {
+      const { lerRelatorioFinancialReporting } = await import('./financialReporting');
+      return lerRelatorioFinancialReporting(await getSupabaseClientAsync(), ctx.user.id, input);
+    }),
+
   resumoCaixa: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
     const fonte = db ? null : await getSupabaseClientAsync();
@@ -295,41 +310,35 @@ const dashboardRouter = router({
           id: parcelas.id, clienteId: parcelas.clienteId, clienteNome: clientes.nome,
           numeroParcela: parcelas.numeroParcela, valorOriginal: parcelas.valorOriginal,
           valor: sql<string>`valor`,
+          saldoResidual: parcelas.saldoResidual, valorMulta: parcelas.valorMulta,
           dataVencimento: parcelas.dataVencimento, status: parcelas.status,
         }).from(parcelas).innerJoin(clientes, and(eq(parcelas.clienteId, clientes.id), eq(clientes.userId, ctx.user.id)))
-          .where(and(eq(parcelas.status, 'atrasada'), eq(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
+          .where(and(inArray(parcelas.status, [...STATUS_ABERTOS_DASHBOARD]), or(eq(parcelas.status, 'atrasada'), lt(parcelas.dataVencimento, dataHojeBrasilia())), eq(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
         return rows.map(r => {
           const base = valorBaseDashboard(r);
-          const { total, diasAtraso } = calcularJurosMora(base, new Date(dataCivilBrasiliaParaIso(r.dataVencimento)), new Date(dataCivilBrasiliaParaIso(dataHojeBrasilia())));
-          return { ...r, valorOriginal: String(base), valorAtualizado: total, diasAtraso };
+          const valorAtualizado = valorAbertoDashboard(r);
+          const diasAtraso = Math.max(0, diferencaDiasData(r.dataVencimento, dataHojeBrasilia()));
+          return { ...r, valorOriginal: String(base), valorAtualizado, diasAtraso };
         });
       } catch (err) { throw err; }
     }
     const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
-    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status')
-      .eq('status', 'atrasada').eq('user_id', ctx.user.id).order('data_vencimento').limit(20);
-    const registros = await vincularClientesDashboard(supabase, dadosDashboard(resultado), ctx.user.id);
+    const abertas = await listarDashboard(supabase, 'parcelas', 'id, cliente_id, numero_parcela, valor, valor_original, saldo_residual, valor_multa, data_vencimento, status', ctx.user.id,
+      q => q.in('status', [...STATUS_ABERTOS_DASHBOARD]));
+    const elegiveis = abertas.filter(r => r.status === 'atrasada' || r.data_vencimento < dataHojeBrasilia())
+      .sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento) || a.id - b.id).slice(0, 20);
+    const registros = await vincularClientesDashboard(supabase, elegiveis, ctx.user.id);
     return registros.map((r: any) => {
       const base = valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor });
-      const { total, diasAtraso } = calcularJurosMora(base, new Date(dataCivilBrasiliaParaIso(r.data_vencimento)), new Date(dataCivilBrasiliaParaIso(dataHojeBrasilia())));
-      return { id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero_parcela, valorOriginal: String(base), dataVencimento: r.data_vencimento, status: r.status, valorAtualizado: total, diasAtraso };
+      const valorAtualizado = valorAbertoDashboard({ status: r.status, valor: r.valor, valorOriginal: r.valor_original, saldoResidual: r.saldo_residual, valorMulta: r.valor_multa, dataVencimento: r.data_vencimento });
+      const diasAtraso = Math.max(0, diferencaDiasData(r.data_vencimento, dataHojeBrasilia()));
+      return { id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero_parcela, valorOriginal: String(base), dataVencimento: r.data_vencimento, status: r.status, valorAtualizado, diasAtraso };
     });
   }),
 
   scoreNegocio: protectedProcedure.query(async ({ ctx }) => {
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return { score: 0, taxaRecebimento: 0, inadimplencia: 0, totalRecebido: 0, emAtraso: 0 };
-    const userId = ctx.user.id;
-    const { data: all } = await supabase.from('parcelas').select('valor_original, status').eq('user_id', userId);
-    const pagas = (all ?? []).filter((p: any) => p.status === 'paga');
-    const atrasadasP = (all ?? []).filter((p: any) => p.status === 'atrasada');
-    const totalRecebido = pagas.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
-    const emAtraso = atrasadasP.reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
-    const totalGeral = (all ?? []).reduce((s: number, p: any) => s + parseFloat(p.valor_original ?? '0'), 0);
-    const taxaRecebimento = totalGeral > 0 ? (totalRecebido / totalGeral) * 100 : 0;
-    const inadimplencia = totalGeral > 0 ? (emAtraso / totalGeral) * 100 : 0;
-    const score = Math.max(0, Math.min(100, Math.round(taxaRecebimento - inadimplencia * 0.5)));
-    return { score, taxaRecebimento, inadimplencia, totalRecebido, emAtraso };
+    const { lerScoreFinancialReporting } = await import('./financialReporting');
+    return lerScoreFinancialReporting(await getSupabaseClientAsync(), ctx.user.id);
   }),
 
   precisaAtencao: protectedProcedure.query(async ({ ctx }) => {
@@ -339,9 +348,9 @@ const dashboardRouter = router({
     const colunas = 'valor, valor_original, saldo_residual, valor_multa, status, data_vencimento, cliente_id';
     const [semana, atrasados] = await Promise.all([
       listarDashboard(supabase, 'parcelas', colunas, userId, q => q
-        .in('status', ['pendente','vencendo_hoje']).gte('data_vencimento', hoje).lte('data_vencimento', em7Dias)),
+        .in('status', [...STATUS_ABERTOS_DASHBOARD]).gte('data_vencimento', hoje).lte('data_vencimento', em7Dias)),
       listarDashboard(supabase, 'parcelas', colunas, userId, q => q
-        .eq('status', 'atrasada').lte('data_vencimento', ha30Dias))
+        .in('status', [...STATUS_ABERTOS_DASHBOARD]).lte('data_vencimento', ha30Dias))
     ]);
     const somarAbertos = (registros: any[]) => registros.reduce((s: number, p: any) => s + Math.round(valorAbertoDashboard({
       status: p.status, valor: p.valor, valorOriginal: p.valor_original,
@@ -416,10 +425,10 @@ function mapClienteFromRest(row: any): any {
 
 const clientesRouter = router({
   list: protectedProcedure
-    .input(z.object({ busca: z.string().optional(), ativo: z.boolean().optional() }).optional())
+    .input(z.object({ busca: z.string().trim().max(255).optional(), ativo: z.boolean().optional() }).optional())
     .query(async ({ ctx, input }) => {
       const db = await getDb();
-      let rows: any[];
+      let rows: any[] | undefined;
       if (db) {
         try {
           rows = await db.select().from(clientes)
@@ -428,88 +437,48 @@ const clientesRouter = router({
         } catch (err) {
           console.warn('[clientes.list] Drizzle failed, trying REST:', (err as Error).message);
           resetDb();
-          rows = [];
         }
-      } else {
-        rows = [];
       }
-      // Fallback: Supabase REST se Drizzle falhou
-      if (rows.length === 0) {
+      // Uma consulta bem-sucedida vazia não exige fallback; falha não é base vazia.
+      if (rows === undefined) {
         const supabase = await getSupabaseClientAsync();
-        if (supabase) {
-          let query = supabase.from('clientes').select('*').order('createdAt', { ascending: false }).eq('user_id', ctx.user.id);
-          if (input?.ativo !== undefined) query = (query as any).eq('ativo', input.ativo);
-          const { data, error } = await query;
-          if (!error && data) rows = data;
+        if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
+        let query = supabase.from('clientes').select('*').order('createdAt', { ascending: false }).eq('user_id', ctx.user.id);
+        if (input?.ativo !== undefined) query = query.eq('ativo', input.ativo);
+        const { data, error } = await query;
+        if (error || !Array.isArray(data)) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar os clientes. Tente novamente.' });
         }
+        rows = data;
       }
-      // Normalizar campos snake_case -> camelCase (Supabase REST retorna snake_case)
       rows = rows.map(mapClienteFromRest);
-      if (input?.busca) {
-        const b = input.busca.toLowerCase();
-        rows = rows.filter((c: any) =>
-          (c.nome ?? '').toLowerCase().includes(b) ||
-          (c.cpfCnpj ?? '').includes(b) ||
-          (c.telefone ?? '').includes(b)
-        );
-      }
+      if (input?.busca) rows = rows.filter(c => clienteCorrespondeBusca(c, input.busca!));
       return { clientes: rows, total: rows.length };
     }),
 
-  byId: protectedProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
+  byId: protectedProcedure.input(z.object({ id: z.number().int().positive() })).query(async ({ ctx, input }) => {
     const db = await getDb();
     if (db) {
       try {
         const rows = await db.select().from(clientes).where(and(eq(clientes.id, input.id), eq(clientes.userId, ctx.user.id))).limit(1);
-        if (rows.length > 0) return rows[0];
+        return rows[0] ?? null;
       } catch (err) {
         console.warn('[clientes.byId] Drizzle failed, trying REST:', (err as Error).message);
         resetDb();
       }
     }
-    // Fallback: Supabase REST — filtrar por user_id para isolamento multi-tenant
+    // maybeSingle distingue ausência legítima de falha, sem enumerar outros donos.
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) return null;
-    const { data, error } = await supabase.from('clientes').select('*').eq('id', input.id).eq('user_id', ctx.user.id).single();
-    if (error) return null;
+    if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
+    const { data, error } = await supabase.from('clientes').select('*').eq('id', input.id).eq('user_id', ctx.user.id).maybeSingle();
+    if (error || data === undefined) {
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar o cliente. Tente novamente.' });
+    }
     return mapClienteFromRest(data);
   }),
 
   create: protectedProcedure
-    .input(z.object({
-      nome: z.string().min(2),
-      cpfCnpj: z.string().optional(),
-      cnpj: z.string().optional(),
-      rg: z.string().optional(),
-      telefone: z.string().optional(),
-      whatsapp: z.string().optional(),
-      email: z.string().email().optional().or(z.literal('')),
-      chavePix: z.string().optional(),
-      tipoChavePix: z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria']).optional(),
-      endereco: z.string().optional(),
-      numero: z.string().optional(),
-      complemento: z.string().optional(),
-      bairro: z.string().optional(),
-      cidade: z.string().optional(),
-      estado: z.string().optional(),
-      cep: z.string().optional(),
-      observacoes: z.string().optional(),
-      instagram: z.string().optional(),
-      facebook: z.string().optional(),
-      profissao: z.string().optional(),
-      dataNascimento: z.string().optional(),
-      sexo: z.enum(['masculino', 'feminino', 'outro']).optional(),
-      estadoCivil: z.enum(['solteiro', 'casado', 'divorciado', 'viuvo', 'outro']).optional(),
-      nomeMae: z.string().optional(),
-      nomePai: z.string().optional(),
-      fotoUrl: z.string().optional(),
-      documentosUrls: z.string().optional(),
-      tipoCliente: z.string().optional(),
-      isReferral: z.boolean().optional(),
-      banco: z.string().optional(),
-      agencia: z.string().optional(),
-      numeroConta: z.string().optional(),
-    }))
+    .input(clienteCreateInput)
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
@@ -529,6 +498,7 @@ const clientesRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível' });
       const insertData: Record<string, unknown> = { nome: input.nome };
+      if (input.ativo !== undefined) insertData.ativo = input.ativo;
       if (input.cpfCnpj) insertData.cpf_cnpj = input.cpfCnpj;
       if (input.cnpj) insertData.cnpj = input.cnpj;
       if (input.rg) insertData.rg = input.rg;
@@ -566,53 +536,23 @@ const clientesRouter = router({
       return { id: (data as any).id };
     }),
   update: protectedProcedure
-    .input(z.object({
-      id: z.number(),
-      nome: z.string().min(2).optional(),
-      cpfCnpj: z.string().optional(),
-      cnpj: z.string().optional(),
-      rg: z.string().optional(),
-      telefone: z.string().optional(),
-      whatsapp: z.string().optional(),
-      email: z.string().optional(),
-      chavePix: z.string().optional(),
-      tipoChavePix: z.enum(['cpf', 'cnpj', 'email', 'telefone', 'aleatoria']).optional(),
-      endereco: z.string().optional(),
-      numero: z.string().optional(),
-      complemento: z.string().optional(),
-      bairro: z.string().optional(),
-      cidade: z.string().optional(),
-      estado: z.string().optional(),
-      cep: z.string().optional(),
-      observacoes: z.string().optional(),
-      score: z.number().min(0).max(1000).optional(),
-      instagram: z.string().optional(),
-      facebook: z.string().optional(),
-      profissao: z.string().optional(),
-      dataNascimento: z.string().optional(),
-      sexo: z.enum(['masculino', 'feminino', 'outro']).optional(),
-      estadoCivil: z.enum(['solteiro', 'casado', 'divorciado', 'viuvo', 'outro']).optional(),
-      nomeMae: z.string().optional(),
-      nomePai: z.string().optional(),
-      fotoUrl: z.string().optional(),
-      documentosUrls: z.string().optional(),
-      tipoCliente: z.string().optional(),
-      isReferral: z.boolean().optional(),
-      banco: z.string().optional(),
-      agencia: z.string().optional(),
-      numeroConta: z.string().optional(),
-    }))
+    .input(clienteUpdateInput)
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
       const { id, ...data } = input;
       if (db) {
         try {
-          await db.update(clientes).set(data).where(and(
+          const updated = await db.update(clientes).set(data).where(and(
             eq(clientes.id, id),
             eq(clientes.userId, ctx.user.id),
-          ));
+          )).returning({ id: clientes.id });
+          if (updated.length !== 1) throw new TRPCError({
+            code: updated.length === 0 ? 'NOT_FOUND' : 'INTERNAL_SERVER_ERROR',
+            message: 'Não foi possível confirmar a atualização do cliente.',
+          });
           return { success: true };
         } catch (err) {
+          if (err instanceof TRPCError) throw err;
           console.warn('[clientes.update] Drizzle failed, trying REST:', (err as Error).message);
           resetDb();
         }
@@ -621,6 +561,7 @@ const clientesRouter = router({
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
       const updateData: Record<string, unknown> = {};
+      if (data.ativo !== undefined) updateData.ativo = data.ativo;
       if (data.nome) updateData.nome = data.nome;
       if (data.cpfCnpj !== undefined) updateData.cpf_cnpj = data.cpfCnpj;
       if (data.cnpj !== undefined) updateData.cnpj = data.cnpj;
@@ -654,8 +595,12 @@ const clientesRouter = router({
       if (data.banco !== undefined) updateData.banco = data.banco;
       if (data.agencia !== undefined) updateData.agencia = data.agencia;
       if (data.numeroConta !== undefined) updateData.numero_conta = data.numeroConta;
-      const { error } = await supabase.from('clientes').update(updateData).eq('id', id).eq('user_id', ctx.user.id);
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+      const { data: updated, error } = await supabase.from('clientes').update(updateData).eq('id', id).eq('user_id', ctx.user.id).select('id');
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível atualizar o cliente. Tente novamente.' });
+      if (!Array.isArray(updated) || updated.length !== 1) throw new TRPCError({
+        code: Array.isArray(updated) && updated.length === 0 ? 'NOT_FOUND' : 'INTERNAL_SERVER_ERROR',
+        message: 'Não foi possível confirmar a atualização do cliente.',
+      });
       return { success: true };
     }),
 
@@ -941,27 +886,39 @@ const clientesRouter = router({
       const db = await getDb();
       if (db) {
         try {
-          await db.update(clientes).set({ documentosUrls: input.documentosUrls } as any).where(and(
+          const updated = await db.update(clientes).set({ documentosUrls: input.documentosUrls } as any).where(and(
             eq(clientes.id, input.id),
             eq(clientes.userId, ctx.user.id),
-          ));
+          )).returning({ id: clientes.id });
+          if (updated.length !== 1) throw new TRPCError({
+            code: updated.length === 0 ? 'NOT_FOUND' : 'INTERNAL_SERVER_ERROR',
+            message: 'Não foi possível confirmar a atualização do cliente.',
+          });
           return { success: true };
         } catch (err) {
+          if (err instanceof TRPCError) throw err;
           console.warn('[clientes.updateDocumentos] Drizzle failed, trying REST:', (err as Error).message);
           resetDb();
         }
       }
       const supabase = await getSupabaseClientAsync();
       if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('clientes')
         .update({ documentos_urls: input.documentosUrls })
         .eq('id', input.id)
-        .eq('user_id', ctx.user.id);
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
+        .eq('user_id', ctx.user.id)
+        .select('id');
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível atualizar os documentos. Tente novamente.' });
+      if (!Array.isArray(updated) || updated.length !== 1) throw new TRPCError({
+        code: Array.isArray(updated) && updated.length === 0 ? 'NOT_FOUND' : 'INTERNAL_SERVER_ERROR',
+        message: 'Não foi possível confirmar a atualização do cliente.',
+      });
       return { success: true };
     }),
 });
+// Import mantido nesta seção para limitar a alteração ao bloco de clientes.
+import { clienteCreateInput, clienteUpdateInput, clienteCorrespondeBusca } from '../shared/clientesInput';
 // ─── CONTRATOS ────────────────────────────────────────────────────────────────
 const contratosRouter = router({
   // Lista contratos com dados agregados das parcelas para os cards de Empréstimos
@@ -2729,25 +2686,35 @@ const caixaRouter = router({
     }
     // Fallback REST
     const supabase = await getSupabaseClientAsync();
-    if (!supabase) return [];
+    if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar as contas de Caixa. Tente novamente.' });
     // Tabela usa 'ativo' (não 'ativa') e 'saldo' (não 'saldo_inicial')
-    const { data: contasData, error: contasErr } = await supabase.from('contas_caixa').select('*').eq('ativo', true).eq('user_id', ctx.user.id);
-    if (contasErr) { console.error('[caixa.contas] REST error:', contasErr.message); return []; }
-    const transData = await listarTransacoesCaixaDoUsuario(supabase, ctx.user.id);
+    const { data: contasData, error: contasErr } = await supabase.from('contas_caixa').select('id,nome,tipo,banco,saldo,ativo,user_id').eq('ativo', true).eq('user_id', ctx.user.id).limit(1000);
+    if (contasErr || !Array.isArray(contasData) || contasData.length >= 1000) {
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar todas as contas de Caixa. Tente novamente.' });
+    }
+    if (contasData.some((conta: any) => !Number.isSafeInteger(conta.id) || conta.id <= 0 || conta.user_id !== ctx.user.id || conta.ativo !== true)) {
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Não foi possível confirmar a titularidade das contas de Caixa.' });
+    }
+    const transData = await listarTransacoesCaixaDoUsuario(supabase, ctx.user.id, contasData.map((conta: any) => conta.id));
     const result2 = [];
     for (const conta of (contasData || [])) {
       const transacoesConta = transData.filter((t: any) => t.conta_caixa_id === conta.id);
-      // Campo real é 'saldo' (não 'saldo_inicial')
-      const saldoBase = parseFloat(conta.saldo ?? conta.saldo_inicial ?? '0');
-      const saldoAtual = calcularSaldoAtual(saldoBase, transacoesConta);
+      // Preservar o decimal recebido: parseFloat antes da soma perderia centavos.
+      const saldoBase = conta.saldo;
+      if (conta.user_id !== ctx.user.id || conta.ativo !== true || saldoBase === null || saldoBase === undefined) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Conta de Caixa exige revisão antes de exibir seu saldo.' });
+      }
+      let saldoAtual: number;
+      try { saldoAtual = calcularSaldoAtual(saldoBase, transacoesConta); }
+      catch { throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'O saldo de Caixa não pôde ser representado com precisão. Revise os lançamentos.' }); }
       result2.push({
         id: conta.id,
         nome: conta.nome,
         tipo: conta.tipo,
         banco: conta.banco ?? null,
-        saldoInicial: saldoBase,
+        saldoInicial: Number(saldoBase),
         saldoAtual,
-        ativa: conta.ativo ?? conta.ativa ?? true,
+        ativa: conta.ativo,
       });
     }
     return result2;
@@ -2783,7 +2750,7 @@ const caixaRouter = router({
       }
       // Fallback REST
       const supabase = await getSupabaseClientAsync();
-      if (!supabase) return [];
+      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar os lançamentos de Caixa.' });
       let txQuery = supabase
         .from('transacoes_caixa')
         .select('id, conta_caixa_id, tipo, categoria, valor, descricao, data_transacao')
@@ -2792,13 +2759,16 @@ const caixaRouter = router({
         .eq('user_id', ctx.user.id);
       if (input?.contaCaixaId) txQuery = txQuery.eq('conta_caixa_id', input.contaCaixaId);
       const { data: txData, error: txQueryErr } = await txQuery;
-      if (txQueryErr) { console.error('[caixa.transacoes] REST error:', txQueryErr.message); return []; }
+      if (txQueryErr || !Array.isArray(txData)) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar os lançamentos de Caixa. Tente novamente.' });
       // Buscar nomes das contas separadamente
       const contaIdsSet = new Set<number>((txData ?? []).map((t: any) => t.conta_caixa_id).filter(Boolean));
       const contaIds = Array.from(contaIdsSet);
-      const { data: contasData } = contaIds.length > 0
-        ? await supabase.from('contas_caixa').select('id, nome').in('id', contaIds).eq('user_id', ctx.user.id)
-        : { data: [] };
+      const { data: contasData, error: contasNamesErr } = contaIds.length > 0
+        ? await supabase.from('contas_caixa').select('id, nome').in('id', contaIds).eq('user_id', ctx.user.id).limit(1000)
+        : { data: [], error: null };
+      if (contasNamesErr || !Array.isArray(contasData) || contasData.length !== contaIds.length) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Não foi possível confirmar a conta dos lançamentos de Caixa.' });
+      }
       const contasMap = Object.fromEntries((contasData ?? []).map((c: any) => [c.id, c.nome]));
       return (txData ?? []).map((t: any) => ({
         id: t.id,
@@ -3340,78 +3310,14 @@ const whatsappRouter = router({
   relatorioDiario: protectedProcedure
     .input(z.object({ telefone: z.string().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const hoje = dataHojeBrasilia();
-      const inicioHoje = dataCivilBrasiliaParaIso(hoje);
-      const inicioAmanha = dataCivilBrasiliaParaIso(adicionarDiasData(hoje, 1));
-      const { data: parcelasHoje } = await supabase
-        .from('parcelas')
-        .select('id, valor, valor_pago, status, data_vencimento, contratos(clientes(nome))')
-        .eq('data_vencimento', hoje)
-        .eq('user_id', ctx.user.id);
-      const { data: pagamentosHoje } = await supabase
-        .from('parcelas')
-        .select('id, valor_pago, data_pagamento, contratos(clientes(nome))')
-        .gte('data_pagamento', inicioHoje)
-        .lt('data_pagamento', inicioAmanha)
-        .eq('status', 'paga')
-        .eq('user_id', ctx.user.id);
-      const { data: atrasadas } = await supabase
-        .from('parcelas')
-        .select('id, valor, data_vencimento, contratos(clientes(nome))')
-        .eq('status', 'atrasada')
-        .eq('user_id', ctx.user.id)
-        .order('data_vencimento', { ascending: true })
-        .limit(10);
-      const totalRecebidoHoje = (pagamentosHoje || []).reduce((s: number, p: any) => s + parseFloat(p.valor_pago || 0), 0);
-      const totalVencendoHoje = (parcelasHoje || []).filter((p: any) => p.status !== 'paga').length;
-      const totalAtrasadas = (atrasadas || []).length;
-      const { data: cfgData } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
-      const cfg: Record<string, string> = {};
-      (cfgData || []).forEach((r: any) => { cfg[r.chave] = r.valor; });
-      const nomeEmpresa = cfg['nomeEmpresa'] || 'CobraPro';
-      const assinatura = cfg['assinaturaWhatsapp'] || nomeEmpresa;
-      const dataFormatada = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' });
-      let msg = `\uD83D\uDCCA *RELAT\u00D3RIO DO DIA \u2014 ${dataFormatada.toUpperCase()}*\n`;
-      msg += `_${nomeEmpresa}_\n\n`;
-      msg += `\uD83D\uDCB0 *RECEBIMENTOS HOJE*\n`;
-      msg += `Total recebido: *R$ ${totalRecebidoHoje.toFixed(2).replace('.', ',')}*\n`;
-      if ((pagamentosHoje || []).length > 0) {
-        (pagamentosHoje || []).slice(0, 5).forEach((p: any) => {
-          const nome = (p.contratos as any)?.clientes?.nome || 'Cliente';
-          msg += `  \u2705 ${nome}: R$ ${parseFloat(p.valor_pago || 0).toFixed(2).replace('.', ',')}\n`;
-        });
-        if ((pagamentosHoje || []).length > 5) msg += `  ... e mais ${(pagamentosHoje || []).length - 5} pagamentos\n`;
-      } else {
-        msg += `  Nenhum pagamento registrado hoje\n`;
-      }
-      msg += `\n\uD83D\uDCC5 *VENCIMENTOS HOJE*\n`;
-      if (totalVencendoHoje > 0) {
-        msg += `${totalVencendoHoje} parcela(s) vencem hoje\n`;
-        (parcelasHoje || []).filter((p: any) => p.status !== 'paga').slice(0, 5).forEach((p: any) => {
-          const nome = (p.contratos as any)?.clientes?.nome || 'Cliente';
-          msg += `  \u23F0 ${nome}: R$ ${parseFloat(p.valor || 0).toFixed(2).replace('.', ',')}\n`;
-        });
-      } else {
-        msg += `  Nenhum vencimento hoje\n`;
-      }
-      if (totalAtrasadas > 0) {
-        msg += `\n\uD83D\uDD34 *INADIMPLENTES (${totalAtrasadas})*\n`;
-        (atrasadas || []).slice(0, 5).forEach((p: any) => {
-          const nome = (p.contratos as any)?.clientes?.nome || 'Cliente';
-          const venc = new Date(p.data_vencimento).toLocaleDateString('pt-BR');
-          msg += `  \u274C ${nome} \u2014 venceu ${venc}\n`;
-        });
-        if (totalAtrasadas > 5) msg += `  ... e mais ${totalAtrasadas - 5} inadimplentes\n`;
-      }
-      msg += `\n_Enviado pelo ${assinatura}_`;
-      const telefone = input?.telefone || cfg['telefoneEmpresa'] || '';
-      const telefoneNumeros = telefone.replace(/\D/g, '');
+      const { gerarPreviewRelatorioDiario } = await import('./financialReporting');
+      const preview = await gerarPreviewRelatorioDiario(await getSupabaseClientAsync(), ctx.user.id);
+      const telefoneNumeros = (input?.telefone || preview.telefoneEmpresa).replace(/\D/g, '');
+      const telefone = telefoneNumeros.startsWith('55') ? telefoneNumeros : `55${telefoneNumeros}`;
       const whatsappUrl = telefoneNumeros
-        ? `https://wa.me/55${telefoneNumeros}?text=${encodeURIComponent(msg)}`
-        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-      return { mensagem: msg, whatsappUrl, totalRecebidoHoje, totalVencendoHoje, totalAtrasadas, pagamentosCount: (pagamentosHoje || []).length };
+        ? `https://wa.me/${telefone}?text=${encodeURIComponent(preview.mensagem)}`
+        : `https://wa.me/?text=${encodeURIComponent(preview.mensagem)}`;
+      return { ...preview, whatsappUrl };
     }),
 });
 // ─── RELATÓRIOS ────────────────────────────────────────────────────────────────
@@ -5057,6 +4963,8 @@ export const appRouter = router({
   reparcelamento: reparcelamentoRouter,
   contasPagar: contasPagarProspectivasRouter,
   emprestimosProspectivos: emprestimosProspectivosRouter,
+  renovacaoProspectiva: renovacaoProspectivaRouter,
+  recebimentosLegados: recebimentosLegadosRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,
   veiculos: veiculosRouter,

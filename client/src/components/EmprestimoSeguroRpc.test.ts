@@ -48,6 +48,8 @@ describe("intenção UI durável", () => {
     expect(receive).toContain("cicloRpc.cotar.query");expect(receive).not.toContain("calcularJurosMora");expect(receive).toContain("Conta original fixa");
     const contratos=readFileSync(new URL("../pages/Contratos.tsx",import.meta.url),"utf8");
     const parcelas=readFileSync(new URL("../pages/Parcelas.tsx",import.meta.url),"utf8");
-    expect(contratos).toContain("<EmprestimoSeguroCriar"); expect(parcelas).toContain("<EmprestimoSeguroReceber");expect(parcelas).not.toContain("<PagamentoDialog");
+    const seletor=readFileSync(new URL("RecebimentoValidado.tsx",import.meta.url),"utf8");
+    expect(contratos).toContain("<EmprestimoSeguroCriar"); expect(parcelas).toContain("<RecebimentoValidado");expect(parcelas).not.toContain("<PagamentoDialog");
+    expect(seletor).toContain("recebimentosLegados.origem.useQuery");expect(seletor).toContain("value.trilho === \"prospectivo\"");expect(seletor).toContain("<EmprestimoSeguroReceber");expect(seletor).toContain("<ParcelaLegadaReceber");
   });
 });

@@ -191,29 +191,18 @@ async function startServer() {
     }
   });
 
-  // ─── Heartbeat: atualizar status de parcelas vencidas ───────────────────────
-  // Chamado pela scheduled task do Manus diariamente para manter status correto
+  // ─── Heartbeat de status: sem escrita financeira ───────────────────────────
+  // O status civil é derivado na listagem. Este endpoint não altera parcelas
+  // nem recebe capability para contornar os guards do ciclo prospectivo.
   app.post('/api/scheduled/atualizar-parcelas', async (req, res) => {
     try {
       if (!(await autenticarDisparadorDeAutomacao(req))) {
         return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
       }
-      const { getSupabaseClientAsync } = await import('../db');
       const { dataHojeBrasilia } = await import('../services/businessDate');
-      const sb = await getSupabaseClientAsync();
-      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
       const hoje = dataHojeBrasilia();
-      // Atualizar pendentes/vencendo_hoje com data < hoje → atrasada
-      const { data: updated, error } = await sb
-        .from('parcelas')
-        .update({ status: 'atrasada' })
-        .in('status', ['pendente', 'vencendo_hoje'])
-        .lt('data_vencimento', hoje)
-        .select('id');
-      if (error) throw error;
-      const count = updated?.length ?? 0;
-      console.log(`[heartbeat/atualizar-parcelas] ${count} parcelas atualizadas para atrasada`);
-      return res.json({ success: true, atualizadas: count });
+      console.log(`[heartbeat/atualizar-parcelas] status civil derivado na leitura (${hoje}); nenhuma parcela alterada`);
+      return res.json({ success: true, atualizadas: 0, modo: 'somente_leitura', data: hoje });
     } catch (err: any) {
       console.error('[heartbeat/atualizar-parcelas] Erro:', err);
       res.status(500).json({ error: String(err) });

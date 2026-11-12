@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { canCloseRejectedIntent, type RecoveryEvidence } from './financialIntentRecovery';
 
 export function diaCivilBrt(now = new Date()): string {
   const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now);
@@ -104,6 +105,18 @@ export class DespesasIntentStore {
     locks.add(key); return true;
   }
   release(action: AcaoDespesa) { locks.delete(this.key(action)); }
+  /** A ausência REST/NOT_FOUND/timeout não satisfaz esta prova. Nunca cleanup automático. */
+  closeRejected(action: AcaoDespesa, evidence: RecoveryEvidence | undefined) {
+    const atual = this.get(action);
+    if (locks.has(this.key(action)) || !atual || !canCloseRejectedIntent(evidence, this.userId, {
+      family: `despesa_${action}`, idempotencyKey: atual.idempotencyKey, payload: atual.payload,
+    })) throw new Error('Não execução NÃO comprovada ou operação em curso; intenção preservada.');
+    try {
+      if (!this.storage) throw new Error('sessionStorage indisponível');
+      this.storage.removeItem(this.key(action));
+      memoria.set(this.key(action), null);
+    } catch { throw new Error('Remoção indisponível; intenção original preservada para conferência.'); }
+  }
   /** Chamar somente depois de confirmação completa validada da RPC. */
   confirmed(action: AcaoDespesa, key: string) {
     const atual = this.get(action);
