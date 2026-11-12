@@ -553,7 +553,7 @@ export default function Parcelas() {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">Recebimento disponível somente para novos empréstimos de proveniência RPC 0021 íntegra, com cotação SQL e conta original fixa. Legado, desconto e renovação permanecem bloqueados. Valores originais da listagem não são totais atualizados nem saldos após pagamentos parciais; confirme exclusivamente a cotação do diálogo. Cobrar nesta listagem está bloqueado porque não há cotação autoritativa vinculada à mensagem. Lembretes manuais sem total no calendário permanecem disponíveis.</p>
+      <p className="text-sm text-muted-foreground">Recebimentos de empréstimos novos e parcelas antigas íntegras exigem cotação validada e disponibilidade do fluxo seguro. Registros inconsistentes ficam bloqueados para revisão. A renovação de juros dos novos empréstimos suportados pode ser conferida na ficha do empréstimo. Descontos e alterações financeiras manuais continuam indisponíveis. Os valores originais da listagem não representam saldos atualizados após pagamentos parciais; confirme a cotação do diálogo. Cobrar nesta listagem permanece bloqueado porque não há cotação autoritativa vinculada à mensagem. Lembretes manuais sem total permanecem disponíveis.</p>
       {/* Contador por Modalidade */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {modalidadeCount.map(m => (

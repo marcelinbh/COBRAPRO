@@ -2687,8 +2687,8 @@ const caixaRouter = router({
     // Fallback REST
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar as contas de Caixa. Tente novamente.' });
-    // Tabela usa 'ativo' (não 'ativa') e 'saldo' (não 'saldo_inicial')
-    const { data: contasData, error: contasErr } = await supabase.from('contas_caixa').select('id,nome,tipo,banco,saldo,ativo,user_id').eq('ativo', true).eq('user_id', ctx.user.id).limit(1000);
+    // Catálogo real usa 'ativo'/'saldo' e não possui 'banco'; a saída mantém banco:null.
+    const { data: contasData, error: contasErr } = await supabase.from('contas_caixa').select('id,nome,tipo,saldo,ativo,user_id').eq('ativo', true).eq('user_id', ctx.user.id).limit(1000);
     if (contasErr || !Array.isArray(contasData) || contasData.length >= 1000) {
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível consultar todas as contas de Caixa. Tente novamente.' });
     }
@@ -2711,7 +2711,7 @@ const caixaRouter = router({
         id: conta.id,
         nome: conta.nome,
         tipo: conta.tipo,
-        banco: conta.banco ?? null,
+        banco: null,
         saldoInicial: Number(saldoBase),
         saldoAtual,
         ativa: conta.ativo,

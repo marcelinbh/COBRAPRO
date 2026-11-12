@@ -1252,8 +1252,9 @@
 - [x] Compatibilizar instalação com postgres não-superuser do Supabase, preservar preflight estrito e repetir ensaio conjunto no snapshot certificado.
 - [x] Instalar hashes finais 0031/0033/0034 em 12/11 às09h54–09h55;56 tabelas comRLS,0 acesso público direto e contagens de usuários/parcelas/Caixa preservadas.
 - [x] Smoke financeiro real segregado com rollback: criação, parcial/integral, despesa/estorno, renovação/replay, legado/prova privada e fence contra execução do UUID encerrado. Zero registros de teste persistidos ou comunicações externas.
-- [ ] Checkpoint, commit/push normal, deploy DigitalOcean com revisão exata e apenas duas flags novas.
-- [ ] Smoke autenticado das leituras, capacidades, cotação e estados de recusa; comprovar operações sintéticas com rollback, sem comunicação externa.
+- [x] Checkpoint e push normal afceb023; rollout b1c9665c live, com apenas duas flags operacionais novas de runtime.
+- [x] Smoke autenticado de capacidades, dashboard, clientes, despesas, parcelas, relatórios e recusas de cotação. WhatsApp conectado e agenda existente preservada; sem mensagens ou operações em contas reais.
+- [ ] Concluir hotfix de caixa.contas: remover banco inexistente da projeção e mostrar erro/retentativa em vez de zero fictício na UI; preservar DATE civil e validar o novo deploy.
 - [ ] Revisão humana dos dados antigos inconsistentes permanece independente e obrigatória; nenhum UPDATE financeiro automático.
 
 **Infraestrutura:** painel de 12/11 informa US$ 36,00 em atraso e risco de suspensão após 14/11. Nenhum pagamento foi realizado.
