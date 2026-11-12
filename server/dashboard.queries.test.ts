@@ -11,6 +11,10 @@ import { listarDashboard } from "./dashboardQueries";
 type Filtro = { metodo: string; coluna: string; valor: any };
 type Consulta = { tabela: string; colunas: string; filtros: Filtro[]; inicio?: number; fim?: number; limite?: number; ordem?: string };
 function fonteRest(tabelas: Record<string, any[]> = {}, falha?: (q: Consulta) => boolean) {
+  // Fixtures de ledger devem ter uma conta própria explícita, como no catálogo físico.
+  if (!("contas_caixa" in tabelas) && tabelas.transacoes_caixa?.some(row => row.user_id === 41)) {
+    tabelas = { ...tabelas, contas_caixa: [{ id: 1, user_id: 41, ativo: true, saldo: "0.00" }] };
+  }
   const consultas: Consulta[] = [];
   const fonte = {
     from(tabela: string) {
@@ -33,10 +37,11 @@ function fonteRest(tabelas: Record<string, any[]> = {}, falha?: (q: Consulta) =>
               default: throw new Error("Filtro não previsto");
             }
           }));
+          const count = data.length;
           if (q.ordem) data = [...data].sort((a, b) => a[q.ordem!] > b[q.ordem!] ? 1 : a[q.ordem!] < b[q.ordem!] ? -1 : 0);
           if (q.inicio != null) data = data.slice(q.inicio, q.fim! + 1);
           if (q.limite != null) data = data.slice(0, q.limite);
-          return Promise.resolve({ data, error: null }).then(resolve, reject);
+          return Promise.resolve({ data, error: null, count }).then(resolve, reject);
         },
       };
       for (const metodo of ["eq", "in", "gte", "lte"]) builder[metodo] = (coluna: string, valor: any) => { q.filtros.push({ metodo, coluna, valor }); return builder; };
@@ -54,7 +59,13 @@ function contexto(): TrpcContext {
 }
 const caller = () => appRouter.createCaller(contexto()).dashboard;
 const parcelaRest = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, cliente_id: 1, numero_parcela: 1, status: "pendente", valor: "100", valor_original: null, saldo_residual: "0", valor_multa: "0", valor_juros: "0", data_vencimento: "2026-11-06", clientes: { nome: "Sintético", user_id: 41 }, ...extra });
-const movimentoRest = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, conta_caixa_id: 1, tipo: "entrada", categoria: "pagamento_parcela", valor: "25", data_transacao: "2026-11-06", ...extra });
+const movimentoRest = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, conta_caixa_id: extra.user_id && extra.user_id !== 41 ? 2 : 1, tipo: "entrada", categoria: "pagamento_parcela", valor: "25", data_transacao: "2026-11-06", ...extra });
+function conferirTenant(q: Consulta) {
+  if (q.colunas === "id, user_id, conta_caixa_id") {
+    expect(q.filtros).toEqual([{ metodo: "in", coluna: "conta_caixa_id", valor: [1] }]);
+  } else expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
+}
+
 
 beforeEach(() => {
   mocks.getDb.mockReset().mockResolvedValue(null);
@@ -76,8 +87,19 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
     });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     expect(await caller().kpis()).toEqual({ saldoTotal: 130, capitalCirculacao: 100, totalReceber: 140, totalInadimplente: 40, qtdInadimplentes: 1, jurosPendentes: 0, qtdVenceHoje: 1, valorVenceHoje: 100, recebidoHoje: 25, contratosAtivos: 1 });
-    for (const q of rest.consultas) expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
+    for (const q of rest.consultas) conferirTenant(q);
     expect(rest.consultas.find(q => q.tabela === "parcelas")?.colunas).toContain("valor,");
+  });
+
+  it.each(["kpis", "resumoCaixa", "fluxoMensal", "tendenciaJuros"] as const)("%s recusa owner divergente fora do período antes de agregar ou ler valores", async procedimento => {
+    const rest = fonteRest({
+      contas_caixa: [{ id: 1, user_id: 41, ativo: true, saldo: "100" }],
+      transacoes_caixa: [movimentoRest({ user_id: 99, conta_caixa_id: 1, valor: "918273.45", data_transacao: "2020-01-01", categoria: "outros", tipo: "saida" })],
+    });
+    mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    await expect(caller()[procedimento]()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(rest.consultas.filter(q => q.tabela === "transacoes_caixa").every(q => q.colunas === "id, user_id, conta_caixa_id")).toBe(true);
+    expect(rest.consultas.some(q => q.tabela === "parcelas")).toBe(false);
   });
 
   it("uma fonte vazia válida continua distinta de fonte ausente", async () => {
@@ -106,7 +128,7 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
     rest.consultas.length = 0;
     expect(await caller().resumoCaixa()).toEqual({ saldoTotal: 125, capitalCirculacao: 200, recebidoHoje: 25, contratosAtivos: 1 });
     expect(rest.consultas.some(q => q.tabela === "parcelas")).toBe(false);
-    for (const q of rest.consultas) expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
+    for (const q of rest.consultas) conferirTenant(q);
   });
 
   it("resumo independente falha explicitamente se o livro-caixa falha ou a fonte está ausente", async () => {
@@ -123,7 +145,8 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
     expect(fluxo.map(d => d.dia)).toEqual(["31/10", "01/11", "02/11", "03/11", "04/11", "05/11", "06/11"]);
     expect(fluxo.at(-1)).toEqual({ dia: "06/11", valor: 25 });
     for (const q of rest.consultas) {
-      expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
+      conferirTenant(q);
+      if (!q.filtros.some(f => f.coluna === "data_transacao")) continue;
       expect(q.filtros.find(f => f.coluna === "data_transacao")?.valor).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
   });
@@ -152,7 +175,7 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
     const tendencia = await caller().tendenciaJuros();
     expect(tendencia.map(m => m.mes)).toEqual(["out", "nov", "dez", "jan", "fev", "mar"]);
     expect(tendencia[4].valor).toBe(25);
-    const fevereiro = rest.consultas[4];
+    const fevereiro = rest.consultas.find(q => q.filtros.some(f => f.coluna === "data_transacao" && f.valor === "2026-02-01"))!;
     expect(fevereiro.filtros).toContainEqual({ metodo: "gte", coluna: "data_transacao", valor: "2026-02-01" });
     expect(fevereiro.filtros).toContainEqual({ metodo: "lte", coluna: "data_transacao", valor: "2026-02-28" });
     for (const q of rest.consultas) for (const f of q.filtros.filter(f => f.coluna === "data_transacao")) expect(f.valor).toMatch(/^\d{4}-\d{2}-\d{2}$/);
@@ -216,20 +239,34 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
 });
 
 type ConsultaDrizzle = { tabela: string; selecao?: Record<string, any>; where?: any; join?: any };
-function fonteDrizzle(respostas: any[][] = [], falha = false) {
+function fonteDrizzle(respostas: any[][] | Record<string, any[]> = [], falha = false) {
   const consultas: ConsultaDrizzle[] = [];
   let indice = 0;
   const db = {
     select(selecao?: Record<string, any>) {
       const q: ConsultaDrizzle = { tabela: "", selecao };
+      let limite = 500, offset = 0;
       const builder: any = {
         from(tabela: any) { q.tabela = getTableName(tabela); return builder; },
         where(condicao: any) { q.where = condicao; return builder; },
         innerJoin(_tabela: any, condicao: any) { q.join = condicao; return builder; },
-        orderBy() { return builder; }, limit() { return builder; },
+        orderBy() { return builder; }, limit(n: number) { limite = n; return builder; }, offset(n: number) { offset = n; return builder; },
         then(resolve: any, reject: any) {
           consultas.push(q);
-          return (falha ? Promise.reject(new Error("Transporte Drizzle indisponível")) : Promise.resolve(respostas[indice++] ?? [])).then(resolve, reject);
+          if (falha) return Promise.reject(new Error("Transporte Drizzle indisponível")).then(resolve, reject);
+          if (Array.isArray(respostas)) return Promise.resolve(respostas[indice++] ?? []).then(resolve, reject);
+          const c = compilar(q.where);
+          const rows = (respostas[q.tabela] ?? []).filter(row => {
+            if (c.sql.includes('"conta_caixa_id" in')) return c.params.includes(row.conta_caixa_id);
+            if (c.sql.includes('DATE(')) return row.tipo === c.params[0] && row.data_transacao === c.params[1] && row.user_id === c.params[2];
+            if (c.sql.includes('"status" in')) return c.params.includes(row.status) && row.user_id === c.params.at(-1);
+            if (c.sql.includes('"status"')) return row.status === c.params[0] && row.user_id === c.params[1];
+            return row.user_id === c.params[0];
+          }).sort((a, b) => a.id - b.id);
+          const data = selecao && "qtd" in selecao ? [{ qtd: String(rows.length) }]
+            : selecao && "total" in selecao ? [{ total: String(rows.reduce((s, row) => s + Number(row.valor), 0)) }]
+            : rows.slice(offset, offset + limite).map(row => Object.fromEntries(Object.entries(selecao ?? {}).map(([alias, coluna]) => [alias, coluna.name ? (coluna.name in row ? row[coluna.name] : row[alias]) : alias === "valor" ? row.valor : row.data_transacao])));
+          return Promise.resolve(data).then(resolve, reject);
         },
       };
       return builder;
@@ -240,38 +277,42 @@ function fonteDrizzle(respostas: any[][] = [], falha = false) {
 const compilar = (sql: any) => new PgDialect().sqlToQuery(sql);
 
 describe("dashboard Drizzle: filtros explícitos e paridade", () => {
-  it("resumo de Caixa é independente de parcelas e mantém tenant em cada consulta", async () => {
-    const drizzle = fonteDrizzle([
-      [{ id: 1, saldo: "100" }], [{ total: "25" }], [{ total: "5" }],
-      [{ total: "100" }], [{ total: "25" }], [{ qtd: 1 }],
-    ]);
+  const fixtureSQL = () => ({
+    contas_caixa: [{ id: 1, user_id: 41, ativo: true, saldo: "100" }],
+    transacoes_caixa: [movimentoRest(), movimentoRest({ id: 2, tipo: "saida", categoria: "outros", valor: "5" })],
+    contratos: [{ id: 1, user_id: 41, status: "ativo", valor_principal: "100" }],
+    parcelas: [
+      { id: 1, user_id: 41, status: "pendente", valorOriginal: null, valor: "100", saldoResidual: "0", valorMulta: "0", valorJuros: "0", dataVencimento: "2026-11-06", clienteId: 1 },
+      { id: 2, user_id: 41, status: "parcial", valorOriginal: "100", valor: "100", saldoResidual: "40", valorMulta: "15", valorJuros: "0", dataVencimento: "2026-11-05", clienteId: 1 },
+    ],
+  });
+  function conferirConsultaSQL(q: ConsultaDrizzle) {
+    const c = compilar(q.where);
+    if (c.sql.includes('"conta_caixa_id" in')) expect(c.params).toEqual([1]);
+    else { expect(c.sql).toContain(`"${q.tabela}"."user_id"`); expect(c.params).toContain(41); }
+  }
+  it("resumo de Caixa é independente de parcelas e confere cada conta própria", async () => {
+    const drizzle = fonteDrizzle(fixtureSQL());
     mocks.getDb.mockResolvedValue(drizzle.db);
     expect(await caller().resumoCaixa()).toEqual({ saldoTotal: 120, capitalCirculacao: 100, recebidoHoje: 25, contratosAtivos: 1 });
     expect(drizzle.consultas.some(q => q.tabela === "parcelas")).toBe(false);
-    for (const consulta of drizzle.consultas) {
-      expect(compilar(consulta.where).sql).toContain(`"${consulta.tabela}"."user_id"`);
-      expect(compilar(consulta.where).params).toContain(41);
-    }
-    expect(compilar(drizzle.consultas[4].where).params).toContain("2026-11-06");
+    drizzle.consultas.forEach(conferirConsultaSQL);
   });
-
-  it("saldo filtra o tenant em entradas e saídas, carteira usa o mesmo helper que REST", async () => {
-    const drizzle = fonteDrizzle([
-      [{ id: 1, saldo: "100" }], [{ total: "25" }], [{ total: "5" }], [{ total: "100" }],
-      [{ status: "pendente", valorOriginal: null, valor: "100", saldoResidual: "0", valorMulta: "0", dataVencimento: "2026-11-06", clienteId: 1 }, { status: "parcial", valorOriginal: "100", saldoResidual: "40", valorMulta: "15", dataVencimento: "2026-11-05", clienteId: 1 }],
-      [{ total: "25" }], [{ qtd: 1 }],
-    ]);
+  it("KPIs e resumo usam o mesmo ledger conferido e preservam a carteira", async () => {
+    const drizzle = fonteDrizzle(fixtureSQL());
     mocks.getDb.mockResolvedValue(drizzle.db);
     expect(await caller().kpis()).toEqual({ saldoTotal: 120, capitalCirculacao: 100, totalReceber: 140, totalInadimplente: 40, qtdInadimplentes: 1, jurosPendentes: 0, qtdVenceHoje: 1, valorVenceHoje: 100, recebidoHoje: 25, contratosAtivos: 1 });
-    for (const consulta of drizzle.consultas) {
-      const sql = compilar(consulta.where);
-      expect(sql.sql).toContain(`"${consulta.tabela}"."user_id"`);
-      expect(sql.params).toContain(41);
-    }
-    for (const q of drizzle.consultas.slice(1, 3)) expect(compilar(q.where).params).toEqual([1, q === drizzle.consultas[1] ? "entrada" : "saida", 41]);
-    const recebido = compilar(drizzle.consultas[5].where);
-    expect(recebido.params).toContain("2026-11-06");
-    expect(recebido.params.some(p => p instanceof Date)).toBe(false);
+    drizzle.consultas.forEach(conferirConsultaSQL);
+    expect(drizzle.consultas.some(q => compilar(q.where).sql.includes('"conta_caixa_id" in'))).toBe(true);
+  });
+
+  it.each(["kpis", "resumoCaixa", "fluxoMensal"] as const)("%s Drizzle recusa conta divergente antes de qualquer agregação", async procedimento => {
+    const dados = fixtureSQL();
+    dados.transacoes_caixa.push(movimentoRest({ id: 3, user_id: 99, conta_caixa_id: 1, valor: "918273.45" }));
+    const drizzle = fonteDrizzle(dados);
+    mocks.getDb.mockResolvedValue(drizzle.db);
+    await expect(caller()[procedimento]()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(drizzle.consultas.some(q => q.selecao && ("valor" in q.selecao || "total" in q.selecao))).toBe(false);
   });
 
   it.each(["parcelasHoje", "parcelasAtrasadas"] as const)("join de %s inclui tenant, e contagem de parcelas também", async procedimento => {
@@ -290,10 +331,10 @@ describe("dashboard Drizzle: filtros explícitos e paridade", () => {
   });
 
   it("fluxo Drizzle termina no dia BRT e todas consultas incluem tenant", async () => {
-    const drizzle = fonteDrizzle(Array.from({ length: 7 }, () => [{ total: "0" }]));
+    const drizzle = fonteDrizzle({ contas_caixa: [], transacoes_caixa: [], contratos: [] });
     mocks.getDb.mockResolvedValue(drizzle.db);
     expect((await caller().fluxoMensal()).at(-1)).toEqual({ dia: "06/11", valor: 0 });
-    expect(drizzle.consultas.map(q => compilar(q.where).params)).toEqual(["2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"].map(data => ["entrada", data, 41]));
+    expect(drizzle.consultas.filter(q => q.selecao && "total" in q.selecao).map(q => compilar(q.where).params)).toEqual(["2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06"].map(data => ["entrada", data, 41]));
   });
 
   it.each(["kpis", "resumoCaixa", "parcelasHoje", "parcelasAtrasadas", "fluxoMensal"] as const)("falha Drizzle em %s não é mascarada por fallback vazio", async procedimento => {

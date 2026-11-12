@@ -46,8 +46,9 @@ function fonteRest(tabelas: Record<string, any[]> = {}, opcoes: { falha?: (q: Co
   return { fonte, consultas };
 }
 const parcela = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, contrato_id: 1, cliente_id: 1, numero_parcela: 1, status: "pendente", valor: "100.00", valor_original: null, saldo_residual: "0.00", valor_multa: "0.00", data_vencimento: "2026-11-10", ...extra });
-const movimento = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, tipo: "entrada", categoria: "pagamento_parcela", valor: "60.00", data_transacao: "2026-11-10", parcela_id: 1, contrato_id: 1, ...extra });
+const movimento = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, conta_caixa_id: extra.user_id && extra.user_id !== 41 ? 99 : 1, tipo: "entrada", categoria: "pagamento_parcela", valor: "60.00", data_transacao: "2026-11-10", parcela_id: 1, contrato_id: 1, ...extra });
 const tabelas = (extra: Record<string, any[]> = {}) => ({
+  contas_caixa: [{ id: 1, user_id: 41, ativo: true, saldo: "0.00" }],
   parcelas: [parcela()], transacoes_caixa: [movimento()],
   contratos: [{ id: 1, user_id: 41, cliente_id: 1, status: "ativo", modalidade: "mensal", valor_principal: "100.00", data_inicio: "2026-10-01" }],
   clientes: [{ id: 1, user_id: 41, ativo: true, nome: "Cliente sintético" }],
@@ -105,7 +106,9 @@ describe("report: REST completo antes de agregação", () => {
     expect(consultas.map(q => [q.inicio, q.fim])).toEqual([[0, 499], [500, 999], [1000, 1499]]);
     for (const q of rest.consultas) {
       expect(q.colunas).not.toBe("*"); expect(q.colunas).not.toContain("(");
-      expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
+      if (q.colunas === "id, user_id, conta_caixa_id") {
+        expect(q.filtros).toEqual([{ metodo: "in", coluna: "conta_caixa_id", valor: [1] }]);
+      } else expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
     }
   });
   it("1001ª parcela parcial vencida entra no score e no atraso civil", async () => {

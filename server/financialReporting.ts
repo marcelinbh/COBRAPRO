@@ -9,7 +9,7 @@ import {
 export const REPORTING_PAGE_SIZE = 500;
 export const REPORTING_MAX_PAGES = 200;
 const COLUNAS_PARCELAS = "id, user_id, contrato_id, cliente_id, numero_parcela, valor, valor_original, saldo_residual, valor_multa, status, data_vencimento";
-const COLUNAS_LEDGER = "id, user_id, tipo, categoria, valor, data_transacao, parcela_id, contrato_id";
+const COLUNAS_LEDGER = "id, user_id, conta_caixa_id, tipo, categoria, valor, data_transacao, parcela_id, contrato_id";
 
 function exigirFonte(fonte: any) {
   if (!fonte) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Fonte de relatórios indisponível; valores não calculados." });
@@ -18,14 +18,21 @@ function exigirFonte(fonte: any) {
 
 /** REST físico: DATE e ativo:boolean. Sem embeds/FKs inferidas ou writes. */
 export async function listarFinancialReporting(fonte: any, tabela: string, colunas: string, userId: number, configurar?: (q: any) => any): Promise<any[]> {
+  return listarPaginasFinancialReporting(fonte, tabela, colunas, q => {
+    q = q.eq("user_id", userId);
+    return configurar ? configurar(q) : q;
+  }, row => row.user_id === userId);
+}
+
+async function listarPaginasFinancialReporting(fonte: any, tabela: string, colunas: string, configurar: (q: any) => any, validar: (row: any) => boolean): Promise<any[]> {
   exigirFonte(fonte);
   const registros: any[] = [];
   const ids = new Set<number>();
   let esperado: number | undefined;
   for (let pagina = 0; pagina < REPORTING_MAX_PAGES; pagina++) {
-    let q = fonte.from(tabela).select(colunas, { count: "exact" }).eq("user_id", userId).order("id")
+    let q = fonte.from(tabela).select(colunas, { count: "exact" }).order("id", { ascending: true })
       .range(pagina * REPORTING_PAGE_SIZE, (pagina + 1) * REPORTING_PAGE_SIZE - 1);
-    if (configurar) q = configurar(q);
+    q = configurar(q);
     const resposta = await q;
     if (resposta.error) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Falha na consulta de relatórios; valores não calculados." });
     if (!Array.isArray(resposta.data) || !Number.isSafeInteger(resposta.count) || resposta.count < 0 || resposta.data.length > REPORTING_PAGE_SIZE) {
@@ -34,7 +41,7 @@ export async function listarFinancialReporting(fonte: any, tabela: string, colun
     if (esperado == null) esperado = resposta.count;
     if (resposta.count !== esperado) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A fonte mudou durante a paginação; atualize o relatório." });
     for (const row of resposta.data) {
-      if (!Number.isInteger(row.id) || row.id <= 0 || ids.has(row.id) || row.user_id !== userId) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Leitura duplicada ou vínculo de empresa inválido; revisão necessária." });
+      if (!row || !Number.isSafeInteger(row.id) || row.id <= 0 || ids.has(row.id) || !validar(row)) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Leitura duplicada ou vínculo de empresa inválido; revisão necessária." });
       ids.add(row.id);
       registros.push(row);
     }
@@ -45,6 +52,22 @@ export async function listarFinancialReporting(fonte: any, tabela: string, colun
     }
   }
   throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Limite de leitura excedido; total incompleto não apresentado." });
+}
+
+/** Não filtrar user_id aqui: isso esconderia lançamentos de outro tenant na
+ * conta alvo. Ler somente metadados, restritos a IDs de contas já autorizadas;
+ * nenhum valor, descrição ou identificador divergente é devolvido ao caller.
+ * A conferência cobre o livro inteiro, antes dos filtros de período/categoria. */
+export async function validarIntegridadeLedgerFinancialReporting(fonte: any, userId: number, contaIds: readonly number[]): Promise<void> {
+  if (contaIds.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(contaIds).size !== contaIds.length) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Contas sem vínculo validado; revisão necessária." });
+  }
+  // Lotes pequenos evitam URLs REST excessivas, mantendo cada lote paginado.
+  for (let inicio = 0; inicio < contaIds.length; inicio += 100) {
+    const lote = contaIds.slice(inicio, inicio + 100);
+    await listarPaginasFinancialReporting(fonte, "transacoes_caixa", "id, user_id, conta_caixa_id",
+      q => q.in("conta_caixa_id", lote), row => row.user_id === userId && lote.includes(row.conta_caixa_id));
+  }
 }
 
 function mapParcela(p: any) {
@@ -66,12 +89,19 @@ export async function lerLedgerFinancialReporting(fonte: any, userId: number, in
   if (inicio != null) dataRelatorio(inicio);
   if (fim != null) dataRelatorio(fim);
   if (inicio && fim && inicio > fim) throw new TRPCError({ code: "BAD_REQUEST", message: "Período inválido." });
+  const contas = await listarFinancialReporting(fonte, "contas_caixa", "id, user_id", userId);
+  const contaIds = contas.map(c => c.id);
+  await validarIntegridadeLedgerFinancialReporting(fonte, userId, contaIds);
   const rows = await listarFinancialReporting(fonte, "transacoes_caixa", COLUNAS_LEDGER, userId, q => {
     // data_transacao é DATE no schema físico versionado. Filtro antes da paginação.
     if (inicio) q = q.gte("data_transacao", inicio);
     if (fim) q = q.lte("data_transacao", fim);
     return configurar ? configurar(q) : q;
   });
+  const contasProprias = new Set(contaIds);
+  if (rows.some(row => !contasProprias.has(row.conta_caixa_id))) {
+    throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Livro-caixa sem conta confirmada na empresa; revisão necessária." });
+  }
   const movimentos = rows.map(mapMovimento);
   return { ...resumirLedgerRelatorio(movimentos), movimentos };
 }

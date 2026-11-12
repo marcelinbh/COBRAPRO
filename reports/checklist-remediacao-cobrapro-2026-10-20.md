@@ -14,7 +14,9 @@
 - [x] Concluir testes integrados:2.218 aprovados,11 opt-in ignorados,TypeScript ebuild; testes PostgreSQL de coexistência, drift, role gerenciada, renovação, legado eworker.
 - [x] Aplicar0031/0033/0034 no Supabase correto às09h54–09h55:56 tabelas públicas comRLS,0 acesso anon/authenticated,14 usuários/1235 parcelas/1152 lançamentos preservados.
 - [x] Smoke segregado sobservice_role comROLLBACK: recebimentos, renovação,replay,despesas/estorno,prova privada,fence;zero registros sintéticos persistidos e nenhum envio externo.
-- [ ] Checkpoint/push/deploy e flags de runtime `ENABLE_RPC_RENOVACAO_PROSPECTIVA` e `ENABLE_RPC_RECEBIMENTO_LEGADO_VALIDADO`; smoke autenticado da revisão exata.
+- [x] Checkpoint/push/deploy e flags de runtime `ENABLE_RPC_RENOVACAO_PROSPECTIVA` e `ENABLE_RPC_RECEBIMENTO_LEGADO_VALIDADO`; capacidades autenticadas e recusa de IDs inexistentes confirmadas. Hotfix de projeção/retry do Caixa live na revisão `0c127eea` às 10h55.
+- [x] Certificar correção de consistência: dashboard, KPIs, gráficos, relatórios e prévia diária recusam livro-caixa com proprietário divergente; sem ocultar lançamentos por filtro de usuário nem ler valores alheios. 2.350 testes aprovados, 11 opt-in ignorados, TypeScript e build; nenhuma alteração de dados/migrations/flags neste hotfix.
+- [ ] Concluir checkpoint/push/rollout do hotfix de consistência e comprovar a mesma recusa no backend autenticado. Evidências em `reports/consistencia-caixa-2026-11-12.md`.
 - [ ] Aprovação humana por registro dos dados antigos divergentes. Recebimento legado só libera mensal integral financeiramente virgem e reconciliado; outras escritas inseguras continuam bloqueadas.
 - [ ] Preservação offsite de backup e cobertura integral deAuth/Storage/infraestrutura; cópia lógica privada restaurada não é backup total do projeto.
 

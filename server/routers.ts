@@ -189,92 +189,31 @@ const dashboardRouter = router({
 
   kpis: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    
+    const hojeStr = dataHojeBrasilia();
+    const fonte = db ? null : exigirFonteDashboard(await getSupabaseClientAsync());
+    // A mesma conferência do Caixa é obrigatória, inclusive quando a carteira
+    // está íntegra: não esconder lançamentos divergentes com filtro de owner.
+    const caixa = await lerResumoCaixaDashboard(db, fonte, ctx.user.id, hojeStr);
+    let carteira;
     if (db) {
-      // Use Drizzle ORM if available
-      const hojeStr = dataHojeBrasilia();
-
-      const contas = await db.select().from(contasCaixa).where(and(eq(contasCaixa.ativo, true), eq(contasCaixa.userId, ctx.user.id)));
-      let saldoTotal = 0;
-      for (const conta of contas) {
-        const entradas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-          .from(transacoesCaixa)
-          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'entrada'), eq(transacoesCaixa.userId, ctx.user.id)));
-        const saidas = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-          .from(transacoesCaixa)
-          .where(and(eq(transacoesCaixa.contaCaixaId, conta.id), eq(transacoesCaixa.tipo, 'saida'), eq(transacoesCaixa.userId, ctx.user.id)));
-        saldoTotal += saldoContaDashboard(conta.saldo, [
-          { tipo: 'entrada', valor: entradas[0]?.total },
-          { tipo: 'saida', valor: saidas[0]?.total },
-        ]);
-      }
-
-      const capitalResult = await db.select({ total: sql<string>`COALESCE(SUM(valor_principal), 0)` })
-        .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
-      const capitalCirculacao = numeroDashboard(capitalResult[0]?.total, 'capital');
-
       const parcelasData = await db.select({
         status: parcelas.status, valorOriginal: parcelas.valorOriginal,
         valor: sql<string>`valor`, saldoResidual: parcelas.saldoResidual,
         valorMulta: parcelas.valorMulta, valorJuros: parcelas.valorJuros,
         dataVencimento: parcelas.dataVencimento, clienteId: parcelas.clienteId,
-      })
-        .from(parcelas).where(and(inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']), eq(parcelas.userId, ctx.user.id)));
-      const carteira = resumirCarteiraDashboard(parcelasData, hojeStr);
-
-      const recebidoResult = await db.select({ total: sql<string>`COALESCE(SUM(valor), 0)` })
-        .from(transacoesCaixa).where(and(
-          eq(transacoesCaixa.tipo, 'entrada'),
-          eq(transacoesCaixa.categoria, 'pagamento_parcela'),
-          eq(sql`DATE(${transacoesCaixa.dataTransacao})`, hojeStr),
-          eq(transacoesCaixa.userId, ctx.user.id)
-        ));
-      const recebidoHoje = numeroDashboard(recebidoResult[0]?.total, 'recebimento');
-
-      const contratosResult = await db.select({ qtd: sql<number>`COUNT(*)` })
-        .from(contratos).where(and(eq(contratos.status, 'ativo'), eq(contratos.userId, ctx.user.id)));
-      const contratosAtivos = numeroDashboard(contratosResult[0]?.qtd, 'quantidade de contratos');
-
-      return {
-        saldoTotal, capitalCirculacao, ...carteira,
-        recebidoHoje, contratosAtivos
-      };
+      }).from(parcelas).where(and(inArray(parcelas.status, [...STATUS_ABERTOS_DASHBOARD]), eq(parcelas.userId, ctx.user.id)));
+      carteira = resumirCarteiraDashboard(parcelasData, hojeStr);
+    } else {
+      const parcelasData = await listarDashboard(fonte, 'parcelas',
+        'valor, valor_original, valor_juros, valor_multa, saldo_residual, status, data_vencimento, cliente_id',
+        ctx.user.id, q => q.in('status', [...STATUS_ABERTOS_DASHBOARD]));
+      carteira = resumirCarteiraDashboard(parcelasData.map(p => ({
+        status: p.status, valor: p.valor, valorOriginal: p.valor_original,
+        saldoResidual: p.saldo_residual, valorMulta: p.valor_multa, valorJuros: p.valor_juros,
+        dataVencimento: p.data_vencimento, clienteId: p.cliente_id,
+      })), hojeStr);
     }
-    
-    // Fallback to Supabase REST API
-    const fonte = exigirFonteDashboard(await getSupabaseClientAsync());
-    
-    const hojeStr = dataHojeBrasilia();
-
-    // Fetch data via Supabase REST (filtrado por user_id para isolamento entre contas)
-    const userId = ctx.user.id;
-    const [contasData, contratosData, parcelasData, transacoes] = await Promise.all([
-      listarDashboard(fonte, 'contas_caixa', 'id, saldo, ativo', userId, q => q.eq('ativo', true)),
-      listarDashboard(fonte, 'contratos', 'valor_principal', userId, q => q.eq('status', 'ativo')),
-      listarDashboard(fonte, 'parcelas', 'valor, valor_original, valor_juros, valor_multa, saldo_residual, status, data_vencimento, cliente_id', userId, q => q.in('status', [...STATUS_ABERTOS_DASHBOARD])),
-      listarDashboard(fonte, 'transacoes_caixa', 'conta_caixa_id, valor, tipo, categoria, data_transacao', userId)
-    ]);
-
-    let saldoTotal = 0;
-    for (const conta of contasData) {
-      const transacoesConta = transacoes.filter((t: any) => t.conta_caixa_id === conta.id);
-      saldoTotal += saldoContaDashboard(conta.saldo, transacoesConta);
-    }
-
-    const capitalCirculacao = contratosData.reduce((s: number, c: any) => s + numeroDashboard(c.valor_principal, 'capital'), 0);
-    const carteira = resumirCarteiraDashboard(parcelasData.map(p => ({
-      status: p.status, valor: p.valor, valorOriginal: p.valor_original,
-      saldoResidual: p.saldo_residual, valorMulta: p.valor_multa, valorJuros: p.valor_juros,
-      dataVencimento: p.data_vencimento, clienteId: p.cliente_id,
-    })), hojeStr);
-    const recebidoHoje = transacoes.filter((t: any) => t.tipo === 'entrada' && t.categoria === 'pagamento_parcela' && t.data_transacao === hojeStr)
-      .reduce((s: number, t: any) => s + Math.round(numeroDashboard(t.valor, 'recebimento') * 100), 0) / 100;
-    const contratosAtivos = contratosData.length;
-
-    return {
-      saldoTotal, capitalCirculacao, ...carteira,
-      recebidoHoje, contratosAtivos
-    };
+    return { ...caixa, ...carteira };
   }),
 
   parcelasHoje: protectedProcedure.query(async ({ ctx }) => {
@@ -365,6 +304,7 @@ const dashboardRouter = router({
   tendenciaJuros: protectedProcedure.query(async ({ ctx }) => {
     const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const userId = ctx.user.id;
+    await lerResumoCaixaDashboard(null, supabase, userId, dataHojeBrasilia());
     const meses: { mes: string; valor: number }[] = [];
     for (const { inicio, fim, mes } of calendarioDashboard().meses) {
       const data = await listarDashboard(supabase, 'transacoes_caixa', 'valor', userId, q => q
@@ -377,6 +317,8 @@ const dashboardRouter = router({
 
   fluxoMensal: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
+    const fonte = db ? null : exigirFonteDashboard(await getSupabaseClientAsync());
+    await lerResumoCaixaDashboard(db, fonte, ctx.user.id, dataHojeBrasilia());
     if (db) {
       try {
         const dias: { dia: string; valor: number }[] = [];
@@ -388,7 +330,7 @@ const dashboardRouter = router({
         return dias;
       } catch (err) { throw err; }
     }
-    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
+    const supabase = fonte;
     const dias: { dia: string; valor: number }[] = [];
     for (const { data, dia } of calendarioDashboard().dias) {
       const registros = await listarDashboard(supabase, 'transacoes_caixa', 'valor', ctx.user.id, q => q.eq('tipo', 'entrada').eq('data_transacao', data));

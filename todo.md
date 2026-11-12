@@ -1267,3 +1267,14 @@
 - [x] Desativar retry automático só nas leituras do Caixa, preservando retentativa manual; 2.280 testes, 11 opt-in ignorados, TypeScript e build aprovados.
 - [ ] Publicar o ajuste de retry e comprovar a apresentação final da recusa sem zero fictício ou loading permanente.
 - [ ] Resolver titularidade/divergências somente após análise e aprovação por registro; contas inconsistentes não estão liberadas para uso irrestrito.
+
+## Fase 71: Consistência de leitura e liberação condicional — 12/11/2026, 15h BRT
+
+- [x] Revalidar em contagens: 12 lançamentos com owner divergente em 2 contas; 6 parcelas com owner/cliente nulo. Nenhum UPDATE, backfill ou ajuste de saldo.
+- [x] Corrigir o bypass de leitura: resumo, KPIs, gráficos, relatórios, score e prévia diária conferem o livro das contas próprias antes de filtros de período/owner/categoria.
+- [x] Somar saldos e capital em centavos exatos, confirmar paginação e recusar dados ausentes/truncados/duplicados sem zero fictício.
+- [x] Certificar 2.350 testes aprovados, 11 opt-in ignorados, TypeScript e build; revisar fronteiras e excluir segredos conhecidos/arquivos privados.
+- [ ] Publicar checkpoint/push/rollout do hotfix e verificar recusa consistente no backend e UI autenticados.
+- [ ] Obter comprovação e aprovação por registro antes de sanear o legado ou anunciar liberação financeira irrestrita.
+
+Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O alerta DigitalOcean de US$ 36,00 em atraso, com prazo antes de 14/11, continua presente; nenhum pagamento foi iniciado.
