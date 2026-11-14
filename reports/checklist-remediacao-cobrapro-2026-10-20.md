@@ -4,6 +4,17 @@
 **Regra solicitada:** correções Kiwify ficam por último.  
 **Objetivo:** eliminar primeiro riscos de tomada de conta, alteração/vazamento entre empresas e corrupção operacional/financeira.
 
+## Atualização de cadastro operacional — 13/11/2026
+
+Esta seção não autoriza saneamento automático ou operação sobre conta alheia. Blacklist permanece a única funcionalidade compartilhada, sem mudanças em suas concessões; Kiwify/ofertas e WhatsApp ficam preservados.
+
+- [x] Novo Cliente/importação independentes de falha ou loading da listagem; formulário preenchido não é fechado por refetch e importação simultânea é recusada.
+- [x] Seletor de contas sem consulta de saldo, disponibilidade reativa com retry e inicialização Supabase concorrente correta.
+- [x] Listagem/ficha com cliente próprio sem embed, integridade de parcelas por metadados antes de valores, paginação com contagem/duplicação conferidas e falha distinta de vazio.
+- [x] Cards usam ficha com recebimento de origem validada; pós-criação invalida consultas e abre o ID confirmado, sem repetir mutation.
+- [x] Certificação final: 2.439 testes aprovados, 11 opt-in ignorados, TypeScript/build/diff check. Contagens read-only 12/2/6 e RLS 56/56/0 preservadas.
+- [ ] Checkpoint/push/rollout e smoke do lote atual. Evidências em `reports/cadastro-operacional-2026-11-13.md`; conclusão produtiva será registrada no status externo.
+
 ## Atualização operacional — 12/11/2026
 
 > Esta seção prevalece sobre os estados históricos abaixo. Kiwify/ofertas ficam fora do lote atual. Acesso manual Blacklist das14 contas concedidas e deploy5dbf966 permanecem preservados. Dados antigos inconsistentes não foram saneados por suposição.

@@ -69,7 +69,7 @@ export default function EmprestimoDetalhes() {
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: config } = trpc.configuracoes.get.useQuery();
 
-  const { data: emprestimo, isLoading, refetch } = trpc.contratos.obterDetalhes.useQuery(
+  const { data: emprestimo, isLoading, isError, isFetching, refetch } = trpc.contratos.obterDetalhes.useQuery(
     { id: emprestimoId },
     { enabled: emprestimoId > 0 }
   );
@@ -150,6 +150,14 @@ export default function EmprestimoDetalhes() {
         </div>
       </div>
     );
+  }
+
+  if (isError) {
+    return <div role="alert" className="space-y-4 rounded-lg border p-4">
+      <p>Não foi possível carregar a ficha do empréstimo. A consulta precisa ser conferida; isso não significa que o contrato foi apagado. Não cadastre novamente a mesma dívida.</p>
+      <Button variant="outline" disabled={isFetching} onClick={() => refetch()}>Tentar novamente</Button>
+      <Button variant="outline" onClick={() => setLocation('/emprestimos')}>Voltar para Empréstimos</Button>
+    </div>;
   }
 
   if (!emprestimo) {

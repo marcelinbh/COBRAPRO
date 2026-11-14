@@ -15,3 +15,23 @@ describe("router prospectivo não alcança legado", () => {
   it("db ausente nunca REST", async () => { mocks.db.mockResolvedValue(null); await expect(caller().receber(input)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" }); expect(mocks.rpc).not.toHaveBeenCalled(); });
   it("disponibilidade não inventa renovação ou precisa banco", async () => { expect(await caller().disponibilidade()).toEqual({ disponivel: true, modalidade: "mensal", regra: "mensal_simples_v1", renovacao: false }); expect(mocks.db).not.toHaveBeenCalled(); });
 });
+
+describe('contas para cadastro não certificam nem dependem de saldo global', () => {
+  it('query é autenticada antes de qualquer consulta', async () => {
+    await expect(caller(null).contasParaCadastro()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    expect(mocks.db).not.toHaveBeenCalled();
+  });
+  it('retorna só metadados e deriva o tenant da sessão mesmo com ciclo de mutação off', async () => {
+    vi.stubEnv('ENABLE_RPC_CICLO_EMPRESTIMOS_PROSPECTIVOS', 'false');
+    const q: any = { select: vi.fn(() => q), eq: vi.fn(() => q), order: vi.fn(() => q), range: vi.fn().mockResolvedValue({ data: [{ id: 5, nome: 'Conta própria', tipo: 'dinheiro', user_id: 77, ativo: true }], count: 1, error: null }) };
+    const from = vi.fn(() => q); mocks.db.mockResolvedValue({ from });
+    expect(await caller().contasParaCadastro()).toEqual({ empresaId: 77, contas: [{ id: 5, nome: 'Conta própria', tipo: 'dinheiro' }] });
+    expect(from).toHaveBeenCalledWith('contas_caixa'); expect(from).toHaveBeenCalledTimes(1);
+    expect(q.select).toHaveBeenCalledWith('id,nome,tipo,ativo,user_id', { count: 'exact' });
+    expect(q.eq).toHaveBeenCalledWith('user_id', 77); expect(mocks.rpc).not.toHaveBeenCalled();
+  });
+  it('erro real de banco não vira opção vazia', async () => {
+    mocks.db.mockResolvedValue(null);
+    await expect(caller().contasParaCadastro()).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+  });
+});

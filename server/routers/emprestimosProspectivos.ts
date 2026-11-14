@@ -6,6 +6,7 @@ import { consultaCicloSchema, entradaRecebimentoProspectivoSchema, exigirCicloEm
 import { financialIntentRecoveryInput } from "../../shared/financialIntentRecovery";
 import { reconcileFinancialIntent } from "../services/financialIntentRecovery";
 import { recebimentoComConfirmacao } from "../services/recebimentoNotificacao";
+import { listarContasParaCadastro } from "../services/contasCadastro";
 async function cliente() {
   exigirCicloEmprestimosProspectivos();
   const client = await getSupabaseClientAsync();
@@ -14,6 +15,11 @@ async function cliente() {
 }
 /** Pai registra em appRouter como emprestimosProspectivos; nenhuma rota legada é liberada. */
 export const emprestimosProspectivosRouter = router({
+  contasParaCadastro: protectedProcedure.query(async ({ ctx }) => {
+    const fonte = await getSupabaseClientAsync();
+    if (!fonte) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível carregar as contas. Tente novamente." });
+    return listarContasParaCadastro(fonte, ctx.user.id);
+  }),
   disponibilidade: protectedProcedure.query(() => ({
     disponivel: process.env.ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS === "true" && process.env.ENABLE_RPC_CICLO_EMPRESTIMOS_PROSPECTIVOS === "true",
     modalidade: "mensal" as const, regra: "mensal_simples_v1" as const,

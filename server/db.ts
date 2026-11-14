@@ -65,35 +65,36 @@ let _db: ReturnType<typeof drizzle> | null = null;
 let _client: ReturnType<typeof postgres> | null = null;
 let _supabase: SupabaseClient | null = null;
 let _dbInitialized = false;
-let _supabaseInitializing = false;
+let _supabaseInitialization: Promise<SupabaseClient | null> | null = null;
 let _supabaseInitialized = false;
 
 // Supabase JS client (connects via HTTPS REST with custom DNS resolver)
 export async function getSupabaseClientAsync(): Promise<SupabaseClient | null> {
   if (_supabase) return _supabase;
   if (_supabaseInitialized) return null;
-  if (_supabaseInitializing) {
-    // Wait for initialization
-    await new Promise(resolve => setTimeout(resolve, 100));
+  if (_supabaseInitialization) return _supabaseInitialization;
+
+  // Todos aguardam o mesmo trabalho: 100 ms não eram prova de indisponibilidade.
+  _supabaseInitialization = (async () => {
+    const url = ENV.supabaseUrl || process.env.SUPABASE_URL;
+    const key = ENV.supabaseServiceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      const customFetch = await getCustomFetch();
+      _supabase = createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { fetch: customFetch },
+      });
+      console.log("[Database] Supabase REST client initialized with custom DNS fetch");
+    }
+    _supabaseInitialized = true;
     return _supabase;
+  })();
+  try {
+    return await _supabaseInitialization;
+  } finally {
+    // Exceção transitória permite retry; não mantém um estado initializing preso.
+    _supabaseInitialization = null;
   }
-  
-  _supabaseInitializing = true;
-  const url = ENV.supabaseUrl || process.env.SUPABASE_URL;
-  const key = ENV.supabaseServiceRoleKey || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  
-  if (url && key) {
-    const customFetch = await getCustomFetch();
-    _supabase = createClient(url, key, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { fetch: customFetch },
-    });
-    console.log("[Database] Supabase REST client initialized with custom DNS fetch");
-  }
-  
-  _supabaseInitialized = true;
-  _supabaseInitializing = false;
-  return _supabase;
 }
 
 // Synchronous version for backward compatibility (returns cached client or null)

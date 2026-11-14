@@ -48,6 +48,7 @@ import { dadosDashboard, exigirFonteDashboard, listarDashboard, vincularClientes
 import { lerResumoCaixaDashboard } from "./dashboardLedger";
 import { statusCalendarioParcela } from "../shared/parcelasCalendar";
 import { onboardingCompleteSchema, criarOnboardingCompleteHandler } from "./services/onboardingRpc";
+import { listarRegistrosEmprestimos, falhaLeituraEmprestimos, falhaVinculoEmprestimos } from "./services/emprestimosLeitura";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -871,55 +872,72 @@ const contratosRouter = router({
       busca: z.string().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) return [];
+      const falhaLeitura = falhaLeituraEmprestimos;
+      const falhaVinculo = falhaVinculoEmprestimos;
+      let supabase;
+      try { supabase = await getSupabaseClientAsync(); } catch { throw falhaLeitura(); }
+      if (!supabase) throw falhaLeitura();
+      // service_role não impõe RLS: confirmar tenant antes de nomes ou valores.
+      const lerLista = (criarQuery: () => any) => listarRegistrosEmprestimos(criarQuery, ctx.user.id);
 
-      // Verificar se o usuário logado é um koletor (filtrar apenas seus contratos)
-      let myKoletorIdForList: number | null = null;
-      try {
-        const { data: koletorMe } = await supabase.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).eq('ativo', true).maybeSingle();
-        if (koletorMe?.perfil === 'koletor') myKoletorIdForList = koletorMe.id;
-      } catch (_) { /* não é koletor */ }
+      // Uma consulta recusada não pode remover o filtro do koletor.
+      const koletorRows = await lerLista(() => supabase.from('koletores')
+        .select('id, perfil, user_id', { count: 'exact' }).eq('user_id', ctx.user.id).eq('ativo', true).order('id'));
+      if (koletorRows.length > 1) throw falhaVinculo();
+      const myKoletorIdForList = koletorRows[0]?.perfil === 'koletor' ? koletorRows[0].id : null;
 
-      // Buscar contratos
-      let cQuery = supabase
-        .from('contratos')
-        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas, clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
-        .order('createdAt', { ascending: false })
-        .eq('user_id', ctx.user.id);
-      if (myKoletorIdForList !== null) cQuery = cQuery.eq('koletor_id', myKoletorIdForList);
-
-      if (input?.status && input.status !== 'todos') cQuery = cQuery.eq('status', input.status);
-      if (input?.modalidade) cQuery = cQuery.eq('modalidade', input.modalidade);
-
-      const { data: contratosData, error: contratosErr } = await cQuery;
-      if (contratosErr) { console.error('[contratos.listComParcelas] error:', contratosErr.message); return []; }
-
-      const contratosList = contratosData ?? [];
+      const contratosList = await lerLista(() => {
+        let query = supabase.from('contratos')
+          .select('id, user_id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas', { count: 'exact' })
+          .eq('user_id', ctx.user.id).order('createdAt', { ascending: false }).order('id', { ascending: false });
+        if (myKoletorIdForList !== null) query = query.eq('koletor_id', myKoletorIdForList);
+        if (input?.status && input.status !== 'todos') query = query.eq('status', input.status);
+        if (input?.modalidade) query = query.eq('modalidade', input.modalidade);
+        return query;
+      });
       if (contratosList.length === 0) return [];
 
-      // Filtrar por busca
+      if (contratosList.some((c: any) => !Number.isSafeInteger(c.cliente_id) || c.cliente_id <= 0)) throw falhaVinculo();
+      const clienteIds = Array.from(new Set<number>(contratosList.map((c: any) => c.cliente_id)));
+      const clientesRows = await lerLista(() => supabase.from('clientes')
+        .select('id, nome, user_id, whatsapp, chave_pix, telefone', { count: 'exact' })
+        .eq('user_id', ctx.user.id).in('id', clienteIds).order('id'));
+      const clientesPorId = new Map<number, any>();
+      for (const cliente of clientesRows) {
+        if (!clienteIds.includes(cliente.id) || clientesPorId.has(cliente.id)) throw falhaVinculo();
+        clientesPorId.set(cliente.id, cliente);
+      }
+      // Vínculo ausente/estrangeiro não apaga contrato nem revela outro cliente.
+      if (contratosList.some((c: any) => !clientesPorId.has(c.cliente_id))) throw falhaVinculo();
       const filtrados = input?.busca
         ? contratosList.filter((c: any) => {
-            const nome = (c.clientes as any)?.nome ?? '';
+            const nome = clientesPorId.get(c.cliente_id)?.nome ?? '';
             return nome.toLowerCase().includes(input.busca!.toLowerCase());
           })
         : contratosList;
+      if (filtrados.length === 0) return [];
 
-      // Buscar todas as parcelas dos contratos
       const contratoIds = filtrados.map((c: any) => c.id);
-      const { data: parcelasData } = await supabase
-        .from('parcelas')
-        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status')
-        .in('contrato_id', contratoIds)
-        .eq('user_id', ctx.user.id)
-        .order('data_vencimento');
+      // Sem filtro de owner neste passo: só metadados dos contratos já próprios.
+      // Isso detecta parcelas antigas cruzadas sem ler valores de outro tenant.
+      const parcelasVinculos = await lerLista(() => supabase.from('parcelas')
+        .select('id, user_id, contrato_id, cliente_id', { count: 'exact' })
+        .in('contrato_id', contratoIds).order('id'));
+      const contratosPorId = new Map<number, any>(filtrados.map((c: any) => [c.id, c]));
+      if (parcelasVinculos.some((p: any) => !contratosPorId.has(p.contrato_id) ||
+          p.cliente_id !== contratosPorId.get(p.contrato_id).cliente_id)) throw falhaVinculo();
+      const parcelasData = await lerLista(() => supabase.from('parcelas')
+        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
+        .eq('user_id', ctx.user.id).in('contrato_id', contratoIds).order('data_vencimento').order('id'));
+      const vinculosPorId = new Map<number, any>(parcelasVinculos.map((p: any) => [p.id, p]));
+      if (parcelasData.length !== parcelasVinculos.length || parcelasData.some((p: any) =>
+          !vinculosPorId.has(p.id) || p.contrato_id !== vinculosPorId.get(p.id).contrato_id)) throw falhaVinculo();
 
       const hoje = dataHojeBrasilia();
 
       // Agrupar parcelas por contrato
       const parcelasPorContrato: Record<number, any[]> = {};
-      for (const p of (parcelasData ?? [])) {
+      for (const p of parcelasData) {
         if (!parcelasPorContrato[p.contrato_id]) parcelasPorContrato[p.contrato_id] = [];
         // Atualizar status em memória
         let statusAtual = p.status;
@@ -936,23 +954,21 @@ const contratosRouter = router({
       let multaDiaria = 0;
       let multaPercentual = 0;
       let jurosMultaAutomatico = false;
-      try {
-        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
-        if (configRows) {
-          const configMap: Record<string, string> = {};
-          for (const r of configRows) configMap[r.chave] = r.valor ?? '';
-          jurosMultaAutomatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
-          if (jurosMultaAutomatico) {
-            const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
-            const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
-            multaDiaria = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
-            multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
-          }
-        }
-      } catch (_) { /* sem configuração, não há cobrança automática */ }
+      const configRows = await lerLista(() => supabase.from('configuracoes')
+        .select('user_id, chave, valor', { count: 'exact' }).eq('user_id', ctx.user.id)
+        .in('chave', ['jurosMultaAutomatico', 'juros_multa_automatico', 'multaDiaria', 'multa_diaria', 'multaPadrao', 'multa_padrao']).order('chave'));
+      const configMap: Record<string, string> = {};
+      for (const r of configRows) configMap[r.chave] = r.valor ?? '';
+      jurosMultaAutomatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
+      if (jurosMultaAutomatico) {
+        const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
+        const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
+        multaDiaria = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
+        multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
+      }
 
       return filtrados.map((c: any) => {
-        const cliente = c.clientes as any;
+        const cliente = clientesPorId.get(c.cliente_id);
         const parcelasContrato = parcelasPorContrato[c.id] ?? [];
         const parcelasAbertas = parcelasContrato.filter((p: any) => !['paga'].includes(p.status));
         const parcelasPagas = parcelasContrato.filter((p: any) => p.status === 'paga');
@@ -1043,32 +1059,43 @@ const contratosRouter = router({
       });
     }),
   obterDetalhes: protectedProcedure
-    .input(z.object({ id: z.number() }))
+    .input(z.object({ id: z.number().int().positive() }))
     .query(async ({ ctx, input }) => {
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) return null;
+      let supabase;
+      try { supabase = await getSupabaseClientAsync(); } catch { throw falhaLeituraEmprestimos(); }
+      if (!supabase) throw falhaLeituraEmprestimos();
+      const lerLista = (criarQuery: () => any) => listarRegistrosEmprestimos(criarQuery, ctx.user.id);
 
-      // Buscar contrato
-      const { data: contratoData, error: contratoErr } = await supabase
+      // Não fazer embed com service_role: o cliente também precisa ser próprio.
+      const contratosFicha = await lerLista(() => supabase
         .from('contratos')
-        .select('id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas, clientes!inner(id, nome, whatsapp, chave_pix, telefone)')
+        .select('id, user_id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas', { count: 'exact' })
         .eq('id', input.id)
         .eq('user_id', ctx.user.id)
-        .single();
+        .order('id'));
+      if (contratosFicha.length === 0) return null;
+      if (contratosFicha.length !== 1) throw falhaVinculoEmprestimos();
+      const contratoData = contratosFicha[0];
+      if (!Number.isSafeInteger(contratoData.cliente_id) || contratoData.cliente_id <= 0) throw falhaVinculoEmprestimos();
+      const clientesFicha = await lerLista(() => supabase.from('clientes')
+        .select('id, user_id, nome, whatsapp, chave_pix, telefone', { count: 'exact' })
+        .eq('id', contratoData.cliente_id).eq('user_id', ctx.user.id).order('id'));
+      if (clientesFicha.length !== 1 || clientesFicha[0].id !== contratoData.cliente_id) throw falhaVinculoEmprestimos();
+      const cliente = clientesFicha[0];
 
-      if (contratoErr || !contratoData) return null;
-
-      // Buscar parcelas
-      const { data: parcelasData } = await supabase
-        .from('parcelas')
-        .select('id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status')
-        .eq('contrato_id', input.id)
-        .eq('user_id', ctx.user.id)
-        .order('data_vencimento');
+      const parcelasVinculos = await lerLista(() => supabase.from('parcelas')
+        .select('id, user_id, contrato_id, cliente_id', { count: 'exact' })
+        .eq('contrato_id', input.id).order('id'));
+      if (parcelasVinculos.some((p: any) => p.contrato_id !== input.id || p.cliente_id !== cliente.id)) throw falhaVinculoEmprestimos();
+      const parcelasData = await lerLista(() => supabase.from('parcelas')
+        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
+        .eq('contrato_id', input.id).eq('user_id', ctx.user.id).order('data_vencimento').order('id'));
+      const vinculosPorId = new Map<number, any>(parcelasVinculos.map((p: any) => [p.id, p]));
+      if (parcelasData.length !== parcelasVinculos.length || parcelasData.some((p: any) =>
+          !vinculosPorId.has(p.id) || p.contrato_id !== input.id)) throw falhaVinculoEmprestimos();
 
       const hoje = dataHojeBrasilia();
-      const cliente = contratoData.clientes as any;
-      const parcelas = (parcelasData ?? []).map((p: any) => {
+      const parcelas = parcelasData.map((p: any) => {
         let statusAtual = p.status;
         if (statusAtual !== 'paga' && statusAtual !== 'parcial') {
           if (p.data_vencimento < hoje) statusAtual = 'atrasada';
@@ -1080,20 +1107,18 @@ const contratosRouter = router({
       // Sem ativação explícita não há juros automáticos de mora.
       let multaDiaria = 0;
       let multaPercentual = 0;
-      try {
-        const { data: configRows } = await supabase.from('configuracoes').select('chave, valor').eq('user_id', ctx.user.id);
-        if (configRows) {
-          const configMap: Record<string, string> = {};
-          for (const r of configRows) configMap[r.chave] = r.valor ?? '';
-          const automatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
-          if (automatico) {
-            const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
-            const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
-            multaDiaria = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
-            multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
-          }
-        }
-      } catch (_) { /* sem configuração, não há cobrança automática */ }
+      const configRows = await lerLista(() => supabase.from('configuracoes')
+        .select('user_id, chave, valor', { count: 'exact' }).eq('user_id', ctx.user.id)
+        .in('chave', ['jurosMultaAutomatico', 'juros_multa_automatico', 'multaDiaria', 'multa_diaria', 'multaPadrao', 'multa_padrao']).order('chave'));
+      const configMap: Record<string, string> = {};
+      for (const r of configRows) configMap[r.chave] = r.valor ?? '';
+      const automatico = configMap['jurosMultaAutomatico'] === 'true' || configMap['juros_multa_automatico'] === 'true';
+      if (automatico) {
+        const diaria = Number.parseFloat(configMap['multaDiaria'] ?? configMap['multa_diaria'] ?? '0');
+        const percentual = Number.parseFloat(configMap['multaPadrao'] ?? configMap['multa_padrao'] ?? '0');
+        multaDiaria = Number.isFinite(diaria) && diaria > 0 ? diaria : 0;
+        multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
+      }
 
       // Calcular KPIs
       const parcelasAbertas = parcelas.filter((p: any) => !['paga'].includes(p.status));

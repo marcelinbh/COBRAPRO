@@ -1683,7 +1683,7 @@ function EmprestimoCardCobra({
           {/* Nome centralizado */}
           <h3 
             className="text-center font-bold text-white text-base tracking-wide mb-2 cursor-pointer hover:text-emerald-400 transition-colors"
-            onClick={() => { setAbaModalInicial('detalhes'); setShowEditarModal(true); }}
+            onClick={() => setLocation(`/emprestimos/${emp.id}`)}
             title="Clique para ver detalhes"
           >
             {emp.clienteNome.toUpperCase()}
@@ -1719,7 +1719,7 @@ function EmprestimoCardCobra({
                 size="sm"
                 variant="outline"
                 className="h-7 px-2 text-[10px] gap-1 border-border/50 bg-transparent hover:bg-accent/20"
-                onClick={() => { setAbaModalInicial('detalhes'); setShowEditarModal(true); }}
+                onClick={() => setLocation(`/emprestimos/${emp.id}`)}
               >
                 <Eye className="w-3 h-3" /> {t('loans.details')}
               </Button>
@@ -1874,25 +1874,16 @@ function EmprestimoCardCobra({
         {/* ── BARRA DE AÇÕES INFERIOR ── */}
         <div className="px-4 pb-4 flex items-center gap-2 border-t border-border/40 pt-3">
           {/* Pagar */}
-          <PagamentoModal
-            emprestimo={emp}
-            contas={contas}
-            onSuccess={onRefresh}
-            triggerClassName="flex-1 h-9 text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1"
-            triggerLabel={t('loans.pay')}
-            triggerIcon={<CheckCircle className="h-3.5 w-3.5" />}
-          />
+          <Button className="flex-1 h-9 text-xs bg-emerald-700 hover:bg-emerald-800 text-white gap-1"
+            onClick={() => setLocation(`/emprestimos/${emp.id}`)}>
+            <CheckCircle className="h-3.5 w-3.5" /> {t('loans.pay')}
+          </Button>
 
-          {/* Pagar Juros */}
-          <PagamentoModal
-            emprestimo={emp}
-            contas={contas}
-            onSuccess={onRefresh}
-            modoInicial="juros"
-            triggerClassName="flex-1 h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1"
-            triggerLabel={t('loans.payInterest')}
-            triggerIcon={<DollarSign className="h-3.5 w-3.5" />}
-          />
+          {/* A ficha oferece somente recebimento/renovação validados para a origem. */}
+          <Button className="flex-1 h-9 text-xs bg-amber-600 hover:bg-amber-700 text-white gap-1"
+            onClick={() => setLocation(`/emprestimos/${emp.id}`)}>
+            <DollarSign className="h-3.5 w-3.5" /> Receber / renovar
+          </Button>
 
           {/* Ícones de ação */}
           <div className="flex gap-1">
@@ -1913,7 +1904,7 @@ function EmprestimoCardCobra({
               variant="outline"
               className="h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20"
               title={t('loanDetails.editLoan')}
-              onClick={() => { setAbaModalInicial('editar'); setShowEditarModal(true); }}
+              onClick={() => setLocation(`/emprestimos/${emp.id}`)}
             >
               <Edit className="h-4 w-4" />
             </Button>
@@ -1924,7 +1915,7 @@ function EmprestimoCardCobra({
               variant="outline"
               className="h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20 text-violet-400 hover:text-violet-300"
               title="Etiquetas"
-              onClick={() => { setAbaModalInicial('etiquetas'); setShowEditarModal(true); }}
+              onClick={() => setShowEtiquetasModal(true)}
             >
               <Tag className="h-4 w-4" />
             </Button>
@@ -1998,7 +1989,7 @@ function EmprestimoCardCobra({
             variant="outline"
             className="h-8 text-xs"
             title={t('common.details')}
-            onClick={() => { setAbaModalInicial('detalhes'); setShowEditarModal(true); }}
+            onClick={() => setLocation(`/emprestimos/${emp.id}`)}
           >
             <Eye className="h-3.5 w-3.5" />
           </Button>
@@ -2007,7 +1998,7 @@ function EmprestimoCardCobra({
             variant="outline"
             className="h-8 text-xs"
             title={t('common.edit')}
-            onClick={() => { setAbaModalInicial('editar'); setShowEditarModal(true); }}
+            onClick={() => setLocation(`/emprestimos/${emp.id}`)}
           >
             <Edit className="h-3.5 w-3.5" />
           </Button>
@@ -2022,15 +2013,6 @@ function EmprestimoCardCobra({
           </Button>
         </div>
       </div>
-
-      {showEditarModal && (
-        <EditarEmprestimoModal
-          emprestimo={emp}
-          onClose={() => { setShowEditarModal(false); setAbaModalInicial('editar'); }}
-          onSuccess={onRefresh}
-          abaInicial={abaModalInicial}
-        />
-      )}
 
       {showEditarJurosModal === emp.id && (
         <Dialog open={true} onOpenChange={() => setShowEditarJurosModal(null)}>
@@ -2202,7 +2184,7 @@ export default function Emprestimos() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  const { data: emprestimos, isLoading, refetch } = trpc.contratos.listComParcelas.useQuery();
+  const { data: emprestimos, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery();
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: koletores } = trpc.cobradores.list.useQuery();
   const { data: recebimentosData, isLoading: loadingRecebimentos } = trpc.whatsapp.recebimentos.useQuery(
@@ -2303,7 +2285,16 @@ export default function Emprestimos() {
   const capitalNaRua = emprestimos?.reduce((s, e) => s + parseFloat(e.valorPrincipal), 0) ?? 0;
   const totalReceber = emprestimos?.reduce((s, e) => s + e.totalReceber, 0) ?? 0;
 
-  if (isLoading) return <div className="p-8 text-center">{t('common.loading')}</div>;
+  if (isLoading || isError) return <div className="space-y-4">
+    <div className="flex items-center justify-between gap-2">
+      <h1 className="text-2xl font-bold">{t('loans.title')}</h1>
+      <Button onClick={() => setLocation('/contratos/novo')}><Plus className="h-4 w-4" /> Novo empréstimo</Button>
+    </div>
+    {isLoading ? <p role="status">Carregando empréstimos...</p> : <div role="alert" className="space-y-3 rounded-lg border p-4">
+      <p>Não foi possível carregar os empréstimos. A consulta está indisponível; isso não significa que os registros foram apagados. Não cadastre novamente uma dívida já existente.</p>
+      <Button variant="outline" disabled={isFetching} onClick={() => refetch()}>Tentar novamente</Button>
+    </div>}
+  </div>;
 
   return (
     <div className="space-y-6">

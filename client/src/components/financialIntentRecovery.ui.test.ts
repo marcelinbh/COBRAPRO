@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
-const h = vi.hoisted(() => ({ current: null as any, user: { id: 5001 }, search: '', validar: vi.fn(), criar: vi.fn(), receber: vi.fn(), cotar: vi.fn(), rec: vi.fn(), despesaRec: vi.fn(), expensePay: vi.fn(), success: vi.fn(), error: vi.fn(), location: vi.fn() }));
+const h = vi.hoisted(() => ({ current: null as any, user: { id: 5001 }, search: '', queries: {} as Record<string, any>, saldoQuery: vi.fn(), invalidar: vi.fn(), validar: vi.fn(), criar: vi.fn(), receber: vi.fn(), cotar: vi.fn(), rec: vi.fn(), despesaRec: vi.fn(), expensePay: vi.fn(), success: vi.fn(), error: vi.fn(), location: vi.fn() }));
 vi.mock('react', async importOriginal => {
   const actual = await importOriginal<typeof React>();
   return { ...actual,
@@ -21,12 +21,16 @@ vi.mock('@/components/ui/textarea', () => ({ Textarea: 'textarea' }));
 vi.mock('sonner', () => ({ toast: { success: h.success, error: h.error } }));
 vi.mock('wouter', () => ({ useLocation: () => ['/contratos/novo', h.location] }));
 vi.mock('@/lib/trpc', () => {
-  const utils = new Proxy({}, { get: () => new Proxy({}, { get: () => ({ invalidate: async () => {} }) }) });
-  const q = (data: any) => ({ data, isError: false, isLoading: false });
+  const utils = new Proxy({}, { get: () => new Proxy({}, { get: () => ({ invalidate: h.invalidar }) }) });
+  const q = (data: any) => ({ data, isError: false, isLoading: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data }) });
   return { trpc: {
     auth: { me: { useQuery: () => q(h.user) } },
-    clientes: { list: { useQuery: () => q({ clientes: [{ id: 1, nome: 'Sintético' }] }) } },
-    caixa: { contas: { useQuery: () => q([{ id: 1, nome: 'Sintética', ativa: true }]) } },
+    clientes: { list: { useQuery: () => h.queries.clientes ?? q({ clientes: [{ id: 1, nome: 'Sintético', userId: h.user.id }] }) } },
+    caixa: { contas: { useQuery: () => { h.saldoQuery(); return q([{ id: 1, nome: 'Sintética', ativa: true }]); } } },
+    emprestimosProspectivos: {
+      disponibilidade: { useQuery: () => h.queries.disponibilidade ?? q({ disponivel: true }) },
+      contasParaCadastro: { useQuery: () => h.queries.contas ?? q({ empresaId: h.user.id, contas: [{ id: 1, nome: 'Conta própria', tipo: 'dinheiro' }] }) },
+    },
     useUtils: () => utils,
     contasPagar: {
       resumo: { useQuery: () => q({ totalPendente: '100.00', qtdPendente: 2, totalAtrasado: '0.00', qtdAtrasado: 0, totalPago: '0.00', qtdPago: 0 }) },
@@ -69,7 +73,7 @@ class MemoryUI {
 let data: Map<string, string>, storage: any;
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal('React', React); vi.stubEnv('ENABLE_RPC_EMPRESTIMOS_PROSPECTIVOS', 'true'); vi.stubEnv('ENABLE_RPC_CICLO_EMPRESTIMOS_PROSPECTIVOS', 'true');
-  h.user = { id: h.user.id + 1 }; h.search = ''; data = new Map();
+  h.user = { id: h.user.id + 1 }; h.search = ''; h.queries = {}; data = new Map(); h.invalidar.mockResolvedValue(undefined);
   storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, v), removeItem: (k: string) => data.delete(k) };
   vi.stubGlobal('sessionStorage', storage); vi.stubGlobal('window', { sessionStorage: storage, location: { get search() { return h.search; } } });
   h.cotar.mockResolvedValue(quote); h.criar.mockRejectedValue(new Error('timeout')); h.receber.mockRejectedValue(new Error('CONFLICT'));
@@ -88,13 +92,13 @@ function fill(r: MemoryUI, principal = '100.00', taxa = '0', dates = '2026-12-10
 }
 describe('componentes reais com hooks, storage e RPC em memória (sem navegador/rede)', () => {
   it.each([['0', '0', '2026-12-10'], ['100', '1000', '2026-12-10'], ['0.01', '0', '2026-12-10,2027-01-10'], ['100', '0', '2026-12-31,2027-01-31'], ['100', '0', '2026-12-10,2027-02-10'], ['100', '0', '2026-02-30']])('validação completa antes de persistir: %s/%s/%s', async (principal, taxa, dates) => {
-    const r = await createUI(); fill(r, principal, taxa, dates); await r.click('Confirmar criação');
+    const r = await createUI(); fill(r, principal, taxa, dates); await r.click('Cadastrar empréstimo');
     expect(h.criar).not.toHaveBeenCalled(); expect(data.size).toBe(0); expect(r.nodes('input')).toHaveLength(4);
     expect(h.error).toHaveBeenCalled();
   });
   it('principal zero continua editável e principal corrigido preserva payload em timeout/reload', async () => {
-    let r = await createUI(); fill(r, '0'); await r.click('Confirmar criação'); expect(r.nodes('input')).toHaveLength(4);
-    r.change(r.nodes('input')[0], '100.00'); await r.click('Confirmar criação'); const first = h.criar.mock.calls[0][0];
+    let r = await createUI(); fill(r, '0'); await r.click('Cadastrar empréstimo'); expect(r.nodes('input')).toHaveLength(4);
+    r.change(r.nodes('input')[0], '100.00'); await r.click('Cadastrar empréstimo'); const first = h.criar.mock.calls[0][0];
     expect(first.valorPrincipal).toBe('100.00'); expect(r.nodes('input')).toHaveLength(0);
     r = await createUI(); await r.click('Conferir/repetir'); expect(h.criar.mock.calls[1][0]).toEqual(first);
     expect(r.text()).not.toContain('Corrigir campos após');
@@ -108,7 +112,7 @@ describe('componentes reais com hooks, storage e RPC em memória (sem navegador/
   });
   it('resposta antiga de criação/validação não preenche outra sessão', async () => {
     const response = deferred<any>(); h.criar.mockReturnValueOnce(response.promise);
-    const r = await createUI(); fill(r); const sending = r.click('Confirmar criação'); await r.flush(); const old = h.user.id;
+    const r = await createUI(); fill(r); const sending = r.click('Cadastrar empréstimo'); await r.flush(); const old = h.user.id;
     h.user = { id: old + 1 }; r.render(); response.resolve({ id: 9, totalContrato: '100.00' }); await sending; await r.flush();
     expect(h.success).not.toHaveBeenCalled(); expect(r.nodes('input')).toHaveLength(4);
     expect(data.has(chaveIntencao(old, 'criar'))).toBe(true); expect(data.has(chaveIntencao(h.user.id, 'criar'))).toBe(false);
@@ -129,9 +133,9 @@ describe('componentes reais com hooks, storage e RPC em memória (sem navegador/
   });
   it.each(['/contratos/novo', '/emprestimos/novo'])('atalho %s monta mensal seguro, não legado', path => {
     const r = new MemoryUI(NovoContrato, {}).render(); expect(r.nodes().some(n => n.type === EmprestimoSeguroCriar)).toBe(true);
-    expect(r.text()).toContain('Criação legada permanece bloqueada'); expect(path).toMatch(/novo$/);
+    expect(r.text()).not.toContain('Criação legada permanece bloqueada'); expect(r.text()).toContain('Novo empréstimo'); expect(path).toMatch(/novo$/);
     h.search = '?modalidade=tabela_price&valorPrincipal=900'; r.render(); expect(r.nodes().some(n => n.type === EmprestimoSeguroCriar)).toBe(false);
-    expect(r.text()).toContain('Não há conversão silenciosa'); expect(r.nodes('a')[0].props.href).toBe('/contratos/novo');
+    expect(r.text()).toContain('não foram convertidos nem gravados'); expect(r.nodes('a')[0].props.href).toBe('/contratos/novo');
   });
   it('despesa NOT_FOUND/timeout não libera outra operação; reconciliação comprovada + escolha explícita libera', async () => {
     const s = new DespesasIntentStore(h.user.id, storage, h.error, () => key); s.begin('pagar', { id: 101, contaCaixaId: 1, dataPagamento: '2026-11-10' });
@@ -142,5 +146,57 @@ describe('componentes reais com hooks, storage e RPC em memória (sem navegador/
     await r.click('Reconciliar UUID'); expect(data.size).toBe(1); await r.click('Encerrar após'); expect(data.size).toBe(0);
     expect(r.nodes('button').filter(n => r.text(n).includes('Registrar pagamento atômico')).every(n => !n.props.disabled)).toBe(true);
     expect(h.expensePay).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('cadastro normal: recuperação e isolamento sem gate de saldo', () => {
+  const query = (data: any, isError = false) => ({ data, isError, isLoading: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data }) });
+  it('cadastro usa metadados e nunca consulta saldo do Caixa', async () => {
+    const r = await createUI();
+    expect(r.text()).toContain('Conta própria'); expect(r.button('Cadastrar empréstimo').props.disabled).toBeFalsy();
+    expect(h.saldoQuery).not.toHaveBeenCalled(); expect(h.criar).not.toHaveBeenCalled();
+  });
+  it('disponibilidade em erro pode ser reconsultada e não fica presa até desmontar', async () => {
+    h.queries.disponibilidade = query(undefined, true);
+    const r = await createUI();
+    expect(r.button('Cadastrar empréstimo').props.disabled).toBe(true); expect(r.text()).toContain('Tente novamente');
+    h.queries.disponibilidade.refetch.mockImplementation(async () => { h.queries.disponibilidade = query({ disponivel: true }); });
+    await r.click('Atualizar dados');
+    expect(r.button('Cadastrar empréstimo').props.disabled).toBeFalsy(); expect(h.criar).not.toHaveBeenCalled(); expect(h.validar).not.toHaveBeenCalled();
+  });
+  it('flag realmente desligada não habilita POST apenas por atualizar a tela', async () => {
+    h.queries.disponibilidade = query({ disponivel: false });
+    const r = await createUI(); await r.click('Atualizar dados');
+    expect(r.button('Cadastrar empréstimo').props.disabled).toBe(true); expect(h.criar).not.toHaveBeenCalled();
+  });
+  it('falha da listagem de contas mostra retry e não base vazia nem saldo falso', async () => {
+    h.queries.contas = query({ empresaId: h.user.id, contas: [{ id: 9, nome: 'Cache não certificado' }] }, true);
+    const r = await createUI();
+    expect(r.text()).toContain('Não foi possível carregar'); expect(r.text()).not.toContain('Cache não certificado');
+    expect(r.text()).not.toContain('Cadastre uma conta'); expect(r.button('Cadastrar empréstimo').props.disabled).toBe(true);
+  });
+  it('cache de contas e clientes de outra sessão nunca aparece nos seletores', async () => {
+    h.queries.contas = query({ empresaId: h.user.id - 1, contas: [{ id: 9, nome: 'Conta da empresa anterior' }] });
+    h.queries.clientes = query({ clientes: [{ id: 9, nome: 'Cliente da empresa anterior', userId: h.user.id - 1 }] });
+    const r = await createUI();
+    expect(r.text()).not.toContain('Conta da empresa anterior'); expect(r.text()).not.toContain('Cliente da empresa anterior');
+    expect(r.button('Cadastrar empréstimo').props.disabled).toBe(true); expect(h.criar).not.toHaveBeenCalled();
+  });
+  it('carregamento real impede envio, mas não vira alerta de responsável não habilitou', async () => {
+    h.queries.disponibilidade = { ...query(undefined), isLoading: true };
+    const r = await createUI();
+    expect(r.text()).toContain('Carregando os dados'); expect(r.text()).not.toContain('responsável');
+    expect(r.button('Cadastrar empréstimo').props.disabled).toBe(true);
+  });
+  it('confirmação preserva operação e atualiza leituras, mesmo se invalidar consulta falhar', async () => {
+    h.criar.mockResolvedValueOnce({ id: 31, totalContrato: '100.00' }); h.invalidar.mockRejectedValue(new Error('read unavailable'));
+    const r = await createUI(); fill(r); await r.click('Cadastrar empréstimo');
+    expect(h.criar).toHaveBeenCalledOnce(); expect(h.invalidar).toHaveBeenCalledTimes(6); expect(h.success).toHaveBeenCalled(); expect(h.error).not.toHaveBeenCalled();
+    expect(JSON.parse(data.get(chaveIntencao(h.user.id, 'criar'))!).confirmacao.id).toBe(31);
+  });
+  it('após criar abre exatamente a ficha do id confirmado', () => {
+    const r = new MemoryUI(NovoContrato, {}).render();
+    const form = r.nodes().find(n => n.type === EmprestimoSeguroCriar)!;
+    form.props.onSuccess(31); expect(h.location).toHaveBeenCalledWith('/emprestimos/31');
   });
 });

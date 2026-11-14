@@ -1281,3 +1281,13 @@
 - [ ] Obter comprovação e aprovação por registro antes de sanear o legado ou anunciar liberação financeira irrestrita.
 
 Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O alerta DigitalOcean de US$ 36,00 em atraso, com prazo antes de 14/11, continua presente; nenhum pagamento foi iniciado.
+
+## Fase 72: Cadastro operacional sem gates indevidos — 13/11/2026
+- [x] Retirar os gates de erro/carregamento da LISTAGEM sobre Novo Cliente/importação e manter rascunho aberto após erro de refetch; 51 testes específicos aprovados.
+- [x] Separar metadados das contas do agregador de saldo no cadastro de empréstimo; manter validação da conta escolhida e cliente/tenant na RPC.
+- [x] Corrigir disponibilidade presa por Promise única e a corrida de inicialização Supabase; seletores não apresentam cache de outra empresa.
+- [x] Corrigir leituras de lista/ficha: falha não vira vazio/inexistência; cliente próprio sem embed e parcelas conferidas por metadados antes de valores.
+- [x] Encaminhar pagamentos/detalhes dos cards à ficha com fluxo de origem validado; invalidar consultas após criação e abrir ID confirmado sem repetir mutation.
+- [x] Certificação final às 22h51: 2.439 testes, TypeScript/build e diff check aprovados. Contagens produtivas read-only 12/2/6 e RLS 56/56/0 preservadas.
+- [ ] Concluir checkpoint, push fast-forward e rollout/smoke; publicação não pode ser presumida por edição local. Conclusão será registrada no status externo.
+- [ ] Revisão humana de registros históricos permanece separada. Nenhum UPDATE, saneamento, flag financeira, Kiwify/oferta ou WhatsApp foi alterado.

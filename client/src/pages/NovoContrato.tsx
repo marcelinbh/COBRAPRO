@@ -26,13 +26,13 @@ export default function NovoContrato() {
   const suportado = (!modalidade || modalidade === 'mensal') && (!tipoTaxa || tipoTaxa === 'mensal');
   return <div className="space-y-4 max-w-3xl">
     <Button variant="outline" onClick={() => setLocation('/contratos')}>Voltar aos contratos</Button>
-    <h1 className="text-2xl font-semibold">Novo empréstimo — fluxo seguro</h1>
-    <p>Criação legada permanece bloqueada. Nenhum valor, agenda, cliente ou parâmetro de simulador/venda é convertido ou aplicado automaticamente.</p>
+    <h1 className="text-2xl font-semibold">Novo empréstimo</h1>
+    <p>Cadastre o empréstimo com o cliente e a conta da sua empresa. O desembolso e as parcelas são registrados juntos após a confirmação.</p>
     {suportado ? <>
       {params.size > 0 && <p role="status">Preencha e confira explicitamente os campos mensais abaixo; parâmetros do atalho não foram importados.</p>}
-      <EmprestimoSeguroCriar onSuccess={() => setLocation('/contratos')} />
+      <EmprestimoSeguroCriar onSuccess={id => setLocation(`/emprestimos/${id}`)} />
     </> : <>
-      <p role="alert">Modalidade/taxa não suportada neste ciclo: {modalidade ?? 'não informada'} / {tipoTaxa ?? 'não informada'}. Price, diário, semanal, quinzenal, bullet, venda, cheque e reparcelamento estão indisponíveis. Não há conversão silenciosa para mensal.</p>
+      <p role="alert">Este atalho solicita {modalidade ?? 'modalidade não informada'} / {tipoTaxa ?? 'taxa não informada'}, mas este formulário cadastra empréstimos mensais. Os dados do atalho não foram convertidos nem gravados. Para outra modalidade, não confirme um cadastro mensal como substituição.</p>
       <a className="underline" href="/contratos/novo">Iniciar explicitamente outro empréstimo mensal sem os parâmetros anteriores</a>
     </>}
   </div>;

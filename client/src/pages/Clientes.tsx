@@ -680,6 +680,7 @@ export default function Clientes() {
   const [filtroIndicado, setFiltroIndicado] = useState("todos");
   const [showImportModal, setShowImportModal] = useState(false);
   const [importando, setImportando] = useState(false);
+  const importandoRef = useRef(false);
   const [importResultado, setImportResultado] = useState<{ ok: number; erros: number; mensagens: string[] } | null>(null);
   const [deleteClienteId, setDeleteClienteId] = useState<number | null>(null);
   const [deleteClienteNome, setDeleteClienteNome] = useState("");
@@ -762,11 +763,11 @@ export default function Clientes() {
             <Download className="h-4 w-4" />
             {t('clients.exportCSV')}
           </Button>
-          <Button variant="outline" className="gap-2" onClick={() => setShowImportModal(true)} disabled={isError || isLoading}>
+          <Button variant="outline" className="gap-2" onClick={() => setShowImportModal(true)} disabled={importando}>
             <Upload className="h-4 w-4" />
             {t('clients.importCSV')}
           </Button>
-          <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }} disabled={isError || isLoading}>
+          <Button className="gap-2 bg-green-600 hover:bg-green-700" onClick={() => { setClienteEditar(null); setShowNovoModal(true); }}>
             <Plus className="h-4 w-4" />
             {t('clients.newClient')}
           </Button>
@@ -914,7 +915,7 @@ export default function Clientes() {
 
       {/* Modal Novo/Editar Cliente */}
       <NovoClienteModal
-        open={showNovoModal && !isError}
+        open={showNovoModal}
         onClose={() => setShowNovoModal(false)}
         onSuccess={() => utils.clientes.list.invalidate()}
         clienteEditar={clienteEditar}
@@ -950,7 +951,7 @@ export default function Clientes() {
       </Dialog>
 
       {/* Modal de Importação CSV */}
-      <Dialog open={showImportModal && !isError} onOpenChange={(open) => { if (!open) { setShowImportModal(false); setImportResultado(null); } }}>
+      <Dialog open={showImportModal} onOpenChange={(open) => { if (!open) { setShowImportModal(false); setImportResultado(null); } }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Importar Clientes via CSV</DialogTitle>
@@ -1029,7 +1030,8 @@ export default function Clientes() {
   );
 
   async function processarCSV(file: File) {
-    if (isError) { toast.error("Consulte a lista novamente antes de importar clientes."); return; }
+    if (importando || importandoRef.current) return;
+    importandoRef.current = true;
     setImportando(true);
     try {
       const text = await file.text();
@@ -1068,6 +1070,7 @@ export default function Clientes() {
     } catch (e: any) {
       toast.error('Erro ao processar CSV: ' + e.message);
     } finally {
+      importandoRef.current = false;
       setImportando(false);
     }
   }
