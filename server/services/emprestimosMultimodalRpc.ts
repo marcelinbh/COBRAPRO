@@ -44,10 +44,15 @@ export async function chamarMultimodal(cliente: ClienteEmprestimosRpc, nome: str
   catch { falhar("INTERNAL_SERVER_ERROR", "Transporte sem confirmação. Preserve o mesmo UUID/payload; timeout não prova rollback."); }
   if (!jsonMultimodalSeguro(response) || response === null || typeof response !== "object" || Array.isArray(response) ||
       !Object.hasOwn(response, "data") || !Object.hasOwn(response, "error") ||
-      Object.keys(response).some(k => !["data", "error", "count", "status", "statusText"].includes(k))) {
+      Object.keys(response).some(k => !["data", "error", "count", "status", "statusText", "success"].includes(k))) {
     falhar("INTERNAL_SERVER_ERROR", "Envelope RPC inválido; preserve UUID/payload sem presumir rollback.");
   }
-  const r = response as { data: unknown; error: unknown };
+  const r = response as { data: unknown; error: unknown; success?: unknown };
+  // Versões atuais do PostgREST incluem esse metadado. Não certifica dinheiro:
+  // só aceita booleano coerente com error, mantendo os parsers completos abaixo.
+  if (Object.hasOwn(response, "success") && (typeof r.success !== "boolean" || r.success !== (r.error === null))) {
+    falhar("INTERNAL_SERVER_ERROR", "Envelope RPC contraditório; preserve a intenção sem presumir confirmação.");
+  }
   if (r.error !== null) {
     if (typeof r.error !== "object" || Array.isArray(r.error)) falhar("INTERNAL_SERVER_ERROR", "Erro RPC inválido; resultado financeiro não confirmado.");
     const code = (r.error as { code?: unknown }).code;

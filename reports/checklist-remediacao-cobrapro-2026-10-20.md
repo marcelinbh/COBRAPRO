@@ -11,8 +11,10 @@
 - [x] Coexistência mensal/despesa/recebimento legado na mesma conta sem autorizar escrita sobre origem multimodal.
 - [x] UI/recovery com sessão, storage, geração, respostas antigas e família de intenção comprovados; nenhum segundo UUID por timeout.
 - [x] Lista/ficha sem próxima parcela encerrada, juros Price por composição e valores pagos registrados; estimativa não é saldo certificado.
-- [x] Certificação: 2.754 testes, TypeScript/build/diff check e PG17 isolado adversarial/concorrente.
-- [ ] Instalação prospectiva, checkpoint/push e aceite produtivo em execução; consultar a comprovação final no status operacional externo de 16/11/2026.
+- [x] Certificação final ampliada: 2.759 testes, TypeScript/build/diff check e PG17 isolado adversarial/concorrente.
+- [x] Instalação prospectiva 0035, checkpoint/push e revisão `533e131` live/Healthy às 18h25min48; RLS65/65/0 e contagens 12/2/6 preservadas. Proteção de senha versionada mantida.
+- [x] Corrigir envelope `success` do SDK real sem confirmação falsa e refetch circular de sessão por montagem; SDK/QueryObserver reais exercitados sem rede produtiva.
+- [ ] Publicação/aceite do complemento SDK e sessão; consultar a comprovação final no status operacional externo de 16/11/2026.
 
 Escopo detalhado em `reports/liberacao-multimodal-2026-11-16.md`. Sem saneamento de registros antigos, remoção de isolamento ou alterações de Kiwify/oferta/Blacklist/WhatsApp/flags.
 

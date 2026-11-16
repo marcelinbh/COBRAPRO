@@ -55,7 +55,7 @@ function useCotacaoAtual<T>(geracao: object, enabled: boolean, pedido: string,
   };
 }
 export function EmprestimoMultimodalReceber({ contratoId, parcelaId, origemUserId, status, onSuccess }: Props) {
-  const auth = trpc.auth.me.useQuery();
+  const auth = trpc.auth.me.useQuery(undefined, { refetchOnMount: false });
   const user = !auth.isError && !auth.isLoading && !auth.isFetching ? auth.data : undefined;
   const atual = !!user && user.id === origemUserId;
   const aberta = ["pendente", "atrasada", "vencendo_hoje", "parcial"].includes(status);
@@ -101,7 +101,7 @@ export function EmprestimoMultimodalReceber({ contratoId, parcelaId, origemUserI
   </section>;
 }
 export function EmprestimoMultimodalRenovar({ contratoId, parcelaId, origemUserId, status, onSuccess }: Props) {
-  const auth = trpc.auth.me.useQuery();
+  const auth = trpc.auth.me.useQuery(undefined, { refetchOnMount: false });
   const user = !auth.isError && !auth.isLoading && !auth.isFetching ? auth.data : undefined;
   const atual = !!user && user.id === origemUserId;
   const aberta = ["pendente", "atrasada", "vencendo_hoje"].includes(status);

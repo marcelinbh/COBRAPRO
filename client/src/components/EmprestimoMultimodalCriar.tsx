@@ -9,7 +9,7 @@ import { calcularMultimodal, gerarAgendaMultimodal, tipoTaxaMultimodal, validarE
 
 const nomes: Record<ModalidadeMultimodal, string> = { mensal: "Mensal — juros simples do período", semanal: "Semanal — juros simples do período", quinzenal: "Quinzenal — juros simples do período", diario: "Diário — taxa única sobre o principal", tabela_price: "Tabela Price — taxa mensal sobre saldo" };
 export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mensal" }: { onSuccess: (id: number) => void; modalidadeInicial?: ModalidadeMultimodal }) {
-  const auth = trpc.auth.me.useQuery();
+  const auth = trpc.auth.me.useQuery(undefined, { refetchOnMount: false });
   const user = !auth.isError && !auth.isLoading && !auth.isFetching ? auth.data : undefined;
   const clientesQ = trpc.clientes.list.useQuery(undefined, { enabled: !!user });
   const contasQ = trpc.emprestimosMultimodal.contasParaCadastro.useQuery(undefined, { enabled: !!user });

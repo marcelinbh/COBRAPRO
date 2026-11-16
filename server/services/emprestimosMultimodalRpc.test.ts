@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
+import { createClient } from "@supabase/supabase-js";
 import * as pure from "../../shared/emprestimosMultimodalCalculo";
 import {
   calcularMultimodal, gerarAgendaMultimodal, modalidadesMultimodal, tipoTaxaMultimodal,
@@ -53,7 +54,7 @@ const renovado = {
   ...consultaRenovacao, success: true, repetida: false, operationId: OP, novaParcelaId: 21, transacaoCaixaId: "9007199254740993", contaCaixaId: 40,
   valorRecebido: "10.00", dataPagamento: "2028-02-29", contratoStatus: "ativo", status: "renovada", regra: "renovacao_multimodal_brt_v1",
 };
-const client = (data: unknown, error: unknown = null) => ({ rpc: vi.fn().mockResolvedValue({ data, error }) });
+const client = (data: unknown, error: unknown = null) => ({ rpc: vi.fn().mockResolvedValue({ data, error, success: error === null, count: null, status: error === null ? 200 : 400, statusText: error === null ? "OK" : "Bad Request" }) });
 const cents = (s: string) => BigInt(s.replace(".", ""));
 function conservar(c: pure.CalculoMultimodal) {
   const total = c.parcelas.reduce((s, p) => s + cents(p.valor), BigInt(0));
@@ -245,6 +246,32 @@ describe("respostas estritas e reflexão da intenção", () => {
 });
 
 describe("SQL/transporte fail-closed e mesmo UUID", () => {
+  it("SDK instalado confirma dados completos e classifica recusa SQL com success booleano, sem rede", async () => {
+    for (const [call, data] of [
+      [(c: ReturnType<typeof createClient>) => criarMultimodal(c, 7, criacao), criado],
+      [(c: ReturnType<typeof createClient>) => cotarMultimodal(c, 7, consulta), cotacao],
+      [(c: ReturnType<typeof createClient>) => receberMultimodal(c, 7, recebimento), recebido],
+      [(c: ReturnType<typeof createClient>) => renovarMultimodal(c, 7, renovacao), renovado],
+    ] as const) {
+      const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(data), { status: 200, headers: { "Content-Type": "application/json" } }));
+      const sdk = createClient("https://example.invalid", "chave-sintetica", { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchMock } });
+      expect(await call(sdk)).toEqual(data); expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ code: "42501", message: "private snapshot", details: null, hint: null }), { status: 403, headers: { "Content-Type": "application/json" } }));
+    const sdk = createClient("https://example.invalid", "chave-sintetica", { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchMock } });
+    await expect(cotarMultimodal(sdk, 7, consulta)).rejects.toMatchObject({ code: "NOT_FOUND" }); expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+  it("success do SDK não substitui resultado financeiro ou prova autoritativa de recuperação", async () => {
+    for (const envelope of [{ data: criado, error: null, success: false }, { data: criado, error: { code: "42501" }, success: true }, { data: criado, error: null, success: "true" }, { data: { success: true }, error: null, success: true }]) {
+      await expect(criarMultimodal({ rpc: vi.fn().mockResolvedValue(envelope) }, 7, criacao)).rejects.toMatchObject({ code: "INTERNAL_SERVER_ERROR" });
+    }
+    const { idempotencyKey, ...payload } = criacao;
+    const req = { family: "multimodal_criar" as const, idempotencyKey, payload };
+    const evidence = { userId: 7, ...req, payloadHash: HASH, proof: "uuid_fenced_v1", status: "confirmed", fenceId: null, result: criado, quote: null };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(evidence), { status: 200, headers: { "Content-Type": "application/json" } }));
+    const sdk = createClient("https://example.invalid", "chave-sintetica", { auth: { persistSession: false, autoRefreshToken: false }, global: { fetch: fetchMock } });
+    expect((await reconciliarMultimodal(sdk, 7, req)).result).toEqual(criado); expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it.each([["22023", "BAD_REQUEST"], ["22007", "BAD_REQUEST"], ["22008", "BAD_REQUEST"], ["22P02", "BAD_REQUEST"], ["22003", "BAD_REQUEST"], ["23505", "CONFLICT"], ["23514", "CONFLICT"], ["40001", "CONFLICT"], ["40P01", "CONFLICT"], ["55000", "CONFLICT"], ["42501", "NOT_FOUND"], ["PGRST202", "PRECONDITION_FAILED"], ["42883", "PRECONDITION_FAILED"], ["42P01", "PRECONDITION_FAILED"], ["XX000", "INTERNAL_SERVER_ERROR"]])("%s mapeia %s sem fallback e sem detalhes SQL", async (sql, code) => {
     const c = client(null, { code: sql, message: "private snapshot secret" });
     await expect(criarMultimodal(c, 7, criacao)).rejects.toMatchObject({ code });

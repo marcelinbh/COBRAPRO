@@ -5,7 +5,7 @@ const h = vi.hoisted(() => ({
   current: null as any, user: { id: 901 } as any, auth: {} as any, search: "", queries: {} as Record<string, any>,
   invalidar: vi.fn(), validar: vi.fn(), criar: vi.fn(), receber: vi.fn(), renovar: vi.fn(), rec: vi.fn(),
   cotar: vi.fn(), cotarRenovacao: vi.fn(), query: vi.fn(), clientes: vi.fn(), contas: vi.fn(), saldo: vi.fn(),
-  success: vi.fn(), error: vi.fn(), location: vi.fn(), oldMutation: vi.fn(),
+  success: vi.fn(), error: vi.fn(), location: vi.fn(), oldMutation: vi.fn(), authQuery: vi.fn(),
 }));
 vi.mock("react", async original => {
   const actual = await original<typeof React>();
@@ -38,7 +38,7 @@ vi.mock("@/lib/trpc", () => {
   const utils = new Proxy({}, { get: () => new Proxy({}, { get: () => ({ invalidate: h.invalidar }) }) });
   const q = (data: any, extra = {}) => ({ data, isError: false, isLoading: false, isFetching: false, refetch: vi.fn().mockResolvedValue({ data, isError: false }), ...extra });
   return { trpc: {
-    auth: { me: { useQuery: () => q(h.user, h.auth) } },
+    auth: { me: { useQuery: (input: any, options: any) => { h.authQuery(input, options); return q(h.user, h.auth); } } },
     clientes: { list: { useQuery: (input: any, options: any) => { h.clientes(input, options); return h.queries.clientes ?? q({ clientes: [{ id: 1, nome: "Cliente próprio", userId: h.user?.id }] }); } } },
     caixa: { contas: { useQuery: () => { h.saldo(); return q([]); } } },
     emprestimosMultimodal: {
@@ -378,5 +378,14 @@ describe('entrada preserva a família da intenção, sem cadastro duplicado por 
   it('sessão em fetching não lê intenções nem monta formulário com identidade antiga', () => {
     h.auth = { isFetching: true }; const r = new MemoryUI(NovoContrato, {}).render();
     expect(storage.getItem).not.toHaveBeenCalled(); expect(r.nodes(EmprestimoMultimodalCriar)).toHaveLength(0); expect(r.nodes('cadastro-mensal-anterior')).toHaveLength(0);
+  });
+});
+
+describe("sessão sem refetch circular da montagem dos filhos", () => {
+  it("criação, recebimento e renovação não iniciam nova conferência apenas por montar", async () => {
+    await createUI(); await receiveUI(); await renewUI();
+    expect(h.authQuery).toHaveBeenCalled();
+    expect(h.authQuery.mock.calls.every(([input, options]) => input === undefined && options?.refetchOnMount === false)).toBe(true);
+    expect(h.criar).not.toHaveBeenCalled(); expect(h.receber).not.toHaveBeenCalled(); expect(h.renovar).not.toHaveBeenCalled();
   });
 });

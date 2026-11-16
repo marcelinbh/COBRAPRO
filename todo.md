@@ -1289,7 +1289,7 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Corrigir leituras de lista/ficha: falha não vira vazio/inexistência; cliente próprio sem embed e parcelas conferidas por metadados antes de valores.
 - [x] Encaminhar pagamentos/detalhes dos cards à ficha com fluxo de origem validado; invalidar consultas após criação e abrir ID confirmado sem repetir mutation.
 - [x] Certificação final às 22h51: 2.439 testes, TypeScript/build e diff check aprovados. Contagens produtivas read-only 12/2/6 e RLS 56/56/0 preservadas.
-- [ ] Concluir checkpoint, push fast-forward e rollout/smoke; publicação não pode ser presumida por edição local. Conclusão será registrada no status externo.
+- [x] Checkpoint/push/rollout e smoke `68f5d5c` concluídos em 13/11 e reconfirmados live/Healthy em 16/11. Comprovação no status externo de 13/11.
 - [ ] Revisão humana de registros históricos permanece separada. Nenhum UPDATE, saneamento, flag financeira, Kiwify/oferta ou WhatsApp foi alterado.
 
 ## Fase 73: Liberação prospectiva multimodal — 16/11/2026
@@ -1298,7 +1298,9 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Coexistência validada de mensal/despesa/recebimento legado na mesma conta sem autorizar escrita sobre cohort multimodal.
 - [x] Isolamento de formulário/cache/UUID, recuperação autoritativa, storage e respostas/handlers antigos; ciclo da intenção anterior preservado na entrada.
 - [x] Lista/ficha com parcela aberta real, juros por composição, pagamentos registrados e residual sem duplicação; lucro conservador não é saldo certificado.
-- [x] Gate final: 2.754 testes, TypeScript/build/diff check; PG17 adversarial e concorrência; SQL aplicado anteriormente intacto e fronteira sem segredos conhecidos.
+- [x] Gate final ampliado: 2.759 testes, TypeScript/build/diff check; PG17 adversarial/concorrência, SDK e QueryObserver reais; SQL anterior intacto e fronteira sem segredos conhecidos.
 - [x] Preflight produtivo read-only: PG17/owner, corpos/assinaturas/rowtypes compatíveis; 12/2/6 e RLS56/56/0 preservados antes da instalação.
-- [ ] Checkpoint, instalação prospectiva 0035, push fast-forward e rollout/smoke a comprovar no status externo de 16/11/2026.
+- [x] Checkpoint, instalação prospectiva 0035 e push fast-forward; `533e131` live/Healthy às 18h25min48. RLS65/65/0, ACLs e 12/2/6 preservados; zero origens novas às 18h33. Proteção de senha 0016 comprovada e preservada.
+- [x] Corrigir envelope booleano `success` do SDK sem aceitar confirmação falsa e refetch circular por montagem; 170 regressões direcionadas e gate completo aprovados.
+- [ ] Publicar e aceitar o complemento SDK/sessão; conclusão real a registrar no status externo de 16/11/2026.
 - [ ] Revisão humana de dados antigos continua separada. Sem alterações de Kiwify/oferta/Blacklist/WhatsApp/flags e sem correções automáticas de saldos ou tenant.
