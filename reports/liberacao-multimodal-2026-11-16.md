@@ -45,3 +45,11 @@ Não há autorização para misturar empresas ou retirar validação de integrid
 Vendas, cheques e reparcelamentos não são convertidos em empréstimos por atalhos. Modalidades, recebimentos ou alterações financeiras sem ciclo comprovado não são liberados por simples retirada de um guard.
 
 Blacklist permanece a única função compartilhada segundo as concessões existentes. Kiwify/ofertas, QR/Evolution, agenda e workflow WhatsApp, revogação de sessões e demais flags ficam fora do lote. A última execução WhatsApp conferida nesta retomada estava concluída com sucesso; isso não certifica a entrega de cada mensagem aos destinatários.
+
+## Complemento de compatibilidade da instalação
+
+A primeira tentativa foi recusada antes de DDL por um trigger de senha legítimo não previsto no inventário inicial. A leitura por metadados confirmou zero tabelas multimodais novas; o corpo da função é exatamente o gerado da fonte versionada 0016 para `passwordHash`. Não houve alteração de senha, versão de sessão, flag ou registro financeiro produtivo.
+
+O inventário agora aceita somente essa proteção comprovada por source/assinatura/owner/configuração e binding completo, sem tolerância a nomes falsos, overload, condição, coluna ou desativação. Sua superfície entra apenas no manifesto novo, sem recalcular o antigo nem congelar valores de senha/perfil. O fixture reproduz a função da fonte local e comprova preservação, funcionamento e recusas adversariais.
+
+Após esse complemento, a certificação completa voltou a aprovar **2.754 testes e 11 opt-in ignorados, TypeScript/build/diff check**. O mesmo gate de instalação executado em modo read-only na produção autorizada também aprovou todos os requisitos, com zero objetos multimodais preexistentes. O SQL final certificado tem SHA-256 `6e5c11587d571e64a51585488c2fad7075f4d5dfeb9202a3a5dced795a9c0b03`. Instalação, push e rollout serão comprovados no fechamento operacional externo, não por este registro pré-publicação.

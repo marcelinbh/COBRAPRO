@@ -44,7 +44,32 @@ it('PG17 multimodal: instalação fail-closed, cinco fórmulas, ciclo completo, 
   run(`${bin}/initdb`,['-D',`${root}/data`,'-U','postgres','-A','trust','--no-locale','-E','UTF8']);
   run(`${bin}/pg_ctl`,['-D',`${root}/data`,'-l',`${root}/postgres.log`,'-o',`-k ${root}/socket -p ${port} -c listen_addresses='' -c unix_socket_permissions=0700`,'-w','start']);started=true;
   await db.connect();await sql("SET statement_timeout='30s'; SET TimeZone='UTC'");
-  for(const f of ['tests/postgres-loans/fixture.sql','tests/postgres-financial-coexistence/fixture.sql','drizzle/0020_rpc_despesas_prospectivas.sql','drizzle/0021_rpc_emprestimos_prospectivos.sql','drizzle/0022_rpc_ciclo_emprestimos_prospectivos.sql','drizzle/0025_integrar_rpc_despesas_ciclo.sql','drizzle/0031_rpc_renovacao_juros_prospectiva.sql','drizzle/0033_rpc_reconciliacao_intencoes_financeiras.sql','drizzle/0034_rpc_recebimento_legado_validado.sql'])await sql(readFileSync(f,'utf8'));
+  for(const f of ['tests/postgres-loans/fixture.sql','tests/postgres-financial-coexistence/fixture.sql'])await sql(readFileSync(f,'utf8'));
+  // Colunas antes do selo 0034; jamais recalcula/adota metadata legada depois.
+  await sql('ALTER TABLE users ADD COLUMN "passwordHash" text, ADD COLUMN session_version integer NOT NULL DEFAULT 0, ADD CONSTRAINT users_session_version_nonnegative CHECK(session_version>=0)');
+  for(const f of ['drizzle/0020_rpc_despesas_prospectivas.sql','drizzle/0021_rpc_emprestimos_prospectivos.sql','drizzle/0022_rpc_ciclo_emprestimos_prospectivos.sql','drizzle/0025_integrar_rpc_despesas_ciclo.sql','drizzle/0031_rpc_renovacao_juros_prospectiva.sql','drizzle/0033_rpc_reconciliacao_intencoes_financeiras.sql','drizzle/0034_rpc_recebimento_legado_validado.sql'])await sql(readFileSync(f,'utf8'));
+  await rollback(async()=>{const before=await financial();await sql(body);expect((await rpc('rpc_capacidades_emprestimos_multimodal',[])).disponivel).toBe(true);await sql('SET LOCAL search_path=public,pg_catalog');expect(await financial()).toEqual(before);});
+  evidence.push('PASS variante sem função/trigger 0016 não cria proteção por presunção');
+  const sessionSource=readFileSync('drizzle/0016_revogacao_sessoes_reset_senha.sql','utf8');
+  const sessionBody=sessionSource.slice(sessionSource.indexOf('CREATE OR REPLACE FUNCTION public.revogar_sessoes_ao_alterar_senha()')).match(/AS \$body\$([\s\S]*?)\$body\$/)![1].replace(/%L/g,"'passwordHash'");
+  const sessionDefinition=`CREATE OR REPLACE FUNCTION public.revogar_sessoes_ao_alterar_senha() RETURNS trigger LANGUAGE plpgsql SECURITY INVOKER SET search_path=pg_catalog,public AS $body$${sessionBody}$body$`;
+  await sql(sessionDefinition+'; CREATE TRIGGER users_revogar_sessoes_ao_alterar_senha BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.revogar_sessoes_ao_alterar_senha()');
+  for(const [name,setup] of [
+   ['0016 source',sessionDefinition.replace('RETURN NEW;','NEW.session_version:=999; RETURN NEW;')],
+   ['0016 owner','ALTER FUNCTION revogar_sessoes_ao_alterar_senha() OWNER TO service_role'],
+   ['0016 config','ALTER FUNCTION revogar_sessoes_ao_alterar_senha() SET search_path=public,pg_catalog'],
+   ['0016 definer','ALTER FUNCTION revogar_sessoes_ao_alterar_senha() SECURITY DEFINER'],
+   ['0016 overload','CREATE FUNCTION public.revogar_sessoes_ao_alterar_senha(integer) RETURNS integer LANGUAGE sql AS $$SELECT 1$$'],
+   ['0016 disabled','ALTER TABLE users DISABLE TRIGGER users_revogar_sessoes_ao_alterar_senha'],
+   ['0016 missing function/trigger pair','DROP TRIGGER users_revogar_sessoes_ao_alterar_senha ON users'],
+   ['0016 rebinding','DROP TRIGGER users_revogar_sessoes_ao_alterar_senha ON users; CREATE TRIGGER users_revogar_sessoes_ao_alterar_senha BEFORE UPDATE ON users FOR EACH ROW EXECUTE FUNCTION ciclo_guardar()'],
+   ['0016 wrong table','DROP TRIGGER users_revogar_sessoes_ao_alterar_senha ON users; CREATE TRIGGER users_revogar_sessoes_ao_alterar_senha BEFORE UPDATE ON clientes FOR EACH ROW EXECUTE FUNCTION revogar_sessoes_ao_alterar_senha()'],
+   ['0016 UPDATE OF','DROP TRIGGER users_revogar_sessoes_ao_alterar_senha ON users; CREATE TRIGGER users_revogar_sessoes_ao_alterar_senha BEFORE UPDATE OF session_version ON users FOR EACH ROW EXECUTE FUNCTION revogar_sessoes_ao_alterar_senha()'],
+   ['0016 qual','DROP TRIGGER users_revogar_sessoes_ao_alterar_senha ON users; CREATE TRIGGER users_revogar_sessoes_ao_alterar_senha BEFORE UPDATE ON users FOR EACH ROW WHEN(NEW.id>0) EXECUTE FUNCTION revogar_sessoes_ao_alterar_senha()'],
+   ['0016 ambiguous password column','ALTER TABLE users ADD COLUMN password_hash text'],
+   ['0016 wrong default','ALTER TABLE users ALTER COLUMN session_version SET DEFAULT 1'],
+   ['0016 missing constraint','ALTER TABLE users DROP CONSTRAINT users_session_version_nonnegative'],
+  ])await gate(name,setup);
   for(const [name,setup] of [
    ['homônimo função outro schema',"CREATE SCHEMA alt; CREATE FUNCTION alt.multimodal_unknown() RETURNS int LANGUAGE sql AS $$SELECT 1$$"],
    ['homônimo tipo','CREATE TYPE multimodal_foo AS ENUM (\'x\')'],
@@ -74,6 +99,17 @@ it('PG17 multimodal: instalação fail-closed, cinco fórmulas, ciclo completo, 
   const installed=await catalog();for(const p of oldCatalog.p)expect(installed.p.find((v:any)=>v.oid===p.oid)).toEqual(p);
   for(const t of oldCatalog.t)expect(installed.t.find((v:any)=>v.oid===t.oid)).toEqual(t);
   evidence.push('PASS instalação sem mutação de dados/RPCs/ACL/triggers legados');
+  await scenario('0016 metadata e troca de senha preservadas sem congelar perfil',async()=>{
+   await rollback(async()=>{
+    const version=(await sql('SELECT session_version FROM users WHERE id=1'))[0].session_version;
+    await sql('UPDATE users SET "passwordHash"=\'hash-sintetico\' WHERE id=1');
+    expect((await sql('SELECT session_version FROM users WHERE id=1'))[0].session_version).toBe(version+1);
+    expect((await rpc('rpc_capacidades_emprestimos_multimodal',[])).disponivel).toBe(true);
+   });
+   for(const mutation of ['ALTER TABLE users DISABLE TRIGGER users_revogar_sessoes_ao_alterar_senha','ALTER FUNCTION revogar_sessoes_ao_alterar_senha() SET search_path=public,pg_catalog','ALTER TABLE users ALTER COLUMN session_version SET DEFAULT 1','REVOKE EXECUTE ON FUNCTION revogar_sessoes_ao_alterar_senha() FROM PUBLIC'])await rollback(async()=>{
+    await sql(mutation);await sql('SAVEPOINT metadata_session');await reject(()=>rpc('rpc_capacidades_emprestimos_multimodal',[]),'55000');await sql('ROLLBACK TO SAVEPOINT metadata_session');
+   });
+  });
   await gate('one-shot reaplicação','SELECT 1');
   await scenario('capabilities funcionais, helpers/tabelas privados, RLS sem policy e service_role somente EXECUTE',async()=>{
    await sql('SET ROLE service_role');expect(await rpc('rpc_capacidades_emprestimos_multimodal',[])).toEqual({disponivel:true,regra:'multimodal_v1',modalidades:['mensal','semanal','quinzenal','diario','tabela_price'],recebimento:true,renovacao:true});await reject(()=>sql('SELECT * FROM multimodal_origens'),'42501');await reject(()=>rpc('multimodal_nova_linha',['parcelas']),'42501');await sql('RESET ROLE');
