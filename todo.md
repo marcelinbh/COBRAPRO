@@ -1302,5 +1302,6 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Preflight produtivo read-only: PG17/owner, corpos/assinaturas/rowtypes compatíveis; 12/2/6 e RLS56/56/0 preservados antes da instalação.
 - [x] Checkpoint, instalação prospectiva 0035 e push fast-forward; `533e131` live/Healthy às 18h25min48. RLS65/65/0, ACLs e 12/2/6 preservados; zero origens novas às 18h33. Proteção de senha 0016 comprovada e preservada.
 - [x] Corrigir envelope booleano `success` do SDK sem aceitar confirmação falsa e refetch circular por montagem; 170 regressões direcionadas e gate completo aprovados.
-- [ ] Publicar e aceitar o complemento SDK/sessão; conclusão real a registrar no status externo de 16/11/2026.
+- [x] Complemento `46238e2` live/Healthy às 18h41min26; bundle exato e cadastro de cinco modalidades pronto às 18h42. Cotação de ID inexistente NOT_FOUND e ficha null; RLS65/65/0 e 12/2/6 preservados, zero origens novas. Nenhum empréstimo/mensagem criado pelo smoke.
+- [ ] Resolver/atestar frequência da agenda WhatsApp: active/cron*/5, mas último schedule success às 14h39 BRT e ausência de execuções novas por cerca de quatro horas; não certifica entrega contínua. Verificação sem dispatch, alterações ou mensagens.
 - [ ] Revisão humana de dados antigos continua separada. Sem alterações de Kiwify/oferta/Blacklist/WhatsApp/flags e sem correções automáticas de saldos ou tenant.
