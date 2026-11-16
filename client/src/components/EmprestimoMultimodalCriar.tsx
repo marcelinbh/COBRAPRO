@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { multimodalRpc, percentualMultimodal, useIntencaoMultimodal } from "./EmprestimoMultimodalRpc";
 import { dinheiroIntencao } from "./EmprestimoSeguroRpc";
 import { calcularMultimodal, gerarAgendaMultimodal, tipoTaxaMultimodal, validarEntradaCriacaoMultimodal, type ModalidadeMultimodal, type EntradaMultimodal } from "../../../shared/emprestimosMultimodalCalculo";
+import { dataHojeBrasilia } from "../../../shared/finance";
 
 const nomes: Record<ModalidadeMultimodal, string> = { mensal: "Mensal — juros simples do período", semanal: "Semanal — juros simples do período", quinzenal: "Quinzenal — juros simples do período", diario: "Diário — taxa única sobre o principal", tabela_price: "Tabela Price — taxa mensal sobre saldo" };
 export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mensal" }: { onSuccess: (id: number) => void; modalidadeInicial?: ModalidadeMultimodal }) {
@@ -13,15 +14,16 @@ export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mens
   const user = !auth.isError && !auth.isLoading && !auth.isFetching ? auth.data : undefined;
   const clientesQ = trpc.clientes.list.useQuery(undefined, { enabled: !!user });
   const contasQ = trpc.emprestimosMultimodal.contasParaCadastro.useQuery(undefined, { enabled: !!user });
-  const capacidadesQ = trpc.emprestimosMultimodal.disponibilidade.useQuery(undefined, { enabled: !!user });
+  const capacidadesQ = trpc.emprestimosMultimodal.disponibilidade.useQuery(undefined, { enabled: !!user, refetchOnMount: false });
   const utils = trpc.useUtils();
   const [modalidade, setModalidade] = useState<ModalidadeMultimodal>(modalidadeInicial);
   const [clienteId, setCliente] = useState(""), [contaId, setConta] = useState("");
   const [principal, setPrincipal] = useState(""), [taxa, setTaxa] = useState("0");
-  const [inicio, setInicio] = useState(""), [primeira, setPrimeira] = useState("");
+  const [inicio, setInicio] = useState(dataHojeBrasilia), [primeira, setPrimeira] = useState("");
   const [numero, setNumero] = useState("1"), [multa, setMulta] = useState("2.0000"), [mora, setMora] = useState("0.0330");
-  const clientes = user && !clientesQ.isError && !clientesQ.isLoading && !clientesQ.isFetching ? (clientesQ.data?.clientes ?? []).filter(c => c.userId === user.id) : [];
-  const contas = user && !contasQ.isError && !contasQ.isLoading && !contasQ.isFetching && contasQ.data?.empresaId === user.id ? contasQ.data?.contas ?? [] : [];
+  const vencimentoEditado = useRef(false);
+  const clientes = user && !clientesQ.isError && !clientesQ.isLoading ? (clientesQ.data?.clientes ?? []).filter(c => c.userId === user.id) : [];
+  const contas = user && !contasQ.isError && !contasQ.isLoading && contasQ.data?.empresaId === user.id ? contasQ.data?.contas ?? [] : [];
   const loading = clientesQ.isLoading || contasQ.isLoading || capacidadesQ.isLoading || clientesQ.isFetching || contasQ.isFetching || capacidadesQ.isFetching;
   const erroDados = clientesQ.isError || contasQ.isError || capacidadesQ.isError;
   const disponivel = !!user && !capacidadesQ.isError && !capacidadesQ.isLoading && !capacidadesQ.isFetching && capacidadesQ.data?.disponivel === true && Array.isArray(capacidadesQ.data.modalidades) && capacidadesQ.data.modalidades.includes(modalidade);
@@ -33,8 +35,14 @@ export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mens
     onSuccess(id);
   });
   useEffect(() => {
-    setCliente(""); setConta(""); setPrincipal(""); setTaxa("0"); setInicio(""); setPrimeira(""); setNumero("1"); setMulta("2.0000"); setMora("0.0330"); setModalidade(modalidadeInicial);
-  }, [user?.id]);
+    vencimentoEditado.current = false;
+    setCliente(""); setConta(""); setPrincipal(""); setTaxa("0"); setInicio(dataHojeBrasilia()); setPrimeira(""); setNumero("1"); setMulta("2.0000"); setMora("0.0330"); setModalidade(modalidadeInicial);
+  }, [auth.data?.id]);
+  useEffect(() => {
+    if (vencimentoEditado.current) return;
+    try { setPrimeira(inicio ? gerarAgendaMultimodal(inicio, 2, modalidade)[1] : ""); }
+    catch { setPrimeira(""); }
+  }, [inicio, modalidade, auth.data?.id]);
   async function atualizar() { await Promise.all([clientesQ.refetch(), contasQ.refetch(), capacidadesQ.refetch()]); }
   let previa: ReturnType<typeof calcularMultimodal> | null = null, datas: string[] = [], erroPrevia = "";
   if (principal && primeira && numero) {
@@ -43,7 +51,11 @@ export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mens
   }
   async function novoPayload(): Promise<EntradaMultimodal> {
     if (!intent.atual() || !podeCriar.current) throw new Error("Cadastro sem sessão e capacidades atuais; não iniciar outra intenção.");
-    if (!clienteId || !contaId || !inicio || !primeira || !clientes.some(c => c.id === Number(clienteId)) || !contas.some(c => c.id === Number(contaId))) throw new Error("Cliente e conta próprios, principal e datas civis devem ser selecionados explicitamente.");
+    if (!clienteId || !clientes.some(c => c.id === Number(clienteId))) throw new Error("Selecione um cliente da sua empresa.");
+    if (!contaId || !contas.some(c => c.id === Number(contaId))) throw new Error("Selecione a conta da sua empresa para o desembolso.");
+    if (!principal) throw new Error("Informe o valor principal do empréstimo.");
+    if (!inicio) throw new Error("Informe a data de início e desembolso.");
+    if (!primeira) throw new Error("Informe a data do primeiro vencimento.");
     const payload: EntradaMultimodal = {
       idempotencyKey: crypto.randomUUID(), clienteId: Number(clienteId), contaCaixaId: Number(contaId), modalidade,
       tipoTaxa: tipoTaxaMultimodal[modalidade], valorPrincipal: dinheiroIntencao(principal), taxaJuros: dinheiroIntencao(taxa),
@@ -58,6 +70,7 @@ export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mens
   function corrigirOuConcluir() {
     const old = intent.concluirOuCorrigir();
     if (old) {
+      vencimentoEditado.current = true;
       setModalidade(old.modalidade); setCliente(String(old.clienteId)); setConta(String(old.contaCaixaId)); setPrincipal(String(old.valorPrincipal)); setTaxa(String(old.taxaJuros));
       setInicio(old.dataInicio); setPrimeira(old.vencimentos[0]); setNumero(String(old.numeroParcelas)); setMulta(String(old.multaAtraso)); setMora(String(old.jurosMoraDiario));
     } else if (intent.encerrada()) {
@@ -81,7 +94,7 @@ export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mens
       <p>{intent.pendente.confirmacao ? "Confirmada. Não será enviado outro desembolso ao repetir." : "Aguardando confirmação. Após timeout/reload será usado exatamente o UUID e payload original."}</p>
       {!intent.pendente.confirmacao && <Button type="button" variant="outline" disabled={intent.busy} onClick={intent.reconciliar}>Conferir intenção no servidor</Button>}
       {(!!intent.pendente.confirmacao || intent.recovery?.status === "not_executed") && <Button type="button" variant="outline" disabled={intent.busy} onClick={corrigirOuConcluir}>{intent.pendente.confirmacao ? "Iniciar outro cadastro após confirmação" : "Corrigir após não execução comprovada"}</Button>}
-    </div> : <fieldset disabled={intent.busy} className="grid gap-3 sm:grid-cols-2">
+    </div> : <fieldset disabled={intent.busy || loading} className="grid gap-3 sm:grid-cols-2">
       <label><Label>Modalidade e regra de juros</Label><select className="w-full border p-2 rounded bg-background" value={modalidade} onChange={e => setModalidade(e.target.value as ModalidadeMultimodal)}>{Object.entries(nomes).map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}</select></label>
       <label><Label>Cliente da empresa</Label><select className="w-full border p-2 rounded bg-background" value={clienteId} onChange={e => setCliente(e.target.value)}><option value="">Selecione</option>{clientes.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>
       <label><Label>Conta própria de desembolso e recebimento</Label><select className="w-full border p-2 rounded bg-background" value={contaId} onChange={e => setConta(e.target.value)}><option value="">Selecione</option>{contas.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}</select></label>
@@ -89,7 +102,7 @@ export function EmprestimoMultimodalCriar({ onSuccess, modalidadeInicial = "mens
       <label><Label>{modalidade === "diario" ? "Taxa única (%)" : modalidade === "tabela_price" ? "Taxa mensal Price (%)" : "Taxa do período (%)"}</Label><Input inputMode="decimal" value={taxa} onChange={e => setTaxa(e.target.value)} /></label>
       <label><Label>Número de parcelas (1 a 60)</Label><Input type="number" min={1} max={60} value={numero} onChange={e => setNumero(e.target.value)} /></label>
       <label><Label>Data de início e desembolso</Label><Input type="date" value={inicio} onChange={e => setInicio(e.target.value)} /></label>
-      <label><Label>Primeiro vencimento</Label><Input type="date" value={primeira} onChange={e => setPrimeira(e.target.value)} /></label>
+      <label><Label>Primeiro vencimento</Label><Input type="date" value={primeira} onChange={e => { vencimentoEditado.current = true; setPrimeira(e.target.value); }} /></label>
       <label><Label>Multa após atraso (%)</Label><Input inputMode="decimal" value={multa} onChange={e => setMulta(e.target.value)} /></label>
       <label><Label>Mora simples por dia após atraso (%)</Label><Input inputMode="decimal" value={mora} onChange={e => setMora(e.target.value)} /></label>
       {erroPrevia && <p role="alert" className="sm:col-span-2">{erroPrevia}</p>}

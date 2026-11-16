@@ -4,6 +4,20 @@
 **Regra solicitada:** correções Kiwify ficam por último.  
 **Objetivo:** eliminar primeiro riscos de tomada de conta, alteração/vazamento entre empresas e corrupção operacional/financeira.
 
+## Correções do vídeo e controles WhatsApp — 16/11/2026
+
+- [x] Cadastro mantém seleção de conta/cliente no refetch da própria empresa; reconferência da sessão não desmonta o formulário multimodal e troca real de usuário continua segregada.
+- [x] Datas iniciais e primeiro vencimento automáticos no calendário BRT, editáveis; vencimento manual e payload de intenção existente não são sobrescritos.
+- [x] Campo faltante é identificado antes de gerar UUID/solicitar desembolso; aviso de transporte incerto reservado a intenção já preservada. Carregamento de capacidade não vira erro falso de modalidade.
+- [x] Controles de validação sem envio, teste com número explícito e processamento confirmado somente da própria empresa; edição de regra independe do master. Sem retry de envio ambíguo.
+- [x] Respostas tardias e histórico WhatsApp segregados por tenant/geração; vínculo de cliente contraditório não expõe telefone ou texto.
+- [x] Credencial backend Manus atualizada por formulário seguro e validada com teste Vitest HTTP200 negativo, sem dados pessoais ou escrita.
+- [ ] Confirmar checkpoint/push/rollout e smoke destas correções; as seções anteriores descrevem lotes já publicados, não o lote atual.
+- [ ] Atualizar a publicação Manus que executa a agenda nativa e confirmar uma execução nova bem-sucedida; logs após a chave ainda mostraram CONFIGURACOES_INDISPONIVEIS. Chave válida não prova cadência/entrega.
+- [ ] Multa manual fixa recebível: não implementada neste lote. O protótipo de registro separado foi rejeitado/arquivado fora do Git porque os recebimentos/renovações existentes não o liquidam. Não foi instalado e não representa liberação da multa.
+
+Nenhum guard de propriedade, migration aplicada, saldo, flag, Kiwify/oferta ou Blacklist foi removido/alterado neste lote.
+
 ## Ampliação prospectiva certificada — 16/11/2026
 
 - [x] Mensal/semanal/quinzenal/diário/Price com centavos exatos, agenda civil e criação atômica própria.

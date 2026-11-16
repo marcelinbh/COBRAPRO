@@ -9,7 +9,8 @@ import type { EntradaEmprestimoProspectivo } from "../../../server/services/empr
 import { assertRecoveryEvidence, canCloseRejectedIntent, recoveryRequest, type RecoveryEvidence } from "../../../shared/financialIntentRecovery";
 
 export function EmprestimoSeguroCriar({ onSuccess }: { onSuccess: (id: number) => void }) {
-  const { data: user } = trpc.auth.me.useQuery(undefined, { refetchOnMount: false });
+  const auth = trpc.auth.me.useQuery(undefined, { refetchOnMount: false });
+  const user = !auth.isError && !auth.isLoading && !auth.isFetching ? auth.data : undefined;
   const utils = trpc.useUtils();
   const clientesQuery = trpc.clientes.list.useQuery(undefined, { enabled: !!user });
   const contasQuery = trpc.emprestimosProspectivos.contasParaCadastro.useQuery(undefined, { enabled: !!user });

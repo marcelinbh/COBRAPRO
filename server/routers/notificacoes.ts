@@ -9,7 +9,9 @@ import {
 import { dataHojeBrasilia } from "../services/businessDate";
 import {
   enfileirarConfirmacaoPagamento,
+  enfileirarLembretesAutomaticos,
   obterSaudeNotificacoes,
+  processarFilaWhatsApp,
   substituirVariaveis,
 } from "../services/notificacoesAutomaticas";
 import {
@@ -310,7 +312,7 @@ export const notificacoesRouter = router({
       const sb = await requireDb();
       const { data, error } = await sb
         .from("notificacoes_log")
-        .select("*, clientes(nome)")
+        .select("id, user_id, tipo, cliente_id, telefone, mensagem, status, erro, createdAt")
         .eq("user_id", ctx.user.id)
         .order("createdAt", { ascending: false })
         .limit(input?.limit ?? 50);
@@ -319,7 +321,31 @@ export const notificacoesRouter = router({
           code: "INTERNAL_SERVER_ERROR",
           message: error.message,
         });
-      return data ?? [];
+      const logs = (data ?? []).filter((row: any) => row.user_id === ctx.user.id);
+      const ids = Array.from(new Set<number>(logs.map((row: any) => row.cliente_id as number).filter((id: number) => Number.isSafeInteger(id) && id > 0)));
+      const nomes = new Map<number, string>();
+      if (ids.length) {
+        const { data: clientes, error: clientesError } = await sb
+          .from("clientes")
+          .select("id, user_id, nome")
+          .eq("user_id", ctx.user.id)
+          .in("id", ids);
+        if (clientesError)
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível conferir os clientes do histórico" });
+        for (const cliente of clientes ?? [])
+          if (cliente.user_id === ctx.user.id) nomes.set(cliente.id, cliente.nome);
+      }
+      return logs.map((log: any) => {
+        const nome = nomes.get(log.cliente_id);
+        const vinculoSeguro = Boolean(nome) || (log.tipo === "teste_envio" && log.cliente_id == null);
+        return {
+          id: log.id, tipo: log.tipo, status: log.status, createdAt: log.createdAt,
+          telefone: vinculoSeguro ? log.telefone : null,
+          mensagem: vinculoSeguro ? log.mensagem : null,
+          erro: vinculoSeguro ? log.erro : "Vínculo de cliente indisponível ou contraditório; dados ocultos",
+          clientes: nome ? { nome } : null,
+        };
+      });
     }),
 
   saude: protectedProcedure.query(async ({ ctx }) =>
@@ -519,12 +545,30 @@ export const notificacoesRouter = router({
       };
     }),
 
-  /** Legado: o agendador oficial produz e processa a outbox; não há mais disparo direto por tRPC. */
-  dispararDoDia: protectedProcedure.mutation(async () => ({
-    enviados: 0,
-    mensagem:
-      "Use a rotina agendada: as mensagens agora passam pela fila rastreável.",
-  })),
+  /** Ação deliberada, com simulação por padrão; nunca recebe tenant do body.
+   * O motor mantém horário, opt-in, revalidação e não reenvio de ambiguidades. */
+  dispararDoDia: protectedProcedure
+    .input(z.object({ dryRun: z.boolean().default(true) }).strict().default({ dryRun: true }))
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.user.id;
+      if (!Number.isSafeInteger(userId) || userId <= 0)
+        throw new TRPCError({ code: "UNAUTHORIZED", message: "Sessão inválida" });
+      try {
+        const lembretes = await enfileirarLembretesAutomaticos(new Date(), input.dryRun, userId);
+        const fila = await processarFilaWhatsApp(25, input.dryRun, userId);
+        return {
+          dryRun: input.dryRun,
+          ...lembretes,
+          ...fila,
+          falhas: lembretes.falhasItens + fila.falhas,
+        };
+      } catch {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Não foi possível concluir a operação da sua fila. Consulte o histórico antes de tentar novamente; resultados ambíguos exigem reconciliação manual.",
+        });
+      }
+    }),
 });
 
 export { substituirVariaveis };

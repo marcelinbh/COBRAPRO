@@ -127,7 +127,14 @@ export function useIntencaoMultimodal<T extends Record<string, unknown> & { idem
       const confirmed = { ...saved, confirmacao: confirmar(acao, result, saved.payload) };
       persistir(confirmed);
       toast.success("Operação financeira confirmada sem duplicar a intenção."); callback.current(confirmed.confirmacao);
-    } catch (e) { if (atual()) toast.error(`${(e as Error).message} Preserve UUID/payload; erro de transporte não prova rollback.`); }
+    } catch (e) {
+      if (atual()) {
+        const aviso = ref.current
+          ? "Preserve UUID/payload; erro de transporte não prova rollback."
+          : "Corrija o campo informado e confirme novamente. Nenhum desembolso foi solicitado por esta tentativa.";
+        toast.error(`${(e as Error).message} ${aviso}`);
+      }
+    }
     finally { if (atual()) { flight.current = false; setBusy(false); } }
   }
   async function reconciliar() {

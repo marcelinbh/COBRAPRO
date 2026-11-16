@@ -389,3 +389,56 @@ describe("sessão sem refetch circular da montagem dos filhos", () => {
     expect(h.criar).not.toHaveBeenCalled(); expect(h.receber).not.toHaveBeenCalled(); expect(h.renovar).not.toHaveBeenCalled();
   });
 });
+
+describe("regressões do vídeo — preenchimento preservado e erros de formulário", () => {
+  it.each(["clientes", "contas"])("refetch de %s preserva a seleção própria até concluir", async tipo => {
+    const r = await createUI(); fill(r);
+    const original = tipo === "clientes" ? { clientes: [{ id: 1, nome: "Cliente próprio", userId: 901 }] } : { empresaId: 901, contas: [{ id: 3, nome: "Conta própria" }] };
+    h.queries[tipo] = query(original, { isFetching: true }); r.render();
+    expect(r.nodes("select")[1].props.value).toBe("1"); expect(r.nodes("select")[2].props.value).toBe("3");
+    expect(r.text()).toContain("Conta própria"); expect(r.button("Confirmar cadastro").props.disabled).toBe(true);
+    h.queries[tipo] = query(original); r.render();
+    expect(r.nodes("select")[2].props.value).toBe("3"); expect(r.button("Confirmar cadastro").props.disabled).toBe(false);
+  });
+  it("reconferir a mesma sessão não apaga principal, conta ou datas", async () => {
+    const r = await createUI(); fill(r); h.auth = { isFetching: true }; r.render();
+    expect(r.text()).not.toContain("Conta própria"); expect(h.criar).not.toHaveBeenCalled();
+    h.auth = {}; r.render(); await r.flush();
+    expect(r.nodes("select")[2].props.value).toBe("3");
+    expect(r.nodes("input")[0].props.value).toBe("500.00"); expect(r.nodes("input")[4].props.value).toBe("2027-01-31");
+  });
+  it.each(["conta", "inicio", "vencimento"])("falta de %s informa o campo antes de gerar UUID ou solicitar desembolso", async campo => {
+    const r = await createUI(); fill(r);
+    if (campo === "conta") r.change(r.nodes("select")[2], "");
+    else r.change(r.nodes("input")[campo === "inicio" ? 3 : 4], "");
+    await r.click("Confirmar cadastro");
+    expect(h.validar).not.toHaveBeenCalled(); expect(h.criar).not.toHaveBeenCalled(); expect(crypto.randomUUID).not.toHaveBeenCalled();
+    expect(h.error.mock.calls[0][0]).not.toContain("erro de transporte");
+    expect(h.error.mock.calls[0][0]).toContain("Nenhum desembolso foi solicitado por esta tentativa"); expect(data.size).toBe(0);
+  });
+  it("root mantém o mesmo formulário durante auth refetch sem ler storage", () => {
+    const r = new MemoryUI(NovoContrato, {}).render(); const child = r.nodes(EmprestimoMultimodalCriar)[0];
+    storage.getItem.mockClear(); h.auth = { isFetching: true }; r.render();
+    expect(r.nodes(EmprestimoMultimodalCriar)[0].key).toBe(child.key); expect(storage.getItem).not.toHaveBeenCalled();
+    expect(r.text()).toContain("sem apagar seu preenchimento");
+  });
+  it("capacidade em refetch mostra carregamento, não erro de modalidade", () => {
+    h.queries.capacidade = query({ disponivel: true }, { isFetching: true });
+    const r = new MemoryUI(NovoContrato, {}).render();
+    expect(r.text()).toContain("Conferindo as modalidades"); expect(r.text()).not.toContain("Não foi possível conferir o ciclo");
+  });
+});
+
+describe("datas do cadastro sem campos vazios inesperados", () => {
+  it("preenche início BRT e primeiro vencimento mensal, sem importar valores do atalho", async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date("2026-11-11T01:00:00Z"));
+    try {
+      const r = await createUI();
+      expect(r.nodes("input")[3].props.value).toBe("2026-11-10");
+      expect(r.nodes("input")[4].props.value).toBe("2026-12-10");
+      expect(r.nodes("input")[0].props.value).toBe(""); expect(h.criar).not.toHaveBeenCalled();
+      r.change(r.nodes("input")[4], "2027-01-31"); r.change(r.nodes("select")[0], "diario");
+      expect(r.nodes("input")[4].props.value).toBe("2027-01-31");
+    } finally { vi.useRealTimers(); }
+  });
+});

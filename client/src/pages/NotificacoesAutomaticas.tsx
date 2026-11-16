@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import {
@@ -57,6 +57,19 @@ export default function NotificacoesAutomaticas() {
   const [testeAberto, setTesteAberto] = useState(false);
   const [testeConfigurado, setTesteConfigurado] = useState<{ tipo: string; mensagem: string } | null>(null);
   const [telefoneTeste, setTelefoneTeste] = useState("");
+  const [confirmarFila, setConfirmarFila] = useState(false);
+  const filaEmExecucao = useRef(false);
+  const [resultadoFila, setResultadoFila] = useState<{
+    dryRun: boolean;
+    elegiveis: number;
+    enfileiradas: number;
+    processadas: number;
+    enviadas: number;
+    falhas: number;
+    aguardandoReconexao: number;
+    ambiguas: number;
+    canceladas: number;
+  } | null>(null);
   const [resultadoTeste, setResultadoTeste] = useState<{
     telefone: string;
     providerMessageId: string | null;
@@ -65,38 +78,61 @@ export default function NotificacoesAutomaticas() {
   } | null>(null);
 
   const utils = trpc.useUtils();
+  const auth = trpc.auth.me.useQuery(undefined, { retry: false, refetchOnMount: false });
+  const userId = auth.data?.id;
+  const sessaoDisponivel = Number.isSafeInteger(userId) && Number(userId) > 0 && !auth.isLoading && !auth.isFetching && !auth.isError;
+  const sessao = useRef({ userId, disponivel: sessaoDisponivel, geracao: 0 });
+  const identidadeMudou = sessao.current.userId !== userId || sessao.current.disponivel !== sessaoDisponivel;
+  if (identidadeMudou) sessao.current = { userId, disponivel: sessaoDisponivel, geracao: sessao.current.geracao + 1 };
+  const geracao = sessao.current.geracao;
+  const queryScope = {
+    enabled: sessaoDisponivel && !identidadeMudou,
+    queryKeyHashFn: (key: readonly unknown[]) => JSON.stringify([userId, geracao, key]),
+  };
+  const capturarSessao = () => ({ userId, geracao });
+  const respostaAtual = (origem: { userId: number | undefined; geracao: number } | undefined) =>
+    !!origem && sessao.current.disponivel && origem.userId === sessao.current.userId && origem.geracao === sessao.current.geracao;
 
-  const { data: globalAtivo, isLoading: loadingGlobal } = trpc.notificacoes.getGlobalAtivo.useQuery();
-  const { data: automacao, isLoading: loadingAutomacao } = trpc.notificacoes.getAutomacao.useQuery();
-  const { data: regras, isLoading: loadingRegras } = trpc.notificacoes.listar.useQuery();
-  const { data: historico, isLoading: loadingHistorico } = trpc.notificacoes.historico.useQuery({ limit: 50 });
-  const { data: saude } = trpc.notificacoes.saude.useQuery(undefined, { refetchInterval: 30_000 });
-  const { data: conexao, isLoading: loadingConexao } = trpc.whatsappEvolution.getStatus.useQuery(undefined, { refetchInterval: testeAberto ? 10_000 : 60_000 });
+  const { data: globalAtivo, isLoading: loadingGlobal, error: erroGlobal } = trpc.notificacoes.getGlobalAtivo.useQuery(undefined, queryScope);
+  const { data: automacao, isLoading: loadingAutomacao, error: erroAutomacao } = trpc.notificacoes.getAutomacao.useQuery(undefined, queryScope);
+  const { data: regras, isLoading: loadingRegras, error: erroRegras } = trpc.notificacoes.listar.useQuery(undefined, queryScope);
+  const { data: historico, isLoading: loadingHistorico, error: erroHistorico } = trpc.notificacoes.historico.useQuery({ limit: 50 }, queryScope);
+  const { data: saude, isLoading: loadingSaude, error: erroSaude } = trpc.notificacoes.saude.useQuery(undefined, { ...queryScope, refetchInterval: 30_000 });
+  const { data: conexao, isLoading: loadingConexao, error: erroConexao } = trpc.whatsappEvolution.getStatus.useQuery(undefined, { ...queryScope, refetchInterval: testeAberto ? 10_000 : 60_000 });
 
   const salvarAutomacao = trpc.notificacoes.salvarAutomacao.useMutation({
-    onSuccess: () => {
+    onMutate: capturarSessao,
+    onSuccess: (_data, _input, origem) => {
+      if (!respostaAtual(origem)) return;
       utils.notificacoes.getGlobalAtivo.invalidate();
       utils.notificacoes.getAutomacao.invalidate();
       toast.success("Automação de WhatsApp atualizada.");
     },
-    onError: (erro) => toast.error(erro.message),
+    onError: (erro, _input, origem) => { if (respostaAtual(origem)) toast.error(erro.message); },
   });
 
   const toggle = trpc.notificacoes.toggle.useMutation({
-    onSuccess: () => utils.notificacoes.listar.invalidate(),
+    onMutate: capturarSessao,
+    onSuccess: (_data, _input, origem) => { if (respostaAtual(origem)) utils.notificacoes.listar.invalidate(); },
+    onError: (erro, _input, origem) => { if (respostaAtual(origem)) toast.error(erro.message); },
   });
 
   const salvar = trpc.notificacoes.salvar.useMutation({
-    onSuccess: () => {
+    onMutate: capturarSessao,
+    onSuccess: (_data, _input, origem) => {
+      if (!respostaAtual(origem)) return;
       utils.notificacoes.listar.invalidate();
       setEditando(null);
       toast.success(t('toast_success.mensagem_salva_com_sucesso'));
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e, _input, origem) => { if (respostaAtual(origem)) toast.error(e.message); },
   });
 
   const testar = trpc.notificacoes.testar.useMutation({
-    onSuccess: (data) => {
+    onMutate: capturarSessao,
+    retry: false,
+    onSuccess: (data, _input, origem) => {
+      if (!respostaAtual(origem)) return;
       setResultadoTeste({
         telefone: data.telefone,
         providerMessageId: data.providerMessageId,
@@ -107,30 +143,88 @@ export default function NotificacoesAutomaticas() {
       utils.notificacoes.saude.invalidate();
       toast.success("A Evolution aceitou a mensagem de teste.");
     },
-    onError: (e) => toast.error(`Erro ao testar: ${e.message}`),
+    onError: (e, _input, origem) => { if (respostaAtual(origem)) toast.error(`Erro ao testar: ${e.message}`); },
   });
 
+  const disparar = trpc.notificacoes.dispararDoDia.useMutation({
+    onMutate: capturarSessao,
+    retry: false,
+    onSettled: (_data, _erro, _input, origem) => { if (respostaAtual(origem)) filaEmExecucao.current = false; },
+    onSuccess: (data, _input, origem) => {
+      if (!respostaAtual(origem)) return;
+      setResultadoFila(data);
+      setConfirmarFila(false);
+      utils.notificacoes.historico.invalidate();
+      utils.notificacoes.saude.invalidate();
+      if (data.falhas || data.ambiguas) {
+        toast.warning("Operação concluída com itens que exigem atenção. Confira os contadores e o histórico.");
+      } else {
+        toast.info(data.dryRun ? "Validação concluída sem enviar mensagens." : `Fila processada: ${data.enviadas} solicitação(ões) aceita(s) pela Evolution.`);
+      }
+    },
+    onError: (erro, _input, origem) => {
+      if (!respostaAtual(origem)) return;
+      utils.notificacoes.historico.invalidate();
+      utils.notificacoes.saude.invalidate();
+      toast.error(erro.message);
+    },
+  });
+  const filaIndisponivel = !sessaoDisponivel || identidadeMudou || loadingRegras || loadingGlobal || loadingAutomacao || !!erroRegras || !!erroGlobal || !!erroAutomacao || disparar.isPending || salvar.isPending || toggle.isPending || salvarAutomacao.isPending;
+  const handleProcessarFila = (dryRun: boolean) => {
+    if (filaEmExecucao.current || filaIndisponivel || testar.isPending || (!dryRun && (!confirmarFila || !conexao?.connected || loadingConexao || erroConexao))) return;
+    filaEmExecucao.current = true;
+    setResultadoFila(null);
+    disparar.reset();
+    disparar.mutate({ dryRun });
+  };
+
   useEffect(() => {
-    if (automacao?.horario) setHorario(automacao.horario);
-  }, [automacao?.horario]);
+    setEditando(null);
+    setTelefoneTeste("");
+    setTesteConfigurado(null);
+    setResultadoTeste(null);
+    setResultadoFila(null);
+    setTesteAberto(false);
+    setConfirmarFila(false);
+    setHorario("09:00");
+    filaEmExecucao.current = false;
+    salvarAutomacao.reset(); toggle.reset(); salvar.reset(); testar.reset(); disparar.reset();
+  }, [geracao]);
+
+  useEffect(() => {
+    sessao.current.disponivel = sessaoDisponivel;
+    return () => {
+      sessao.current.disponivel = false;
+      filaEmExecucao.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (sessaoDisponivel && !erroAutomacao && automacao?.horario) setHorario(automacao.horario);
+  }, [automacao?.horario, sessaoDisponivel, erroAutomacao]);
 
   const handleToggleGlobal = (ativo: boolean) => {
+    if (!sessaoDisponivel || identidadeMudou || loadingGlobal || loadingAutomacao || erroGlobal || erroAutomacao || salvarAutomacao.isPending || disparar.isPending) return;
     salvarAutomacao.mutate({ ativo, horario });
   };
 
   const handleSalvarHorario = () => {
+    if (!sessaoDisponivel || identidadeMudou || loadingGlobal || loadingAutomacao || erroGlobal || erroAutomacao || salvarAutomacao.isPending || disparar.isPending) return;
     salvarAutomacao.mutate({ ativo: globalAtivo ?? false, horario });
   };
 
   const handleToggleRegra = (tipo: string, ativo: boolean) => {
+    if (!sessaoDisponivel || identidadeMudou || loadingRegras || erroRegras || salvar.isPending || toggle.isPending || disparar.isPending) return;
     toggle.mutate({ tipo, ativo });
   };
 
   const handleEditar = (regra: { tipo: string; mensagem_template: string }) => {
+    if (!sessaoDisponivel || identidadeMudou || loadingRegras || erroRegras || salvar.isPending || toggle.isPending || disparar.isPending) return;
     setEditando({ tipo: regra.tipo, mensagem: regra.mensagem_template });
   };
 
   const handleSalvar = () => {
+    if (!sessaoDisponivel || identidadeMudou || loadingRegras || erroRegras || salvar.isPending || toggle.isPending || disparar.isPending) return;
     if (!editando) return;
     const regra = regras?.find(r => r.tipo === editando.tipo);
     if (!regra) return;
@@ -138,6 +232,7 @@ export default function NotificacoesAutomaticas() {
   };
 
   const abrirTeste = (tipo?: string, mensagem?: string) => {
+    if (!sessaoDisponivel || identidadeMudou || loadingRegras || erroRegras || testar.isPending || disparar.isPending) return;
     const regraPadrao = regras?.[0];
     const configuracao = tipo && mensagem
       ? { tipo, mensagem }
@@ -156,6 +251,7 @@ export default function NotificacoesAutomaticas() {
   };
 
   const handleTestar = () => {
+    if (!sessaoDisponivel || identidadeMudou || loadingRegras || erroRegras || testar.isPending || disparar.isPending || loadingConexao || erroConexao || !conexao?.connected) return;
     if (!testeConfigurado) return;
     if (!telefoneTeste.replace(/\D/g, "").match(/^\d{10,13}$/)) {
       toast.error("Informe um número brasileiro com DDD para receber o teste.");
@@ -174,6 +270,13 @@ export default function NotificacoesAutomaticas() {
   };
 
   const regraEditando = regras?.find(r => r.tipo === editando?.tipo);
+  if (!sessaoDisponivel || identidadeMudou) return (
+    <DashboardLayout>
+      <div className="p-6" role={auth.isError ? "alert" : "status"}>
+        {auth.isError ? "Sessão indisponível. Nenhuma alteração ou envio pode ser solicitado." : "Conferindo sua sessão antes de carregar notificações…"}
+      </div>
+    </DashboardLayout>
+  );
 
   return (
     <DashboardLayout>
@@ -194,18 +297,41 @@ export default function NotificacoesAutomaticas() {
               {loadingConexao ? <Loader2 className="mr-1 size-3 animate-spin" /> : conexao?.connected ? <CheckCheck className="mr-1 size-3" /> : <Phone className="mr-1 size-3" />}
               {loadingConexao ? "Verificando WhatsApp" : conexao?.connected ? "WhatsApp conectado" : "WhatsApp desconectado"}
             </Badge>
-            <Button size="sm" onClick={() => abrirTeste()} disabled={loadingRegras || !conexao?.connected} className="w-full gap-2 sm:w-auto">
+            <Button size="sm" onClick={() => abrirTeste()} disabled={loadingRegras || !!erroRegras || loadingConexao || !!erroConexao || !conexao?.connected || testar.isPending || disparar.isPending} className="w-full gap-2 sm:w-auto">
               <Send className="w-4 h-4" />
               Enviar teste
             </Button>
-            <Button variant="outline" size="sm" disabled className="hidden gap-2 sm:flex" title="Os envios são processados pela automação em fila, com prevenção de duplicidade.">
+            <Button variant="outline" size="sm" onClick={() => handleProcessarFila(true)} disabled={filaIndisponivel || testar.isPending} className="gap-2">
+              {disparar.isPending && disparar.variables?.dryRun ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+              Validar sem enviar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => { disparar.reset(); setConfirmarFila(true); }} disabled={filaIndisponivel || testar.isPending || loadingConexao || !!erroConexao || !conexao?.connected} className="gap-2">
               <Zap className="w-4 h-4" />
-              Fila automática
+              Processar minha fila
             </Button>
           </div>
         </div>
 
-        {!loadingConexao && !conexao?.connected && (
+        {(erroRegras || erroGlobal || erroAutomacao || erroConexao) && (
+          <p role="alert" className="rounded-lg border border-red-500/20 px-3 py-2 text-sm text-red-400">
+            Não foi possível carregar {erroRegras ? "as regras" : erroConexao ? "a conexão do WhatsApp" : "as preferências da automação"}. Tente novamente antes de alterar esta configuração ou processar a fila.
+          </p>
+        )}
+        {disparar.error && (
+          <p role="alert" className="rounded-lg border border-red-500/20 px-3 py-2 text-sm text-red-400">{disparar.error.message}</p>
+        )}
+        {disparar.isPending && <p role="status" className="text-sm text-muted-foreground">{disparar.variables?.dryRun ? "Validando sem enviar…" : "Processando sua fila…"}</p>}
+        {resultadoFila && (
+          <Card>
+            <CardContent className="space-y-2 py-4" aria-live="polite">
+              <p className="font-semibold">{resultadoFila.dryRun ? "Validação sem envio" : "Resultado do processamento"}</p>
+              <p className="text-sm">Elegíveis: {resultadoFila.elegiveis} · Enfileiradas: {resultadoFila.enfileiradas} · Processadas: {resultadoFila.processadas} · Aceitas pela Evolution: {resultadoFila.enviadas}</p>
+              <p className="text-sm">Falhas: {resultadoFila.falhas} · Aguardando reconexão: {resultadoFila.aguardandoReconexao} · Revisão manual: {resultadoFila.ambiguas} · {resultadoFila.dryRun ? "Obsoletas" : "Canceladas"}: {resultadoFila.canceladas}</p>
+              <p className="text-xs text-muted-foreground">{resultadoFila.dryRun ? "Nenhuma mensagem enviada e nenhuma alteração persistida. A simulação da fila avalia apenas itens já pendentes." : "Aceitação pela Evolution não comprova entrega ou leitura. Itens ambíguos não são reenviados; confira o histórico."} Novos lembretes respeitam o horário de Brasília, a ativação geral e as regras ativas. Cada processamento avalia até 25 itens da sua fila.</p>
+            </CardContent>
+          </Card>
+        )}
+        {!loadingConexao && !erroConexao && !conexao?.connected && (
           <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-300">
             Conecte o WhatsApp da empresa antes de enviar um teste. O teste não depende de as automações estarem ativadas.
           </p>
@@ -231,9 +357,10 @@ export default function NotificacoesAutomaticas() {
                 </div>
               </div>
               <Switch
+                aria-label="Ativar automação geral"
                 checked={globalAtivo ?? false}
                 onCheckedChange={handleToggleGlobal}
-                disabled={loadingGlobal || loadingAutomacao || salvarAutomacao.isPending}
+                disabled={loadingGlobal || loadingAutomacao || !!erroGlobal || !!erroAutomacao || salvarAutomacao.isPending || disparar.isPending}
                 className="scale-125"
               />
             </div>
@@ -249,10 +376,10 @@ export default function NotificacoesAutomaticas() {
                   step="300"
                   value={horario}
                   onChange={(event) => setHorario(event.target.value)}
-                  disabled={loadingAutomacao || salvarAutomacao.isPending}
+                  disabled={loadingGlobal || loadingAutomacao || !!erroGlobal || !!erroAutomacao || salvarAutomacao.isPending || disparar.isPending}
                   className="w-full sm:w-32"
                 />
-                <Button variant="outline" size="sm" onClick={handleSalvarHorario} disabled={loadingAutomacao || salvarAutomacao.isPending}>
+                <Button variant="outline" size="sm" onClick={handleSalvarHorario} disabled={loadingGlobal || loadingAutomacao || !!erroGlobal || !!erroAutomacao || salvarAutomacao.isPending || disparar.isPending}>
                   Salvar horário
                 </Button>
               </div>
@@ -260,6 +387,10 @@ export default function NotificacoesAutomaticas() {
           </CardContent>
         </Card>
 
+        {!loadingGlobal && !erroGlobal && !globalAtivo && (
+          <p className="text-sm text-muted-foreground">Você pode editar e ligar regras com a automação geral desligada. Isso não ativa os envios automaticamente; o envio depende da ativação geral e do horário configurado.</p>
+        )}
+        {erroSaude && <p role="alert" className="text-sm text-red-400">Não foi possível carregar a situação da fila.</p>}
         <Card className="border-border bg-muted/20">
           <CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-5">
             {[
@@ -270,13 +401,13 @@ export default function NotificacoesAutomaticas() {
             ].map(([label, valor, cor]) => (
               <div key={String(label)} className="rounded-lg border border-border bg-background/40 p-3">
                 <p className="text-xs text-muted-foreground">{label}</p>
-                <p className={`mt-1 text-lg font-semibold ${cor}`}>{valor}</p>
+                <p className={`mt-1 text-lg font-semibold ${cor}`}>{loadingSaude ? "…" : erroSaude ? "—" : valor}</p>
               </div>
             ))}
             <div className="col-span-2 rounded-lg border border-border bg-background/40 p-3 sm:col-span-1">
               <p className="text-xs text-muted-foreground">Último envio</p>
               <p className="mt-1 truncate text-xs font-medium text-foreground">
-                {saude?.ultimoEnvioEm ? new Date(saude.ultimoEnvioEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Sem envio"}
+                {loadingSaude ? "Carregando…" : erroSaude ? "Indisponível" : saude?.ultimoEnvioEm ? new Date(saude.ultimoEnvioEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Sem envio"}
               </p>
             </div>
           </CardContent>
@@ -321,13 +452,15 @@ export default function NotificacoesAutomaticas() {
                   <div key={i} className="h-20 bg-muted/30 rounded-lg animate-pulse" />
                 ))}
               </div>
+            ) : erroRegras ? (
+              <p role="alert" className="text-sm text-red-400">Regras indisponíveis. Não foram substituídas por uma lista vazia.</p>
             ) : (
               <div className="space-y-2">
                 {(regras ?? []).map((regra) => {
                   const cat = getCategoria(regra.tipo);
                   const Icone = cat.icone;
                   return (
-                    <Card key={regra.tipo} className={`transition-all ${!globalAtivo ? "opacity-50" : ""}`}>
+                    <Card key={regra.tipo} className="transition-all">
                       <CardContent className="py-3 px-4">
                         <div className="flex items-center gap-3">
                           {/* Ícone categoria */}
@@ -352,16 +485,17 @@ export default function NotificacoesAutomaticas() {
                               variant="ghost"
                               size="sm"
                               onClick={() => handleEditar(regra)}
-                              disabled={!globalAtivo}
+                              disabled={loadingRegras || !!erroRegras || salvar.isPending || toggle.isPending || disparar.isPending}
                               className="h-8 px-2 text-xs"
                             >
                               <MessageSquare className="w-3.5 h-3.5 mr-1" />
                               {t('common.edit')}
                             </Button>
                             <Switch
+                              aria-label={`Ativar regra ${regra.label}`}
                               checked={regra.ativo}
                               onCheckedChange={(val) => handleToggleRegra(regra.tipo, val)}
-                              disabled={!globalAtivo || toggle.isPending}
+                              disabled={loadingRegras || !!erroRegras || toggle.isPending || salvar.isPending || disparar.isPending}
                             />
                           </div>
                         </div>
@@ -385,6 +519,8 @@ export default function NotificacoesAutomaticas() {
                   <div className="space-y-2">
                     {[1, 2, 3].map(i => <div key={i} className="h-12 bg-muted/30 rounded animate-pulse" />)}
                   </div>
+                ) : erroHistorico ? (
+                  <p role="alert" className="text-sm text-red-400">Não foi possível carregar o histórico. A ausência de dados não comprova ausência de envios.</p>
                 ) : !historico || historico.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <History className="w-8 h-8 mx-auto mb-2 opacity-30" />
@@ -441,7 +577,7 @@ export default function NotificacoesAutomaticas() {
       </div>
 
       {/* ─── DIALOG EDITAR MENSAGEM ──────────────────────────────────────────── */}
-      <Dialog open={!!editando} onOpenChange={(open) => !open && setEditando(null)}>
+      <Dialog open={!!editando} onOpenChange={(open) => !open && !salvar.isPending && setEditando(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -510,9 +646,31 @@ placeholder={t('notifications.messagePlaceholder')}
               <Send className="w-4 h-4" />
               Testar em um número
             </Button>
-            <Button onClick={handleSalvar} disabled={salvar.isPending} className="gap-2">
+            <Button onClick={handleSalvar} disabled={salvar.isPending || toggle.isPending || loadingRegras || !!erroRegras || !editando?.mensagem.trim()} className="gap-2">
               <CheckCircle2 className="w-4 h-4" />
               {salvar.isPending ? t('common.saving') : t('common.save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={confirmarFila} onOpenChange={(open) => !open && !disparar.isPending && setConfirmarFila(false)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Confirmar processamento da minha fila</DialogTitle>
+            <DialogDescription>Esta ação pode enviar mensagens reais pelo WhatsApp da sua empresa.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm">
+            <p>Somente suas regras ativas e seus próprios clientes são considerados, com a ativação geral e o horário de Brasília respeitados. Nenhuma regra ou automação será ativada por esta ação.</p>
+            <p>Até 25 itens pendentes da sua fila serão revalidados antes do envio. Relatórios próprios já autorizados também podem estar na fila. Mensagens ambíguas e testes manuais não são reenviados.</p>
+            <p className="text-muted-foreground">Para conferir sem enviar nem persistir alterações, cancele e use “Validar sem enviar”. A aceitação pela Evolution não é prova de entrega ou leitura.</p>
+            {disparar.error && <p role="alert" className="text-red-400">{disparar.error.message}</p>}
+          </div>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmarFila(false)} disabled={disparar.isPending}>Cancelar</Button>
+            <Button onClick={() => handleProcessarFila(false)} disabled={filaIndisponivel || testar.isPending || loadingConexao || !!erroConexao || !conexao?.connected} className="gap-2">
+              {disparar.isPending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+              {disparar.isPending ? "Processando…" : "Confirmar envio da minha fila"}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -242,20 +242,36 @@ export async function enfileirarConfirmacaoPagamento(
   );
 }
 
+function validarEscopoUsuario(userId?: number): void {
+  if (userId !== undefined && (!Number.isSafeInteger(userId) || userId <= 0))
+    throw new Error("USUARIO_ESCOPO_INVALIDO");
+}
+
+function ownerValido(item: any, userId?: number): boolean {
+  return (
+    Number.isSafeInteger(item?.user_id) &&
+    item.user_id > 0 &&
+    (userId === undefined || item.user_id === userId)
+  );
+}
+
 export async function enfileirarLembretesAutomaticos(
   now: Date = new Date(),
-  dryRun = false
+  dryRun = false,
+  userId?: number
 ): Promise<{
   usuariosNoHorario: number;
   elegiveis: number;
   enfileiradas: number;
   falhasItens: number;
 }> {
+  validarEscopoUsuario(userId);
   const sb = await getSupabaseClientAsync();
   if (!sb) throw new Error("Banco de dados indisponível");
-  const { data: configsAtivos, error: configsError } = await sb
-    .from("configuracoes")
-    .select("user_id")
+  let consultaAtivos = sb.from("configuracoes").select("user_id");
+  if (userId !== undefined)
+    consultaAtivos = consultaAtivos.eq("user_id", userId);
+  const { data: configsAtivos, error: configsError } = await consultaAtivos
     .eq("chave", "notificacoes_auto_ativo")
     .eq("valor", "true");
   if (configsError) throw new Error("CONFIGURACOES_INDISPONIVEIS");
@@ -265,23 +281,33 @@ export async function enfileirarLembretesAutomaticos(
     falhasItens = 0;
   const dataHoje = dataHojeBrasilia(now);
   for (const configAtiva of configsAtivos ?? []) {
-    const userId = configAtiva.user_id as number;
+    // Defesa contra resposta contraditória; o escopo já foi aplicado no banco.
+    if (!ownerValido(configAtiva, userId)) {
+      falhasItens++;
+      continue;
+    }
+    const tenantId = configAtiva.user_id as number;
     const [
       { data: regras, error: regrasError },
       { data: configuracoes, error: configuracoesError },
     ] = await Promise.all([
       sb
         .from("notificacoes_automaticas")
-        .select("tipo, dias_antes, mensagem_template")
-        .eq("user_id", userId)
+        .select("user_id, tipo, dias_antes, mensagem_template")
+        .eq("user_id", tenantId)
         .eq("ativo", true),
       sb
         .from("configuracoes")
-        .select("chave, valor")
-        .eq("user_id", userId)
+        .select("user_id, chave, valor")
+        .eq("user_id", tenantId)
         .in("chave", ["nomeEmpresa", "notificacoes_auto_horario"]),
     ]);
-    if (regrasError || configuracoesError) {
+    if (
+      regrasError ||
+      configuracoesError ||
+      (regras ?? []).some((row: any) => !ownerValido(row, tenantId)) ||
+      (configuracoes ?? []).some((row: any) => !ownerValido(row, tenantId))
+    ) {
       falhasItens++;
       continue;
     }
@@ -312,9 +338,11 @@ export async function enfileirarLembretesAutomaticos(
       const { data: parcelas, error: parcelasError } = await sb
         .from("parcelas")
         .select(
-          "id, valor_original, numero_parcela, cliente_id, contrato_id, contratos!inner(user_id, numero_parcelas, cliente_id, clientes!inner(id, user_id, nome, whatsapp, telefone))"
+          "id, user_id, valor_original, numero_parcela, cliente_id, contrato_id, contratos!inner(user_id, numero_parcelas, cliente_id, clientes!inner(id, user_id, nome, whatsapp, telefone))"
         )
-        .eq("user_id", userId)
+        .eq("user_id", tenantId)
+        .eq("contratos.user_id", tenantId)
+        .eq("contratos.clientes.user_id", tenantId)
         .eq("data_vencimento", dataAlvo)
         .in("status", ["pendente", "atrasada"]);
       if (parcelasError) {
@@ -326,8 +354,9 @@ export async function enfileirarLembretesAutomaticos(
           const cliente = parcela.contratos?.clientes;
           if (
             !cliente ||
-            parcela.contratos.user_id !== userId ||
-            cliente.user_id !== userId ||
+            !ownerValido(parcela, tenantId) ||
+            !ownerValido(parcela.contratos, tenantId) ||
+            !ownerValido(cliente, tenantId) ||
             parcela.cliente_id !== cliente.id ||
             parcela.contratos.cliente_id !== cliente.id
           )
@@ -348,14 +377,14 @@ export async function enfileirarLembretesAutomaticos(
           });
           const criada = await enfileirarMensagemWhatsApp(
             {
-              userId,
+              userId: tenantId,
               tipo: regra.tipo,
               telefone,
               mensagem,
               dataReferencia: dataHoje,
               parcelaId: parcela.id,
               clienteId: cliente.id,
-              chaveDeduplicacao: `lembrete:${userId}:${parcela.id}:${regra.tipo}:${dataHoje}`,
+              chaveDeduplicacao: `lembrete:${tenantId}:${parcela.id}:${regra.tipo}:${dataHoje}`,
             },
             dryRun
           );
@@ -388,23 +417,28 @@ export function deveMarcarRelatorioDiarioComoConcluido(
   );
 }
 /** Lease expirado não prova que POST não ocorreu. Nunca retorna à fila. */
-export async function recuperarLeasesExpiradosWhatsApp(): Promise<number> {
+export async function recuperarLeasesExpiradosWhatsApp(
+  userId?: number
+): Promise<number> {
+  validarEscopoUsuario(userId);
   const sb = await getSupabaseClientAsync();
   if (!sb) throw new Error("Banco de dados indisponível");
   const agora = new Date().toISOString();
-  const { data, error } = await sb
-    .from("whatsapp_outbox")
-    .update({
-      status: "desconhecido",
-      lease_expira_em: null,
-      proxima_tentativa_em: agora,
-      ultimo_erro: "LEASE_EXPIRADO_RECONCILIACAO_MANUAL",
-      updated_at: agora,
-    })
+  let recuperacao = sb.from("whatsapp_outbox").update({
+    status: "desconhecido",
+    lease_expira_em: null,
+    proxima_tentativa_em: agora,
+    ultimo_erro: "LEASE_EXPIRADO_RECONCILIACAO_MANUAL",
+    updated_at: agora,
+  });
+  if (userId !== undefined) recuperacao = recuperacao.eq("user_id", userId);
+  const { data, error } = await recuperacao
     .eq("status", "enviando")
     .lt("lease_expira_em", agora)
     .select("id, user_id, tipo, parcela_id, cliente_id");
   if (error) throw new Error("RECUPERACAO_LEASE_FALHOU");
+  if ((data ?? []).some((item: any) => !ownerValido(item, userId)))
+    throw new Error("PROPRIEDADE_DIVERGENTE");
   for (const item of data ?? [])
     await persistirHistoricoWhatsApp(
       sb,
@@ -416,19 +450,26 @@ export async function recuperarLeasesExpiradosWhatsApp(): Promise<number> {
 }
 export async function sincronizarMarcadoresDeRelatorioDiario(
   dataReferencia = dataHojeBrasilia(),
-  limite = 200
+  limite = 200,
+  userId?: number
 ): Promise<number> {
+  validarEscopoUsuario(userId);
   const sb = await getSupabaseClientAsync();
   if (!sb) throw new Error("Banco de dados indisponível");
-  const { data, error } = await sb
+  let consultaMarcadores = sb
     .from("whatsapp_outbox")
-    .select("user_id, data_referencia")
+    .select("user_id, data_referencia");
+  if (userId !== undefined)
+    consultaMarcadores = consultaMarcadores.eq("user_id", userId);
+  const { data, error } = await consultaMarcadores
     .eq("tipo", "relatorio_diario")
     .eq("status", "enviado")
     .eq("data_referencia", dataReferencia)
     .order("data_referencia", { ascending: true })
     .limit(limite);
   if (error) throw new Error("RELATORIO_RECONCILIACAO_FALHOU");
+  if ((data ?? []).some((item: any) => !ownerValido(item, userId)))
+    throw new Error("PROPRIEDADE_DIVERGENTE");
   let atualizados = 0;
   for (const item of data ?? []) {
     if (!item.user_id || !item.data_referencia) continue;
@@ -455,16 +496,19 @@ async function motivoItemObsoleto(
   item: any,
   now = new Date()
 ): Promise<string | null> {
+  if (!ownerValido(item)) return "PROPRIEDADE_DIVERGENTE";
   if (item.tipo === "teste_envio") return "TESTE_MANUAL_NAO_REENVIAVEL";
   if (!referenciaVigente(item.data_referencia, now))
     return "VALIDADE_DIARIA_BRT_EXPIRADA";
   if (item.tipo === "relatorio_diario") {
     const { data, error } = await sb
       .from("configuracoes")
-      .select("chave, valor")
+      .select("user_id, chave, valor")
       .eq("user_id", item.user_id)
       .in("chave", ["relatorio_diario_ativo", "relatorio_diario_telefone"]);
     if (error) throw new Error("REVALIDACAO_INDISPONIVEL");
+    if ((data ?? []).some((row: any) => !ownerValido(row, item.user_id)))
+      return "PROPRIEDADE_DIVERGENTE";
     const cfg = Object.fromEntries(
       (data ?? []).map((c: any) => [c.chave, c.valor])
     );
@@ -490,28 +534,36 @@ async function motivoItemObsoleto(
   ] = await Promise.all([
     sb
       .from("configuracoes")
-      .select("valor")
+      .select("user_id, valor")
       .eq("user_id", item.user_id)
       .eq("chave", "notificacoes_auto_ativo")
       .maybeSingle(),
     sb
       .from("notificacoes_automaticas")
-      .select("ativo")
+      .select("user_id, ativo")
       .eq("user_id", item.user_id)
       .eq("tipo", item.tipo)
       .eq("dias_antes", dias)
       .maybeSingle(),
     sb
       .from("parcelas")
-      .select("id, status, cliente_id, contrato_id, data_vencimento")
+      .select("id, user_id, status, cliente_id, contrato_id, data_vencimento")
       .eq("user_id", item.user_id)
       .eq("id", item.parcela_id)
       .maybeSingle(),
   ]);
   if (globalErro || regraErro || parcelaErro)
     throw new Error("REVALIDACAO_INDISPONIVEL");
+  if (
+    [global, regra, parcela].some(row => row && !ownerValido(row, item.user_id))
+  )
+    return "PROPRIEDADE_DIVERGENTE";
   if (global?.valor !== "true" || !regra?.ativo) return "AUTOMACAO_DESATIVADA";
-  if (!parcela || parcela.cliente_id !== item.cliente_id)
+  if (
+    !parcela ||
+    parcela.id !== item.parcela_id ||
+    parcela.cliente_id !== item.cliente_id
+  )
     return "PROPRIEDADE_DIVERGENTE";
   if (item.tipo === "confirmacao_pagamento") {
     const chave = lerChavePagamento(item.chave_deduplicacao, item.user_id);
@@ -544,19 +596,27 @@ async function motivoItemObsoleto(
   ] = await Promise.all([
     sb
       .from("contratos")
-      .select("id, cliente_id, status")
+      .select("id, user_id, cliente_id, status")
       .eq("user_id", item.user_id)
       .eq("id", parcela.contrato_id)
       .maybeSingle(),
     sb
       .from("clientes")
-      .select("id, whatsapp, telefone")
+      .select("id, user_id, whatsapp, telefone")
       .eq("user_id", item.user_id)
       .eq("id", item.cliente_id)
       .maybeSingle(),
   ]);
   if (contratoErro || clienteErro) throw new Error("REVALIDACAO_INDISPONIVEL");
-  if (!contrato || !cliente || contrato.cliente_id !== cliente.id)
+  if (
+    !contrato ||
+    !cliente ||
+    !ownerValido(contrato, item.user_id) ||
+    !ownerValido(cliente, item.user_id) ||
+    contrato.id !== parcela.contrato_id ||
+    cliente.id !== item.cliente_id ||
+    contrato.cliente_id !== cliente.id
+  )
     return "PROPRIEDADE_DIVERGENTE";
   if (item.tipo !== "confirmacao_pagamento" && contrato.status !== "ativo")
     return "CONTRATO_NAO_EXIGIVEL";
@@ -574,7 +634,8 @@ async function motivoItemObsoleto(
 
 export async function processarFilaWhatsApp(
   limite = 25,
-  dryRun = false
+  dryRun = false,
+  userId?: number
 ): Promise<{
   processadas: number;
   enviadas: number;
@@ -584,6 +645,7 @@ export async function processarFilaWhatsApp(
   relatoriosConcluidos: number;
   canceladas: number;
 }> {
+  validarEscopoUsuario(userId);
   const sb = await getSupabaseClientAsync();
   if (!sb) throw new Error("Banco de dados indisponível");
   let processadas = 0,
@@ -594,20 +656,26 @@ export async function processarFilaWhatsApp(
     relatoriosConcluidos = 0,
     canceladas = 0;
   if (!dryRun) {
-    ambiguas += await recuperarLeasesExpiradosWhatsApp();
-    await sincronizarMarcadoresDeRelatorioDiario();
+    ambiguas += await recuperarLeasesExpiradosWhatsApp(userId);
+    await sincronizarMarcadoresDeRelatorioDiario(undefined, undefined, userId);
   }
-  const { data: candidatas, error } = await sb
+  let consultaFila = sb
     .from("whatsapp_outbox")
     .select(
       "id, user_id, tipo, telefone, mensagem, parcela_id, cliente_id, data_referencia, tentativas, chave_deduplicacao"
-    )
+    );
+  if (userId !== undefined) consultaFila = consultaFila.eq("user_id", userId);
+  const { data: candidatas, error } = await consultaFila
     .eq("status", "pendente")
     .lte("proxima_tentativa_em", new Date().toISOString())
     .order("created_at", { ascending: true })
     .limit(Math.max(1, Math.min(limite, 200)));
   if (error) throw new Error("FILA_INDISPONIVEL");
   for (const item of candidatas ?? []) {
+    if (!ownerValido(item, userId)) {
+      falhas++;
+      continue;
+    }
     if (dryRun) {
       processadas++;
       try {
@@ -630,13 +698,17 @@ export async function processarFilaWhatsApp(
       .eq("id", item.id)
       .eq("user_id", item.user_id)
       .eq("status", "pendente")
-      .select("id")
+      .select("id, user_id")
       .maybeSingle();
     if (reservaErro) {
       falhas++;
       continue;
     }
     if (!reservada) continue;
+    if (reservada.id !== item.id || !ownerValido(reservada, item.user_id)) {
+      falhas++;
+      continue;
+    }
     processadas++;
     let result: ResultadoEnvioEvolution;
     let motivo: string | null = null;
@@ -671,15 +743,18 @@ export async function processarFilaWhatsApp(
               if (motivo) return false;
               const { data: owned, error: ownedErro } = await sb
                 .from("whatsapp_outbox")
-                .select("id")
+                .select("id, user_id")
                 .eq("id", item.id)
+                .eq("user_id", item.user_id)
                 .eq("status", "enviando")
                 .eq("lease_expira_em", lease)
                 .gt("lease_expira_em", new Date().toISOString())
                 .maybeSingle();
               if (ownedErro) throw new Error("LEASE_VALIDACAO_FALHOU");
-              if (!owned) motivo = "LEASE_NAO_PERTENCE_AO_WORKER";
-              return Boolean(owned);
+              const pertence =
+                owned?.id === item.id && ownerValido(owned, item.user_id);
+              if (!pertence) motivo = "LEASE_NAO_PERTENCE_AO_WORKER";
+              return pertence;
             }
           );
       }
@@ -727,8 +802,17 @@ export async function processarFilaWhatsApp(
       .eq("user_id", item.user_id)
       .eq("status", "enviando")
       .eq("lease_expira_em", lease)
-      .select("id")
+      .select("id, user_id")
       .maybeSingle();
+    if (
+      persistida &&
+      (persistida.id !== item.id || !ownerValido(persistida, item.user_id))
+    ) {
+      // Resposta contraditória não é prova para histórico ou marcador.
+      ambiguas++;
+      falhas++;
+      continue;
+    }
     if (updateErro || !persistida) {
       // Não contabiliza enviado sem prova de persistência. Se até a compensação
       // falhar, o lease original será convertido em desconhecido na próxima execução.

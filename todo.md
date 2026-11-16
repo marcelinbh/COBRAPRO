@@ -1305,3 +1305,15 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Complemento `46238e2` live/Healthy às 18h41min26; bundle exato e cadastro de cinco modalidades pronto às 18h42. Cotação de ID inexistente NOT_FOUND e ficha null; RLS65/65/0 e 12/2/6 preservados, zero origens novas. Nenhum empréstimo/mensagem criado pelo smoke.
 - [ ] Resolver/atestar frequência da agenda WhatsApp: active/cron*/5, mas último schedule success às 14h39 BRT e ausência de execuções novas por cerca de quatro horas; não certifica entrega contínua. Verificação sem dispatch, alterações ou mensagens.
 - [ ] Revisão humana de dados antigos continua separada. Sem alterações de Kiwify/oferta/Blacklist/WhatsApp/flags e sem correções automáticas de saldos ou tenant.
+
+## Fase 74: Correções do vídeo e controles WhatsApp — 16/11/2026
+
+- [x] Preservar seleção própria no refetch e formulário multimodal durante reconferência de sessão; troca real de empresa continua segregada.
+- [x] Datas iniciais/vencimento automáticos BRT, com preservação de datas manuais e de payload original; validação de campo faltante não é erro de transporte.
+- [x] Validação WhatsApp sem envio, teste em número explícito e processamento confirmado da própria empresa, com histórico e callbacks segregados por geração.
+- [x] Credencial backend Manus atualizada via formulário seguro e teste negativo HTTP200; nenhum segredo no Git.
+- [x] Certificação final fechada: 2.933 testes aprovados, 11 opt-in ignorados, TypeScript/build/diff check aprovados. Sem DDL/DML produtivos, alteração de flags, Kiwify/oferta ou Blacklist neste lote.
+- [ ] Publicar este lote e confirmar revisão live, bundle, cadastro e controles reais sem envio ou empréstimo sintético persistido.
+- [ ] Publicar a versão Manus que executa a agenda nativa e confirmar execução nova bem-sucedida; logs após atualização da chave ainda apresentaram CONFIGURACOES_INDISPONIVEIS.
+- [ ] Implementar multa manual fixa RECEBÍVEL nas transições auditadas. Protótipo de registro lateral foi rejeitado e arquivado fora do Git; não instalado nem incluído neste lote. Não declarar multa liberada.
+- [ ] Revisão humana por registro das divergências históricas, sem atribuição automática de empresa/valores.

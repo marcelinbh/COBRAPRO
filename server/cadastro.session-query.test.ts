@@ -28,13 +28,16 @@ describe('sessão conferida sem loop de remontagem', () => {
       expect(seen).toContain(901); expect(seen).toContain(902);
     } finally { unsub(); child?.destroy(); parent.destroy(); client.clear(); }
   });
-  it('filhos financeiros adotam a política, sem retirar o gate isFetching do pai', () => {
+  it('filhos financeiros adotam a política e recusam envio enquanto a sessão é reconferida', () => {
     for (const path of ['EmprestimoMultimodalCriar.tsx', 'EmprestimoMultimodalOperacoes.tsx', 'EmprestimoSeguroCriar.tsx']) {
       const source = readFileSync(new URL('../client/src/components/' + path, import.meta.url), 'utf8');
       expect(source).not.toMatch(/auth\.me\.useQuery\(\)/);
       expect(source).toContain('refetchOnMount: false');
+      expect(source).toContain('!auth.isFetching');
     }
     const parent = readFileSync(new URL('../client/src/pages/NovoContrato.tsx', import.meta.url), 'utf8');
-    expect(parent).toContain('auth.isError || auth.isLoading || auth.isFetching ? null : auth.data');
+    expect(parent).toContain('auth.isError || auth.isLoading ? null : auth.data');
+    expect(parent).toContain('user && !auth.isFetching');
+    expect(parent).toContain('key={user.id}');
   });
 });

@@ -26,8 +26,10 @@ import { chaveMultimodal } from "@/components/EmprestimoMultimodalRpc";
 export default function NovoContrato() {
   const [, setLocation] = useLocation();
   const auth = trpc.auth.me.useQuery();
-  const user = auth.isError || auth.isLoading || auth.isFetching ? null : auth.data;
-  const capacidade = trpc.emprestimosMultimodal.disponibilidade.useQuery(undefined, { enabled: !!user });
+  // Uma reconferência não desmonta e apaga o formulário. Os filhos continuam
+  // recusando ações/storage enquanto a identidade está sendo verificada.
+  const user = auth.isError || auth.isLoading ? null : auth.data;
+  const capacidade = trpc.emprestimosMultimodal.disponibilidade.useQuery(undefined, { enabled: !!user && !auth.isFetching, refetchOnMount: false });
   const escolha = useRef<{ escopo: string; ciclo: 'mensal' | 'multimodal'; explicita?: boolean } | null>(null);
   const [, atualizarEscolha] = useState(0);
   const params = new URLSearchParams(window.location.search);
@@ -39,7 +41,7 @@ export default function NovoContrato() {
   const escopo = `${user?.id ?? ''}:${modalidade}:${tipoTaxa ?? ''}`;
   if (user && escolha.current?.escopo !== escopo) escolha.current = null;
   let mensalSalva = false, multimodalSalva = false, falhaStorage = false;
-  if (user) {
+  if (user && !auth.isFetching) {
     try {
       mensalSalva = sessionStorage.getItem(chaveIntencao(user.id, 'criar')) !== null;
       multimodalSalva = sessionStorage.getItem(chaveMultimodal(user.id, 'criar')) !== null;
@@ -61,13 +63,14 @@ export default function NovoContrato() {
     <Button variant="outline" onClick={() => setLocation('/contratos')}>Voltar aos contratos</Button>
     <h1 className="text-2xl font-semibold">Novo empréstimo</h1>
     <p>Cadastre o empréstimo com o cliente e a conta da sua empresa. O desembolso e as parcelas são registrados juntos após a confirmação.</p>
+    {auth.isFetching && <p role="status">Conferindo a sessão sem apagar seu preenchimento...</p>}
     {suportado && ampliado ? <>
       {params.size > 0 && <p role="status">A modalidade foi selecionada. Confira explicitamente cliente, conta, valores e datas; valores financeiros do atalho não foram importados.</p>}
-      <EmprestimoMultimodalCriar modalidadeInicial={modalidade} onSuccess={id => setLocation(`/emprestimos/${id}`)} />
+      <EmprestimoMultimodalCriar key={user.id} modalidadeInicial={modalidade} onSuccess={id => setLocation(`/emprestimos/${id}`)} />
     </> : suportado && anterior ? <>
       <p role="status">O cadastro mensal anterior continua no seu próprio fluxo atômico. Sua intenção não será convertida ou reenviada por outro ciclo.</p>
-      <EmprestimoSeguroCriar onSuccess={id => setLocation(`/emprestimos/${id}`)} />
-    </> : suportado && capacidade.isLoading ? <p role="status">Conferindo as modalidades instaladas...</p>
+      <EmprestimoSeguroCriar key={user.id} onSuccess={id => setLocation(`/emprestimos/${id}`)} />
+    </> : suportado && (capacidade.isLoading || capacidade.isFetching || auth.isFetching) ? <p role="status">Conferindo as modalidades instaladas...</p>
     : suportado ? <>
       <p role="alert">Não foi possível conferir o ciclo desta modalidade. Nenhum cadastro foi convertido ou gravado.</p>
       <Button variant="outline" onClick={() => capacidade.refetch()}>Tentar novamente</Button>
