@@ -1291,3 +1291,14 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Certificação final às 22h51: 2.439 testes, TypeScript/build e diff check aprovados. Contagens produtivas read-only 12/2/6 e RLS 56/56/0 preservadas.
 - [ ] Concluir checkpoint, push fast-forward e rollout/smoke; publicação não pode ser presumida por edição local. Conclusão será registrada no status externo.
 - [ ] Revisão humana de registros históricos permanece separada. Nenhum UPDATE, saneamento, flag financeira, Kiwify/oferta ou WhatsApp foi alterado.
+
+## Fase 73: Liberação prospectiva multimodal — 16/11/2026
+- [x] Baseline anterior `68f5d5c` reconfirmado live/Healthy na DigitalOcean; aplicação HTTP 200.
+- [x] Cinco modalidades com cálculo exato e agenda civil, recebimento integral/parcial e renovação sucessiva elegível sem novo desembolso.
+- [x] Coexistência validada de mensal/despesa/recebimento legado na mesma conta sem autorizar escrita sobre cohort multimodal.
+- [x] Isolamento de formulário/cache/UUID, recuperação autoritativa, storage e respostas/handlers antigos; ciclo da intenção anterior preservado na entrada.
+- [x] Lista/ficha com parcela aberta real, juros por composição, pagamentos registrados e residual sem duplicação; lucro conservador não é saldo certificado.
+- [x] Gate final: 2.754 testes, TypeScript/build/diff check; PG17 adversarial e concorrência; SQL aplicado anteriormente intacto e fronteira sem segredos conhecidos.
+- [x] Preflight produtivo read-only: PG17/owner, corpos/assinaturas/rowtypes compatíveis; 12/2/6 e RLS56/56/0 preservados antes da instalação.
+- [ ] Checkpoint, instalação prospectiva 0035, push fast-forward e rollout/smoke a comprovar no status externo de 16/11/2026.
+- [ ] Revisão humana de dados antigos continua separada. Sem alterações de Kiwify/oferta/Blacklist/WhatsApp/flags e sem correções automáticas de saldos ou tenant.

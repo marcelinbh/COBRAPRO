@@ -553,7 +553,7 @@ export default function Parcelas() {
         </div>
       </div>
 
-      <p className="text-sm text-muted-foreground">Recebimentos de empréstimos novos e parcelas antigas íntegras exigem cotação validada e disponibilidade do fluxo seguro. Registros inconsistentes ficam bloqueados para revisão. A renovação de juros dos novos empréstimos suportados pode ser conferida na ficha do empréstimo. Descontos e alterações financeiras manuais continuam indisponíveis. Os valores originais da listagem não representam saldos atualizados após pagamentos parciais; confirme a cotação do diálogo. Cobrar nesta listagem permanece bloqueado porque não há cotação autoritativa vinculada à mensagem. Lembretes manuais sem total permanecem disponíveis.</p>
+      <p className="text-sm text-muted-foreground">Recebimentos de empréstimos novos e parcelas antigas íntegras exigem cotação validada e disponibilidade do fluxo seguro. Registros inconsistentes ficam bloqueados para revisão. A primeira renovação mensal prospectiva elegível pode ser acessada em Receber / conferir; parcelas renovadas permitem somente conferir/repetir uma intenção já preservada na sessão, sem cobrar principal novamente. Descontos e alterações financeiras manuais continuam indisponíveis. Os valores originais da listagem não representam saldos atualizados após pagamentos parciais; confirme a cotação do diálogo. Cobrar nesta listagem permanece bloqueado porque não há cotação autoritativa vinculada à mensagem. Lembretes manuais sem total permanecem disponíveis.</p>
       {/* Contador por Modalidade */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {modalidadeCount.map(m => (
@@ -706,7 +706,7 @@ export default function Parcelas() {
                       <div className="text-xs text-muted-foreground">Valor original · sem cotação</div>
                     </div>
 
-                    {parcela.status === 'paga' && <RecebimentoValidado contratoId={parcela.contratoId} parcelaId={parcela.id} onSuccess={() => refetch()} />}
+                    {parcela.status === 'paga' && <RecebimentoValidado contratoId={parcela.contratoId} parcelaId={parcela.id} permitirRenovacao onSuccess={() => refetch()} />}
                     {parcela.status !== 'paga' && (
                       <div className="flex gap-2">
                         {whatsappUrl && (
@@ -720,6 +720,7 @@ export default function Parcelas() {
                         <RecebimentoValidado
                           contratoId={parcela.contratoId}
                           parcelaId={parcela.id}
+                          permitirRenovacao
                           onSuccess={() => refetch()}
                         />
                       </div>

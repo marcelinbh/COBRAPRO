@@ -1,5 +1,5 @@
 import { z } from 'zod';
-export const recoveryFamilies = ['emprestimo_criar', 'emprestimo_receber', 'despesa_criar', 'despesa_pagar', 'despesa_estornar'] as const;
+export const recoveryFamilies = ['emprestimo_criar', 'emprestimo_receber', 'despesa_criar', 'despesa_pagar', 'despesa_estornar', 'multimodal_criar', 'multimodal_receber', 'multimodal_renovar'] as const;
 export type RecoveryFamily = typeof recoveryFamilies[number];
 export const financialIntentRecoveryInput = z.object({
   family: z.enum(recoveryFamilies), idempotencyKey: z.string().uuid(), payload: z.record(z.string(), z.unknown()),

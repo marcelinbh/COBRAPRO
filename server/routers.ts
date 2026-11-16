@@ -11,6 +11,7 @@ import { notificacoesRouter } from "./routers/notificacoes";
 import { blacklistRouter } from "./routers/blacklist";
 import { contasPagarRouter as contasPagarProspectivasRouter } from "./routers/contasPagar";
 import { emprestimosProspectivosRouter } from "./routers/emprestimosProspectivos";
+import { emprestimosMultimodalRouter } from "./routers/emprestimosMultimodal";
 import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
@@ -863,6 +864,7 @@ const clientesRouter = router({
 // Import mantido nesta seção para limitar a alteração ao bloco de clientes.
 import { clienteCreateInput, clienteUpdateInput, clienteCorrespondeBusca } from '../shared/clientesInput';
 // ─── CONTRATOS ────────────────────────────────────────────────────────────────
+import { apresentarEmprestimo } from './services/emprestimosApresentacao';
 const contratosRouter = router({
   // Lista contratos com dados agregados das parcelas para os cards de Empréstimos
   listComParcelas: protectedProcedure
@@ -927,7 +929,7 @@ const contratosRouter = router({
       if (parcelasVinculos.some((p: any) => !contratosPorId.has(p.contrato_id) ||
           p.cliente_id !== contratosPorId.get(p.contrato_id).cliente_id)) throw falhaVinculo();
       const parcelasData = await lerLista(() => supabase.from('parcelas')
-        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
+        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_juros, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
         .eq('user_id', ctx.user.id).in('contrato_id', contratoIds).order('data_vencimento').order('id'));
       const vinculosPorId = new Map<number, any>(parcelasVinculos.map((p: any) => [p.id, p]));
       if (parcelasData.length !== parcelasVinculos.length || parcelasData.some((p: any) =>
@@ -939,13 +941,7 @@ const contratosRouter = router({
       const parcelasPorContrato: Record<number, any[]> = {};
       for (const p of parcelasData) {
         if (!parcelasPorContrato[p.contrato_id]) parcelasPorContrato[p.contrato_id] = [];
-        // Atualizar status em memória
-        let statusAtual = p.status;
-        if (statusAtual !== 'paga' && statusAtual !== 'parcial') {
-          if (p.data_vencimento < hoje) statusAtual = 'atrasada';
-          else if (p.data_vencimento === hoje) statusAtual = 'vencendo_hoje';
-        }
-        parcelasPorContrato[p.contrato_id].push({ ...p, status: statusAtual });
+        parcelasPorContrato[p.contrato_id].push(p);
       }
 
       // Uma configuração ausente ou cobrança automática desligada jamais pode
@@ -970,60 +966,7 @@ const contratosRouter = router({
       return filtrados.map((c: any) => {
         const cliente = clientesPorId.get(c.cliente_id);
         const parcelasContrato = parcelasPorContrato[c.id] ?? [];
-        const parcelasAbertas = parcelasContrato.filter((p: any) => !['paga'].includes(p.status));
-        const parcelasPagas = parcelasContrato.filter((p: any) => p.status === 'paga');
-        const parcelasAtrasadas = parcelasContrato.filter((p: any) => p.status === 'atrasada');
-
-        // KPIs
-        const valorPrincipal = parseFloat(c.valor_principal ?? '0');
-        const valorParcela = parseFloat(c.valor_parcela ?? '0');
-        const taxaJuros = parseFloat(c.taxa_juros ?? '0');
-        const numeroParcelas = parseInt(c.numero_parcelas ?? '1') || 1;
-        // Juros por parcela = capital × taxa%
-        // Para contratos de juros simples (quinzenal, mensal, etc.): juros = principal × taxa / 100
-        // Isso é sempre correto: R$500 × 50% = R$250 de juros por parcela
-        const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
-
-        // Total a receber = exatamente o saldo ainda aberto de cada parcela.
-        const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + calcularValorAbertoParcela({
-          status: p.status,
-          valorOriginal: p.valor_original,
-          saldoResidual: p.saldo_residual,
-          valorMulta: p.valor_multa,
-        }), 0);
-        // Total pago = soma das parcelas pagas
-        const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
-        // Lucro previsto = total a receber restante - capital ainda não recebido
-        // Fórmula: totalReceber - (capital proporcional às parcelas abertas)
-        const capitalRestante = numeroParcelas > 0 ? valorPrincipal * (parcelasAbertas.length / numeroParcelas) : 0;
-        const lucroPrevisto = Math.max(0, totalReceber - capitalRestante);
-        // Lucro realizado = total pago - capital emprestado
-        // Fórmula: totalPago - valorPrincipal
-        // Lógica: tudo que foi recebido além do capital emprestado é lucro
-        // Ex: emprestou 500, recebeu 550 (2x só juros) → lucro = 550 - 500 = 50
-        const lucroRealizado = Math.max(0, totalPago - valorPrincipal);
-
-        // Próxima parcela em aberto
-        const proximaParcela = parcelasAbertas.length > 0 ? parcelasAbertas[0] : null;
-
-        // Calcular juros por atraso para parcelas atrasadas
-        const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
-          const calculoMora = calcularJurosMora(
-            parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0'),
-            new Date(`${p.data_vencimento}T12:00:00-03:00`),
-            new Date(),
-            multaDiaria,
-            multaPercentual,
-          );
-          const multaAplicada = parseFloat(p.valor_multa ?? '0');
-          return {
-            ...p,
-            diasAtraso: calculoMora.diasAtraso,
-            jurosAtraso: calculoMora.juros + calculoMora.multa,
-            multaAplicada,
-            totalComAtraso: parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0') + calculoMora.juros + calculoMora.multa + multaAplicada,
-          };
-        });
+        const apresentacao = apresentarEmprestimo(c, parcelasContrato, hoje, multaDiaria, multaPercentual);
 
         return {
           id: c.id,
@@ -1042,18 +985,7 @@ const contratosRouter = router({
           dataInicio: c.data_inicio,
           createdAt: c.createdAt,
           // KPIs calculados
-          totalReceber,
-          totalPago,
-          lucroPrevisto,
-          lucroRealizado,
-          valorJurosParcela,
-          // Parcelas
-          parcelasAbertas: parcelasAbertas.length,
-          parcelasAtrasadas: parcelasAtrasadas.length,
-          parcelasPagas: parcelasPagas.length,
-          proximaParcela,
-          parcelasComAtraso,
-          todasParcelas: parcelasContrato,
+          ...apresentacao,
           etiquetas: (() => { try { return JSON.parse(c.etiquetas ?? '[]'); } catch { return []; } })(),
         };
       });
@@ -1088,21 +1020,13 @@ const contratosRouter = router({
         .eq('contrato_id', input.id).order('id'));
       if (parcelasVinculos.some((p: any) => p.contrato_id !== input.id || p.cliente_id !== cliente.id)) throw falhaVinculoEmprestimos();
       const parcelasData = await lerLista(() => supabase.from('parcelas')
-        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
+        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_juros, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
         .eq('contrato_id', input.id).eq('user_id', ctx.user.id).order('data_vencimento').order('id'));
       const vinculosPorId = new Map<number, any>(parcelasVinculos.map((p: any) => [p.id, p]));
       if (parcelasData.length !== parcelasVinculos.length || parcelasData.some((p: any) =>
           !vinculosPorId.has(p.id) || p.contrato_id !== input.id)) throw falhaVinculoEmprestimos();
 
       const hoje = dataHojeBrasilia();
-      const parcelas = parcelasData.map((p: any) => {
-        let statusAtual = p.status;
-        if (statusAtual !== 'paga' && statusAtual !== 'parcial') {
-          if (p.data_vencimento < hoje) statusAtual = 'atrasada';
-          else if (p.data_vencimento === hoje) statusAtual = 'vencendo_hoje';
-        }
-        return { ...p, status: statusAtual };
-      });
 
       // Sem ativação explícita não há juros automáticos de mora.
       let multaDiaria = 0;
@@ -1120,45 +1044,7 @@ const contratosRouter = router({
         multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
       }
 
-      // Calcular KPIs
-      const parcelasAbertas = parcelas.filter((p: any) => !['paga'].includes(p.status));
-      const parcelasPagas = parcelas.filter((p: any) => p.status === 'paga');
-      const parcelasAtrasadas = parcelas.filter((p: any) => p.status === 'atrasada');
-
-      const valorPrincipal = parseFloat(contratoData.valor_principal ?? '0');
-      const valorParcela = parseFloat(contratoData.valor_parcela ?? '0');
-      const taxaJuros = parseFloat(contratoData.taxa_juros ?? '0');
-      const valorJurosParcela = Math.round(valorPrincipal * (taxaJuros / 100) * 100) / 100;
-
-      const totalReceber = parcelasAbertas.reduce((s: number, p: any) => s + calcularValorAbertoParcela({
-        status: p.status,
-        valorOriginal: p.valor_original,
-        saldoResidual: p.saldo_residual,
-        valorMulta: p.valor_multa,
-      }), 0);
-      const totalPago = parcelasPagas.reduce((s: number, p: any) => s + parseFloat(p.valor_pago ?? p.valor_original ?? '0'), 0);
-      const lucroPrevisto = valorJurosParcela * parcelasAbertas.length;
-      // Lucro realizado = total pago - capital emprestado
-      // Tudo que foi recebido além do capital emprestado é lucro
-      const lucroRealizado = Math.max(0, totalPago - valorPrincipal);
-
-      const parcelasComAtraso = parcelasAtrasadas.map((p: any) => {
-        const calculoMora = calcularJurosMora(
-          parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0'),
-          new Date(`${p.data_vencimento}T12:00:00-03:00`),
-          new Date(),
-          multaDiaria,
-          multaPercentual,
-        );
-        const multaAplicada = parseFloat(p.valor_multa ?? '0');
-        return {
-          ...p,
-          diasAtraso: calculoMora.diasAtraso,
-          jurosAtraso: calculoMora.juros + calculoMora.multa,
-          multaAplicada,
-          totalComAtraso: parseFloat(p.valor_original ?? '0') + parseFloat(p.saldo_residual ?? '0') + calculoMora.juros + calculoMora.multa + multaAplicada,
-        };
-      });
+      const apresentacao = apresentarEmprestimo(contratoData, parcelasData, hoje, multaDiaria, multaPercentual);
 
       return {
         id: contratoData.id,
@@ -1177,16 +1063,7 @@ const contratosRouter = router({
         dataInicio: contratoData.data_inicio,
         dataVencimento: contratoData.data_vencimento_primeira,
         dataCriacao: contratoData.createdAt,
-        totalReceber,
-        totalPago,
-        lucroPrevisto,
-        lucroRealizado,
-        valorJurosParcela,
-        parcelasAbertas: parcelasAbertas.length,
-        parcelasAtrasadas: parcelasAtrasadas.length,
-        parcelasPagas: parcelasPagas.length,
-        parcelasComAtraso,
-        todasParcelas: parcelas,
+        ...apresentacao,
       };
     }),
 
@@ -4930,6 +4807,7 @@ export const appRouter = router({
   reparcelamento: reparcelamentoRouter,
   contasPagar: contasPagarProspectivasRouter,
   emprestimosProspectivos: emprestimosProspectivosRouter,
+  emprestimosMultimodal: emprestimosMultimodalRouter,
   renovacaoProspectiva: renovacaoProspectivaRouter,
   recebimentosLegados: recebimentosLegadosRouter,
   vendas: vendasRouter,

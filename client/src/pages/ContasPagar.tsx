@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { hashKey } from '@tanstack/react-query';
 import { trpc } from '@/lib/trpc';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,13 +25,20 @@ const statuses = { pendente: 'Pendente', paga: 'Paga', atrasada: 'Atrasada', can
 const freshForm = (): PayloadDespesa['criar'] => ({ descricao: '', categoria: 'outros', valor: '', dataVencimento: diaCivilBrt(), observacoes: '' });
 const dataLabel = (d: string | null) => d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d.split('-').reverse().join('/') : 'Data requer conferência';
 const acoes: AcaoDespesa[] = ['criar', 'pagar', 'estornar'];
+let proximaSessaoCache = 0;
 
 export default function ContasPagar() {
   // Usar apenas o id do contexto de sessão; não persistir resposta de auth/tokens.
   const auth = trpc.auth.me.useQuery(undefined, { retry: false });
-  const userId = auth.data?.id;
+  const userId = !auth.isError && !auth.isLoading ? auth.data?.id : undefined;
   const usuarioAtual = useRef(userId);
   usuarioAtual.current = userId;
+  // Identidade por transição, inclusive A -> B -> A: uma resposta de A antigo não pertence ao novo A.
+  const sessao = useMemo(() => ({ userId, cacheId: ++proximaSessaoCache }), [userId]);
+  const sessaoAtual = useRef(sessao);
+  sessaoAtual.current = sessao;
+  const [sessaoUi, setSessaoUi] = useState(sessao);
+  const pertenceSessao = () => sessaoAtual.current === sessao && usuarioAtual.current === userId;
   const [avisoStorage, setAvisoStorage] = useState('');
   const [intencoes, setIntencoes] = useState<IntencaoDespesaPersistida[]>([]);
   const [recovery, setRecovery] = useState<Record<string, RecoveryEvidence>>({});
@@ -47,13 +55,26 @@ export default function ContasPagar() {
     if (!userId) return null;
     let storage: StorageDespesas | null = null;
     try { storage = window.sessionStorage; } catch { /* Store bloqueia recuperação incerta. */ }
-    return new DespesasIntentStore(userId, storage, message => { setAvisoStorage(message); toast.error(message); });
-  }, [userId]);
+    return new DespesasIntentStore(userId, storage, message => {
+      if (pertenceSessao()) { setAvisoStorage(message); toast.error(message); }
+    });
+  }, [sessao]);
   function sync(s = store) { setIntencoes(s ? acoes.map(a => s.get(a)).filter((v): v is IntencaoDespesaPersistida => !!v) : []); }
-  useEffect(() => { sync(store); setRecovery({}); }, [store]);
+  useEffect(() => {
+    // Limpar apenas a UI; intenções incertas e locks do store antigo não são descartados.
+    setAvisoStorage(''); setRecovery({}); setBusy(false); inFlight.current = false;
+    setFiltroStatus('todos'); setNovo(false); setPagarId(null); setEstornarId(null);
+    setContaCaixaId(''); setMotivo(''); setForm(freshForm());
+    sync(store); setSessaoUi(sessao);
+  }, [store, sessao]);
   const utils = trpc.useUtils();
   const expensesUtils = despesasTrpc.useUtils();
-  const options = { enabled: !!userId, retry: false };
+  // O input RPC não muda. O hash privado evita adotar cache compartilhado/placeholder de outra sessão.
+  const options = useMemo(() => ({
+    enabled: !!userId, retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined,
+    queryKeyHashFn: (key: readonly unknown[]) => hashKey(['contasPagar-sessao', sessao.cacheId, userId ?? null, key]),
+    trpc: { abortOnUnmount: true },
+  }), [sessao]);
   const resumo = despesasTrpc.contasPagar.resumo.useQuery(undefined, options);
   const lista = despesasTrpc.contasPagar.listar.useQuery(filtroStatus === 'todos' ? undefined : { status: filtroStatus as 'pendente' | 'paga' | 'atrasada' | 'cancelada' }, options);
   const capacidades = despesasTrpc.contasPagar.capacidades.useQuery(undefined, options);
@@ -62,15 +83,15 @@ export default function ContasPagar() {
   const pagar = despesasTrpc.contasPagar.pagar.useMutation({ retry: false });
   const estornar = despesasTrpc.contasPagar.estornar.useMutation({ retry: false });
   const reconciliacao = despesasTrpc.contasPagar.reconciliar.useMutation({ retry: false });
-  const habilitado = !!userId && capacidades.data?.prospectivasHabilitadas === true && !capacidades.isError;
+  const habilitado = !!userId && sessaoUi === sessao && capacidades.data?.prospectivasHabilitadas === true && !capacidades.isError;
   const locked = (action: AcaoDespesa) => busy || intencoes.some(i => i.action === action) || !!store?.blocked(action);
-  const ativas = caixa.data?.filter(c => c.ativa !== false);
-  const despesaPagar = lista.data?.find(d => d.id === pagarId);
-  const despesaEstornar = lista.data?.find(d => d.id === estornarId);
+  const ativas = userId ? caixa.data?.filter(c => c.ativa !== false) : undefined;
+  const despesaPagar = userId ? lista.data?.find(d => d.id === pagarId) : undefined;
+  const despesaEstornar = userId ? lista.data?.find(d => d.id === estornarId) : undefined;
 
   async function enviar(intent: IntencaoDespesaPersistida, s: DespesasIntentStore) {
     if (recovery[intent.idempotencyKey]?.status === 'not_executed') return;
-    if (usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
+    if (!pertenceSessao() || usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
     inFlight.current = true; setBusy(true);
     try {
       const result = intent.action === 'criar' ? await criar.mutateAsync({ ...intent.payload, idempotencyKey: intent.idempotencyKey })
@@ -79,38 +100,38 @@ export default function ContasPagar() {
       // Adapter valida confirmação integral no servidor; UI também não aceita falso sucesso/chave trocada.
       if (result.success !== true || result.acao !== intent.action || result.userId !== intent.userId || result.chaveIdempotencia.toLowerCase() !== intent.idempotencyKey.toLowerCase() || !result.operationId) throw new Error('Confirmação incompatível; requer conferência com a MESMA chave.');
       s.confirmed(intent.action, intent.idempotencyKey);
-      if (usuarioAtual.current === intent.userId) {
-        setNovo(false); setPagarId(null); setEstornarId(null); setMotivo(''); setForm(freshForm());
+      if (pertenceSessao() && usuarioAtual.current === intent.userId) {
+        setNovo(false); setPagarId(null); setEstornarId(null); setContaCaixaId(''); setMotivo(''); setForm(freshForm());
         toast.success(`${intent.action === 'criar' ? 'Despesa criada' : intent.action === 'pagar' ? 'Pagamento registrado' : 'Estorno registrado sem excluir a baixa'}. Operação ${result.operationId}`);
+        // Falha de consulta não altera a confirmação nem dispara intenção nova. Não invalidar a nova sessão.
+        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate(), utils.dashboard.kpis.invalidate()]);
       }
-      // Falha de atualização da consulta não altera o resultado já confirmado, nem dispara uma nova intenção.
-      void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate(), utils.dashboard.kpis.invalidate()]);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Resultado desconhecido';
-      if (usuarioAtual.current === intent.userId) toast.error(`${message} A intenção foi mantida: confira/reenvie a MESMA chave com o payload original. Não crie outra operação por timeout.`);
+      if (pertenceSessao() && usuarioAtual.current === intent.userId) toast.error(`${message} A intenção foi mantida: confira/reenvie a MESMA chave com o payload original. Não crie outra operação por timeout.`);
     } finally {
-      s.release(intent.action); inFlight.current = false; setBusy(false);
-      if (usuarioAtual.current === intent.userId) sync(s);
+      s.release(intent.action);
+      if (pertenceSessao() && usuarioAtual.current === intent.userId) { inFlight.current = false; setBusy(false); sync(s); }
     }
   }
   async function reconciliar(intent: IntencaoDespesaPersistida, s: DespesasIntentStore) {
-    if (usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
+    if (!pertenceSessao() || usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
     inFlight.current = true; setBusy(true);
     try {
       const request = { family: `despesa_${intent.action}` as const, idempotencyKey: intent.idempotencyKey, payload: intent.payload };
       const r = assertRecoveryEvidence(await reconciliacao.mutateAsync(request), intent.userId, request);
-      if (usuarioAtual.current !== intent.userId) return;
+      if (!pertenceSessao() || usuarioAtual.current !== intent.userId) return;
       setRecovery(prev => ({ ...prev, [intent.idempotencyKey]: r }));
       if (r.status === 'confirmed') {
         s.confirmed(intent.action, intent.idempotencyKey);
         toast.success('Operação original confirmada na reconciliação; nenhuma nova operação enviada.');
         void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate()]);
       }
-    } catch (e) { if (usuarioAtual.current === intent.userId) toast.error(`${(e as Error).message} Não execução NÃO comprovada; nenhum descarte permitido.`); }
-    finally { s.release(intent.action); inFlight.current = false; if (usuarioAtual.current === intent.userId) { setBusy(false); sync(s); } }
+    } catch (e) { if (pertenceSessao() && usuarioAtual.current === intent.userId) toast.error(`${(e as Error).message} Não execução NÃO comprovada; nenhum descarte permitido.`); }
+    finally { s.release(intent.action); if (pertenceSessao() && usuarioAtual.current === intent.userId) { inFlight.current = false; setBusy(false); sync(s); } }
   }
   function encerrarRejeitada(intent: IntencaoDespesaPersistida) {
-    if (!store || inFlight.current || usuarioAtual.current !== intent.userId) return;
+    if (!store || !pertenceSessao() || inFlight.current || usuarioAtual.current !== intent.userId) return;
     try {
       store.closeRejected(intent.action, recovery[intent.idempotencyKey]);
       setNovo(false); setPagarId(null); setEstornarId(null); setContaCaixaId(''); setMotivo(''); sync(store);
@@ -118,7 +139,7 @@ export default function ContasPagar() {
     } catch (e) { toast.error((e as Error).message); }
   }
   function iniciar<A extends AcaoDespesa>(action: A, payload: PayloadDespesa[A]) {
-    if (!store || !habilitado || inFlight.current || locked(action)) return;
+    if (!store || !pertenceSessao() || !habilitado || inFlight.current || locked(action)) return;
     try {
       const intent = store.begin(action, payload);
       sync(store);
@@ -145,6 +166,9 @@ export default function ContasPagar() {
     iniciar('estornar', parsed.data);
   }
 
+  // O efeito ainda não rodou neste render: não pintar nem permitir interação com a UI do owner anterior.
+  if (sessaoUi !== sessao) return <p role="status">Atualizando sessão de despesas...</p>;
+
   return <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
     <div className="flex items-center justify-between gap-3">
       <div><h1 className="text-2xl font-bold flex gap-2"><Receipt />Contas a Pagar</h1><p className="text-sm text-muted-foreground">Despesas novas no trilho atômico; histórico somente consulta.</p></div>
@@ -165,7 +189,7 @@ export default function ContasPagar() {
       </div>)}
     </section>}
     <section aria-label="Resumo de despesas">
-      {resumo.isError ? <div role="alert">Resumo indisponível: {resumo.error.message} <Button variant="outline" onClick={() => void resumo.refetch()}>Tentar consulta</Button></div>
+      {!userId ? <p role="status">Resumo indisponível sem sessão.</p> : resumo.isError ? <div role="alert">Resumo indisponível: {resumo.error.message} <Button variant="outline" onClick={() => void resumo.refetch()}>Tentar consulta</Button></div>
         : resumo.isLoading || !resumo.data ? <p role="status">{userId ? 'Carregando resumo...' : 'Resumo indisponível sem sessão.'}</p>
           : <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{[
             ['A pagar', resumo.data.totalPendente, resumo.data.qtdPendente], ['Em atraso', resumo.data.totalAtrasado, resumo.data.qtdAtrasado], ['Pagas (mês BRT)', resumo.data.totalPago, resumo.data.qtdPago],
@@ -173,7 +197,7 @@ export default function ContasPagar() {
     </section>
     <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
     <section aria-label="Lista de despesas" className="space-y-3">
-      {lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
+      {!userId ? <p role="status">Consulta indisponível sem sessão.</p> : lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
         : lista.isLoading || !lista.data ? <p role="status">{userId ? 'Carregando despesas...' : 'Consulta indisponível sem sessão.'}</p>
           : lista.data.length === 0 ? <p>Nenhuma conta encontrada para este filtro.</p>
             : lista.data.map(d => <Card key={d.id}><CardContent className="p-4 space-y-2">

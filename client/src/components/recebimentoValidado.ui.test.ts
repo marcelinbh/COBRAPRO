@@ -210,7 +210,7 @@ describe('páginas reais montam RecebimentoValidado, nunca o diálogo de pagamen
     h.parcelas[0].status = status; const page = new MemoryUI(Parcelas, {}).render(); const child = page.nodes(RecebimentoValidado)[0]; expect(child.props).toMatchObject({ contratoId: 1, parcelaId: 2 });
     expect(page.nodes().some(n => typeof n.type === 'function' && n.type.name === 'PagamentoDialog')).toBe(false);
     h.origem = result(origem({ status })); const gate = new MemoryUI(child.type, child.props).render(); await gate.click('Receber / conferir');
-    if (status === 'renovada') noPaymentChildren(gate); else { expect(gate.text()).toContain('Escolha explicitamente'); noPaymentChildren(gate); }
+    if (['paga', 'renovada'].includes(status)) { expect(gate.text()).not.toContain('Escolha explicitamente'); noPaymentChildren(gate); } else { expect(gate.text()).toContain('Escolha explicitamente'); noPaymentChildren(gate); }
     expect(h.oldMutation).not.toHaveBeenCalled();
   });
   it('EmprestimoDetalhes: ação principal e tabela usam gate com renovação e IDs', async () => {

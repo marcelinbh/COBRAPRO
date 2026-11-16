@@ -31,6 +31,7 @@ vi.mock('@/lib/trpc', () => {
       disponibilidade: { useQuery: () => h.queries.disponibilidade ?? q({ disponivel: true }) },
       contasParaCadastro: { useQuery: () => h.queries.contas ?? q({ empresaId: h.user.id, contas: [{ id: 1, nome: 'Conta própria', tipo: 'dinheiro' }] }) },
     },
+    emprestimosMultimodal: { disponibilidade: { useQuery: () => q({ disponivel: false, modalidades: [] }) } },
     useUtils: () => utils,
     contasPagar: {
       resumo: { useQuery: () => q({ totalPendente: '100.00', qtdPendente: 2, totalAtrasado: '0.00', qtdAtrasado: 0, totalPago: '0.00', qtdPago: 0 }) },
@@ -135,7 +136,7 @@ describe('componentes reais com hooks, storage e RPC em memória (sem navegador/
     const r = new MemoryUI(NovoContrato, {}).render(); expect(r.nodes().some(n => n.type === EmprestimoSeguroCriar)).toBe(true);
     expect(r.text()).not.toContain('Criação legada permanece bloqueada'); expect(r.text()).toContain('Novo empréstimo'); expect(path).toMatch(/novo$/);
     h.search = '?modalidade=tabela_price&valorPrincipal=900'; r.render(); expect(r.nodes().some(n => n.type === EmprestimoSeguroCriar)).toBe(false);
-    expect(r.text()).toContain('não foram convertidos nem gravados'); expect(r.nodes('a')[0].props.href).toBe('/contratos/novo');
+    expect(r.text()).toContain('Nenhum cadastro foi convertido ou gravado'); expect(r.button('Tentar novamente').props.disabled).not.toBe(true);
   });
   it('despesa NOT_FOUND/timeout não libera outra operação; reconciliação comprovada + escolha explícita libera', async () => {
     const s = new DespesasIntentStore(h.user.id, storage, h.error, () => key); s.begin('pagar', { id: 101, contaCaixaId: 1, dataPagamento: '2026-11-10' });

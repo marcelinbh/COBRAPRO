@@ -4,6 +4,18 @@
 **Regra solicitada:** correções Kiwify ficam por último.  
 **Objetivo:** eliminar primeiro riscos de tomada de conta, alteração/vazamento entre empresas e corrupção operacional/financeira.
 
+## Ampliação prospectiva certificada — 16/11/2026
+
+- [x] Mensal/semanal/quinzenal/diário/Price com centavos exatos, agenda civil e criação atômica própria.
+- [x] Recebimento integral/parcial e renovação sucessiva elegível sem novo desembolso; ciclo antigo e novo não se confundem.
+- [x] Coexistência mensal/despesa/recebimento legado na mesma conta sem autorizar escrita sobre origem multimodal.
+- [x] UI/recovery com sessão, storage, geração, respostas antigas e família de intenção comprovados; nenhum segundo UUID por timeout.
+- [x] Lista/ficha sem próxima parcela encerrada, juros Price por composição e valores pagos registrados; estimativa não é saldo certificado.
+- [x] Certificação: 2.754 testes, TypeScript/build/diff check e PG17 isolado adversarial/concorrente.
+- [ ] Instalação prospectiva, checkpoint/push e aceite produtivo em execução; consultar a comprovação final no status operacional externo de 16/11/2026.
+
+Escopo detalhado em `reports/liberacao-multimodal-2026-11-16.md`. Sem saneamento de registros antigos, remoção de isolamento ou alterações de Kiwify/oferta/Blacklist/WhatsApp/flags.
+
 ## Atualização de cadastro operacional — 13/11/2026
 
 Esta seção não autoriza saneamento automático ou operação sobre conta alheia. Blacklist permanece a única funcionalidade compartilhada, sem mudanças em suas concessões; Kiwify/ofertas e WhatsApp ficam preservados.
@@ -13,7 +25,7 @@ Esta seção não autoriza saneamento automático ou operação sobre conta alhe
 - [x] Listagem/ficha com cliente próprio sem embed, integridade de parcelas por metadados antes de valores, paginação com contagem/duplicação conferidas e falha distinta de vazio.
 - [x] Cards usam ficha com recebimento de origem validada; pós-criação invalida consultas e abre o ID confirmado, sem repetir mutation.
 - [x] Certificação final: 2.439 testes aprovados, 11 opt-in ignorados, TypeScript/build/diff check. Contagens read-only 12/2/6 e RLS 56/56/0 preservadas.
-- [ ] Checkpoint/push/rollout e smoke do lote atual. Evidências em `reports/cadastro-operacional-2026-11-13.md`; conclusão produtiva será registrada no status externo.
+- [x] Checkpoint/push/rollout e smoke do lote `68f5d5c` concluídos em 13/11 e reconfirmados live/Healthy em 16/11. Evidências de fechamento no status externo de 13/11.
 
 ## Atualização operacional — 12/11/2026
 

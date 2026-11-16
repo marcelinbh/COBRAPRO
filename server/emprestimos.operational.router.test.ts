@@ -129,3 +129,128 @@ describe("Ficha de empréstimo: mesma segregação da listagem", () => {
     expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
   });
 });
+
+// Slots monetários de 0035 (não reconstruímos a fórmula econômica no router).
+const vetoresSlots = [
+  { modalidade: "mensal", n: 1, slots: [["110.00", "10.00"]], total: 110, juros: 10, restante: 0, jurosRestantes: 0, capitalRestante: 0 },
+  { modalidade: "semanal", n: 1, slots: [["110.00", "10.00"]], total: 110, juros: 10, restante: 0, jurosRestantes: 0, capitalRestante: 0 },
+  { modalidade: "diario", n: 1, slots: [["110.00", "10.00"]], total: 110, juros: 10, restante: 0, jurosRestantes: 0, capitalRestante: 0 },
+  { modalidade: "tabela_price", n: 1, slots: [["110.00", "10.00"]], total: 110, juros: 10, restante: 0, jurosRestantes: 0, capitalRestante: 0 },
+  { modalidade: "mensal", n: 3, slots: [["43.33", "10.00"], ["43.33", "10.00"], ["43.34", "10.00"]], total: 130, juros: 30, restante: 86.67, jurosRestantes: 20, capitalRestante: 66.67 },
+  { modalidade: "semanal", n: 3, slots: [["43.33", "10.00"], ["43.33", "10.00"], ["43.34", "10.00"]], total: 130, juros: 30, restante: 86.67, jurosRestantes: 20, capitalRestante: 66.67 },
+  { modalidade: "diario", n: 3, slots: [["36.67", "3.33"], ["36.67", "3.33"], ["36.66", "3.34"]], total: 110, juros: 10, restante: 73.33, jurosRestantes: 6.67, capitalRestante: 66.66 },
+  { modalidade: "tabela_price", n: 3, slots: [["40.21", "10.00"], ["40.21", "6.98"], ["40.22", "3.66"]], total: 120.64, juros: 20.64, restante: 80.43, jurosRestantes: 10.64, capitalRestante: 69.79 },
+];
+const camposApresentacao = ["totalReceber", "totalPago", "lucroPrevisto", "lucroRealizado", "valorJurosParcela", "parcelasAbertas", "parcelasPagas", "parcelasAtrasadas", "proximaParcela", "parcelasComAtraso", "todasParcelas"] as const;
+async function apresentarListaEFicha(f: ReturnType<typeof fonte>) {
+  mocks.getSupabaseClientAsync.mockResolvedValue(f);
+  const lista = (await caller().listComParcelas())[0];
+  const ficha = await caller().obterDetalhes({ id: 1 });
+  expect(ficha).not.toBeNull();
+  for (const campo of camposApresentacao) expect(ficha![campo], campo).toEqual(lista[campo]);
+  for (const campo of camposApresentacao.slice(0, 8)) expect(typeof lista[campo]).toBe("number");
+  expect(lista.valorPrincipal).toBe(f.tables.contratos[0].valor_principal);
+  return lista;
+}
+
+describe("Apresentação por parcela: slots persistidos, sem principal proporcional ao contador", () => {
+  it.each(vetoresSlots)("$modalidade N=$n: próxima e previsto seguem a própria composição", async v => {
+    const f = fonte();
+    Object.assign(f.tables.contratos[0], { modalidade: v.modalidade, numero_parcelas: v.n, taxa_juros: "10.00", valor_parcela: v.slots[0][0] });
+    f.tables.parcelas = v.slots.map(([valor_original, valor_juros], i) => ({ ...parcela, id: 3 + i, numero_parcela: i + 1, valor_original, valor_juros, data_vencimento: `2099-01-${String(10 + i).padStart(2, "0")}` }));
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: v.total, totalPago: 0, lucroPrevisto: v.juros, valorJurosParcela: Number(v.slots[0][1]), parcelasAbertas: v.n });
+    Object.assign(f.tables.parcelas[0], { status: "paga", valor_pago: v.slots[0][0] });
+    const restante = await apresentarListaEFicha(f);
+    expect(restante).toMatchObject({ totalReceber: v.restante, totalPago: Number(v.slots[0][0]), lucroPrevisto: v.jurosRestantes, parcelasAbertas: v.n - 1, parcelasPagas: 1, valorJurosParcela: v.n === 1 ? 0 : Number(v.slots[1][1]) });
+    expect(Math.round((restante.totalReceber - restante.lucroPrevisto) * 100)).toBe(Math.round(v.capitalRestante * 100));
+  });
+
+  it("bullet renovado N=3: antecessoras canceladas recebem juros/encargos, sucessora conserva principal inteiro", async () => {
+    const f = fonte(); Object.assign(f.tables.contratos[0], { numero_parcelas: 3, taxa_juros: "10.00", valor_parcela: "110.00" });
+    f.tables.parcelas = [
+      { ...parcela, id: 3, valor_original: "110.00", valor_juros: "10.00", valor_pago: "15.00", valor_multa: "5.00", saldo_residual: "100.00", status: "cancelada", data_vencimento: "2001-01-01" },
+      { ...parcela, id: 4, numero_parcela: 2, valor_original: "110.00", valor_juros: "10.00", valor_pago: "10.00", saldo_residual: "100.00", status: "cancelada", data_vencimento: "2001-02-01" },
+      { ...parcela, id: 5, numero_parcela: 3, valor_original: "110.00", valor_juros: "10.00", data_vencimento: "2099-01-01" },
+    ];
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 110, totalPago: 25, lucroPrevisto: 10, lucroRealizado: 0, valorJurosParcela: 10, parcelasAbertas: 1, parcelasAtrasadas: 0, parcelasComAtraso: [], proximaParcela: { id: 5 }, todasParcelas: [{ status: "cancelada" }, { status: "cancelada" }, { status: "pendente" }] });
+  });
+
+  it("renovada antiga não duplica residual nem exige/inventa prova nova", async () => {
+    const f = fonte(); f.tables.parcelas = [
+      { ...parcela, id: 3, valor_original: "110.00", valor_juros: null, valor_pago: "10.00", saldo_residual: "100.00", status: "renovada", data_vencimento: "2001-01-01" },
+      { ...parcela, id: 4, valor_original: "110.00", valor_juros: "10.00", data_vencimento: "2099-01-01" },
+    ];
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalPago: 10, totalReceber: 110, lucroPrevisto: 10, proximaParcela: { id: 4 }, parcelasAtrasadas: 0 });
+    expect(f.calls.every(c => ["contratos", "clientes", "parcelas", "koletores", "configuracoes"].includes(c.table))).toBe(true);
+  });
+
+  it.each(["paga", "pago", "cancelada", "cancelado", "renovada"])("estado encerrado %s preserva recebimento mas não próxima/atraso", async status => {
+    const f = fonte(); Object.assign(f.tables.parcelas[0], { status, data_vencimento: "2001-01-01", valor_pago: "10.00", saldo_residual: "90.00" });
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 0, totalPago: 10, lucroPrevisto: 0, valorJurosParcela: 0, proximaParcela: null, parcelasAbertas: 0, parcelasAtrasadas: 0, parcelasComAtraso: [] });
+  });
+
+  it.each(["quitado", "cancelado"])("contrato %s não tem próxima/atraso", async status => {
+    const f = fonte(); f.tables.contratos[0].status = status; f.tables.parcelas[0].data_vencimento = "2001-01-01";
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 0, proximaParcela: null, parcelasAtrasadas: 0 });
+  });
+
+  it("parcial 40 de 100 soma pagamento registrado e não presume composição de lucro", async () => {
+    const f = fonte(); Object.assign(f.tables.parcelas[0], { status: "parcial", valor_pago: "40.00", saldo_residual: "60.00", valor_juros: "10.00" });
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalPago: 40, totalReceber: 60, lucroRealizado: 0, lucroPrevisto: 0, valorJurosParcela: 10 });
+  });
+
+  it("pagamento parcial abaixo dos juros usa só limite inferior documentado", async () => {
+    const f = fonte(); Object.assign(f.tables.parcelas[0], { status: "parcial", valor_pago: "4.00", saldo_residual: "96.00", valor_juros: "10.00" });
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalPago: 4, totalReceber: 96, lucroRealizado: 0, lucroPrevisto: 6 });
+  });
+
+  it("mora parcial calcula sobre residual 40, sem original 100 ou multa 5 novamente", async () => {
+    const f = fonte(); Object.assign(f.tables.parcelas[0], { status: "parcial", valor_pago: "65.00", saldo_residual: "40.00", valor_multa: "5.00", data_vencimento: "2001-01-01" });
+    f.tables.configuracoes = [{ user_id: 41, chave: "jurosMultaAutomatico", valor: "true" }, { user_id: 41, chave: "multaPadrao", valor: "10" }];
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 40, totalPago: 65, parcelasAtrasadas: 1, parcelasComAtraso: [{ status: "parcial", jurosAtraso: 4, multaAplicada: 5, totalComAtraso: 44 }] });
+  });
+
+  it("pendente reutiliza original/residual/multa e não duplica a base de mora", async () => {
+    const f = fonte(); Object.assign(f.tables.parcelas[0], { saldo_residual: "40.00", valor_multa: "5.00", data_vencimento: "2001-01-01" });
+    f.tables.configuracoes = [{ user_id: 41, chave: "jurosMultaAutomatico", valor: "true" }, { user_id: 41, chave: "multaPadrao", valor: "10" }];
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 145, parcelasComAtraso: [{ jurosAtraso: 14, totalComAtraso: 159 }] });
+  });
+
+  it.each([null, undefined, "0.00"])("juros legacy %s é conservador sem aplicar taxa contratual", async valor_juros => {
+    const f = fonte(); f.tables.contratos[0].taxa_juros = "99.00"; Object.assign(f.tables.parcelas[0], { valor_original: "110.00", valor_juros });
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 110, valorJurosParcela: 0, lucroPrevisto: 0 });
+  });
+
+  it("paga sem valor_pago não inventa recebimento do valor_original", async () => {
+    const f = fonte(); Object.assign(f.tables.parcelas[0], { status: "paga", valor_pago: null });
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalPago: 0, totalReceber: 0 });
+  });
+
+  it("zeros explícitos permanecem finitos e numéricos", async () => {
+    const f = fonte(); Object.assign(f.tables.contratos[0], { valor_principal: "0.00", valor_parcela: "0.00" }); Object.assign(f.tables.parcelas[0], { valor_original: "0.00", valor_juros: "0.00" });
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 0, totalPago: 0, lucroPrevisto: 0, lucroRealizado: 0, valorJurosParcela: 0 });
+  });
+
+  it("somatórios de centavos não acumulam erro binário", async () => {
+    const f = fonte(); f.tables.contratos[0].valor_principal = "0.20";
+    f.tables.parcelas = ["0.10", "0.20"].map((valor_original, i) => ({ ...parcela, id: 3 + i, valor_original, valor_pago: valor_original, valor_juros: "0.01" }));
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 0.3, totalPago: 0.3, lucroRealizado: 0.1 });
+  });
+
+  it.each(["valor_original", "valor_pago", "valor_juros", "saldo_residual", "valor_multa"])("%s inválido é recusado na lista e ficha", async campo => {
+    for (const invalido of ["12abc", "0.001", "", "-1.00", "NaN", NaN, Infinity, true, "90071992547409.92"]) {
+      const f = fonte(); f.tables.parcelas[0][campo] = invalido; mocks.getSupabaseClientAsync.mockResolvedValue(f);
+      await expect(caller().listComParcelas()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      await expect(caller().obterDetalhes({ id: 1 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    }
+  });
+
+  it("principal inválido e composição juros maior que original são recusados", async () => {
+    const f = fonte(); f.tables.contratos[0].valor_principal = "100x"; mocks.getSupabaseClientAsync.mockResolvedValue(f);
+    await expect(caller().listComParcelas()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(caller().obterDetalhes({ id: 1 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    f.tables.contratos[0].valor_principal = "100.00"; f.tables.parcelas[0].valor_juros = "100.01";
+    await expect(caller().listComParcelas()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(caller().obterDetalhes({ id: 1 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+});

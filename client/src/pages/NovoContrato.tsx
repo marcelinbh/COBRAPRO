@@ -1,6 +1,6 @@
 'use client';
 import { useTranslation } from 'react-i18next';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -18,22 +18,62 @@ import { ArrowLeft, Calculator, CheckCircle, Info, ChevronsUpDown, Check } from 
 import { cn } from "@/lib/utils";
 import { formatarMoeda, calcularParcelaPadrao, calcularParcelaDiario, calcularParcelasPrice, MODALIDADE_LABELS } from "../../../shared/finance";
 import { EmprestimoSeguroCriar } from "@/components/EmprestimoSeguroCriar";
+import { EmprestimoMultimodalCriar } from "@/components/EmprestimoMultimodalCriar";
+import { modalidadesMultimodal, tipoTaxaMultimodal, type ModalidadeMultimodal } from "../../../shared/emprestimosMultimodalCalculo";
+import { chaveIntencao } from "@/components/EmprestimoSeguroRpc";
+import { chaveMultimodal } from "@/components/EmprestimoMultimodalRpc";
 
 export default function NovoContrato() {
   const [, setLocation] = useLocation();
+  const auth = trpc.auth.me.useQuery();
+  const user = auth.isError || auth.isLoading || auth.isFetching ? null : auth.data;
+  const capacidade = trpc.emprestimosMultimodal.disponibilidade.useQuery(undefined, { enabled: !!user });
+  const escolha = useRef<{ escopo: string; ciclo: 'mensal' | 'multimodal'; explicita?: boolean } | null>(null);
+  const [, atualizarEscolha] = useState(0);
   const params = new URLSearchParams(window.location.search);
-  const modalidade = params.get('modalidade'), tipoTaxa = params.get('tipoTaxa');
-  const suportado = (!modalidade || modalidade === 'mensal') && (!tipoTaxa || tipoTaxa === 'mensal');
+  const solicitada = params.get('modalidade');
+  const modalidade = (solicitada === 'emprestimo_diario' ? 'diario' : solicitada === 'emprestimo_padrao' ? 'mensal' : solicitada ?? 'mensal') as ModalidadeMultimodal;
+  const tipoTaxa = params.get('tipoTaxa');
+  const suportado = modalidadesMultimodal.includes(modalidade) && (!tipoTaxa || tipoTaxa === tipoTaxaMultimodal[modalidade]);
+  const mensalAnterior = modalidade === 'mensal' && (!tipoTaxa || tipoTaxa === 'mensal');
+  const escopo = `${user?.id ?? ''}:${modalidade}:${tipoTaxa ?? ''}`;
+  if (user && escolha.current?.escopo !== escopo) escolha.current = null;
+  let mensalSalva = false, multimodalSalva = false, falhaStorage = false;
+  if (user) {
+    try {
+      mensalSalva = sessionStorage.getItem(chaveIntencao(user.id, 'criar')) !== null;
+      multimodalSalva = sessionStorage.getItem(chaveMultimodal(user.id, 'criar')) !== null;
+    } catch { falhaStorage = true; }
+    if (!escolha.current && !falhaStorage) {
+      if (mensalSalva !== multimodalSalva) escolha.current = { escopo, ciclo: mensalSalva ? 'mensal' : 'multimodal' };
+      else if (!mensalSalva && !capacidade.isError && !capacidade.isLoading && !capacidade.isFetching) {
+        if (capacidade.data?.disponivel === true) escolha.current = { escopo, ciclo: 'multimodal' };
+        else if (capacidade.data?.disponivel === false && mensalAnterior) escolha.current = { escopo, ciclo: 'mensal' };
+      }
+    }
+  }
+  const ampliado = escolha.current?.escopo === escopo && escolha.current.ciclo === 'multimodal';
+  const anterior = escolha.current?.escopo === escopo && escolha.current.ciclo === 'mensal';
+  if (!user) return <div className="space-y-4"><p role={auth.isError ? 'alert' : 'status'}>Conferindo a sessão da sua empresa antes de abrir o cadastro.</p>{auth.isError && <Button variant="outline" onClick={() => auth.refetch()}>Tentar novamente</Button>}</div>;
+  if (falhaStorage) return <div className="space-y-4"><p role="alert">Não foi possível conferir a intenção desta sessão. Preserve o histórico antes de iniciar outra operação.</p><Button variant="outline" onClick={() => atualizarEscolha(v => v + 1)}>Tentar novamente</Button></div>;
+  if (suportado && mensalSalva && multimodalSalva && !escolha.current?.explicita) return <div className="space-y-4"><p role="alert">Há intenções em dois ciclos. Confira cada uma sem iniciar outra cobrança.</p>{(['mensal', 'multimodal'] as const).map(ciclo => <Button key={ciclo} variant="outline" onClick={() => { escolha.current = { escopo, ciclo, explicita: true }; atualizarEscolha(v => v + 1); }}>Conferir intenção {ciclo === 'mensal' ? 'mensal anterior' : 'multimodal'}</Button>)}</div>;
   return <div className="space-y-4 max-w-3xl">
     <Button variant="outline" onClick={() => setLocation('/contratos')}>Voltar aos contratos</Button>
     <h1 className="text-2xl font-semibold">Novo empréstimo</h1>
     <p>Cadastre o empréstimo com o cliente e a conta da sua empresa. O desembolso e as parcelas são registrados juntos após a confirmação.</p>
-    {suportado ? <>
-      {params.size > 0 && <p role="status">Preencha e confira explicitamente os campos mensais abaixo; parâmetros do atalho não foram importados.</p>}
+    {suportado && ampliado ? <>
+      {params.size > 0 && <p role="status">A modalidade foi selecionada. Confira explicitamente cliente, conta, valores e datas; valores financeiros do atalho não foram importados.</p>}
+      <EmprestimoMultimodalCriar modalidadeInicial={modalidade} onSuccess={id => setLocation(`/emprestimos/${id}`)} />
+    </> : suportado && anterior ? <>
+      <p role="status">O cadastro mensal anterior continua no seu próprio fluxo atômico. Sua intenção não será convertida ou reenviada por outro ciclo.</p>
       <EmprestimoSeguroCriar onSuccess={id => setLocation(`/emprestimos/${id}`)} />
+    </> : suportado && capacidade.isLoading ? <p role="status">Conferindo as modalidades instaladas...</p>
+    : suportado ? <>
+      <p role="alert">Não foi possível conferir o ciclo desta modalidade. Nenhum cadastro foi convertido ou gravado.</p>
+      <Button variant="outline" onClick={() => capacidade.refetch()}>Tentar novamente</Button>
     </> : <>
-      <p role="alert">Este atalho solicita {modalidade ?? 'modalidade não informada'} / {tipoTaxa ?? 'taxa não informada'}, mas este formulário cadastra empréstimos mensais. Os dados do atalho não foram convertidos nem gravados. Para outra modalidade, não confirme um cadastro mensal como substituição.</p>
-      <a className="underline" href="/contratos/novo">Iniciar explicitamente outro empréstimo mensal sem os parâmetros anteriores</a>
+      <p role="alert">Este atalho solicita {solicitada ?? 'modalidade não informada'} / {tipoTaxa ?? 'taxa não informada'}. Não será convertido para outra regra. Vendas e cheques não são empréstimos e precisam de seu próprio fluxo financeiro.</p>
+      <a className="underline" href="/contratos/novo">Iniciar explicitamente outro cadastro sem os parâmetros anteriores</a>
     </>}
   </div>;
 }
