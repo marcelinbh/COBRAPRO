@@ -68,7 +68,7 @@ export default function EmprestimoDetalhes() {
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: config } = trpc.configuracoes.get.useQuery();
 
-  const { data: emprestimo, isLoading, isError, isFetching, refetch } = trpc.contratos.obterDetalhes.useQuery(
+  const { data: emprestimo, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.obterDetalhes.useQuery(
     { id: emprestimoId },
     { enabled: emprestimoId > 0 }
   );
@@ -129,12 +129,21 @@ export default function EmprestimoDetalhes() {
     onError: (e: any) => toast.error('Erro ao atualizar parcela: ' + e.message),
   });
 
-  if (isLoading) {
+  // Pending/paused e ausência de resposta não comprovam exclusão do contrato.
+  const leituraEmAndamento = emprestimoId > 0 && !isError && (
+    isLoading || isPending || emprestimo === undefined || (isFetching && emprestimo === null)
+  );
+  if (leituraEmAndamento) {
     return (
       <div className="space-y-6">
+        <p role="status" aria-live="polite">Carregando ficha do empréstimo...</p>
         <div className="animate-pulse space-y-4">
           <div className="h-12 bg-muted rounded-lg" />
           <div className="h-48 bg-muted rounded-lg" />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" disabled={isFetching} onClick={() => refetch()}>Tentar novamente</Button>
+          <Button variant="outline" onClick={() => setLocation('/emprestimos')}>Voltar para Empréstimos</Button>
         </div>
       </div>
     );

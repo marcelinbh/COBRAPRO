@@ -103,6 +103,35 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
 });
 
 describe('Ficha: falha não apaga contrato nem apresenta cache como certificado', () => {
+  it('observer real pendente/pausado não informa que o empréstimo não existe', () => {
+    const client = new QueryClient();
+    const onlineBefore = onlineManager.isOnline();
+    onlineManager.setOnline(false);
+    const queryFn = vi.fn().mockResolvedValue(null);
+    const observer = new QueryObserver(client, { queryKey: ['paused-loan-details'], queryFn, retry: false });
+    const unsubscribe = observer.subscribe(() => {});
+    try {
+      h.query = observer.getCurrentResult();
+      expect(h.query).toMatchObject({ status: 'pending', fetchStatus: 'paused', isPending: true, isLoading: false, data: undefined });
+      const html = renderToStaticMarkup(React.createElement(EmprestimoDetalhes));
+      expect(html).toContain('Carregando ficha do empréstimo');
+      expect(html).toContain('Voltar para Empréstimos');
+      expect(html).not.toContain('loanDetails.loanNotFound');
+      expect(queryFn).not.toHaveBeenCalled(); expect(h.mutate).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe(); client.clear(); onlineManager.setOnline(onlineBefore);
+    }
+  });
+  it.each([
+    { data: undefined, isPending: false, isLoading: false, isFetching: false },
+    { data: null, isPending: false, isLoading: false, isFetching: true },
+  ])('ausência sem resposta final ou em reconferência não é contrato inexistente %j', flags => {
+    Object.assign(h.query, flags);
+    const html = renderToStaticMarkup(React.createElement(EmprestimoDetalhes));
+    expect(html).toContain('Carregando ficha do empréstimo');
+    expect(html).toContain('Voltar para Empréstimos');
+    expect(html).not.toContain('loanDetails.loanNotFound'); expect(h.mutate).not.toHaveBeenCalled();
+  });
   it.each([undefined, { id: 31, clienteNome: 'Nome do cache não mostrar' }])('erro de leitura com data %j é recuperável e não vira não encontrado', data => {
     Object.assign(h.query, { data, isError: true });
     const html = renderToStaticMarkup(React.createElement(EmprestimoDetalhes));
