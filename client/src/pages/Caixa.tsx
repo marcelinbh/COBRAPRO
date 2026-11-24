@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,9 +12,25 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, Wallet, ArrowUpRight, ArrowDownRight, Building2, PlusCircle, MinusCircle, ClipboardCheck, RefreshCw, ShieldCheck, AlertTriangle } from "lucide-react";
+import { Plus, Wallet, ArrowUpRight, ArrowDownRight, Building2, ClipboardCheck, RefreshCw, ShieldCheck, AlertTriangle } from "lucide-react";
 import { formatarData, formatarMoeda } from "../../../shared/finance";
 import { calcularSaldoAtual } from "../../../shared/caixa";
+import { Caixa37Aporte, Caixa37Transferencia, type ContaOpcao37 } from "@/components/Caixa37Operacoes";
+import { copiarJsonCaixa37, CAIXA37_MAX_ID } from "../../../shared/caixa37";
+import { z } from "zod";
+
+const metadata37Schema = z.object({
+  empresaId: z.number().int().positive().max(CAIXA37_MAX_ID),
+  contas: z.array(z.object({ id: z.number().int().positive().max(CAIXA37_MAX_ID), nome: z.string(), tipo: z.string() }).strict()).max(10000),
+}).strict().refine(m => m.contas.every((c, i) => i === 0 || c.id > m.contas[i - 1].id));
+
+/** Metadados próprios não certificam dinheiro; JSON inválido nunca vira seletor de outra empresa. */
+export function contasPropriasCaixa37(value: unknown, userId: number): ContaOpcao37[] | null {
+  try {
+    const m = metadata37Schema.parse(copiarJsonCaixa37(value));
+    return m.empresaId === userId ? m.contas.map(c => ({ id: c.id, nome: c.nome })) : null;
+  } catch { return null; }
+}
 
 function formatarDataTransacao(valor: string | Date): string {
   // DATE representa um dia civil, não meia-noite UTC nem um horário de lançamento.
@@ -44,24 +60,27 @@ function ErroConsultaCaixa({ origem, mensagem, isFetching, refetch }: {
 }
 
 // ── Modal: Nova Conta ─────────────────────────────────────────────────────────
-function NovaConta({ onSuccess, disabled = false }: { onSuccess: () => void; disabled?: boolean }) {
+function NovaConta({ onSuccess, disabled = false, atual }: { onSuccess: () => void; disabled?: boolean; atual: () => boolean }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ nome: "", tipo: "caixa", banco: "", saldoInicial: "0" });
 
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const vigente = () => mounted.current && atual();
   const mutation = trpc.caixa.criarConta.useMutation({
-    onSuccess: () => { toast.success(t('toast_success.conta_criada')); setOpen(false); onSuccess(); },
-    onError: (e) => toast.error(e.message),
+    onSuccess: () => { if (!vigente()) return; toast.success(t('toast_success.conta_criada')); setOpen(false); onSuccess(); },
+    onError: (e) => { if (vigente()) toast.error(e.message); },
   });
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2" disabled={disabled}><Plus className="h-4 w-4" />{t('cashbox.newTransaction')}</Button>
+        <Button variant="outline" size="sm" className="gap-2" disabled={disabled}><Plus className="h-4 w-4" />Nova conta</Button>
       </DialogTrigger>
       <DialogContent className="max-w-sm">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl tracking-wide">{t('cashbox.title').toUpperCase()}</DialogTitle>
+          <DialogTitle className="font-display text-xl tracking-wide">NOVA CONTA</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-2">
           <div>
@@ -93,8 +112,19 @@ function NovaConta({ onSuccess, disabled = false }: { onSuccess: () => void; dis
             className="w-full"
             disabled={disabled || !form.nome || mutation.isPending}
             onClick={() => {
-              if (disabled) return;
-              mutation.mutate({ nome: form.nome, tipo: form.tipo as any, banco: form.banco || undefined, saldoInicial: parseFloat(form.saldoInicial) });
+              if (disabled || !vigente()) return;
+              const raw = form.saldoInicial;
+              if (!/^-?(0|[1-9][0-9]{0,12})(?:\.[0-9]{1,2})?$/.test(raw)) {
+                toast.error("Saldo inicial inválido. Use decimal com até duas casas, sem arredondamento."); return;
+              }
+              const [inteiro, fracao = ""] = raw.replace(/^-/, "").split(".");
+              const cents = (BigInt(inteiro) * BigInt(100) + BigInt(fracao.padEnd(2, "0"))) * (raw.startsWith("-") ? BigInt(-1) : BigInt(1));
+              const valor = Number(raw);
+              if (!Number.isFinite(valor) || !Number.isSafeInteger(Number(cents)) ||
+                BigInt(Math.round(valor * 100)) !== cents) {
+                toast.error("Saldo inicial não representável com precisão. Nenhum cadastro enviado."); return;
+              }
+              mutation.mutate({ nome: form.nome.trim(), tipo: form.tipo as "caixa" | "banco" | "digital", banco: form.banco || undefined, saldoInicial: valor });
             }}
           >
             {mutation.isPending ? t('common.saving') : t('cashbox.createAccount')}
@@ -105,206 +135,10 @@ function NovaConta({ onSuccess, disabled = false }: { onSuccess: () => void; dis
   );
 }
 
-// ── Modal: Nova Transação (completo) ─────────────────────────────────────────
-function NovaTransacao({ contas, onSuccess, disabled = false }: { contas: { id: number; nome: string }[]; onSuccess: () => void; disabled?: boolean }) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ contaCaixaId: "", tipo: "entrada", categoria: "outros", valor: "", descricao: "" });
-
-  const mutation = trpc.caixa.registrarTransacao.useMutation({
-    onSuccess: () => { toast.success(t('toast_success.transação_registrada')); setOpen(false); onSuccess(); },
-    onError: (e) => toast.error(e.message),
-  });
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="gap-2" disabled={disabled || contas.length === 0}><Plus className="h-4 w-4" />{t('cashbox.newTransaction')}</Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl tracking-wide">{t('cashbox.newTransaction').toUpperCase()}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          <div>
-            <Label>{t('cashbox.account')} *</Label>
-            <Select value={form.contaCaixaId} onValueChange={v => setForm(f => ({ ...f, contaCaixaId: v }))}>
-              <SelectTrigger className="mt-1"><SelectValue placeholder={t('emprestimos.cashAccount')} /></SelectTrigger>
-              <SelectContent>
-                {contas.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>{t('cashbox.type')}</Label>
-            <div className="grid grid-cols-2 gap-2 mt-1">
-              {['entrada', 'saida'].map(t => (
-                <button
-                  key={t}
-                  className={`p-2 rounded-lg border text-sm font-medium transition-all ${
-                    form.tipo === t
-                      ? t === 'entrada' ? 'border-success bg-success/15 text-success' : 'border-primary bg-primary/15 text-primary'
-                      : 'border-border text-muted-foreground'
-                  }`}
-                  onClick={() => setForm(f => ({ ...f, tipo: t }))}
-                >
-                  {t === 'entrada' ? '↑ Entrada' : '↓ Saída'}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <Label>{t('cashbox.type')}</Label>
-            <Select value={form.categoria} onValueChange={v => setForm(f => ({ ...f, categoria: v }))}>
-              <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pagamento_parcela">{t('cashbox.paymentReceived')}</SelectItem>
-                <SelectItem value="emprestimo_liberado">{t('cashbox.loanDisbursement')}</SelectItem>
-                <SelectItem value="despesa_operacional">{t('cashbox.operationalExpense')}</SelectItem>
-                <SelectItem value="transferencia_conta">{t('cashbox.other')}</SelectItem>
-                <SelectItem value="ajuste_manual">{t('cashbox.other')}</SelectItem>
-                <SelectItem value="outros">{t('cashbox.other')}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label>{t('cashbox.amount')} (R$) *</Label>
-            <Input className="mt-1" type="number" step="0.01" min="0" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: e.target.value }))} />
-          </div>
-          <div>
-            <Label>{t('cashbox.description')}</Label>
-            <Input className="mt-1" placeholder={t('cashflow.descriptionPlaceholder')} value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} />
-          </div>
-          <Button
-            className="w-full"
-            disabled={disabled || !contas.some(c => String(c.id) === form.contaCaixaId) || !form.valor || mutation.isPending}
-            onClick={() => {
-              if (disabled || !contas.some(c => String(c.id) === form.contaCaixaId)) return;
-              mutation.mutate({
-                contaCaixaId: parseInt(form.contaCaixaId),
-                tipo: form.tipo as any,
-                categoria: form.categoria as any,
-                valor: parseFloat(form.valor),
-                descricao: form.descricao || undefined,
-              });
-            }}
-          >
-            {mutation.isPending ? t('common.saving') : t('common.save')}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Modal: Lançamento Rápido (Adicionar / Debitar) ────────────────────────────
-function LancamentoRapido({
-  conta,
-  tipo,
-  onSuccess,
-  disabled = false,
-}: {
-  conta: { id: number; nome: string };
-  tipo: "entrada" | "saida";
-  onSuccess: () => void;
-  disabled?: boolean;
-}) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const [valor, setValor] = useState("");
-  const [descricao, setDescricao] = useState("");
-
-  const mutation = trpc.caixa.registrarTransacao.useMutation({
-    onSuccess: () => {
-      toast.success(tipo === "entrada" ? t("toast.balanceAdded") : t("toast.balanceDebited"));
-      setOpen(false);
-      setValor("");
-      setDescricao("");
-      onSuccess();
-    },
-    onError: (e) => toast.error(e.message),
-  });
-
-  const isEntrada = tipo === "entrada";
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <button
-          disabled={disabled}
-          onClick={e => e.stopPropagation()}
-          className={`p-1.5 rounded-lg transition-all hover:scale-110 ${
-            isEntrada
-              ? "bg-success/15 hover:bg-success/30 text-success"
-              : "bg-primary/15 hover:bg-primary/30 text-primary"
-          }`}
-          title={isEntrada ? t('cashbox.addBalance') : t('cashbox.debitBalance')}
-        >
-          {isEntrada ? <PlusCircle className="h-4 w-4" /> : <MinusCircle className="h-4 w-4" />}
-        </button>
-      </DialogTrigger>
-      <DialogContent className="max-w-sm" onClick={e => e.stopPropagation()}>
-        <DialogHeader>
-          <DialogTitle className="font-display text-xl tracking-wide">
-            {isEntrada ? `➕ ${t('cashbox.addBalance').toUpperCase()}` : `➖ ${t('cashbox.debitBalance').toUpperCase()}`}
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 mt-2">
-          <div className="p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
-            {t('cashbox.account')}: <span className="font-medium text-foreground">{conta.nome}</span>
-          </div>
-          <div>
-            <Label>{t('cashbox.amount')} (R$) *</Label>
-            <Input
-              className="mt-1 text-lg font-semibold"
-              type="number"
-              step="0.01"
-              min="0.01"
-              placeholder="0,00"
-              value={valor}
-              onChange={e => setValor(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div>
-            <Label>{t('cashbox.description')} ({t('common.optional')})</Label>
-            <Input
-              className="mt-1"
-              placeholder={isEntrada ? t('placeholder.ex_deposito') : t('placeholder.ex_retirada')}
-              value={descricao}
-              onChange={e => setDescricao(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>{t('common.cancel')}</Button>
-            <Button
-              className={isEntrada ? "bg-success hover:bg-success/90 text-white" : ""}
-              variant={isEntrada ? "default" : "destructive"}
-              disabled={disabled || !valor || parseFloat(valor) <= 0 || mutation.isPending}
-              onClick={() => {
-                if (disabled) return;
-                mutation.mutate({
-                  contaCaixaId: conta.id,
-                  tipo,
-                  categoria: "ajuste_manual",
-                  valor: parseFloat(valor),
-                  descricao: descricao || (isEntrada ? t('cashbox.addBalance') : t('cashbox.debitBalance')),
-                });
-              }}
-            >
-              {mutation.isPending ? t('common.saving') : isEntrada ? t('common.add') : t('cashbox.debit')}
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── Conferência operacional (somente leitura) ─────────────────────────────────
-function ConferenciaCaixa() {
+function ConferenciaCaixa({ leituraId }: { leituraId: string }) {
   const [open, setOpen] = useState(false);
-  const { data, isFetching, error, refetch } = trpc.caixa.conferencia.useQuery(undefined, {
+  const { data, isFetching, error, refetch } = trpc.caixa.conferencia.useQuery({ leituraId }, {
     enabled: open,
     staleTime: 0,
   });
@@ -403,19 +237,25 @@ function ConferenciaCaixa() {
 }
 
 // ── Página Principal ──────────────────────────────────────────────────────────
-export default function Caixa() {
+export function CaixaEmpresa({ userId, atual }: { userId: number; atual: () => boolean }) {
+  const [leituraId] = useState(() => globalThis.crypto.randomUUID());
   const { t } = useTranslation();
   const [contaSelecionada, setContaSelecionada] = useState<number | undefined>();
   const utils = trpc.useUtils();
+  const metadata = trpc.caixa.contasParaOperacao37.useQuery(undefined, { retry: false, staleTime: 0 });
+  const metadadosProprios = contasPropriasCaixa37(metadata.data, userId);
+  const metadataValida = !metadata.isError && !metadata.error && !metadata.isLoading &&
+    !metadata.isFetching && metadadosProprios !== null;
+  const contasOperacao: ContaOpcao37[] = metadataValida ? metadadosProprios! : [];
 
   const {
     data: contas, isLoading: contasLoading, isError: contasIsError,
     error: contasError, isFetching: contasFetching, refetch: refetchContas,
-  } = trpc.caixa.contas.useQuery(undefined, { retry: false });
+  } = trpc.caixa.contas.useQuery({ leituraId }, { retry: false });
   const {
     data: transacoes, isLoading: transacoesLoading, isError: transacoesIsError,
     error: transacoesError, isFetching: transacoesFetching, refetch: refetchTransacoes,
-  } = trpc.caixa.transacoes.useQuery({ contaCaixaId: contaSelecionada }, { retry: false });
+  } = trpc.caixa.transacoes.useQuery({ contaCaixaId: contaSelecionada, leituraId }, { retry: false });
 
   // Um refetch pode falhar mantendo data em cache. Esse cache não é sucesso atual.
   const contasFalha = contasIsError || !!contasError;
@@ -437,8 +277,6 @@ export default function Caixa() {
       saldoError = "Não foi possível calcular o saldo total com segurança. Atualize as contas antes de lançar valores.";
     }
   }
-  const mutacoesBloqueadas = !contasDisponiveis || !transacoesDisponiveis
-    || contasFetching || transacoesFetching || !!saldoError;
 
   const tipoIcons = { entrada: ArrowUpRight, saida: ArrowDownRight };
   const categoriaLabels: Record<string, string> = {
@@ -453,22 +291,31 @@ export default function Caixa() {
   const invalidarTudo = () => {
     utils.caixa.contas.invalidate();
     utils.caixa.transacoes.invalidate();
+    utils.caixa.contasParaOperacao37.invalidate();
+    utils.caixa.conferencia.invalidate();
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-3xl text-foreground tracking-wide">{t('cashbox.title').toUpperCase()}</h1>
           <p className="text-sm text-muted-foreground mt-1">{t('cashbox.transactions')}</p>
         </div>
-        <div className="flex flex-wrap gap-2 justify-end">
-          <ConferenciaCaixa />
-          <NovaConta onSuccess={invalidarTudo} disabled={mutacoesBloqueadas} />
-          <NovaTransacao contas={contasVisiveis ?? []} onSuccess={invalidarTudo} disabled={mutacoesBloqueadas} />
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <ConferenciaCaixa leituraId={leituraId} />
+          <NovaConta onSuccess={invalidarTudo} disabled={!atual()} atual={atual} />
+          <Caixa37Aporte userId={userId} contas={contasOperacao} onSuccess={invalidarTudo} />
+          <Caixa37Transferencia userId={userId} contas={contasOperacao} onSuccess={invalidarTudo} />
         </div>
       </div>
 
+      {!metadataValida && <div role="status" className="text-sm text-muted-foreground">
+        {metadata.isError || metadata.error ? "Não foi possível carregar os metadados próprios de contas." : "Conferindo os metadados de contas desta empresa..."}
+        <span> A conferência de uma intenção já enviada continua acessível em Aportar ou Transferir. Saldo e extrato antigos não autorizam nova operação.</span>
+        <Button variant="outline" size="sm" disabled={metadata.isFetching} onClick={() => void metadata.refetch()}>Atualizar seletor de contas</Button>
+      </div>}
+      <p className="text-xs text-muted-foreground">Aportes e transferências têm prévia autoritativa e confirmação próprias. Retiradas avulsas e exclusão de lançamentos não são substituídas por ajuste manual.</p>
       {/* Saldo Total */}
       <Card className="border-border bg-gradient-to-r from-card to-card/50">
         <CardContent className="p-6">
@@ -522,9 +369,7 @@ export default function Caixa() {
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                   </div>
                   <div className="flex items-center gap-1">
-                    {/* Botões rápidos de lançamento */}
-                    <LancamentoRapido conta={conta} tipo="entrada" onSuccess={invalidarTudo} disabled={mutacoesBloqueadas} />
-                    <LancamentoRapido conta={conta} tipo="saida" onSuccess={invalidarTudo} disabled={mutacoesBloqueadas} />
+                    {/* Operações financeiras usam os controles37 acima; nenhum writer genérico por cartão. */}
                     <span className="text-xs text-muted-foreground capitalize ml-1">{conta.tipo.replace('_', ' ')}</span>
                   </div>
                 </div>
@@ -597,4 +442,16 @@ export default function Caixa() {
       </div>
     </div>
   );
+}
+
+/** Troca de empresa invalida formulários/seleção e callbacks da tela anterior. */
+export default function Caixa() {
+  const auth = trpc.auth.me.useQuery(undefined, { retry: false });
+  const userId = !auth.isError && !auth.error && !auth.isLoading && !auth.isFetching &&
+    Number.isSafeInteger(auth.data?.id) && (auth.data?.id ?? 0) > 0 ? auth.data!.id : undefined;
+  const scope = useRef({ userId, epoch: 0 });
+  if (scope.current.userId !== userId) scope.current = { userId, epoch: scope.current.epoch + 1 };
+  const token = scope.current;
+  if (!userId) return <p role="status">Conferindo a sessão atual da empresa...</p>;
+  return <CaixaEmpresa key={`${userId}:${token.epoch}`} userId={userId} atual={() => scope.current === token} />;
 }

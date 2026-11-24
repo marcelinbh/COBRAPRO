@@ -1327,6 +1327,25 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Gate final: 3392 testes aprovados/11 opt-in ignorados; 158 arquivos aprovados/3 ignorados, TypeScript/build/diff check. PG17 independente:22 grupos aprovados, sem declarar teste dedicado0031.
 - [x] Migration0036 SHA7194c1f7038eb9e36358330614249b66575075bef465fcfe3c8aca59a4fed21f, 71 predecessoras e3 extensões previstas; SQL anterior intocado.
 - [x] Checkpoint904e614e e instalação produtiva exata às23h31 BRT: verifiers34/35/36 verdes, RLS75/75/0, ACL36 privadas e zero novas operações/origens36. Hashes integrais das quatro tabelas financeiras idênticos antes/depois;12/2/6 preservados.
-- [ ] Push fast-forward e deploy Healthy da versão certificada.
-- [ ] Smoke no site oficial depois do deploy, sem movimentação financeira nem mensagem real.
+- [x] Push fast-forward `2ce2f6cb`; DO159591e0 Live/Healthy às23h37; bundle oficial exato SHA2a12193e0a3304934b7546671dd36b7fbd8ccfb24f9258230c15dbadbe0e96c6. Regressões pós-push490/490; publicação Manus concluída.
+- [x] Smoke oficial read-only: cinco modalidades/cadastro próprio, capacidade36 true, três consultas de IDs inexistentes NOT_FOUND e ficha sem crash. Sem ficha própria para teste financeiro real; nenhum submit ou mensagem. Postflight23h40 e hashes financeiros integrais idênticos ao antesDDL,12/2/6 preservados.
+- [x] Reconfirmar produção24/11 às00h36 somente leitura: HTTP200, verifiers34/35/36PASS/cap36true, RLS75/75/CRUD0/sem resíduos36 e quatro hashes integrais idênticos. Nenhum impacto atual do bug de autovacuum observado em produção.
+- [x] Certificar/instalar hotfix preventivo36a separado:61 checks locais/44 negativas/manutenção e autovacuum reais, SQLdf1abe... instalado24/11 às01h11BRT com selo ORIGINAL válido;98/98 fontes finais sem drift,75/75RLS/zeroLeaks e snapshots financeiros antes/depois idênticos. Somente seis campos voláteis excluídos; não ressela drift arbitrário nem toca dinheiro/provas/tenant. SQL0036 permanece SHA7194...; commits isoladosf02c6c3/checkpoint89f1668d sem37.
 - [ ] Próximos lotes: aporte/transferência37; manutenção de despesas; reparcelamento e trilhos de vendas/veículos/cheques. Não afirmar liberação100% antes da certificação própria.
+
+## Fase 76: Aporte e transferência atômicos37 — LOCAL, 24/11/2026
+
+- [x] Implementar contratos strict, cinco RPC adapters protegidos e UI com quote SQL autoritativo, request/UUID congelados e recuperação sem retry financeiro/fallback.
+- [x] Integrar à página Caixa com metadados próprios sem saldo, recuperação acessível durante falha de consultas e isolamento de cache/callbacks A→B→A; remover writers genéricos da UI/backend.
+- [x] Preservar NovaConta como fluxo cadastral preexistente separado, sem declarar cadastro de conta certificado pela RPC37.
+- [x] Corrigir snapshot predecessor global37 para escopo da empresa/vínculos e comprovar corrida A37/B35 independente sem falso erro de integridade.
+- [x] Reforçar preflight físico37 por fontes versionadas pinadas, preservar seis extensões exatas e SQL20..36; duas bases freshPG17 da matriz inicial passaram com11 novos drifts físicos negativos em24/11 às00h12.
+- [x] Validar cinco envelopes SQL reais sintéticos via SDK/shared/backend:23 testes, mais52 da página real; sem operação financeira ou mensagem produtiva.
+- [x] Gate CANDIDATO79dd:3687PASS/11SKIP,164arquivosPASS/3SKIP, TypeScript/build/diff verdes às00h15. Não é certificação final: testes avançados posteriormente encontraram bugs reais.
+- [x] Corrigir e revalidar20 confirmações inválidas de provas sintéticas37: schema exato e reconstrução de quote/resultado contra estado físico histórico congelado, pin causal primeira_op. Runtime2acc em duas freshDB rejeitou todos os casos23514, incluindo novas variantes missing_pernas e quote falso coerente; zero achados finais. Não instalado em produção.
+- [x] Completar P0 runtime de virada BRT pós-lock, falhas antes/depois de cada perna/proof/seal, adulteração NEW/extraefeito, capabilities37 adversariais, prova corrompida e restart PG17 real;56 grupos PASS/zero falhas em duas freshDB sobre SQL2acc, zero resíduos e replay histórico preservado. Não substitui convivência ou certificação global37.
+- [x] Completar convivência contratual37:38 dedicadas/486 seleções e equivalentes originais,0 falhas,32 locks/14tryfail,sete writers em ambos sentidos,create/reparent,stress e manutenção real. Setup36 original9PASS/fresh pré37. Limites:36 omissões nominais/26 gaps shadow de alcance, não negativas descartadas; nenhuma seleção é suíte full antiga sobre37. Decisão GO local restrito e mapeamento das fronteiras reais documentados em RESULT.md/docs; não alegar cobertura integral/universal ausente.
+- [x] Gate completo final SQL2acc/harness coex final concluído24/11 às01h29:55BRT:3688PASS/11SKIP,165arquivosPASS/3SKIP,SQLvalidate/TypeScript/build/diffPASS. RESULT37/README consolidam decisão e limites; apenas ajustes de formato/documentação depois, SQL e código congelados. Não é plataforma100%.
+- [ ] Somente após certificação: checkpoint, preflight/snapshot produtivos, instalar SQL37 exato, postflight/ACL/RLS/hashes, push fast-forward/deploy e smoke read-only no site oficial.
+
+Kiwify, ofertas, planos, Blacklist e configurações WhatsApp não integram este lote. Registros históricos divergentes permanecem preservados para revisão humana; nenhum saneamento automático ou retirada avulsa genérica foi liberado.

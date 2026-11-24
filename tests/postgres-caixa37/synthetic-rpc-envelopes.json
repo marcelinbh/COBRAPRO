@@ -1,0 +1,525 @@
+{
+  "syntheticOnly": true,
+  "source": "PG17 local disposable Caixa37; nenhuma credencial/dado real",
+  "cases": [
+    {
+      "name": "aporte_0.01",
+      "userId": 1,
+      "idempotencyKey": "588b75b6-f269-43a1-b2ec-06958f0affa1",
+      "request": {
+        "acao": "aporte",
+        "contaOrigemId": null,
+        "contaDestinoId": 8,
+        "valor": "0.01",
+        "descricao": null,
+        "dataTransacao": "2026-11-24",
+        "estadoHash": "84b7cd61ef70228170f4d16af71225ecdfd3f9c60a948d22bd58e5285535bf60"
+      },
+      "quote": {
+        "acao": "aporte",
+        "regra": "caixa37_brt_v1",
+        "valor": "0.01",
+        "origem": null,
+        "destino": {
+          "nome": "Base negativa37",
+          "saidas": "0.00",
+          "entradas": "0.00",
+          "saldoBase": "-10.01",
+          "contaCaixaId": 8,
+          "saldoEfetivo": "-10.01"
+        },
+        "elegivel": true,
+        "descricao": null,
+        "estadoHash": "84b7cd61ef70228170f4d16af71225ecdfd3f9c60a948d22bd58e5285535bf60",
+        "contaOrigemId": null,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 8,
+        "saldoOrigemApos": null,
+        "saldoDestinoApos": "-10.00",
+        "saldoTotalOwnerApos": "1897.00",
+        "saldoTotalOwnerAntes": "1896.99"
+      },
+      "result": {
+        "acao": "aporte",
+        "regra": "caixa37_v1",
+        "valor": "0.01",
+        "pernas": [
+          {
+            "tipo": "entrada",
+            "papel": "aporte",
+            "valor": "0.01",
+            "contaCaixaId": 8,
+            "transacaoCaixaId": "1004"
+          }
+        ],
+        "success": true,
+        "repetida": false,
+        "descricao": null,
+        "operationId": "585fed81-bd2a-44f9-a1dd-2da65d945d97",
+        "contaOrigemId": null,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 8,
+        "idempotencyKey": "588b75b6-f269-43a1-b2ec-06958f0affa1",
+        "saldoOrigemApos": null,
+        "saldoDestinoApos": "-10.00",
+        "saldoOrigemAntes": null,
+        "saldoDestinoAntes": "-10.01",
+        "saldoTotalOwnerApos": "1897.00",
+        "saldoTotalOwnerAntes": "1896.99"
+      },
+      "recovery": {
+        "proof": "uuid_fenced37_v1",
+        "result": {
+          "acao": "aporte",
+          "regra": "caixa37_v1",
+          "valor": "0.01",
+          "pernas": [
+            {
+              "tipo": "entrada",
+              "papel": "aporte",
+              "valor": "0.01",
+              "contaCaixaId": 8,
+              "transacaoCaixaId": "1004"
+            }
+          ],
+          "success": true,
+          "repetida": false,
+          "descricao": null,
+          "operationId": "585fed81-bd2a-44f9-a1dd-2da65d945d97",
+          "contaOrigemId": null,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 8,
+          "idempotencyKey": "588b75b6-f269-43a1-b2ec-06958f0affa1",
+          "saldoOrigemApos": null,
+          "saldoDestinoApos": "-10.00",
+          "saldoOrigemAntes": null,
+          "saldoDestinoAntes": "-10.01",
+          "saldoTotalOwnerApos": "1897.00",
+          "saldoTotalOwnerAntes": "1896.99"
+        },
+        "status": "confirmed",
+        "userId": 1,
+        "request": {
+          "acao": "aporte",
+          "valor": "0.01",
+          "descricao": null,
+          "estadoHash": "84b7cd61ef70228170f4d16af71225ecdfd3f9c60a948d22bd58e5285535bf60",
+          "contaOrigemId": null,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 8
+        },
+        "operationId": "585fed81-bd2a-44f9-a1dd-2da65d945d97",
+        "requestHash": "7abdb3588107dcc180a2b793d07afa59452715767c736b84be0d2f7c1f71c3cc",
+        "idempotencyKey": "588b75b6-f269-43a1-b2ec-06958f0affa1"
+      }
+    },
+    {
+      "name": "aporte_9999999999.99",
+      "userId": 1,
+      "idempotencyKey": "c9d4b1bc-dd68-4b1f-af26-cd099458b2d3",
+      "request": {
+        "acao": "aporte",
+        "contaOrigemId": null,
+        "contaDestinoId": 7,
+        "valor": "9999999999.99",
+        "descricao": null,
+        "dataTransacao": "2026-11-24",
+        "estadoHash": "16950f6cd9ffb15192a85e317d63ca52b2a7ffb9fa973728994a5367be2e134b"
+      },
+      "quote": {
+        "acao": "aporte",
+        "regra": "caixa37_brt_v1",
+        "valor": "9999999999.99",
+        "origem": null,
+        "destino": {
+          "nome": "Destino37",
+          "saidas": "0.00",
+          "entradas": "0.00",
+          "saldoBase": "-100.00",
+          "contaCaixaId": 7,
+          "saldoEfetivo": "-100.00"
+        },
+        "elegivel": true,
+        "descricao": null,
+        "estadoHash": "16950f6cd9ffb15192a85e317d63ca52b2a7ffb9fa973728994a5367be2e134b",
+        "contaOrigemId": null,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 7,
+        "saldoOrigemApos": null,
+        "saldoDestinoApos": "9999999899.99",
+        "saldoTotalOwnerApos": "10000001896.99",
+        "saldoTotalOwnerAntes": "1897.00"
+      },
+      "result": {
+        "acao": "aporte",
+        "regra": "caixa37_v1",
+        "valor": "9999999999.99",
+        "pernas": [
+          {
+            "tipo": "entrada",
+            "papel": "aporte",
+            "valor": "9999999999.99",
+            "contaCaixaId": 7,
+            "transacaoCaixaId": "1005"
+          }
+        ],
+        "success": true,
+        "repetida": false,
+        "descricao": null,
+        "operationId": "f50af157-f174-45a6-b893-a4b6bd6a77f3",
+        "contaOrigemId": null,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 7,
+        "idempotencyKey": "c9d4b1bc-dd68-4b1f-af26-cd099458b2d3",
+        "saldoOrigemApos": null,
+        "saldoDestinoApos": "9999999899.99",
+        "saldoOrigemAntes": null,
+        "saldoDestinoAntes": "-100.00",
+        "saldoTotalOwnerApos": "10000001896.99",
+        "saldoTotalOwnerAntes": "1897.00"
+      },
+      "recovery": {
+        "proof": "uuid_fenced37_v1",
+        "result": {
+          "acao": "aporte",
+          "regra": "caixa37_v1",
+          "valor": "9999999999.99",
+          "pernas": [
+            {
+              "tipo": "entrada",
+              "papel": "aporte",
+              "valor": "9999999999.99",
+              "contaCaixaId": 7,
+              "transacaoCaixaId": "1005"
+            }
+          ],
+          "success": true,
+          "repetida": false,
+          "descricao": null,
+          "operationId": "f50af157-f174-45a6-b893-a4b6bd6a77f3",
+          "contaOrigemId": null,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 7,
+          "idempotencyKey": "c9d4b1bc-dd68-4b1f-af26-cd099458b2d3",
+          "saldoOrigemApos": null,
+          "saldoDestinoApos": "9999999899.99",
+          "saldoOrigemAntes": null,
+          "saldoDestinoAntes": "-100.00",
+          "saldoTotalOwnerApos": "10000001896.99",
+          "saldoTotalOwnerAntes": "1897.00"
+        },
+        "status": "confirmed",
+        "userId": 1,
+        "request": {
+          "acao": "aporte",
+          "valor": "9999999999.99",
+          "descricao": null,
+          "estadoHash": "16950f6cd9ffb15192a85e317d63ca52b2a7ffb9fa973728994a5367be2e134b",
+          "contaOrigemId": null,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 7
+        },
+        "operationId": "f50af157-f174-45a6-b893-a4b6bd6a77f3",
+        "requestHash": "dc0929595d74f919829af430634f7481c234436542f399fe885ccfee98dfd17c",
+        "idempotencyKey": "c9d4b1bc-dd68-4b1f-af26-cd099458b2d3"
+      }
+    },
+    {
+      "name": "transfer_8_7",
+      "userId": 1,
+      "idempotencyKey": "525d152a-9961-4285-b195-09b99140b248",
+      "request": {
+        "acao": "transferir",
+        "contaOrigemId": 8,
+        "contaDestinoId": 7,
+        "valor": "100.00",
+        "descricao": null,
+        "dataTransacao": "2026-11-24",
+        "estadoHash": "de2970288fd2f3ea73053e8d2c1512b883ed4008077c7f69f8067ccfc48a9f63"
+      },
+      "quote": {
+        "acao": "transferir",
+        "regra": "caixa37_brt_v1",
+        "valor": "100.00",
+        "origem": {
+          "nome": "Base negativa37",
+          "saidas": "0.00",
+          "entradas": "0.01",
+          "saldoBase": "-10.01",
+          "contaCaixaId": 8,
+          "saldoEfetivo": "-10.00"
+        },
+        "destino": {
+          "nome": "Destino37",
+          "saidas": "0.00",
+          "entradas": "9999999999.99",
+          "saldoBase": "-100.00",
+          "contaCaixaId": 7,
+          "saldoEfetivo": "9999999899.99"
+        },
+        "elegivel": true,
+        "descricao": null,
+        "estadoHash": "de2970288fd2f3ea73053e8d2c1512b883ed4008077c7f69f8067ccfc48a9f63",
+        "contaOrigemId": 8,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 7,
+        "saldoOrigemApos": "-110.00",
+        "saldoDestinoApos": "9999999999.99",
+        "saldoTotalOwnerApos": "10000001896.99",
+        "saldoTotalOwnerAntes": "10000001896.99"
+      },
+      "result": {
+        "acao": "transferir",
+        "regra": "caixa37_v1",
+        "valor": "100.00",
+        "pernas": [
+          {
+            "tipo": "saida",
+            "papel": "origem",
+            "valor": "100.00",
+            "contaCaixaId": 8,
+            "transacaoCaixaId": "1006"
+          },
+          {
+            "tipo": "entrada",
+            "papel": "destino",
+            "valor": "100.00",
+            "contaCaixaId": 7,
+            "transacaoCaixaId": "1007"
+          }
+        ],
+        "success": true,
+        "repetida": false,
+        "descricao": null,
+        "operationId": "1972283f-7a46-443e-88d3-bd6234887908",
+        "contaOrigemId": 8,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 7,
+        "idempotencyKey": "525d152a-9961-4285-b195-09b99140b248",
+        "saldoOrigemApos": "-110.00",
+        "saldoDestinoApos": "9999999999.99",
+        "saldoOrigemAntes": "-10.00",
+        "saldoDestinoAntes": "9999999899.99",
+        "saldoTotalOwnerApos": "10000001896.99",
+        "saldoTotalOwnerAntes": "10000001896.99"
+      },
+      "recovery": {
+        "proof": "uuid_fenced37_v1",
+        "result": {
+          "acao": "transferir",
+          "regra": "caixa37_v1",
+          "valor": "100.00",
+          "pernas": [
+            {
+              "tipo": "saida",
+              "papel": "origem",
+              "valor": "100.00",
+              "contaCaixaId": 8,
+              "transacaoCaixaId": "1006"
+            },
+            {
+              "tipo": "entrada",
+              "papel": "destino",
+              "valor": "100.00",
+              "contaCaixaId": 7,
+              "transacaoCaixaId": "1007"
+            }
+          ],
+          "success": true,
+          "repetida": false,
+          "descricao": null,
+          "operationId": "1972283f-7a46-443e-88d3-bd6234887908",
+          "contaOrigemId": 8,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 7,
+          "idempotencyKey": "525d152a-9961-4285-b195-09b99140b248",
+          "saldoOrigemApos": "-110.00",
+          "saldoDestinoApos": "9999999999.99",
+          "saldoOrigemAntes": "-10.00",
+          "saldoDestinoAntes": "9999999899.99",
+          "saldoTotalOwnerApos": "10000001896.99",
+          "saldoTotalOwnerAntes": "10000001896.99"
+        },
+        "status": "confirmed",
+        "userId": 1,
+        "request": {
+          "acao": "transferir",
+          "valor": "100.00",
+          "descricao": null,
+          "estadoHash": "de2970288fd2f3ea73053e8d2c1512b883ed4008077c7f69f8067ccfc48a9f63",
+          "contaOrigemId": 8,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 7
+        },
+        "operationId": "1972283f-7a46-443e-88d3-bd6234887908",
+        "requestHash": "4d5565f8e42e5abf357474cf66fe7999d4391d045eb3cd9e547ca018cb6d70ab",
+        "idempotencyKey": "525d152a-9961-4285-b195-09b99140b248"
+      }
+    },
+    {
+      "name": "transfer_7_8",
+      "userId": 1,
+      "idempotencyKey": "55a903ba-9516-4d2c-954f-f50c5b586f65",
+      "request": {
+        "acao": "transferir",
+        "contaOrigemId": 7,
+        "contaDestinoId": 8,
+        "valor": "100.00",
+        "descricao": null,
+        "dataTransacao": "2026-11-24",
+        "estadoHash": "5f47758a427e38f09a6929201ec4a8d75f808c654f756c645f6390f0aeb88883"
+      },
+      "quote": {
+        "acao": "transferir",
+        "regra": "caixa37_brt_v1",
+        "valor": "100.00",
+        "origem": {
+          "nome": "Destino37",
+          "saidas": "0.00",
+          "entradas": "10000000099.99",
+          "saldoBase": "-100.00",
+          "contaCaixaId": 7,
+          "saldoEfetivo": "9999999999.99"
+        },
+        "destino": {
+          "nome": "Base negativa37",
+          "saidas": "100.00",
+          "entradas": "0.01",
+          "saldoBase": "-10.01",
+          "contaCaixaId": 8,
+          "saldoEfetivo": "-110.00"
+        },
+        "elegivel": true,
+        "descricao": null,
+        "estadoHash": "5f47758a427e38f09a6929201ec4a8d75f808c654f756c645f6390f0aeb88883",
+        "contaOrigemId": 7,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 8,
+        "saldoOrigemApos": "9999999899.99",
+        "saldoDestinoApos": "-10.00",
+        "saldoTotalOwnerApos": "10000001896.99",
+        "saldoTotalOwnerAntes": "10000001896.99"
+      },
+      "result": {
+        "acao": "transferir",
+        "regra": "caixa37_v1",
+        "valor": "100.00",
+        "pernas": [
+          {
+            "tipo": "saida",
+            "papel": "origem",
+            "valor": "100.00",
+            "contaCaixaId": 7,
+            "transacaoCaixaId": "1008"
+          },
+          {
+            "tipo": "entrada",
+            "papel": "destino",
+            "valor": "100.00",
+            "contaCaixaId": 8,
+            "transacaoCaixaId": "1009"
+          }
+        ],
+        "success": true,
+        "repetida": false,
+        "descricao": null,
+        "operationId": "fe302646-9a6a-4040-8ca5-5886e4565c89",
+        "contaOrigemId": 7,
+        "dataTransacao": "2026-11-24",
+        "contaDestinoId": 8,
+        "idempotencyKey": "55a903ba-9516-4d2c-954f-f50c5b586f65",
+        "saldoOrigemApos": "9999999899.99",
+        "saldoDestinoApos": "-10.00",
+        "saldoOrigemAntes": "9999999999.99",
+        "saldoDestinoAntes": "-110.00",
+        "saldoTotalOwnerApos": "10000001896.99",
+        "saldoTotalOwnerAntes": "10000001896.99"
+      },
+      "recovery": {
+        "proof": "uuid_fenced37_v1",
+        "result": {
+          "acao": "transferir",
+          "regra": "caixa37_v1",
+          "valor": "100.00",
+          "pernas": [
+            {
+              "tipo": "saida",
+              "papel": "origem",
+              "valor": "100.00",
+              "contaCaixaId": 7,
+              "transacaoCaixaId": "1008"
+            },
+            {
+              "tipo": "entrada",
+              "papel": "destino",
+              "valor": "100.00",
+              "contaCaixaId": 8,
+              "transacaoCaixaId": "1009"
+            }
+          ],
+          "success": true,
+          "repetida": false,
+          "descricao": null,
+          "operationId": "fe302646-9a6a-4040-8ca5-5886e4565c89",
+          "contaOrigemId": 7,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 8,
+          "idempotencyKey": "55a903ba-9516-4d2c-954f-f50c5b586f65",
+          "saldoOrigemApos": "9999999899.99",
+          "saldoDestinoApos": "-10.00",
+          "saldoOrigemAntes": "9999999999.99",
+          "saldoDestinoAntes": "-110.00",
+          "saldoTotalOwnerApos": "10000001896.99",
+          "saldoTotalOwnerAntes": "10000001896.99"
+        },
+        "status": "confirmed",
+        "userId": 1,
+        "request": {
+          "acao": "transferir",
+          "valor": "100.00",
+          "descricao": null,
+          "estadoHash": "5f47758a427e38f09a6929201ec4a8d75f808c654f756c645f6390f0aeb88883",
+          "contaOrigemId": 7,
+          "dataTransacao": "2026-11-24",
+          "contaDestinoId": 8
+        },
+        "operationId": "fe302646-9a6a-4040-8ca5-5886e4565c89",
+        "requestHash": "baba23fd56acd7c88e15307eadc9fd6139cb574e3933156d5c6ba31661bc0c68",
+        "idempotencyKey": "55a903ba-9516-4d2c-954f-f50c5b586f65"
+      }
+    },
+    {
+      "name": "fenced_expired_request",
+      "userId": 1,
+      "idempotencyKey": "f672d01b-c195-4832-ad6e-d9bd4ca53199",
+      "request": {
+        "acao": "aporte",
+        "contaOrigemId": null,
+        "contaDestinoId": 7,
+        "valor": "1.00",
+        "descricao": null,
+        "dataTransacao": "1900-01-01",
+        "estadoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "recovery": {
+        "proof": "uuid_fenced37_v1",
+        "result": null,
+        "status": "not_executed",
+        "userId": 1,
+        "request": {
+          "acao": "aporte",
+          "valor": "1.00",
+          "descricao": null,
+          "estadoHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contaOrigemId": null,
+          "dataTransacao": "1900-01-01",
+          "contaDestinoId": 7
+        },
+        "operationId": null,
+        "requestHash": "2ab05ba54c7f24c77705de2387d3ad6e73a82d6963114f1e927a688c7c02df75",
+        "idempotencyKey": "f672d01b-c195-4832-ad6e-d9bd4ca53199"
+      }
+    }
+  ],
+  "sql37Sha256": "2acc5c0840e77a1131fa02d04f0b1faf85bbdb0430071b73477a276ded312334"
+}

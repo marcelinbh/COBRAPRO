@@ -1,0 +1,11 @@
+# Decisão do responsável — hotfix36 independente (24/11/2026)
+
+A convivência em PG17 real mostrou falsa recusa55000 após autovacuum: `multa36_metadata()` sela `pg_class` inteiro, inclusive seis campos de estatística/manutenção. Produção foi consultada somente em leitura às00h36 BRT: verificadores34/35/36 passaram, capacidades36true, HTTP200 e hashes integrais financeiros idênticos ao pós-smoke. Não foi observado impacto produtivo no momento; o risco permanece após manutenção ordinária.
+
+Será criada uma migration **independente `0036a_multa_metadata_estavel.sql`**, predecessora obrigatória do37. A única função antiga alterada nela é `multa36_metadata()`, mediante substituição exata do seletor `to_jsonb(c)` por `to_jsonb(c)-ARRAY['relpages','reltuples','relallvisible','relallfrozen','relfrozenxid','relminmxid']` no item tables. Esses campos não são fonte, ACL, owner, RLS, coluna, constraint nem trigger. Os demais bytes do corpo serão preservados. `0036_rpc_multa_manual_fixa.sql` instalado mantém SHA7194c1f…; nenhum builder antigo será executado.
+
+**Limite deliberado:** hotfix36a exige que o verificador36 ORIGINAL passe antes da alteração, além de fontes/ACL/rowtypes/triggers estritamente conhecidos. Não conserta nem ressela silenciosamente um selo original já inválido. Se produção mudar para55000 antes da instalação, interromper instalação e analisar drift; não adotar o catálogo desconhecido como baseline. Só após prova original+preflight, sob locks de aplicação e janela sem DDL externa, atualizar a assinatura do manifesto36 de instalação. Nenhum manifesto34/35, operação, fence, prova, encargo, saldo, contrato, parcela ou tenant será alterado.
+
+O contrato37 continua com **seis extensões de writers antigas, exatamente as já autorizadas**. O builder37 incluirá o corpo36a versionado e pinado na baseline; 36a não será uma sétima extensão do37. A certificação37 anterior SHA79dd… passa a ser evidência de candidato anterior, não final. São obrigatórios testes PG17 com autovacuum ON, ANALYZE/VACUUM/FREEZE sem falso55000 e negativos de drift estrutural/source/ACL que continuam falhando. Nenhum GO/commit/install/deploy37 antes de nova certificação final.
+
+As metadata34/35 foram inspecionadas: usam seletores de `pg_class` com nome/owner/ACL/RLS, sem os seis campos voláteis; não necessitam alteração por este achado.

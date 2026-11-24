@@ -77,13 +77,15 @@ describe("contenção de operações financeiras não atômicas", () => {
     expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
   });
 
-  it.each(['pagamento_parcela', 'emprestimo_liberado', 'despesa_operacional', 'transferencia_conta'] as const)(
+  it.each(['pagamento_parcela', 'emprestimo_liberado', 'despesa_operacional', 'transferencia_conta', 'ajuste_manual', 'outros'] as const)(
     "não aceita categoria %s como atalho manual para uma operação vinculada",
     async (categoria) => {
       const caller = appRouter.createCaller(contextoAutenticado());
       for (const habilitada of [false, true]) {
         ENV.enableRpcRecebimentoParcela = habilitada;
-        await expectSuspensa(caller.caixa.registrarTransacao({ contaCaixaId: 1, tipo: 'entrada', categoria, valor: 1, descricao: 'Auditoria' }));
+        for (const tipo of ['entrada', 'saida'] as const) {
+          await expectSuspensa(caller.caixa.registrarTransacao({ contaCaixaId: 1, tipo, categoria, valor: 1, descricao: 'Auditoria' }));
+        }
       }
       expect(mocks.getDb).not.toHaveBeenCalled();
       expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();

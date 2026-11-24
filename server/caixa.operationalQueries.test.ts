@@ -177,3 +177,66 @@ describe("leitura operacional de Caixa", () => {
     await expect(appRouter.createCaller(ctx).caixa.contas()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
   });
 });
+
+
+describe("Montagem Caixa37 e segmentação de leitura — router real", () => {
+  const leituraId = "00000000-0000-4000-8000-000000000041";
+  it("metadata own typed funciona com saldo inválido sem ler o livro", async () => {
+    mocks.getDb.mockClear();
+    const sb = client({ data: [{ ...account, saldo: "NaN" }], error: null, count: 1 } as any, [{ data: null, error: { message: "livro indisponível" } }]);
+    mocks.getSupabaseClientAsync.mockResolvedValue(sb);
+    await expect(appRouter.createCaller(ctx).caixa.contasParaOperacao37()).resolves.toEqual({ empresaId: 41, contas: [{ id: 7, nome: "Caixa fixture", tipo: "caixa" }] });
+    expect(mocks.getDb).not.toHaveBeenCalled();
+    expect(sb.calls).toHaveLength(1);
+    expect(sb.calls[0].columns).toBe("id,nome,tipo,ativo,user_id");
+    expect(sb.calls[0].filters).toEqual([["eq", "user_id", 41], ["eq", "ativo", true]]);
+    expect(sb.calls[0].range).toEqual([0, 99]);
+    expect(sb.calls[0].ordered).toBe("id");
+  });
+
+  it.each([{ user_id: 90 }, { user_id: null }, { ativo: false }, { id: 0 }])("metadata inválida %j nunca vira opções disponíveis", async overrides => {
+    const sb = client({ data: [{ ...account, ...overrides }], error: null, count: 1 } as any);
+    mocks.getSupabaseClientAsync.mockResolvedValue(sb);
+    await expect(appRouter.createCaller(ctx).caixa.contasParaOperacao37()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(sb.from).not.toHaveBeenCalledWith("transacoes_caixa");
+  });
+
+  it("nonce muda somente a chave de cache, não o owner nem o saldo calculado", async () => {
+    const sb = client({ data: [account], error: null }, [{ data: [{ id: 1, user_id: 41, conta_caixa_id: 7, tipo: "entrada", valor: "0.01" }], error: null }]);
+    mocks.getSupabaseClientAsync.mockResolvedValue(sb);
+    const rows = await appRouter.createCaller(ctx).caixa.contas({ leituraId });
+    expect(rows[0].saldoAtual).toBe(1000.01);
+    expect(sb.calls[0].filters).toContainEqual(["eq", "user_id", 41]);
+    expect(sb.calls.every(c => c.filters.every(f => f[1] !== "leituraId"))).toBe(true);
+  });
+
+  it("nonce não autoriza empresa injetada em consulta estrita", async () => {
+    mocks.getDb.mockClear(); mocks.getSupabaseClientAsync.mockClear();
+    await expect(appRouter.createCaller(ctx).caixa.contas({ leituraId, empresaId: 90 } as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(appRouter.createCaller(ctx).caixa.conferencia({ leituraId, userId: 90 } as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.getDb).not.toHaveBeenCalled();
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
+
+  it("capacidade37 montada passa por uma única RPC, não por REST financeiro", async () => {
+    mocks.getDb.mockClear();
+    const rpc = vi.fn().mockResolvedValue({ data: { disponivel: true, regra: "caixa37_v1", aporte: true, transferencia: true, recovery: true }, error: null });
+    const from = vi.fn(() => { throw Error("REST não permitido"); });
+    mocks.getSupabaseClientAsync.mockResolvedValue({ rpc, from });
+    const caixa = appRouter.createCaller(ctx).caixa;
+    for (const name of ["capacidades37", "cotar37", "aportar37", "transferir37", "reconciliar37"] as const) expect(typeof caixa[name]).toBe("function");
+    await expect(caixa.capacidades37()).resolves.toMatchObject({ disponivel: true, regra: "caixa37_v1" });
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("rpc_capacidades_caixa37", {});
+    expect(from).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
+  });
+
+  it("as novas rotas são inacessíveis sem sessão", async () => {
+    mocks.getSupabaseClientAsync.mockClear();
+    const caixa = appRouter.createCaller({ ...ctx, user: null }).caixa;
+    await expect(caixa.capacidades37()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    await expect(caixa.contasParaOperacao37()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
+});

@@ -15,6 +15,8 @@ import { emprestimosMultimodalRouter } from "./routers/emprestimosMultimodal";
 import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { multaManualRouter } from "./routers/multaManual";
+import { caixa37Procedures } from "./routers/caixa37";
+import { listarContasParaCadastro } from "./services/contasCadastro";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
@@ -2512,7 +2514,14 @@ const parcelasRouter = router({
 
 // ─── CAIXA ───────────────────────────────────────────────────────────────────
 const caixaRouter = router({
-  contas: protectedProcedure.query(async ({ ctx }) => {
+  ...caixa37Procedures,
+  contasParaOperacao37: protectedProcedure.query(async ({ ctx }) => {
+    const fonte = await getSupabaseClientAsync();
+    if (!fonte) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível carregar as contas desta empresa.' });
+    return listarContasParaCadastro(fonte, ctx.user.id);
+  }),
+  // leituraId só segmenta cache da tela; ownership permanece exclusivamente ctx.user.id.
+  contas: protectedProcedure.input(z.object({ leituraId: z.string().uuid() }).strict().optional()).query(async ({ ctx }) => {
     const db = await getDb();
     if (db) {
       try {
@@ -2582,7 +2591,7 @@ const caixaRouter = router({
   }),
 
   transacoes: protectedProcedure
-    .input(z.object({ contaCaixaId: z.number().optional(), limit: z.number().default(50) }).optional())
+    .input(z.object({ contaCaixaId: z.number().optional(), limit: z.number().default(50), leituraId: z.string().uuid().optional() }).optional())
     .query(async ({ ctx, input }) => {
       const db = await getDb();
       if (db) {
@@ -2644,7 +2653,7 @@ const caixaRouter = router({
       }));
     }),
 
-  conferencia: protectedProcedure.query(async ({ ctx }) => {
+  conferencia: protectedProcedure.input(z.object({ leituraId: z.string().uuid() }).strict().optional()).query(async ({ ctx }) => {
     const supabase = await getSupabaseClientAsync();
     if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Banco de dados indisponível para conferência' });
 
@@ -2736,44 +2745,9 @@ const caixaRouter = router({
       valor: z.number().positive(),
       descricao: z.string().optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      if (['pagamento_parcela', 'emprestimo_liberado', 'despesa_operacional', 'transferencia_conta'].includes(input.categoria)) {
-        bloquearOperacaoFinanceiraNaoAtomica('O lançamento manual de uma operação financeira vinculada');
-      }
-      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
-      const db = await getDb();
-      if (db) {
-        try {
-          await db.insert(transacoesCaixa).values({
-            contaCaixaId: input.contaCaixaId,
-            tipo: input.tipo,
-            categoria: input.categoria,
-            valor: input.valor.toFixed(2),
-            descricao: input.descricao,
-            userId: ctx.user.id,
-          });
-          // O saldo-base não é alterado: o livro de movimentações é a fonte de verdade.
-          return { success: true };
-        } catch (err) {
-          console.warn('[caixa.registrarTransacao] Drizzle failed:', (err as Error).message);
-          resetDb();
-        }
-      }
-      // Fallback REST
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new Error('DB unavailable');
-      const { error: txErr } = await supabase.from('transacoes_caixa').insert({
-        conta_caixa_id: input.contaCaixaId,
-        tipo: input.tipo,
-        categoria: input.categoria,
-        valor: input.valor,
-        descricao: input.descricao ?? null,
-        data_transacao: new Date().toISOString(),
-        user_id: ctx.user.id,
-      });
-      if (txErr) throw new Error(txErr.message);
-      // O saldo-base não é alterado: o livro de movimentações é a fonte de verdade.
-      return { success: true };
+    .mutation(() => {
+      // Aporte e transferência usam suas RPCs37; nenhum fallback avulso escreve o ledger.
+      throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Use Aportar ou Transferir para operação com prévia e confirmação atômica. O writer genérico de Caixa não executa lançamentos.' });
     }),
 
   removerTransacoesDuplicadasDespesa: protectedProcedure
