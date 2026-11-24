@@ -1,0 +1,4 @@
+import { defineConfig } from 'vitest/config';
+import path from 'node:path';
+const root=path.resolve(import.meta.dirname,'../..');
+export default defineConfig({root,cacheDir:path.join(import.meta.dirname,'artifacts/.vite'),resolve:{alias:{'@':path.join(root,'client/src'),'@shared':path.join(root,'shared')}},test:{environment:'node',include:['tests/release-restantes/unit/*.test.ts','server/reparcelamento.blocked.test.ts','server/financialOperations.blocked.test.ts','server/tenantOwnership.financial.test.ts','server/contratos.by-id.isolamento.test.ts','client/src/pages/emprestimos.operational.ui.test.ts','client/src/components/recebimentoValidado.ui.test.ts','client/src/pages/caixa.operational.ui.test.ts','client/src/pages/contasPagar.session.ui.test.ts','client/src/components/financialIntentRecovery.ui.test.ts'],fileParallelism:false,maxWorkers:1,minWorkers:1,cache:false}});

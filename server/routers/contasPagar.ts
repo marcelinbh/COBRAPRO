@@ -8,6 +8,8 @@ import { criarDespesaAtomica, pagarDespesaAtomica, estornarDespesaAtomica } from
 import { criarDespesaInput, pagarDespesaInput, estornarDespesaInput, dinheiroDespesa, dataCivilDespesa } from "../../shared/despesasIntent";
 import { financialIntentRecoveryInput } from "../../shared/financialIntentRecovery";
 import { reconcileFinancialIntent } from "../services/financialIntentRecovery";
+import { cancelamentoPendenteInput } from "../../shared/despesaCancelamentoPendente";
+import { executarCancelamentoPendente, capacidadesCancelamento } from "../services/despesaCancelamentoPendente";
 
 const expenseColumns = 'id, descricao, categoria, valor::text, data_vencimento, data_pagamento, status, recorrente, frequencia, conta_caixa_id, observacoes, user_id, createdAt, updatedAt';
 const ledgerColumns = 'id::text, conta_caixa_id, tipo, categoria, descricao, valor::text, data_transacao, contrato_id, parcela_id, createdAt, user_id';
@@ -104,6 +106,7 @@ export type DespesaListada = {
   proveniencia0020: boolean; podePagar: boolean; podeEstornar: boolean;
   pagamentoOperationId: string | null; transacaoSaidaId: string | null;
   requerConferencia: boolean; mensagemConferencia: string | null;
+  origemOperationId: string | null; podeCancelarPendente: boolean;
 };
 /** UI é conservadora. A RPC revalida snapshots, conta e TODO ledger sob locks no commit. */
 export function marcarElegibilidade(d: Row, origem: Row | undefined, pg: Row | undefined, ops: Row[], saida: Row | undefined, userId: number, trilhaDisponivel = true): DespesaListada {
@@ -142,6 +145,7 @@ export function marcarElegibilidade(d: Row, origem: Row | undefined, pg: Row | u
     dataVencimento: d.data_vencimento, dataPagamento: d.data_pagamento, contaCaixaId: d.conta_caixa_id,
     recorrente: d.recorrente === true, periodicidade: d.frequencia, observacoes: d.observacoes,
     proveniencia0020: proveniencia, podePagar, podeEstornar,
+    origemOperationId: podePagar ? origem!.operacao_id : null, podeCancelarPendente: podePagar,
     pagamentoOperationId: podeEstornar ? pg!.operacao_id : null, transacaoSaidaId: podeEstornar ? txId : null,
     requerConferencia, mensagemConferencia: requerConferencia ? (!trilhaDisponivel ? 'Trilha 0020 indisponível; requer conferência. Somente consulta.' : 'Requer conferência. Legado/estado encerrado ou proveniência incompatível; somente consulta.') : null,
   };
@@ -209,6 +213,12 @@ export const contasPagarRouter = router({
   criar: protectedProcedure.input(criarDespesaInput).mutation(async ({ ctx, input }) => criarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, descricao: input.descricao, categoria: input.categoria, valor: input.valor, dataVencimento: input.dataVencimento, observacoes: input.observacoes })),
   pagar: protectedProcedure.input(pagarDespesaInput).mutation(async ({ ctx, input }) => pagarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, despesaId: input.id, contaCaixaId: input.contaCaixaId, dataPagamento: input.dataPagamento })),
   estornar: protectedProcedure.input(estornarDespesaInput).mutation(async ({ ctx, input }) => estornarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, despesaId: input.id, pagamentoOperationId: input.pagamentoOperationId, dataEstorno: input.dataEstorno, motivo: input.motivo })),
+  capacidadesCancelamentoPendente: protectedProcedure.query(async () => capacidadesCancelamento(await fonte())),
+  cancelarPendente: protectedProcedure.input(cancelamentoPendenteInput).mutation(async ({ ctx, input }) => {
+    return executarCancelamentoPendente(await fonte(), ctx.user.id, input);
+  }),
+  recuperarCancelamentoPendente: protectedProcedure.input(cancelamentoPendenteInput).mutation(async ({ ctx, input }) =>
+    executarCancelamentoPendente(await fonte(), ctx.user.id, input, true)),
   editar: rejeitar, update: rejeitar, cancelar: rejeitar, excluir: rejeitar, recorrencia: rejeitar, sincronizarCaixa: rejeitar,
 });
 export type ContasPagarRouter = typeof contasPagarRouter;

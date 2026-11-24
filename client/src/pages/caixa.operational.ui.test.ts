@@ -51,6 +51,9 @@ vi.mock("@/lib/trpc", () => ({ trpc: {
   } }),
   auth: { me: { useQuery: () => mocks.auth } },
   caixa: {
+    consultarObservacao45: { useQuery: () => ({ data: undefined, isError: false, error: null, isFetching: false, refetch: vi.fn() }) },
+    corrigirObservacao45: { useMutation: () => ({ mutateAsync: mocks.mutate, isPending: false }) },
+    reconciliarObservacao45: { useMutation: () => ({ mutateAsync: mocks.mutate, isPending: false }) },
     contasParaOperacao37: { useQuery: (_input: any, options: any) => { mocks.queryMetadata(options); return mocks.metadata; } },
     contas: { useQuery: (input: any, options: any) => { mocks.queryContas(input); mocks.queryOptions('contas', options); return mocks.contas; } },
     transacoes: { useQuery: (input: any, options: any) => { mocks.queryTransacoes(input); mocks.queryOptions('transacoes', options); return mocks.transacoes; } },

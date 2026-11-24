@@ -26,7 +26,7 @@ vi.mock('@/lib/trpc', () => {
   return { trpc: {
     auth: { me: { useQuery: () => q(h.user) } },
     clientes: { list: { useQuery: () => h.queries.clientes ?? q({ clientes: [{ id: 1, nome: 'Sintético', userId: h.user.id }] }) } },
-    caixa: { contas: { useQuery: () => { h.saldoQuery(); return q([{ id: 1, nome: 'Sintética', ativa: true }]); } } },
+    caixa: { contas: { useQuery: () => { h.saldoQuery(); return q([{ id: 1, nome: 'Sintética', ativa: true }]); } }, contasParaOperacao37: { useQuery: () => q({ empresaId: h.user.id, contas: [{ id: 1, nome: 'Sintética', tipo: 'caixa' }] }) } },
     emprestimosProspectivos: {
       disponibilidade: { useQuery: () => h.queries.disponibilidade ?? q({ disponivel: true }) },
       contasParaCadastro: { useQuery: () => h.queries.contas ?? q({ empresaId: h.user.id, contas: [{ id: 1, nome: 'Conta própria', tipo: 'dinheiro' }] }) },

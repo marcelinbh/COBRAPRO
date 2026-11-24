@@ -18,6 +18,7 @@ import { calcularSaldoAtual } from "../../../shared/caixa";
 import { Caixa37Aporte, Caixa37Transferencia, type ContaOpcao37 } from "@/components/Caixa37Operacoes";
 import { copiarJsonCaixa37, CAIXA37_MAX_ID } from "../../../shared/caixa37";
 import { z } from "zod";
+import { CaixaManutencao45 } from "@/components/CaixaManutencao45";
 
 const metadata37Schema = z.object({
   empresaId: z.number().int().positive().max(CAIXA37_MAX_ID),
@@ -304,6 +305,7 @@ export function CaixaEmpresa({ userId, atual }: { userId: number; atual: () => b
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
           <ConferenciaCaixa leituraId={leituraId} />
+          <CaixaManutencao45 userId={userId} atual={atual} onSuccess={invalidarTudo} />
           <NovaConta onSuccess={invalidarTudo} disabled={!atual()} atual={atual} />
           <Caixa37Aporte userId={userId} contas={contasOperacao} onSuccess={invalidarTudo} />
           <Caixa37Transferencia userId={userId} contas={contasOperacao} onSuccess={invalidarTudo} />
@@ -422,7 +424,7 @@ export function CaixaEmpresa({ userId, atual }: { userId: number; atual: () => b
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-foreground truncate">
-                          {t.descricao || categoriaLabels[t.categoria] || t.categoria}
+                          #{t.id} · {t.descricao || categoriaLabels[t.categoria] || t.categoria}
                         </div>
                         <div className="text-xs text-muted-foreground">
                           {t.contaNome} · {t.clienteNome && `${t.clienteNome} · `}

@@ -1,237 +1,99 @@
-import { useTranslation } from 'react-i18next';
-import i18n from '../i18n/i18n';
-import { useState } from "react";
-import { trpc } from "@/lib/trpc";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { toast } from "sonner";
-import { RefreshCw, Search, AlertTriangle, DollarSign } from "lucide-react";
-
-function formatMoeda(v: number | string | null | undefined) {
-  const n = typeof v === "string" ? parseFloat(v) : (v ?? 0);
-  return new Intl.NumberFormat(i18n.language === "es" ? "es-ES" : "pt-BR", { style: "currency", currency: "BRL" }).format(n);
-}
+import { useEffect,useRef,useState } from 'react';
+import { trpc } from '@/lib/trpc';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { RecebimentoValidado } from '@/components/RecebimentoValidado';
+import {
+  reparcelamento43PreviewSchema,conferirCotacao43,intencao43DaCotacao,
+  type Reparcelamento43Cotacao,type Reparcelamento43Execucao,type Reparcelamento43Resultado,
+} from '../../../shared/reparcelamento43';
+import {lerIntencao43} from '../../../shared/reparcelamento43Intencao';
+import {enviarIntencao43,recuperarIntencao43} from '../../../shared/reparcelamento43Fluxo';
 
 export default function Reparcelamento() {
-  const { t } = useTranslation();
-  const [contratoIdInput, setContratoIdInput] = useState("");
-  const [contratoId, setContratoId] = useState<number | null>(null);
-  const [numeroParcelas, setNumeroParcelas] = useState(6);
-  const [taxaJuros, setTaxaJuros] = useState(5);
-  const [dataInicio, setDataInicio] = useState(new Date().toISOString().split("T")[0]);
-  const [incluirMultas, setIncluirMultas] = useState(true);
-
-  const { data: preview, isLoading: loadingPreview } = trpc.reparcelamento.preview.useQuery(
-    { contratoId: contratoId!, numeroParcelas, taxaJuros, dataInicio, incluirMultas },
-    { enabled: contratoId !== null }
-  );
-
-  const { data: contratos } = trpc.contratos.list.useQuery(
-    { clienteId: undefined },
-    { enabled: contratoId !== null }
-  );
-  const contrato = contratos?.find((c) => c.id === contratoId);
-
-  function buscarContrato() {
-    const id = parseInt(contratoIdInput);
-    if (!id || isNaN(id)) return toast.error(t('toast_error.digite_um_número_de_contrato_válido'));
-    setContratoId(id);
+  const auth=trpc.auth.me.useQuery(undefined,{retry:false,refetchOnWindowFocus:true});
+  const owner=!auth.isError&&!auth.isLoading&&!auth.isFetching ? auth.data?.id : undefined;
+  const identity=useRef(owner),epoch=useRef(0),mounted=useRef(true);
+  if(identity.current!==owner){identity.current=owner;epoch.current++;}
+  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;epoch.current++;};},[]);
+  const [contrato,setContrato]=useState(''),[n,setN]=useState('6'),[taxa,setTaxa]=useState('5.00');
+  const [data,setData]=useState(''),[multas,setMultas]=useState(true);
+  const [q,setQ]=useState<Reparcelamento43Cotacao>(),[pending,setPending]=useState<Reparcelamento43Execucao|null>(null);
+  const [result,setResult]=useState<Reparcelamento43Resultado>(),[erro,setErro]=useState(''),[busy,setBusy]=useState(false);
+  const click=useRef(false);
+  const request={contratoId:Number(contrato),numeroParcelas:Number(n),taxaJuros:taxa,tipoTaxa:'mensal' as const,dataInicio:data,incluirMultas:multas};
+  const requestKey=JSON.stringify(request),currentForm=useRef(requestKey);currentForm.current=requestKey;
+  const quoteSource=trpc.reparcelamento.preview43.useQuery(request,{enabled:false,retry:false,staleTime:0});
+  const execute=trpc.reparcelamento.executar.useMutation({retry:false});
+  const recovery=trpc.reparcelamento.reconciliar.useMutation({retry:false});
+  // Somente metadados sem validação global do Caixa; conta de origem não é trocada pelo reparcelamento.
+  const accounts=trpc.caixa.contasParaOperacao37.useQuery(undefined,{enabled:!!owner,retry:false,staleTime:0});
+  const accountValid=!!owner&&!accounts.isError&&!accounts.isFetching&&accounts.data?.empresaId===owner;
+  const ownAccounts=accountValid ? accounts.data!.contas : [];
+  const account=q&&accountValid ? ownAccounts.find(a=>a.id===q.contaCaixaId) : undefined;
+  const [stateOwner,setStateOwner]=useState<number>();
+  useEffect(()=>{
+    setQ(undefined);setResult(undefined);setPending(null);setErro('');setBusy(false);setStateOwner(owner);
+    if(owner)try{setPending(lerIntencao43(localStorage,owner));}catch{setErro('Intenção local inválida: não apagar nem enviar; preservar para conferência.');}
+  },[owner]);
+  useEffect(()=>{setQ(undefined);},[requestKey]);
+  const visible=!!owner&&stateOwner===owner;
+  const guard=(uid:number,version:number)=>()=>mounted.current&&identity.current===uid&&epoch.current===version;
+  function refresh(uid:number){if(identity.current===uid)setPending(lerIntencao43(localStorage,uid));}
+  async function cotar(){
+    if(!owner||click.current||pending||erro)return;
+    const uid=owner,version=epoch.current,atual=guard(uid,version),key=requestKey;
+    click.current=true;setBusy(true);setErro('');setQ(undefined);
+    try{const input=reparcelamento43PreviewSchema.parse(request);const response=await quoteSource.refetch();
+      if(response.isError)throw new Error('Cotação indisponível; nenhuma execução enviada.');
+      const quote=conferirCotacao43(response.data,uid,input);
+      if(atual()&&currentForm.current===key)setQ(quote);
+    }catch(error){if(atual())setErro(error instanceof Error?error.message:'Falha ao cotar.');}
+    finally{click.current=false;if(atual())setBusy(false);}
   }
-
-  return (
-    <div className="p-6 space-y-6 max-w-4xl">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <RefreshCw className="w-6 h-6 text-primary" />
-          Reparcelamento
-        </h1>
-        <p className="text-muted-foreground text-sm mt-1">
-          Reagende dívidas em aberto com novas condições de pagamento
-        </p>
-      </div>
-
-      {/* Busca de contrato */}
-      <Card className="border-border bg-card">
-        <CardHeader>
-          <CardTitle className="text-base">Buscar Contrato</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-3">
-            <Input
-              placeholder={t('rescheduling.contractNumberPlaceholder')}
-              value={contratoIdInput}
-              onChange={(e) => setContratoIdInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && buscarContrato()}
-              className="bg-background border-border max-w-xs"
-            />
-            <Button onClick={buscarContrato} variant="outline">
-              <Search className="w-4 h-4 mr-2" /> Buscar
-            </Button>
-          </div>
-          {contrato && (
-            <div className="mt-4 p-4 bg-background/50 rounded-lg border border-border">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                <div>
-                  <p className="text-muted-foreground text-xs">Contrato</p>
-                  <p className="font-bold text-foreground">#{contrato.id}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t('reparcelamento.client')}</p>
-                  <p className="font-medium text-foreground">{contrato.clienteNome}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t('reparcelamento.originalValue')}</p>
-                  <p className="font-medium text-foreground">{formatMoeda(contrato.valorPrincipal)}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground text-xs">{t('reparcelamento.status')}</p>
-                  <Badge variant={contrato.status === "inadimplente" ? "destructive" : "secondary"}>
-                    {contrato.status}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {contratoId && (
-        <>
-          {/* Configuração do reparcelamento */}
-          <Card className="border-border bg-card">
-            <CardHeader>
-              <CardTitle className="text-base">{t('rescheduling.conditions')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div>
-                  <Label>Nº de Parcelas</Label>
-                  <Input
-                    type="number"
-                    min={1}
-                    max={60}
-                    value={numeroParcelas}
-                    onChange={(e) => setNumeroParcelas(parseInt(e.target.value) || 1)}
-                    className="bg-background border-border"
-                  />
-                </div>
-                <div>
-                  <Label>Taxa de Juros (%)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={0.5}
-                    value={taxaJuros}
-                    onChange={(e) => setTaxaJuros(parseFloat(e.target.value) || 0)}
-                    className="bg-background border-border"
-                  />
-                </div>
-                <div>
-                  <Label>Data 1ª Parcela</Label>
-                  <Input
-                    type="date"
-                    value={dataInicio}
-                    onChange={(e) => setDataInicio(e.target.value)}
-                    className="bg-background border-border"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={incluirMultas}
-                      onChange={(e) => setIncluirMultas(e.target.checked)}
-                      className="w-4 h-4 rounded"
-                    />
-                    <span className="text-sm text-foreground">Incluir multas e juros</span>
-                  </label>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Preview */}
-          {loadingPreview && (
-            <div className="text-center py-8 text-muted-foreground">Calculando...</div>
-          )}
-
-          {preview && (
-            <Card className="border-primary/30 bg-card">
-              <CardHeader>
-                <CardTitle className="text-base flex items-center gap-2">
-                  <DollarSign className="w-5 h-5 text-primary" />
-                  Simulação do Reparcelamento
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Resumo */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-background/50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Parcelas em Aberto</p>
-                    <p className="text-2xl font-bold text-yellow-400">{preview.qtdParcelasAbertas}</p>
-                  </div>
-                  <div className="bg-background/50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Saldo Devedor</p>
-                    <p className="text-xl font-bold text-red-400">{formatMoeda(preview.saldoDevedor)}</p>
-                  </div>
-                  <div className="bg-background/50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Nova Parcela</p>
-                    <p className="text-xl font-bold text-green-400">{formatMoeda(preview.valorNovaParcela)}</p>
-                  </div>
-                  <div className="bg-background/50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-muted-foreground">Total Novo</p>
-                    <p className="text-xl font-bold text-foreground">{formatMoeda(preview.totalNovo)}</p>
-                  </div>
-                </div>
-
-                {/* Tabela de parcelas */}
-                <div>
-                  <p className="text-sm font-medium text-foreground mb-2">Novas Parcelas</p>
-                  <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
-                    <table className="w-full text-sm">
-                      <thead className="bg-background/70 sticky top-0">
-                        <tr>
-                          <th className="text-left p-2 text-muted-foreground font-medium">Nº</th>
-                          <th className="text-left p-2 text-muted-foreground font-medium">{t('reparcelamento.dueDate')}</th>
-                          <th className="text-right p-2 text-muted-foreground font-medium">Valor</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {preview.parcelas.map((p) => (
-                          <tr key={p.numero} className="border-t border-border/50">
-                            <td className="p-2 text-foreground">{p.numero}</td>
-                            <td className="p-2 text-foreground">
-                              {new Date(p.vencimento + "T00:00:00").toLocaleDateString(i18n.language === "es" ? "es-ES" : "pt-BR")}
-                            </td>
-                            <td className="p-2 text-right text-foreground font-medium">{formatMoeda(p.valor)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Execução suspensa enquanto não houver transação atômica */}
-                <div id="reparcelamento-suspenso" className="flex items-start gap-2 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <AlertTriangle className="w-4 h-4 text-yellow-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-yellow-300">
-                    Esta é apenas uma simulação: nenhuma parcela ou contrato será alterado. O reparcelamento está suspenso até a implantação de uma transação atômica com conferência de Caixa.
-                  </p>
-                </div>
-
-                <Button disabled className="w-full" aria-describedby="reparcelamento-suspenso">
-                  <RefreshCw className="w-4 h-4 mr-2" /> Reparcelamento temporariamente suspenso
-                </Button>
-              </CardContent>
-            </Card>
-          )}
-        </>
-      )}
-    </div>
-  );
+  async function enviar(){
+    if(!owner||!visible||click.current||pending||!q||!account||erro||JSON.stringify(q.request)!==requestKey)return;
+    const uid=owner,version=epoch.current,atual=guard(uid,version);
+    click.current=true;setBusy(true);setErro('');
+    try{
+      // Guardar/readback do payload FECHADO antes de mutateAsync; timeout jamais cria outra UUID.
+      const input=intencao43DaCotacao(q,crypto.randomUUID());
+      const value=await enviarIntencao43(localStorage,uid,input,atual,i=>execute.mutateAsync(i));
+      if(atual()){setResult(value);setQ(undefined);}
+    }catch(error){if(atual())setErro(error instanceof Error?error.message:'Resultado desconhecido. Confira a intenção preservada.');}
+    finally{click.current=false;if(atual()){refresh(uid);setBusy(false);}}
+  }
+  async function conferir(){
+    if(!owner||!visible||click.current)return;
+    const uid=owner,version=epoch.current,atual=guard(uid,version);
+    click.current=true;setBusy(true);setErro('');
+    try{const value=await recuperarIntencao43(localStorage,uid,atual,i=>recovery.mutateAsync(i));
+      if(atual()){if(value.status==='confirmed')setResult(value.result);else setErro('Não execução comprovada por fence durável. A UUID antiga está fechada; cote uma nova intenção.');setQ(undefined);}
+    }catch(error){if(atual())setErro(error instanceof Error?error.message:'Conferência desconhecida; preserve a intenção.');}
+    finally{click.current=false;if(atual()){refresh(uid);setBusy(false);}}
+  }
+  if(!visible)return <main className="p-6"><p>Conferindo sessão da empresa atual...</p></main>;
+  return <main className="p-6 space-y-5 max-w-4xl">
+    <h1 className="text-2xl font-semibold">Reparcelamento mensal</h1>
+    <p>Legado mensal inteiramente aberto. Transfere principal para sucessora, sem novo desembolso ou recebimento na origem. Parcial/pago e demais modalidades permanecem recusados.</p>
+    {erro&&<div role="alert"><p>{erro}</p>{!pending&&<Button variant="outline" disabled={busy} onClick={()=>setErro('')}>Voltar à conferência</Button>}</div>}
+    {pending ? <section className="border p-4 space-y-3"><h2>Intenção preservada nesta empresa</h2><p>UUID: <code>{pending.idempotencyKey}</code> — origem #{pending.contratoId}</p><p>Não inicie outra execução. A conferência aguarda o mesmo lockUUID e confirma o commit ou grava fence permanente de não execução.</p><Button disabled={busy} onClick={()=>void conferir()}>Conferir mesma intenção no servidor</Button></section> : <>
+      <fieldset disabled={busy} className="grid gap-3 border p-4">
+        <label>Contrato de origem<Input value={contrato} onChange={e=>setContrato(e.target.value)} inputMode="numeric" /></label>
+        <label>Número de parcelas (1–60)<Input value={n} onChange={e=>setN(e.target.value)} inputMode="numeric" /></label>
+        <label>Taxa mensal decimal (ex.: 5.00)<Input value={taxa} onChange={e=>setTaxa(e.target.value)} inputMode="decimal" /></label>
+        <label>Primeiro vencimento<Input type="date" value={data} onChange={e=>setData(e.target.value)} /></label>
+        <label><input type="checkbox" checked={multas} onChange={e=>setMultas(e.target.checked)} /> Incluir multa/mora vencida uma única vez</label>
+        <Button disabled={!!erro} onClick={()=>void cotar()}>Cotar no servidor</Button>
+      </fieldset>
+      {q&&<section className="border p-4 space-y-3"><h2>Cotação vinculada #{q.contratoId}</h2>
+        <p>Principal transferido: R$ {q.saldoDevedor}; encargos incluídos: R$ {q.encargos}; juros novos: R$ {q.jurosNovos}; total: R$ {q.totalNovo}.</p>
+        <p>Conta de origem preservada: #{q.contaCaixaId} {account?.nome??'— metadados desta empresa indisponíveis'}. Nenhum débito novo.</p>
+        <table className="w-full"><thead><tr><th>Parcela</th><th>Vencimento</th><th>Principal</th><th>Juros</th><th>Total</th></tr></thead><tbody>{q.parcelas.map(p=><tr key={p.numero}><td>{p.numero}</td><td>{p.vencimento}</td><td>{p.principal}</td><td>{p.juros}</td><td>{p.valor}</td></tr>)}</tbody></table>
+        <p>A última parcela pode diferir em centavos. Revise a tabela exata antes de confirmar.</p>
+        <Button disabled={busy||!!erro||!account} onClick={()=>void enviar()}>Confirmar transferência sem desembolso</Button>
+      </section>}
+    </>}
+    {result&&result.userId===owner&&<section className="border p-4 space-y-4"><h2>Sucessora #{result.contratoId} confirmada</h2><p>Origem #{result.contratoOrigemId}, raiz #{result.raizId}. Desembolso R$0,00. Receba cada parcela pelo fluxo transacional existente abaixo.</p>{result.parcelasIds.map(id=><div key={id}><h3>Parcela #{id}</h3><RecebimentoValidado contratoId={result.contratoId} parcelaId={id} permitirRenovacao={false} onSuccess={()=>{}} /></div>)}</section>}
+  </main>;
 }

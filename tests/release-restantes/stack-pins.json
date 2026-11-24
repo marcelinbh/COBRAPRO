@@ -1,0 +1,20 @@
+{
+  "drizzle/0020_rpc_despesas_prospectivas.sql": "a6852e4160dcadf21f81029daf231af6d308fab7f8733b3e16769d03923bc452",
+  "drizzle/0021_rpc_emprestimos_prospectivos.sql": "08b05165412c8f6259db98d70c8d220c6f99c7a3a6bc7866aa86cc00b0558a82",
+  "drizzle/0022_rpc_ciclo_emprestimos_prospectivos.sql": "abce663253f85eafe03d3c4f9a81d601941164bba7ef4d0d8024b892be88f64c",
+  "drizzle/0025_integrar_rpc_despesas_ciclo.sql": "63c5a3afbf86e7dbd67a726368d0dcac04a51c90200f797f1f9d35af10259199",
+  "drizzle/0031_rpc_renovacao_juros_prospectiva.sql": "f0d0db2cafecd39c7f9ce0296683e66141ee8bbad4243b079b5994244f02db7f",
+  "drizzle/0033_rpc_reconciliacao_intencoes_financeiras.sql": "7ec52905fa260dc6d14af5fabcef74a2a1a7f0fa65874e15d3bd8358cadc5827",
+  "drizzle/0034_rpc_recebimento_legado_validado.sql": "615d0b81fb1a41b5dd205214ebddc7e32f0d75576022df66905bc90396959ad0",
+  "drizzle/0035_rpc_ciclo_emprestimos_multimodal.sql": "6e5c11587d571e64a51585488c2fad7075f4d5dfeb9202a3a5dced795a9c0b03",
+  "drizzle/0036_rpc_multa_manual_fixa.sql": "7194c1f7038eb9e36358330614249b66575075bef465fcfe3c8aca59a4fed21f",
+  "drizzle/0036a_multa_metadata_estavel.sql": "df1abe0b096b3f993954f16b3c93a1cdfb0ddd36cb968158f39b05150eaeba8f",
+  "drizzle/0037_rpc_aporte_transferencia_caixa.sql": "2acc5c0840e77a1131fa02d04f0b1faf85bbdb0430071b73477a276ded312334",
+  "drizzle/0042_assinaturas_recebimento_atomico.sql": "0df0301ade56145681b721da149fc3048a46ed630cfe1be771c0bcfcf25c83fb",
+  "drizzle/0041_telefone_atomico.sql": "dead49422eecd04c18b241dd0f4c4421f0e8edc1e5ccc9ecebda10adfc76bb6d",
+  "drizzle/0040_cheques_transacionais.sql": "d829fa99f81b3ec0f023480cad0cdb80a5c704e58c6aed532fc2ad10ec91d1af",
+  "drizzle/0043_reparcelamento_execucao.sql": "8d4bc41efa0ae6917e2f685b2d3e7f6ee293f75a9aef5e07be736cc80d1fc4c7",
+  "drizzle/0044_manutencao_emprestimos.sql": "16cb42492a21e1b79d208dd82e6b9bdf79579fa746cdff620226939614951f76",
+  "drizzle/0038c_cancelamento_pendente_isolado.sql": "5fe0f34f68ed727da7058ff1fad9883fb36b6d38400ef65964a66d578d5bb261",
+  "drizzle/0045_caixa_manutencao_observacao_auditada.sql": "8cec2a580792d47216b23891f73bc6fd58094fb8c44bcb17d252ad4f41516ac1"
+}

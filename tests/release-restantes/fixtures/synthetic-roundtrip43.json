@@ -1,0 +1,70 @@
+{
+  "q": {
+    "regra": "reparcelamento43_v1",
+    "userId": 1,
+    "request": {
+      "tipoTaxa": "mensal",
+      "taxaJuros": "0.00",
+      "contratoId": 920,
+      "dataInicio": "2027-01-31",
+      "incluirMultas": false,
+      "numeroParcelas": 3
+    },
+    "encargos": "0.00",
+    "parcelas": [
+      {
+        "juros": "0.00",
+        "valor": "33.33",
+        "numero": 1,
+        "principal": "33.33",
+        "vencimento": "2027-01-31"
+      },
+      {
+        "juros": "0.00",
+        "valor": "33.33",
+        "numero": 2,
+        "principal": "33.33",
+        "vencimento": "2027-02-28"
+      },
+      {
+        "juros": "0.00",
+        "valor": "33.34",
+        "numero": 3,
+        "principal": "33.34",
+        "vencimento": "2027-03-31"
+      }
+    ],
+    "totalNovo": "100.00",
+    "contratoId": 920,
+    "estadoHash": "72700df438abd693147286c0ba77567230a39e59200a939dacc303f77c73953d",
+    "jurosNovos": "0.00",
+    "cotacaoHash": "7bd8e7ab84dc3aa16bbfe34da6c410569897ea7c491e007e59e20ebfbdf5ab65",
+    "dataCalculo": "2026-11-24",
+    "contaCaixaId": 6,
+    "saldoDevedor": "100.00",
+    "valorNovaParcela": "33.33",
+    "qtdParcelasAbertas": 1
+  },
+  "k": "7fab2086-c965-4be3-85f2-c100d3ef7d63",
+  "r": {
+    "regra": "reparcelamento43_v1",
+    "raizId": 920,
+    "userId": 1,
+    "success": true,
+    "repetida": false,
+    "totalNovo": "100.00",
+    "contratoId": 1001,
+    "desembolso": "0.00",
+    "estadoHash": "72700df438abd693147286c0ba77567230a39e59200a939dacc303f77c73953d",
+    "cotacaoHash": "7bd8e7ab84dc3aa16bbfe34da6c410569897ea7c491e007e59e20ebfbdf5ab65",
+    "operationId": "d773400c-ce75-4749-ab95-82f36cd3d611",
+    "parcelasIds": [
+      1001,
+      1002,
+      1003
+    ],
+    "idempotencyKey": "7fab2086-c965-4be3-85f2-c100d3ef7d63",
+    "contratoOrigemId": 920,
+    "principalTransferido": "100.00"
+  }
+}

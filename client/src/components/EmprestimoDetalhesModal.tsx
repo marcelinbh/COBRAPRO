@@ -20,6 +20,7 @@ import { trpc } from '@/lib/trpc';
 import { gerarComprovantePDF } from '@/lib/gerarComprovante';
 import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { DeleteEmprestimoDialog } from './DeleteEmprestimoDialog';
+import { useLocation } from 'wouter';
 
 interface EmprestimoDetalhesModalProps {
   emprestimo: any;
@@ -36,6 +37,7 @@ export function EmprestimoDetalhesModal({
   contas,
   onRefresh,
 }: EmprestimoDetalhesModalProps) {
+  const [, navigate] = useLocation();
   const [aba, setAba] = useState<'etiqueta' | 'detalhes' | 'comprovante'>('etiqueta');
   const [gerandoPDF, setGerandoPDF] = useState(false);
   const [loadingWpp, setLoadingWpp] = useState(false);
@@ -406,38 +408,9 @@ export function EmprestimoDetalhesModal({
                             <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
                               {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
                             </Badge>
-                            {p.status !== 'paga' && (
-                              <button
-                                onClick={() => {
-                                  setParcelaSelecionadaPagamento({
-                                    id: p.id,
-                                    numero: p.numero_parcela,
-                                    valor: parseFloat(String(p.valor_original ?? '0')),
-                                  });
-                                  setValorCustomPagarParcela('');
-                                  setPagamentoParcelaRealizado(null);
-                                  setIdempotencyKeyParcela(crypto.randomUUID());
-                                  setModalPagarParcela(true);
-                                }}
-                                className="p-1 rounded hover:bg-emerald-500/20 text-emerald-400 hover:text-emerald-300"
-                                title="Pagar parcela"
-                              >
-                                <CreditCard className="h-3 w-3" />
-                              </button>
-                            )}
-                            {p.status !== 'paga' && (
-                              <button
-                                onClick={() => setParcelaEditando({
-                                  id: p.id,
-                                  valor: String(parseFloat(p.valor_original).toFixed(2)),
-                                  data: p.data_vencimento?.split('T')[0] ?? '',
-                                })}
-                                className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                                title="Editar parcela"
-                              >
-                                <Pencil className="h-3 w-3" />
-                              </button>
-                            )}
+                            <Button size="sm" variant="outline" onClick={() => { onOpenChange(false); navigate(`/emprestimos/${emprestimo.id}`); }}>
+                              Abrir ficha segura
+                            </Button>
                           </div>
                         )
                     ))}
@@ -462,33 +435,12 @@ export function EmprestimoDetalhesModal({
               </div>
             )}
 
-            {/* Botões de Ação */}
-            <div className="grid grid-cols-2 gap-2 pt-4 border-t border-border">
-              <Button className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white" size="sm" onClick={() => { setValorCustomPagar(''); setIdempotencyKeyPagamento(crypto.randomUUID()); setModalPagar(true); }} disabled={isQuitado}>
-                <DollarSign className="h-4 w-4" /> Pagar
+            {/* 43/44: a ficha identifica a origem; não montar writers/editor legados aqui. */}
+            <div className="pt-4 border-t border-border">
+              <Button variant="outline" onClick={() => { onOpenChange(false); navigate(`/emprestimos/${emprestimo.id}`); }}>
+                Abrir ficha segura: recebimento / calendário
               </Button>
-              <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorCustomJuros(''); setModalPagarJuros(true); }} disabled={isQuitado}>
-                <TrendingUp className="h-4 w-4" /> Pagar Juros
-              </Button>
-              <Button className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
-                <Edit2 className="h-4 w-4" /> Editar Juros
-              </Button>
-              <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorMulta(''); setModalMulta(true); }} disabled={isQuitado}>
-                <AlertTriangle className="h-4 w-4" /> Aplicar Multa
-              </Button>
-              {emprestimo.clienteWhatsapp && (
-                <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp}>
-                  {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
-                  Cobrar (WhatsApp)
-                </Button>
-              )}
-              <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp || !emprestimo.clienteWhatsapp}>
-                {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Enviar Cobrança
-              </Button>
-              <Button className="gap-2 col-span-2" variant="destructive" size="sm" onClick={() => setModalDeletar(true)}>
-                <Trash2 className="h-4 w-4" /> Deletar
-              </Button>
+              <p className="text-xs text-muted-foreground">Calendário44 somente prospectivo mensal sem baixas. Sucessora43 é recebida pelo trilho35; sem renovação ou estorno43 neste incremento.</p>
             </div>
           </div>
         </DialogContent>

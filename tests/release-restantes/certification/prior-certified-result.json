@@ -1,0 +1,212 @@
+{
+  "mode": "certified",
+  "results": [
+    "37 pin real compartilhado + quatro fun\u00e7\u00f5es35 continuam no trilho35 convencional",
+    "42 recebe real ap\u00f3s todos DDL; replay e confer\u00eancia",
+    "41 cria/recebe/cancela real ap\u00f3s stack",
+    "40 cria descontado e cancela com l\u00edquido exato ap\u00f3s stack",
+    "43 executa sem caixa e sucessora recebe parcial/integral REAL pelo writer35 ap\u00f3s stack",
+    "43 sucessora coexiste na MESMA conta1 com42/41/40/35 e pin37 real",
+    "44 calend\u00e1rio real sem modificar caixa",
+    "38c cancela obriga\u00e7\u00e3o20 pendente sem efeito caixa",
+    "45 anota pagamento42 sem alterar linha financeira/saldo/livro",
+    "45 anota pernas40/41/43 sem colis\u00e3o de provas ou muta\u00e7\u00e3o monet\u00e1ria",
+    "hist\u00f3rico contaminado4/5 continua byte-exato; nenhuma capability residual",
+    "runtime n\u00e3o modifica fontes nem selos; verificadores34/35/36/37/41/44/38c/45 \u00edntegros",
+    "drift de fonte35/ponte40/ACL43 detectado sem reseal"
+  ],
+  "files": [
+    {
+      "id": "42",
+      "path": "SOURCE/assinaturas-final/candidate/drizzle/0042_assinaturas_recebimento_atomico.sql",
+      "sha256": "0df0301ade56145681b721da149fc3048a46ed630cfe1be771c0bcfcf25c83fb",
+      "changedPredecessorFunctions": [
+        "public.ciclo_guardar",
+        "public.legados_guardar",
+        "public.multimodal_guardar",
+        "public.multa36_guardar",
+        "public.multa36_ponte",
+        "public.caixa37_perna_comprovada",
+        "public.caixa37_ponte",
+        "public.caixa37_ledger"
+      ],
+      "existingCatalogChanges": [
+        "class:16794",
+        "class:16807"
+      ]
+    },
+    {
+      "id": "41",
+      "path": "SOURCE/telefone-final/candidate/drizzle/0041_telefone_atomico.sql",
+      "sha256": "dead49422eecd04c18b241dd0f4c4421f0e8edc1e5ccc9ecebda10adfc76bb6d",
+      "changedPredecessorFunctions": [
+        "public.ciclo_guardar",
+        "public.legados_guardar",
+        "public.multimodal_guardar",
+        "public.multa36_guardar",
+        "public.multa36_ponte",
+        "public.caixa37_perna_comprovada",
+        "public.caixa37_ponte",
+        "public.caixa37_ledger"
+      ],
+      "existingCatalogChanges": []
+    },
+    {
+      "id": "40",
+      "path": "SOURCE/cheques-final-v2/candidate/drizzle/0040_cheques_transacionais.sql",
+      "sha256": "d829fa99f81b3ec0f023480cad0cdb80a5c704e58c6aed532fc2ad10ec91d1af",
+      "changedPredecessorFunctions": [
+        "public.ciclo_guardar",
+        "public.legados_guardar",
+        "public.multimodal_guardar",
+        "public.multa36_guardar",
+        "public.multa36_ponte",
+        "public.caixa37_perna_comprovada",
+        "public.caixa37_ponte",
+        "public.caixa37_ledger"
+      ],
+      "existingCatalogChanges": [
+        "class:16721"
+      ]
+    },
+    {
+      "id": "43",
+      "path": "SOURCE/combined-release-check/candidate/0043_reparcelamento_execucao.sql",
+      "sha256": "8d4bc41efa0ae6917e2f685b2d3e7f6ee293f75a9aef5e07be736cc80d1fc4c7",
+      "changedPredecessorFunctions": [
+        "public.multimodal_validar",
+        "public.multimodal_travar",
+        "public.multimodal_selar",
+        "public.rpc_identificar_emprestimo_multimodal"
+      ],
+      "existingCatalogChanges": []
+    },
+    {
+      "id": "44",
+      "path": "SOURCE/emprestimos-release-final/candidate/drizzle/0044_manutencao_emprestimos.sql",
+      "sha256": "16cb42492a21e1b79d208dd82e6b9bdf79579fa746cdff620226939614951f76",
+      "changedPredecessorFunctions": [],
+      "existingCatalogChanges": []
+    },
+    {
+      "id": "38c",
+      "path": "SOURCE/despesas-release-final/candidate/drizzle/0038c_cancelamento_pendente_isolado.sql",
+      "sha256": "5fe0f34f68ed727da7058ff1fad9883fb36b6d38400ef65964a66d578d5bb261",
+      "changedPredecessorFunctions": [],
+      "existingCatalogChanges": []
+    },
+    {
+      "id": "45",
+      "path": "SOURCE/caixa-release-final/candidate/drizzle/0045_caixa_manutencao_observacao_auditada.sql",
+      "sha256": "8cec2a580792d47216b23891f73bc6fd58094fb8c44bcb17d252ad4f41516ac1",
+      "changedPredecessorFunctions": [],
+      "existingCatalogChanges": []
+    }
+  ],
+  "errors": [],
+  "role": {
+    "current_user": "postgres",
+    "session_user": "postgres",
+    "rolsuper": false,
+    "rolbypassrls": true,
+    "listen": "",
+    "version": "17.12 (Ubuntu 17.12-1.pgdg24.04+1)"
+  },
+  "baselines": [
+    {
+      "path": "REPO/drizzle/0020_rpc_despesas_prospectivas.sql",
+      "sha256": "a6852e4160dcadf21f81029daf231af6d308fab7f8733b3e16769d03923bc452"
+    },
+    {
+      "path": "REPO/drizzle/0021_rpc_emprestimos_prospectivos.sql",
+      "sha256": "08b05165412c8f6259db98d70c8d220c6f99c7a3a6bc7866aa86cc00b0558a82"
+    },
+    {
+      "path": "REPO/drizzle/0022_rpc_ciclo_emprestimos_prospectivos.sql",
+      "sha256": "abce663253f85eafe03d3c4f9a81d601941164bba7ef4d0d8024b892be88f64c"
+    },
+    {
+      "path": "REPO/drizzle/0025_integrar_rpc_despesas_ciclo.sql",
+      "sha256": "63c5a3afbf86e7dbd67a726368d0dcac04a51c90200f797f1f9d35af10259199"
+    },
+    {
+      "path": "REPO/drizzle/0031_rpc_renovacao_juros_prospectiva.sql",
+      "sha256": "f0d0db2cafecd39c7f9ce0296683e66141ee8bbad4243b079b5994244f02db7f"
+    },
+    {
+      "path": "REPO/drizzle/0033_rpc_reconciliacao_intencoes_financeiras.sql",
+      "sha256": "7ec52905fa260dc6d14af5fabcef74a2a1a7f0fa65874e15d3bd8358cadc5827"
+    },
+    {
+      "path": "REPO/drizzle/0034_rpc_recebimento_legado_validado.sql",
+      "sha256": "615d0b81fb1a41b5dd205214ebddc7e32f0d75576022df66905bc90396959ad0"
+    },
+    {
+      "path": "REPO/drizzle/0035_rpc_ciclo_emprestimos_multimodal.sql",
+      "sha256": "6e5c11587d571e64a51585488c2fad7075f4d5dfeb9202a3a5dced795a9c0b03"
+    },
+    {
+      "path": "REPO/drizzle/0036_rpc_multa_manual_fixa.sql",
+      "sha256": "7194c1f7038eb9e36358330614249b66575075bef465fcfe3c8aca59a4fed21f"
+    },
+    {
+      "path": "REPO/drizzle/0036a_multa_metadata_estavel.sql",
+      "sha256": "df1abe0b096b3f993954f16b3c93a1cdfb0ddd36cb968158f39b05150eaeba8f"
+    },
+    {
+      "path": "REPO/drizzle/0037_rpc_aporte_transferencia_caixa.sql",
+      "sha256": "2acc5c0840e77a1131fa02d04f0b1faf85bbdb0430071b73477a276ded312334"
+    }
+  ],
+  "definerOwners": [
+    {
+      "rolname": "postgres",
+      "rolsuper": false,
+      "rolbypassrls": true
+    }
+  ],
+  "originalsUnchanged": [
+    {
+      "id": "42",
+      "path": "SOURCE/assinaturas-final/candidate/drizzle/0042_assinaturas_recebimento_atomico.sql",
+      "sha256": "0df0301ade56145681b721da149fc3048a46ed630cfe1be771c0bcfcf25c83fb"
+    },
+    {
+      "id": "41",
+      "path": "SOURCE/telefone-final/candidate/drizzle/0041_telefone_atomico.sql",
+      "sha256": "dead49422eecd04c18b241dd0f4c4421f0e8edc1e5ccc9ecebda10adfc76bb6d"
+    },
+    {
+      "id": "40",
+      "path": "SOURCE/cheques-final-v2/candidate/drizzle/0040_cheques_transacionais.sql",
+      "sha256": "d829fa99f81b3ec0f023480cad0cdb80a5c704e58c6aed532fc2ad10ec91d1af"
+    },
+    {
+      "id": "43",
+      "path": "SOURCE/reparcelamento-release-final/candidate/drizzle/0043_reparcelamento_execucao.sql",
+      "sha256": "5ac45bc8a32d003285fc62c806fe8ce3b86aea205a4f9624758799f543e30d2d"
+    },
+    {
+      "id": "44",
+      "path": "SOURCE/emprestimos-release-final/candidate/drizzle/0044_manutencao_emprestimos.sql",
+      "sha256": "16cb42492a21e1b79d208dd82e6b9bdf79579fa746cdff620226939614951f76"
+    },
+    {
+      "id": "38c",
+      "path": "SOURCE/despesas-release-final/candidate/drizzle/0038c_cancelamento_pendente_isolado.sql",
+      "sha256": "5fe0f34f68ed727da7058ff1fad9883fb36b6d38400ef65964a66d578d5bb261"
+    },
+    {
+      "id": "45",
+      "path": "SOURCE/caixa-release-final/candidate/drizzle/0045_caixa_manutencao_observacao_auditada.sql",
+      "sha256": "8cec2a580792d47216b23891f73bc6fd58094fb8c44bcb17d252ad4f41516ac1"
+    }
+  ],
+  "status": "PASS",
+  "cleanup": {
+    "stopped": true,
+    "status": 3,
+    "root": "SOURCE/combined-release-check/evidence/certified/pg17-mmVXEm"
+  },
+  "provenance": "Previously completed combined-release-check certification; port validation reported separately."
+}

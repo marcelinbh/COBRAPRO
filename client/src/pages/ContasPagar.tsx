@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea';
 import { Receipt, Plus, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
+import CancelamentoPendente from '@/components/CancelamentoPendente';
 import {
   DespesasIntentStore, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload,
   diaCivilBrt, dinheiroDespesa, moedaDespesa,
@@ -78,14 +79,14 @@ export default function ContasPagar() {
   const resumo = despesasTrpc.contasPagar.resumo.useQuery(undefined, options);
   const lista = despesasTrpc.contasPagar.listar.useQuery(filtroStatus === 'todos' ? undefined : { status: filtroStatus as 'pendente' | 'paga' | 'atrasada' | 'cancelada' }, options);
   const capacidades = despesasTrpc.contasPagar.capacidades.useQuery(undefined, options);
-  const caixa = trpc.caixa.contas.useQuery(undefined, options);
+  const caixa = trpc.caixa.contasParaOperacao37.useQuery(undefined, options);
   const criar = despesasTrpc.contasPagar.criar.useMutation({ retry: false });
   const pagar = despesasTrpc.contasPagar.pagar.useMutation({ retry: false });
   const estornar = despesasTrpc.contasPagar.estornar.useMutation({ retry: false });
   const reconciliacao = despesasTrpc.contasPagar.reconciliar.useMutation({ retry: false });
   const habilitado = !!userId && sessaoUi === sessao && capacidades.data?.prospectivasHabilitadas === true && !capacidades.isError;
   const locked = (action: AcaoDespesa) => busy || intencoes.some(i => i.action === action) || !!store?.blocked(action);
-  const ativas = userId ? caixa.data?.filter(c => c.ativa !== false) : undefined;
+  const ativas = userId && caixa.data?.empresaId === userId ? caixa.data.contas : undefined;
   const despesaPagar = userId ? lista.data?.find(d => d.id === pagarId) : undefined;
   const despesaEstornar = userId ? lista.data?.find(d => d.id === estornarId) : undefined;
 
@@ -104,7 +105,7 @@ export default function ContasPagar() {
         setNovo(false); setPagarId(null); setEstornarId(null); setContaCaixaId(''); setMotivo(''); setForm(freshForm());
         toast.success(`${intent.action === 'criar' ? 'Despesa criada' : intent.action === 'pagar' ? 'Pagamento registrado' : 'Estorno registrado sem excluir a baixa'}. Operação ${result.operationId}`);
         // Falha de consulta não altera a confirmação nem dispara intenção nova. Não invalidar a nova sessão.
-        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate(), utils.dashboard.kpis.invalidate()]);
+        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contasParaOperacao37.invalidate(), utils.caixa.transacoes.invalidate(), utils.dashboard.kpis.invalidate()]);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Resultado desconhecido';
@@ -125,7 +126,7 @@ export default function ContasPagar() {
       if (r.status === 'confirmed') {
         s.confirmed(intent.action, intent.idempotencyKey);
         toast.success('Operação original confirmada na reconciliação; nenhuma nova operação enviada.');
-        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate()]);
+        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contasParaOperacao37.invalidate(), utils.caixa.transacoes.invalidate()]);
       }
     } catch (e) { if (pertenceSessao() && usuarioAtual.current === intent.userId) toast.error(`${(e as Error).message} Não execução NÃO comprovada; nenhum descarte permitido.`); }
     finally { s.release(intent.action); if (pertenceSessao() && usuarioAtual.current === intent.userId) { inFlight.current = false; setBusy(false); sync(s); } }
@@ -174,7 +175,7 @@ export default function ContasPagar() {
       <div><h1 className="text-2xl font-bold flex gap-2"><Receipt />Contas a Pagar</h1><p className="text-sm text-muted-foreground">Despesas novas no trilho atômico; histórico somente consulta.</p></div>
       <Button disabled={!habilitado || locked('criar')} onClick={() => setNovo(true)}><Plus className="h-4 w-4 mr-2" />Nova despesa</Button>
     </div>
-    <p className="text-sm border rounded-lg p-3">Legado requer conferência. Edição, cancelamento, exclusão e recorrência estão indisponíveis. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
+    <p className="text-sm border rounded-lg p-3">Legado requer conferência. Edição, exclusão e recorrência estão indisponíveis. Cancelamento pendente auditado tem disponibilidade independente abaixo. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
     {auth.isError ? <p role="alert">Erro ao identificar a sessão. Nenhuma operação disponível.</p> : auth.isLoading ? <p role="status">Carregando sessão...</p> : !userId ? <p role="alert">Autentique-se para consultar despesas.</p> : null}
     {userId && (capacidades.isError ? <p role="alert">Não foi possível verificar a disponibilidade do trilho. Escritas bloqueadas.</p> : capacidades.isLoading ? <p role="status">Verificando disponibilidade...</p> : !habilitado ? <p role="alert">Despesas prospectivas desabilitadas; nenhum lançamento será feito no legado.</p> : null)}
     {avisoStorage && <p role="alert" className="text-amber-500 border p-3 rounded-lg break-words">{avisoStorage}</p>}
@@ -196,12 +197,13 @@ export default function ContasPagar() {
           ].map(([label, total, qtd]) => <Card key={String(label)}><CardContent className="p-4"><p className="text-sm">{label}</p><p className="text-xl font-bold">{moedaDespesa(String(total))}</p><p className="text-xs">{qtd} contas</p></CardContent></Card>)}</div>}
     </section>
     <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
+    {userId && <CancelamentoPendente userId={userId} itens={!lista.isError && lista.data ? lista.data : []} />}
     <section aria-label="Lista de despesas" className="space-y-3">
       {!userId ? <p role="status">Consulta indisponível sem sessão.</p> : lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
         : lista.isLoading || !lista.data ? <p role="status">{userId ? 'Carregando despesas...' : 'Consulta indisponível sem sessão.'}</p>
           : lista.data.length === 0 ? <p>Nenhuma conta encontrada para este filtro.</p>
             : lista.data.map(d => <Card key={d.id}><CardContent className="p-4 space-y-2">
-              <div className="flex justify-between gap-3"><div><p className="font-semibold">{d.descricao}</p><p className="text-xs text-muted-foreground">#{d.id} · {categorias[d.categoria as keyof typeof categorias] ?? d.categoria} · Vence: {dataLabel(d.dataVencimento)}</p></div><div className="text-right"><p className="font-bold">{moedaDespesa(d.valor)}</p><Badge variant="outline">{statuses[d.status as keyof typeof statuses] ?? d.status}</Badge></div></div>
+              <div className="flex justify-between gap-3"><div><p className="font-semibold">{d.descricao}</p><p className="text-xs text-muted-foreground">#{d.id} · {categorias[d.categoria as keyof typeof categorias] ?? d.categoria} · Vence: {dataLabel(d.dataVencimento)}</p></div><div className="text-right"><p className="font-bold">{moedaDespesa(d.valor)}</p><Badge variant="outline">{d.status === 'cancelada' ? (d.dataPagamento === null ? 'Cancelada sem baixa' : 'Estornada (baixa preservada)') : (statuses[d.status as keyof typeof statuses] ?? d.status)}</Badge></div></div>
               {d.observacoes && <p className="text-sm">{d.observacoes}</p>}
               {d.recorrente && <p className="text-xs">Recorrência histórica ({d.periodicidade ?? 'não informada'}); geração indisponível.</p>}
               {d.mensagemConferencia && <p className="text-sm text-amber-500">{d.mensagemConferencia}</p>}

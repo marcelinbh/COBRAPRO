@@ -22,6 +22,7 @@ import { trpc } from '@/lib/trpc';
 import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
+import { ManutencaoCalendario } from '@/components/ManutencaoCalendario';
 import { MultaManualAplicar } from '@/components/MultaManualOperacoes';
 
 export default function EmprestimoDetalhes() {
@@ -595,6 +596,7 @@ export default function EmprestimoDetalhes() {
         <Button disabled title="Edição financeira manual bloqueada para preservar a auditoria." className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
           <Edit2 className="h-4 w-4" /> Editar Juros
         </Button>
+        <ManutencaoCalendario contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
         <MultaManualAplicar contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
         {emprestimo.clienteWhatsapp && (
           <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp}>

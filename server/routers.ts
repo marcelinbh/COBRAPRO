@@ -1,3 +1,4 @@
+import { reparcelamento43Router } from './routers/reparcelamento43';
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -15,9 +16,11 @@ import { emprestimosMultimodalRouter } from "./routers/emprestimosMultimodal";
 import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { multaManualRouter } from "./routers/multaManual";
+import { manutencaoEmprestimosRouter } from "./routers/manutencaoEmprestimos";
 import { cheques40Procedures } from "./routers/cheques40";
 import { telefone41Writers } from "./routers/telefone41";
 import { caixa37Procedures } from "./routers/caixa37";
+import { caixaManutencao45Procedures } from "./routers/caixaManutencao45";
 import { listarContasParaCadastro } from "./services/contasCadastro";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
@@ -1643,36 +1646,8 @@ const contratosRouter = router({
 
   deletar: protectedProcedure
     .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de contrato e de seus lançamentos financeiros');
-      const db = await getDb();
-      if (db) {
-        try {
-          // IMPORTANTE: deletar na ordem correta para evitar FK constraints:
-          // 1. transacoes_caixa (referencia parcelas)
-          // 2. parcelas (referencia contratos)
-          // 3. contratos
-          await db.delete(transacoesCaixa).where(and(eq(transacoesCaixa.contratoId, input.id), eq(transacoesCaixa.userId, ctx.user.id)));
-          await db.delete(parcelas).where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id)));
-          await db.delete(contratos).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)));
-          return { success: true };
-        } catch (err: any) {
-          console.warn('[contratos.deletar] Drizzle failed, trying REST:', err.message);
-          resetDb();
-        }
-      }
-      // Fallback: Supabase REST
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      // IMPORTANTE: deletar na ordem correta para evitar FK constraints
-      // 1. transacoes_caixa que referenciam parcelas deste contrato
-      await supabase.from('transacoes_caixa').delete().eq('contrato_id', input.id).eq('user_id', ctx.user.id);
-      // 2. parcelas do contrato
-      await supabase.from('parcelas').delete().eq('contrato_id', input.id).eq('user_id', ctx.user.id);
-      // 3. contrato
-      const { error } = await supabase.from('contratos').delete().eq('id', input.id).eq('user_id', ctx.user.id);
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      return { success: true };
+    .mutation(async () => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A exclusão de contrato exige estorno compensatório auditado; indisponível neste incremento." });
     }),
 
   editar: protectedProcedure
@@ -1686,100 +1661,8 @@ const contratosRouter = router({
       dataPrimeiraParcela: z.string().optional(),
       datasParcelasCustom: z.array(z.string()).optional(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A edição financeira ou de calendário de contrato');
-      const db = await getDb();
-      if (db) {
-        try {
-          const contratoAtualizado = await db.update(contratos).set({
-            valorPrincipal: input.valorPrincipal.toString(),
-            taxaJuros: input.taxaJuros,
-            tipoTaxa: input.tipoTaxa as 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'anual',
-            numeroParcelas: input.numeroParcelas,
-          }).where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id))).returning({ id: contratos.id });
-          if (contratoAtualizado.length !== 1) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
-
-          // Atualizar parcelas pendentes com nova data se fornecida
-          if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
-            const parcelasPendentes = await db.select().from(parcelas)
-              .where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
-              .orderBy(parcelas.numeroParcela);
-            for (let i = 0; i < parcelasPendentes.length; i++) {
-              if (input.datasParcelasCustom[i]) {
-                await db.update(parcelas).set({ dataVencimento: input.datasParcelasCustom[i] }).where(and(eq(parcelas.id, parcelasPendentes[i].id), eq(parcelas.userId, ctx.user.id)));
-              }
-            }
-          } else if (input.dataPrimeiraParcela) {
-            // Recalcular datas de todas as parcelas pendentes a partir da nova 1ª parcela
-            const parcelasPendentes = await db.select().from(parcelas)
-              .where(and(eq(parcelas.contratoId, input.id), eq(parcelas.userId, ctx.user.id), inArray(parcelas.status, ['pendente', 'atrasada', 'vencendo_hoje'])))
-              .orderBy(parcelas.numeroParcela);
-            if (parcelasPendentes.length > 0) {
-              const baseDate = new Date(input.dataPrimeiraParcela + 'T00:00:00');
-              for (let i = 0; i < parcelasPendentes.length; i++) {
-                const novaData = new Date(baseDate);
-                if (input.tipoTaxa === 'diaria') novaData.setDate(novaData.getDate() + i);
-                else if (input.tipoTaxa === 'semanal') novaData.setDate(novaData.getDate() + i * 7);
-                else if (input.tipoTaxa === 'quinzenal') novaData.setDate(novaData.getDate() + i * 15);
-                else if (input.tipoTaxa === 'anual') novaData.setFullYear(novaData.getFullYear() + i);
-                else novaData.setMonth(novaData.getMonth() + i);
-                await db.update(parcelas).set({ dataVencimento: novaData.toISOString() }).where(and(eq(parcelas.id, parcelasPendentes[i].id), eq(parcelas.userId, ctx.user.id)));
-              }
-            }
-          }
-          return { success: true };
-        } catch (err) {
-          if (err instanceof TRPCError) throw err;
-          console.warn('[contratos.editar] Drizzle failed, trying REST:', (err as Error).message);
-          resetDb();
-        }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: contratoAtualizado, error } = await supabase.from('contratos').update({
-        valor_principal: input.valorPrincipal,
-        taxa_juros: input.taxaJuros,
-        tipo_taxa: input.tipoTaxa,
-        numero_parcelas: input.numeroParcelas,
-      }).eq('id', input.id).eq('user_id', ctx.user.id).select('id').maybeSingle();
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      if (!contratoAtualizado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
-
-      // Atualizar datas das parcelas pendentes via Supabase
-      if (input.datasParcelasCustom && input.datasParcelasCustom.length > 0) {
-        const { data: parcelasPendentes } = await supabase.from('parcelas')
-          .select('id, numero_parcela')
-          .eq('contrato_id', input.id)
-          .eq('user_id', ctx.user.id)
-          .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
-          .order('numero_parcela', { ascending: true });
-        for (let i = 0; i < (parcelasPendentes ?? []).length; i++) {
-          if (input.datasParcelasCustom[i]) {
-            await supabase.from('parcelas').update({ data_vencimento: input.datasParcelasCustom[i] }).eq('id', parcelasPendentes![i].id).eq('user_id', ctx.user.id);
-          }
-        }
-      } else if (input.dataPrimeiraParcela) {
-        // Recalcular datas de todas as parcelas pendentes a partir da nova 1ª parcela
-        const { data: parcelasPendentes } = await supabase.from('parcelas')
-          .select('id, numero_parcela')
-          .eq('contrato_id', input.id)
-          .eq('user_id', ctx.user.id)
-          .in('status', ['pendente', 'atrasada', 'vencendo_hoje'])
-          .order('numero_parcela', { ascending: true });
-        if (parcelasPendentes && parcelasPendentes.length > 0) {
-          const baseDate = new Date(input.dataPrimeiraParcela + 'T00:00:00');
-          for (let i = 0; i < parcelasPendentes.length; i++) {
-            const novaData = new Date(baseDate);
-            if (input.tipoTaxa === 'diaria') novaData.setDate(novaData.getDate() + i);
-            else if (input.tipoTaxa === 'semanal') novaData.setDate(novaData.getDate() + i * 7);
-            else if (input.tipoTaxa === 'quinzenal') novaData.setDate(novaData.getDate() + i * 15);
-            else if (input.tipoTaxa === 'anual') novaData.setFullYear(novaData.getFullYear() + i);
-            else novaData.setMonth(novaData.getMonth() + i);
-            await supabase.from('parcelas').update({ data_vencimento: novaData.toISOString() }).eq('id', parcelasPendentes[i].id).eq('user_id', ctx.user.id);
-          }
-        }
-      }
-      return { success: true };
+    .mutation(async () => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Use o calendário prospectivo certificado. Edição de valores e juros permanece suspensa." });
     }),
 
   pagarTotal: protectedProcedure
@@ -1793,30 +1676,10 @@ const contratosRouter = router({
 
   editarJuros: protectedProcedure
     .input(z.object({ id: z.number(), novaTaxa: z.string() }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A alteração manual de juros de contrato');
-      const db = await getDb();
-      if (db) {
-        try {
-          const contratoAtualizado = await db.update(contratos).set({ taxaJuros: input.novaTaxa })
-            .where(and(eq(contratos.id, input.id), eq(contratos.userId, ctx.user.id)))
-            .returning({ id: contratos.id });
-          if (contratoAtualizado.length !== 1) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
-          return { success: true };
-        } catch (err) {
-          if (err instanceof TRPCError) throw err;
-          console.warn('[contratos.editarJuros] Drizzle failed, trying REST:', (err as Error).message);
-          resetDb();
-        }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-       const { data: contratoAtualizado, error } = await supabase.from('contratos').update({ taxa_juros: input.novaTaxa }).eq('id', input.id).eq('user_id', ctx.user.id).select('id').maybeSingle();
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      if (!contratoAtualizado) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado para esta empresa' });
-      await registrarHistorico({ contratoId: input.id, userId: String(ctx.user.id), tipo: 'edicao_juros', descricao: `Taxa de juros alterada para ${input.novaTaxa}%`, valorNovo: input.novaTaxa });
-      return { success: true };
+    .mutation(async () => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "A alteração de juros exige recálculo transacional certificado; indisponível neste incremento." });
     }),
+
   historico: protectedProcedure
     .input(z.object({ contratoId: z.number() }))
     .query(async ({ ctx, input }) => {
@@ -2385,138 +2248,35 @@ const parcelasRouter = router({
       novoValor: z.number().positive().optional(),
       novaDataVencimento: z.string().optional(), // formato YYYY-MM-DD
     }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A edição de parcelas');
-      if (!input.novoValor && !input.novaDataVencimento) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Informe ao menos um campo para editar' });
-      }
-
-      const db = await getDb();
-      if (db) {
-        // Verificar que a parcela pertence ao usuário
-        const rows = await db.select().from(parcelas).where(and(eq(parcelas.id, input.parcelaId), eq(parcelas.userId, ctx.user.id))).limit(1);
-        const parcela = rows[0];
-        if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
-
-        const updateData: Record<string, any> = {};
-        if (input.novoValor) updateData.valorOriginal = input.novoValor.toFixed(2);
-        if (input.novaDataVencimento) updateData.dataVencimento = input.novaDataVencimento;
-
-        await db.update(parcelas).set(updateData).where(and(eq(parcelas.id, input.parcelaId), eq(parcelas.userId, ctx.user.id)));
-      } else {
-        const supabase = await getSupabaseClientAsync();
-        if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-
-        const updateData: Record<string, any> = {};
-        if (input.novoValor) updateData.valor_original = input.novoValor;
-        if (input.novaDataVencimento) updateData.data_vencimento = input.novaDataVencimento;
-
-        const { error } = await supabase.from('parcelas').update(updateData).eq('id', input.parcelaId).eq('user_id', ctx.user.id);
-        if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      }
-
-      return { success: true };
+    .mutation(async () => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Edição individual de valor/data suspensa. Use calendário completo no fluxo certificado." });
     }),
 
-  // Deletar uma parcela pendente/atrasada (não permite deletar parcelas pagas)
   deletarParcela: protectedProcedure
     .input(z.object({
       parcelaId: z.number(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de parcelas');
-      const sb = await getSupabaseClientAsync();
-      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-
-      // Buscar a parcela garantindo que pertence ao usuário
-      const { data: parcela, error: pErr } = await sb
-        .from('parcelas')
-        .select('*')
-        .eq('id', input.parcelaId)
-        .eq('user_id', ctx.user.id)
-        .single();
-
-      if (pErr || !parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
-
-      // Não permitir deletar parcelas pagas
-      if (parcela.status === 'paga') {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'Não é possível deletar uma parcela já paga' });
-      }
-
-      // Deletar a parcela
-      const { error: delErr } = await sb
-        .from('parcelas')
-        .delete()
-        .eq('id', input.parcelaId)
-        .eq('user_id', ctx.user.id);
-
-      if (delErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: delErr.message });
-
-      // Verificar se ainda há parcelas pendentes no contrato
-      const { data: parcelasPendentes } = await sb
-        .from('parcelas')
-        .select('id')
-        .eq('contrato_id', parcela.contrato_id)
-        .eq('user_id', ctx.user.id)
-        .neq('status', 'paga')
-        .limit(1);
-
-      // Se não há mais parcelas pendentes, marcar contrato como quitado
-      if (!parcelasPendentes || parcelasPendentes.length === 0) {
-        await sb.from('contratos').update({ status: 'quitado' }).eq('id', parcela.contrato_id).eq('user_id', ctx.user.id);
-      }
-
-      return { success: true };
+    .mutation(async () => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Exclusão de parcela exige compensação auditada; nenhum registro será apagado." });
     }),
 
-  // Criar nova parcela manualmente em um contrato existente
   criarParcela: protectedProcedure
     .input(z.object({
       contratoId: z.number(),
       dataVencimento: z.string(), // YYYY-MM-DD
       valorOriginal: z.number().positive(),
     }))
-    .mutation(async ({ ctx, input }) => {
-      const sb = await getSupabaseClientAsync();
-      if (!sb) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-
-      // Buscar contrato para obter dados necessários
-      const { data: contrato, error: cErr } = await sb.from('contratos').select('*').eq('id', input.contratoId).eq('user_id', ctx.user.id).single();
-      if (cErr || !contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
-
-      // Descobrir o próximo número de parcela
-      const { data: existentes } = await sb.from('parcelas').select('numero_parcela').eq('contrato_id', input.contratoId).eq('user_id', ctx.user.id).order('numero_parcela', { ascending: false }).limit(1);
-      const ultimoNum = existentes?.[0]?.numero_parcela ?? 0;
-      const novaNumeroParcela = ultimoNum + 1;
-
-      const hoje = dataHojeBrasilia();
-      const dataVenc = input.dataVencimento;
-      let status = 'pendente';
-      if (dataVenc < hoje) status = 'atrasada';
-      else if (dataVenc === hoje) status = 'vencendo_hoje';
-
-      const { error } = await sb.from('parcelas').insert({
-        contrato_id: input.contratoId,
-        cliente_id: contrato.cliente_id,
-        koletor_id: contrato.koletor_id ?? null,
-        numero: novaNumeroParcela,
-        numero_parcela: novaNumeroParcela,
-        valor: parseFloat(input.valorOriginal.toFixed(2)),
-        valor_original: input.valorOriginal.toFixed(2),
-        data_vencimento: dataVenc,
-        status,
-        conta_caixa_id: contrato.conta_caixa_id ?? null,
-        user_id: ctx.user.id,
-      });
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-
-      return { success: true, numeroParcela: novaNumeroParcela };
+    .mutation(async (): Promise<{ success: true; numeroParcela: number }> => {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Criação manual de parcela suspensa. Use apenas renovação transacional certificada." });
     }),
+
+
 });
 
 // ─── CAIXA ───────────────────────────────────────────────────────────────────
 const caixaRouter = router({
   ...caixa37Procedures,
+  ...caixaManutencao45Procedures,
   contasParaOperacao37: protectedProcedure.query(async ({ ctx }) => {
     const fonte = await getSupabaseClientAsync();
     if (!fonte) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível carregar as contas desta empresa.' });
@@ -2754,22 +2514,9 @@ const caixaRouter = router({
 
   removerTransacoesDuplicadasDespesa: protectedProcedure
     .input(z.object({ ids: z.array(z.number().int().positive()).min(1), manterId: z.number().int().positive() }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de lançamentos de Caixa sem revisão e aprovação');
-      const idsParaRemover = idsDuplicadosParaRemocao(input.ids, input.manterId);
-      if (idsParaRemover.length === 0) return { success: true, removidas: 0 };
-
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data, error } = await supabase
-        .from('transacoes_caixa')
-        .delete()
-        .in('id', idsParaRemover)
-        .eq('user_id', ctx.user.id)
-        .eq('categoria', 'despesa_operacional')
-        .select('id');
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      return { success: true, removidas: data?.length ?? 0 };
+    .mutation(() => {
+      // Não manter writer REST destrutivo nem atrás de uma trava removível.
+      bloquearOperacaoFinanceiraNaoAtomica('A exclusão destrutiva de lançamentos de Caixa');
     }),
 });
 
@@ -3510,101 +3257,6 @@ function dataCivilValida(data: string): boolean {
   return date.getUTCFullYear() === ano && date.getUTCMonth() === mes - 1 && date.getUTCDate() === dia;
 }
 
-function adicionarPeriodoReparcelamento(data: string, indice: number, tipoTaxa: 'diaria' | 'semanal' | 'quinzenal' | 'mensal' | 'anual'): string {
-  if (tipoTaxa === 'diaria') return adicionarDiasData(data, indice);
-  if (tipoTaxa === 'semanal') return adicionarDiasData(data, indice * 7);
-  if (tipoTaxa === 'quinzenal') return adicionarDiasData(data, indice * 15);
-  if (tipoTaxa === 'anual') return adicionarDiasData(data, indice * 365);
-  const [ano, mes, dia] = data.split('-').map(Number);
-  const alvo = new Date(Date.UTC(ano, mes - 1 + indice, 1));
-  const ultimoDia = new Date(Date.UTC(alvo.getUTCFullYear(), alvo.getUTCMonth() + 1, 0)).getUTCDate();
-  return `${alvo.getUTCFullYear()}-${String(alvo.getUTCMonth() + 1).padStart(2, '0')}-${String(Math.min(dia, ultimoDia)).padStart(2, '0')}`;
-}
-
-function saldoAbertoParaReparcelamento(parcela: any): number {
-  return calcularValorAbertoParcela({ status: parcela.status, valorOriginal: parcela.valor_original, saldoResidual: parcela.saldo_residual, valorMulta: parcela.valor_multa });
-}
-
-const reparcelamentoRouter = router({
-  preview: protectedProcedure
-    .input(z.object({
-      contratoId: z.number().int().positive(),
-      numeroParcelas: z.number().int().min(1).max(60),
-      taxaJuros: z.number().min(0).max(1000),
-      tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
-      dataInicio: z.string(),
-      incluirMultas: z.boolean().default(true),
-    }))
-    .query(async ({ ctx, input }) => {
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new Error('DB unavailable');
-      if (!dataCivilValida(input.dataInicio)) throw new TRPCError({ code: 'BAD_REQUEST', message: 'A data de início é inválida' });
-      const { data: contrato, error: contratoErro } = await supabase.from('contratos')
-        .select('id, multa_atraso, juros_mora_diario').eq('id', input.contratoId).eq('user_id', ctx.user.id).maybeSingle();
-      if (contratoErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contratoErro.message });
-      if (!contrato) throw new TRPCError({ code: 'NOT_FOUND', message: 'Contrato não encontrado' });
-
-      const { data: parcelasAbertas, error: parcelasErr } = await supabase
-        .from('parcelas')
-        .select('*')
-        .eq('contrato_id', input.contratoId)
-        .eq('user_id', ctx.user.id)
-        .in('status', ['pendente', 'atrasada', 'vencendo_hoje', 'parcial']);
-      if (parcelasErr) throw new Error(parcelasErr.message);
-
-      const hoje = new Date(dataCivilBrasiliaParaIso(dataHojeBrasilia()));
-      let saldoDevedor = 0;
-      for (const p of (parcelasAbertas ?? [])) {
-        const valorBase = saldoAbertoParaReparcelamento(p);
-        let multa = 0;
-        let juros = 0;
-        if (input.incluirMultas && p.status === 'atrasada') {
-          const vencDate = new Date(dataCivilBrasiliaParaIso(String(p.data_vencimento).slice(0, 10)));
-          const resultado = calcularJurosMora(valorBase, vencDate, hoje, Number(contrato.juros_mora_diario ?? 0), Number(contrato.multa_atraso ?? 0));
-          multa = resultado.multa;
-          juros = resultado.juros;
-        }
-        saldoDevedor += valorBase + multa + juros;
-      }
-
-      const valorNovaParcela = calcularParcelaPadrao(saldoDevedor, input.taxaJuros, input.numeroParcelas);
-      return {
-        saldoDevedor,
-        valorNovaParcela,
-        totalNovo: valorNovaParcela * input.numeroParcelas,
-        qtdParcelasAbertas: (parcelasAbertas ?? []).length,
-        parcelas: Array.from({ length: input.numeroParcelas }, (_, i) => {
-          const vencimento = adicionarPeriodoReparcelamento(input.dataInicio, i, input.tipoTaxa);
-          return {
-            numero: i + 1,
-            valor: valorNovaParcela,
-            vencimento,
-          };
-        }),
-      };
-    }),
-
-  executar: protectedProcedure
-    .input(z.object({
-      contratoId: z.number().int().positive(),
-      numeroParcelas: z.number().int().min(1).max(60),
-      taxaJuros: z.number().min(0).max(1000),
-      tipoTaxa: z.enum(['diaria', 'semanal', 'quinzenal', 'mensal', 'anual']).default('mensal'),
-      dataInicio: z.string(),
-      incluirMultas: z.boolean().default(true),
-      observacoes: z.string().optional(),
-    }))
-    .mutation(async () => {
-      // A implementação anterior encadeava escritas REST sem uma transação.
-      // Ela foi removida para que não possa ser reativada acidentalmente. A
-      // execução volta apenas com uma RPC atômica e cobertura de regressão.
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: 'Reparcelamento temporariamente indisponível durante a atualização de segurança financeira.',
-      });
-    }),
-});
-
 // ─── CONTAS A PAGAR ──────────────────────────────────────────────────────────
 const contasPagarRouter = router({
   listar: protectedProcedure
@@ -4334,13 +3986,14 @@ export const appRouter = router({
   relatorios: relatoriosRouter,
   configuracoes: configuracoesRouter,
   cobradores: cobradoresRouter,
-  reparcelamento: reparcelamentoRouter,
+  reparcelamento: reparcelamento43Router,
   contasPagar: contasPagarProspectivasRouter,
   emprestimosProspectivos: emprestimosProspectivosRouter,
   emprestimosMultimodal: emprestimosMultimodalRouter,
   renovacaoProspectiva: renovacaoProspectivaRouter,
   recebimentosLegados: recebimentosLegadosRouter,
   multaManual: multaManualRouter,
+  manutencaoEmprestimos: manutencaoEmprestimosRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,
   veiculos: veiculosRouter,

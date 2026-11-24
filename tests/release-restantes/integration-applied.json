@@ -1,0 +1,525 @@
+{
+  "manifestSha256": "8f193aad6e083d3692aa69bd3b48ac022f48ea5b1f52b765b174da3c37852706",
+  "scope": "file integration only, not SQL installation or publication",
+  "changes": [
+    {
+      "path": "server/routers.ts",
+      "before": "9d41e83da818f4d2ec77f2af2e49acfe499890a57108860cfcb11343eb3904c2",
+      "after": "72338cb41f096915a1710a1b56cc5497c0fb50c5960d2bac02ce19824afe788c"
+    },
+    {
+      "path": "client/src/pages/EmprestimoDetalhes.tsx",
+      "before": "28ebf748e27a258ada8c8356b3874783f02e84f6ec0650f2bb07cf8fdee71436",
+      "after": "98bc0300ce6de39a45fbcc7110b7f96d27b0decf7f85d0223326ef75b182bd0d"
+    },
+    {
+      "path": "server/routers/contasPagar.ts",
+      "before": "d0536b8276ca99eac193b0122ff17bbcb0f104ea74c357f85abbb619eb3098d2",
+      "after": "58067d50b96932225851054ab1abdfaea46f735a1ae6bf284c4d3809b9055ec3"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "before": "0aa7a35c8315775bff3e9e1a4aaed5c0cdbcc9887240ac23fa1fb93260c47c0c",
+      "after": "0b75f8da9ff732fede85466a0044d46e340d6816ade61362c3d23767df1bbe12"
+    },
+    {
+      "path": "client/src/pages/Caixa.tsx",
+      "before": "a0b7feb9aac8d6de084190d097db24a8329691bf2afca3f8d3fc942fbedbf589",
+      "after": "7b5391d186985aa165fdfbd85f1591ac8af533a8703d7939f41769b7dcd0b356"
+    },
+    {
+      "path": "client/src/pages/Reparcelamento.tsx",
+      "before": "e39964e255a46d865091d4b0c743b4c2e319c7b98fff51d426b6eda5cdeeb666",
+      "after": "2907a9c2943c7d9d90e8dfad8ba0d5e316ac32e8e95fffaceb94e63042c8ff33"
+    },
+    {
+      "path": "client/src/components/DeleteEmprestimoDialog.tsx",
+      "before": "853a0a854d78393bfe033214fe8155a61b0bd8b8336e41d448cf064da8b6ac12",
+      "after": "e2cc023a21f460c6c25363182ded66b488b6cf9269c27b3084695bec06578b93"
+    },
+    {
+      "path": "client/src/components/EmprestimoDetalhesModal.tsx",
+      "before": "6d3346a25fd6c933518a639f8701e629fc4e8f9ac6f12b6a9f0cd225a81d404a",
+      "after": "eef778fc2ba9a31a40c05e89243f1b5df14a620e397c0ee7532fd87550ce7bc5"
+    },
+    {
+      "path": "server/reparcelamento.blocked.test.ts",
+      "before": "0451f37bef71a113b4620fad5b24cf54cb740c855bbc2768b9cd6bd5bd1b0348",
+      "after": "6931a855c513e13196bc64caf06696265d37cd54d1e12d1ea34a7548a3b293f7"
+    },
+    {
+      "path": "shared/reparcelamento43.ts",
+      "before": null,
+      "after": "99af9ba04d4153857ea4f410fe9a6538436001c85fe4de16f9ea759d89eb49e0"
+    },
+    {
+      "path": "shared/reparcelamento43Fluxo.ts",
+      "before": null,
+      "after": "e44343e86dab632f42e5b8ad5cdf4bacd47eddd875f62661d1ec1923de4d7305"
+    },
+    {
+      "path": "shared/reparcelamento43Intencao.ts",
+      "before": null,
+      "after": "410b5c542cd85837d23460456f6d5ef35c0440bd4d34068b9d9d4894caf25cde"
+    },
+    {
+      "path": "server/routers/reparcelamento43.ts",
+      "before": null,
+      "after": "10a19ea8e93e3ed11d00a548d9f20c92717b11c2a51ad347c15f36a6535a4be5"
+    },
+    {
+      "path": "server/services/reparcelamento43Rpc.ts",
+      "before": null,
+      "after": "ecd8450b555d509a37818737b5b6df19adbf91d563342e0651abad28e99ad704"
+    },
+    {
+      "path": "shared/manutencaoEmprestimos.ts",
+      "before": null,
+      "after": "55d1490f57ed7e197362a64ca21233562a52035add70d192343f7b871ebc0e16"
+    },
+    {
+      "path": "shared/calendario44Journal.ts",
+      "before": null,
+      "after": "c0baf67e3bb8c2b035faf16601ceb894900e6bbc95a4c0517a4ed1f94f8917d3"
+    },
+    {
+      "path": "server/services/manutencaoEmprestimos.ts",
+      "before": null,
+      "after": "df72e84c3265c73e49d8ca590f6f290a36313ecd205c2431f1c88f3f23276236"
+    },
+    {
+      "path": "server/routers/manutencaoEmprestimos.ts",
+      "before": null,
+      "after": "b947f5e2a39968cb27c1ac218727cad856b57543b20826672317eb90f6a6d857"
+    },
+    {
+      "path": "client/src/components/ManutencaoCalendario.tsx",
+      "before": null,
+      "after": "877636848a87969f9ede98a6c2806f5cd66f381adc7d445189be5ef24088b107"
+    },
+    {
+      "path": "shared/despesaCancelamentoPendente.ts",
+      "before": null,
+      "after": "ac1538368a38fe87668679713e4775de71650313431a90670178ce0955a62d7d"
+    },
+    {
+      "path": "shared/despesas38Original.ts",
+      "before": null,
+      "after": "966e2f9f06c58c9121be2e2fbf605f4c56878653f391f15682e6864edb7477e2"
+    },
+    {
+      "path": "server/services/despesaCancelamentoPendente.ts",
+      "before": null,
+      "after": "92de9c25f685bc651452c2411583dc1cc5a80bbc3e4da8e4938db87051771bbb"
+    },
+    {
+      "path": "client/src/components/CancelamentoPendente.tsx",
+      "before": null,
+      "after": "3be0e49e0f2de3d34ca052a7c84087e18e99ededafb52d2444eb69d0682ef3b5"
+    },
+    {
+      "path": "shared/caixaManutencao45.ts",
+      "before": null,
+      "after": "967af0e3ef0af1f7322d6c08cce8360b1fd2038704124996f20e58389d452860"
+    },
+    {
+      "path": "shared/caixaManutencao45Storage.ts",
+      "before": null,
+      "after": "ee349396424d0213ba8e40628ad3492a731cea17dba97100edda41072d8763fc"
+    },
+    {
+      "path": "server/services/caixaManutencao45Rpc.ts",
+      "before": null,
+      "after": "e7a4dac2eec0c4bda17e0a0c18656b36e0a3c71c3ff5afa28b8aa337ce7355ac"
+    },
+    {
+      "path": "server/routers/caixaManutencao45.ts",
+      "before": null,
+      "after": "b6e57ee9d7a0be655b31e902aae52ae7713cd8f0b11decda2c53c15e6820df58"
+    },
+    {
+      "path": "client/src/components/CaixaManutencao45.tsx",
+      "before": null,
+      "after": "d2ce41632ca649a3e8a7b01a273c3f68f16d7ce9ae329b21f89085d49ead617c"
+    },
+    {
+      "path": "drizzle/0043_reparcelamento_execucao.sql",
+      "before": null,
+      "after": "8d4bc41efa0ae6917e2f685b2d3e7f6ee293f75a9aef5e07be736cc80d1fc4c7"
+    },
+    {
+      "path": "drizzle/0044_manutencao_emprestimos.sql",
+      "before": null,
+      "after": "16cb42492a21e1b79d208dd82e6b9bdf79579fa746cdff620226939614951f76"
+    },
+    {
+      "path": "drizzle/0038c_cancelamento_pendente_isolado.sql",
+      "before": null,
+      "after": "5fe0f34f68ed727da7058ff1fad9883fb36b6d38400ef65964a66d578d5bb261"
+    },
+    {
+      "path": "drizzle/0045_caixa_manutencao_observacao_auditada.sql",
+      "before": null,
+      "after": "8cec2a580792d47216b23891f73bc6fd58094fb8c44bcb17d252ad4f41516ac1"
+    },
+    {
+      "path": "tests/release-restantes/unit/43-service.test.ts",
+      "before": null,
+      "after": "eaaff94d6da44d556fccd0fc0f17a3843f9ca7368cd4ed426c1d28f0e5059614"
+    },
+    {
+      "path": "tests/release-restantes/unit/43-fluxo.test.ts",
+      "before": null,
+      "after": "50f9d0b8d3cb0b6df4f5bef1db61455cbb3ce7184962d52d5838f572a0a169d7"
+    },
+    {
+      "path": "tests/release-restantes/unit/43-router.test.ts",
+      "before": null,
+      "after": "c118e2329c097e553201447bc1c60dbf0f0b186e972e5a77a987e0fa9cde8687"
+    },
+    {
+      "path": "tests/release-restantes/unit/44-service.test.ts",
+      "before": null,
+      "after": "0268ea1c3f90c48e350d4415bd1967fe7c67143e336c9df4adc6d09abf7228d1"
+    },
+    {
+      "path": "tests/release-restantes/unit/44-journal.test.ts",
+      "before": null,
+      "after": "e7f5e850222ed72a4da021cafd25471e8d714e6037e3d6a8c0428e19da720d4d"
+    },
+    {
+      "path": "tests/release-restantes/unit/44-envelope.test.ts",
+      "before": null,
+      "after": "8b257c03eb2368162be7af631e8249cd450314aa082487d7181a2ca1ef363f92"
+    },
+    {
+      "path": "tests/release-restantes/unit/44-surface.test.ts",
+      "before": null,
+      "after": "88c26c7763102cf8ed6056bf10b99d0fc9427622857d25726e54d2ed85f3d7e9"
+    },
+    {
+      "path": "tests/release-restantes/unit/38c-cancelamento.test.ts",
+      "before": null,
+      "after": "463348c3bd40bb55d6311188cc59d1a557b59f0b6f76c5f43563145809d34d9d"
+    },
+    {
+      "path": "tests/release-restantes/unit/38c-ui.test.ts",
+      "before": null,
+      "after": "3fe3bb27279757252913685b7667a598ced2d2c58360707e42ec0d2fbf24dcec"
+    },
+    {
+      "path": "tests/release-restantes/unit/38c-b1b2.test.ts",
+      "before": null,
+      "after": "a60bf55d7133df14719b4d01f2139c5bd0bdea654d683262ba0cd397f493a3d5"
+    },
+    {
+      "path": "tests/release-restantes/unit/45-contract.test.ts",
+      "before": null,
+      "after": "86c08ebe0f5c9c3dfe3d427fb5a2a152dcb5a0f19327e158a9d71ea70eda32be"
+    },
+    {
+      "path": "tests/release-restantes/unit/45-journal.test.ts",
+      "before": null,
+      "after": "58ea90229f34c1c43f2aaddde801500971ee8d60d7ca757be1f31bb9460c3033"
+    },
+    {
+      "path": "tests/release-restantes/unit/45-router.test.ts",
+      "before": null,
+      "after": "f7413558f87eb4ceef7672081d2fcf7cdd761143acb31093a09cb3b4f338ee4f"
+    },
+    {
+      "path": "tests/release-restantes/fixtures/synthetic-roundtrip43.json",
+      "before": null,
+      "after": "c7029054aa6dc310b6a5e2ac7d69f30be119e5b7ba31204dc8f0edcfd8dcc72a"
+    },
+    {
+      "path": "tests/release-restantes/unit/integration-modal.test.ts",
+      "before": null,
+      "after": "a66b16054e0fa019121ee3fff96df28f9d2dec4e4c9f433efec8fa28b47e1535"
+    },
+    {
+      "path": "tests/release-restantes/pg/combined.mjs",
+      "before": null,
+      "after": "afd1a218ff909b182ff13361545d91bb01325f9214572918c312478d5d11f427"
+    },
+    {
+      "path": "tests/release-restantes/pg/runtime.mjs",
+      "before": null,
+      "after": "a376b259aaef92f888b9b33da2397d54bf97baecb10cf4e9186fccdfb5eb97e7"
+    },
+    {
+      "path": "tests/release-restantes/fixtures/cheques40.sql",
+      "before": null,
+      "after": "5d7ff610f8b065c2b701667c6b4866ef91fcc5430086f334385dd8c79bdccb93"
+    },
+    {
+      "path": "tests/release-restantes/fixtures/telefone41.sql",
+      "before": null,
+      "after": "f2433b9fae841120316d4498ff5d0959556803087bf6fef3cabaaeb00335e1b4"
+    },
+    {
+      "path": "tests/release-restantes/fixtures/original43.sql",
+      "before": null,
+      "after": "5ac45bc8a32d003285fc62c806fe8ce3b86aea205a4f9624758799f543e30d2d"
+    },
+    {
+      "path": "tests/release-restantes/certification/bridge40-prosrc.json",
+      "before": null,
+      "after": "f72b9b91ac74807294bba0dc0a17af1114b1217b518bc395b1e25fd3cd12f4b2"
+    },
+    {
+      "path": "tests/release-restantes/regenerate43.py",
+      "before": null,
+      "after": "639983a180f829af8864b613c1e942ca90354faeebb67f241beacb523395487c"
+    },
+    {
+      "path": "tests/release-restantes/certification/prior-certified-result.json",
+      "before": null,
+      "after": "e9bbc160ad6a00597f854346c55d3f9df9bf0004c1379f6f1d8c8dad5e854809"
+    },
+    {
+      "path": "tests/release-restantes/.gitignore",
+      "before": null,
+      "after": "dc3fb0b917885047e64af88fa106d6e79eb89a02122b92304a5129348c7d09ca"
+    },
+    {
+      "path": "tests/release-restantes/vitest.config.ts",
+      "before": null,
+      "after": "4896e58aa1e4b752ca3dd9b3d40bed4346ef27325e162b06466d070592420aa0"
+    },
+    {
+      "path": "tests/release-restantes/typecheck.mjs",
+      "before": null,
+      "after": "0fd6415b7d4e5733d6db311f9c3eeffabbd1141c7c35d4ddfe748350e1b39889"
+    },
+    {
+      "path": "tests/release-restantes/run-offline.sh",
+      "before": null,
+      "after": "e7e93e48fe93b0fd75fd190ba9c8b9b8f67d8a5ae836ce1f1f444077477d7a62"
+    },
+    {
+      "path": "tests/release-restantes/stack-pins.json",
+      "before": null,
+      "after": "b9655bf62494567043e5a709dab310bc051c1858b8bebc6cb25310b4f632bfd9"
+    },
+    {
+      "path": "tests/release-restantes/verify-stack.py",
+      "before": null,
+      "after": "235dc14a69ecbb18b660996c090e3e59523f8938858e5a7e11b5363129900547"
+    }
+  ],
+  "operations": [
+    {
+      "path": "server/routers.ts",
+      "reason": "reparcelamento-release-final/candidate/server/routers.ts.section.patch"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "reparcelamento-release-final/candidate/server/routers.ts.section.patch"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "reparcelamento-release-final/candidate/server/routers.ts.section.patch"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "emprestimos-release-final/candidate/server/routers.integration.diff"
+    },
+    {
+      "path": "client/src/pages/EmprestimoDetalhes.tsx",
+      "reason": "emprestimos-release-final/candidate/client/src/pages/EmprestimoDetalhes.integration.diff"
+    },
+    {
+      "path": "client/src/pages/EmprestimoDetalhes.tsx",
+      "reason": "emprestimos-release-final/candidate/client/src/pages/EmprestimoDetalhes.integration.diff"
+    },
+    {
+      "path": "server/routers/contasPagar.ts",
+      "reason": "despesas-release-final/candidate/server/routers/contasPagar.section.diff"
+    },
+    {
+      "path": "server/routers/contasPagar.ts",
+      "reason": "despesas-release-final/candidate/server/routers/contasPagar.section.diff"
+    },
+    {
+      "path": "server/routers/contasPagar.ts",
+      "reason": "despesas-release-final/candidate/server/routers/contasPagar.section.diff"
+    },
+    {
+      "path": "server/routers/contasPagar.ts",
+      "reason": "despesas-release-final/candidate/server/routers/contasPagar.section.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "client/src/pages/ContasPagar.tsx",
+      "reason": "despesas-release-final/evidence/ui.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "caixa-release-final/integration/router-integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "caixa-release-final/integration/router-integration.diff"
+    },
+    {
+      "path": "server/routers.ts",
+      "reason": "caixa-release-final/integration/router-integration.diff"
+    },
+    {
+      "path": "client/src/pages/Caixa.tsx",
+      "reason": "caixa-release-final/integration/ui-integration.diff"
+    },
+    {
+      "path": "client/src/pages/Caixa.tsx",
+      "reason": "caixa-release-final/integration/ui-integration.diff"
+    },
+    {
+      "path": "client/src/pages/Caixa.tsx",
+      "reason": "caixa-release-final/integration/ui-integration.diff"
+    },
+    {
+      "path": "client/src/pages/Reparcelamento.tsx",
+      "reason": "43 dedicated page replacement; full preimage pinned, no unrelated page"
+    },
+    {
+      "path": "client/src/components/DeleteEmprestimoDialog.tsx",
+      "reason": "44 shared deletion dialog stays non-mutating"
+    },
+    {
+      "path": "client/src/components/DeleteEmprestimoDialog.tsx",
+      "reason": "44 shared deletion dialog stays non-mutating"
+    },
+    {
+      "path": "client/src/components/DeleteEmprestimoDialog.tsx",
+      "reason": "44 shared deletion dialog stays non-mutating"
+    },
+    {
+      "path": "client/src/components/DeleteEmprestimoDialog.tsx",
+      "reason": "44 shared deletion dialog stays non-mutating"
+    },
+    {
+      "path": "client/src/components/EmprestimoDetalhesModal.tsx",
+      "reason": "43/44 modal uses safe existing ficha instead of a second calendar/receipt journal"
+    },
+    {
+      "path": "client/src/components/EmprestimoDetalhesModal.tsx",
+      "reason": "safe ficha navigation hook"
+    },
+    {
+      "path": "client/src/components/EmprestimoDetalhesModal.tsx",
+      "reason": "replace only modal legacy action strip; details/labels unchanged, SQL eligibility authoritative"
+    },
+    {
+      "path": "client/src/components/EmprestimoDetalhesModal.tsx",
+      "reason": "per-installment legacy modal controls enter safe ficha; no unbound edits"
+    },
+    {
+      "path": "server/reparcelamento.blocked.test.ts",
+      "reason": "only replaced legacy43 endpoint test; all unrelated financial gates unchanged"
+    }
+  ],
+  "protectedUnchanged": {
+    "client/src/components/RecebimentoValidado.tsx": "9c93031c2d8a2a0fefb6dd5c245a3063ceb2ad3d967b0abfb5ec2a69852597eb",
+    "client/src/components/recebimentoValidado.ui.test.ts": "85a20ccc9829b013a8d5d99d2bded68ea9f94f49211fa9c79f3e34f1f0b278fd",
+    "client/src/lib/cheques40Intent.ts": "3dbe6b2e42a99e9beec6ad6e4585b134ef746f70cf006e3613c8ea774fa1cd5a",
+    "client/src/pages/Assinaturas.tsx": "8b3ae7b11fbbd455e0413403f2da21141a75f8d17ce89591c007b63e02c576bf",
+    "client/src/pages/Cheques.tsx": "7c4bd20bdaa93481ec8b9fa0cb25cd6cb1021207bafa4d0c2e162533f94a43f1",
+    "client/src/pages/Emprestimos.tsx": "5cf2055b96cb4c13c5e989e96cf53f71b908f12bbfcafce0e86f783a946aaa66",
+    "client/src/pages/VendasTelefone.tsx": "574864fe5929b63a3585822b9814bfa6a9c7d9b71ccfc5fe3a811fe60e8fc8a5",
+    "client/src/pages/emprestimos.operational.ui.test.ts": "a29b2e7d95788f392fba532dbf8afee876b48ba74a11283d061697e2d80c79aa",
+    "drizzle/0040_cheques_transacionais.sql": "d829fa99f81b3ec0f023480cad0cdb80a5c704e58c6aed532fc2ad10ec91d1af",
+    "drizzle/0041_telefone_atomico.sql": "dead49422eecd04c18b241dd0f4c4421f0e8edc1e5ccc9ecebda10adfc76bb6d",
+    "drizzle/0042_assinaturas_recebimento_atomico.sql": "0df0301ade56145681b721da149fc3048a46ed630cfe1be771c0bcfcf25c83fb",
+    "server/contratos.by-id.isolamento.test.ts": "be3878862d6dd32946345b1a9381c54db2925cd39fa136c4c140ee3397b33e1a",
+    "server/financialOperations.blocked.test.ts": "db12ea5fafcae79fb2c6f6601941c15a89ac4c1dbeda4cce8398bc06d03ee0a6",
+    "server/routers/assinaturas.ts": "0b0ee182c6d34cdd06271bcf51bb0c1f73d18ca201105cb4abb22f9a60fdc1c1",
+    "server/routers/cheques40.ts": "aa4f2474735d8f4a6abcd5795677b8e97234fd1d3e09bd0093b8efd879cd9164",
+    "server/routers/telefone41.ts": "1f7c2c39458b571f80f00b03c20cca7276926c0affaf9d7a333a34e36cbae015",
+    "server/services/assinaturasPagamentoRpc.ts": "251dca10378aa965e7e3882d2f74e0e3c20e1433cc9418e83e15dba16f6a321b",
+    "server/services/cheques40Fence.ts": "2567cd40c9c7af2c10146bfa48633771d7ac8843ff913533dabd3b9e3ce76b0d",
+    "server/services/cheques40Rpc.ts": "7cdf021e8fb3ff66b26c5aef1a04e148b58a2e5f85e10f1a9a06d2827360597b",
+    "server/services/telefone41Rpc.ts": "3bf22c5d0b2eb6ab1755b0716927969c275552cc70b9a8d474b358f084dafb1d",
+    "server/tenantOwnership.financial.test.ts": "03f43f2b4642948b73c55eb93c2b9e6c327a142423c4ad3426fc67fa574f7067",
+    "shared/assinaturas42.ts": "4dddfb75d548b42c3d2b1c3d36f690292978bbbe131116f9dbddee4bbf9f1127",
+    "shared/assinaturas42Flow.ts": "a6295516f7c28cf9f6b9ae5ee35d3b2782dfd3e5fdf942e3504494feb93c2a06",
+    "shared/assinaturas42Intent.ts": "12cc653e84ae60c1c416026c2dd10f6ff3836155fcb80aa2ff7cd270e6f46e9b",
+    "shared/cheques40.ts": "ffdc611bdf69c88806d1d9671efdb6dc509906ef6dad2cbfec8ead7ce4dde8fe",
+    "shared/telefone41.ts": "86d4f2f7a3acb33358975bb62962aa55b1238a745204a71c75e487756536df3f"
+  }
+}

@@ -48,7 +48,7 @@ vi.mock('@/lib/trpc', async () => {
   const { QueryObserver, hashKey } = await import('@tanstack/react-query');
   const query = (name: string) => ({ useQuery: (input: any, options: any) => {
     const owner = h.user?.id;
-    const queryKey = [name === 'contas' ? ['caixa', 'contas'] : ['contasPagar', name], { ...(input ? { input } : {}), type: 'query' }];
+    const queryKey = [name === 'contas' ? ['caixa', 'contasParaOperacao37'] : ['contasPagar', name], { ...(input ? { input } : {}), type: 'query' }];
     const opts = { ...options, queryKey, queryFn: () => h.read(name, input, owner) };
     h.queryCalls.push({ name, input, owner, options, queryKey });
     const queryHash = options.queryKeyHashFn?.(queryKey) ?? hashKey(queryKey);
@@ -63,7 +63,7 @@ vi.mock('@/lib/trpc', async () => {
   const utils = new Proxy({}, { get: () => new Proxy({}, { get: () => ({ invalidate: h.invalidate }) }) });
   return { trpc: {
     auth: { me: { useQuery: () => ({ data: h.user, isError: h.authError, isLoading: h.authLoading }) } },
-    useUtils: () => utils, caixa: { contas: query('contas') },
+    useUtils: () => utils, caixa: { contasParaOperacao37: query('contas') },
     contasPagar: {
       resumo: query('resumo'), listar: query('listar'), capacidades: query('capacidades'),
       criar: { useMutation: () => ({ mutateAsync: h.create }) },
@@ -128,7 +128,7 @@ const rows = (owner: number) => [
   { id: 101, descricao: `Pendente owner ${owner}`, valor: '50.01', categoria: 'energia', dataVencimento: '2026-11-10', status: 'pendente', podePagar: true },
   { id: 102, descricao: `Paga owner ${owner}`, valor: '25.02', categoria: 'outros', dataVencimento: '2026-11-10', status: 'paga', podeEstornar: true, pagamentoOperationId: op, contaCaixaId: 1, transacaoSaidaId: '3' },
 ];
-const accounts = (owner: number) => [1, 2].map(id => ({ id, nome: `Conta ${id} owner ${owner}`, ativa: true }));
+const accounts = (owner: number) => ({ empresaId: owner, contas: [1, 2].map(id => ({ id, nome: `Conta ${id} owner ${owner}`, tipo: 'caixa' })) });
 const summary = { totalPendente: '50.01', qtdPendente: 1, totalAtrasado: '0.00', qtdAtrasado: 0, totalPago: '25.02', qtdPago: 1 };
 const confirmation = (owner: number, action: string, input: any) => ({ success: true, userId: owner, acao: action, chaveIdempotencia: input.idempotencyKey, operationId: op });
 const proof = (owner: number, request: any) => ({ ...request, userId: owner, payloadHash: 'b'.repeat(64), proof: 'uuid_fenced_v1', status: 'not_executed', fenceId: op, result: null, quote: null });
@@ -195,7 +195,7 @@ describe('ContasPagar: isolamento local entre sessões, interação sem navegado
     const old = h.user.id, waits = Object.fromEntries(['listar', 'resumo', 'contas', 'capacidades'].map(n => [n, deferred()]));
     // Dados antigos no cache global (chaves reais tRPC, sem owner) não podem ser adotados no mount.
     h.cache.setQueryData([['contasPagar', 'listar'], { type: 'query' }], rows(old - 1));
-    h.cache.setQueryData([['caixa', 'contas'], { type: 'query' }], accounts(old - 1));
+    h.cache.setQueryData([['caixa', 'contasParaOperacao37'], { type: 'query' }], accounts(old - 1));
     h.cache.setQueryData([['contasPagar', 'capacidades'], { type: 'query' }], { prospectivasHabilitadas: true });
     h.read.mockImplementation((name: string, _input: any, owner: number) => owner === old ? waits[name].promise : Promise.resolve(name === 'listar' ? rows(owner) : name === 'contas' ? accounts(owner) : name === 'capacidades' ? { prospectivasHabilitadas: false } : { ...summary, totalPendente: '9.99' }));
     await mount(); expect(ui.text()).not.toContain(`owner ${old - 1}`); expect(ui.button('Nova despesa').props.disabled).toBe(true);
