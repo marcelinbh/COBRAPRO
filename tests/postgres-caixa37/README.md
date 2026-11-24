@@ -31,3 +31,10 @@ Produção exige baseline conhecida36a/selos válidos, snapshot financeiro e his
 ## Gate final confirmado
 
 Em24/11/2026 às01h29:55BRT:3688 testes PASS/11SKIP,165 arquivos PASS/3SKIP; build37 --check, validate37, TypeScript, build e diff aprovados. SQL2acc e código/harness não alterados após essa execução; documentação e formato final conferidos no índice. Warnings de chunk acima600kB são conhecidos, não falha de build. Instalação/publicação37 continuam sujeitas aos gates produtivos descritos acima.
+## Instalação produtiva37 — 24/11/2026
+
+Checkpoint certificado12ec76b1. apply_migration do payload mecanicamente idêntico ao SQL271244bytes/SHA2acc concluiu success às01h36:11BRT. Preflight imediato01h33:98/98 fontes36a/zeroDrift/selos34–36PASS/nenhum objeto37. Pós-instalação01h36:129/129 fontes/zeroDrift/owner-schema0/selos34–37PASS;82/82 tabelasRLS/CRUD anon-auth0; sete tabelas37 privadas/leaks0,31 funções37/26helpers(serviceEXEC0)/cincoRPCservice/anon-authEXEC0. Operações/pernas/pins/fences/caps/coex37 e resíduos36 permaneceram zero; manifesto37 uma row.
+
+Snapshot read-only pré01h35:56→pós01h36:25 comparou mecanicamente hashes e contagens integrais de45 tabelas históricas/financeiras, todos idênticos. Assinaturas dos três manifestos34/35/36 legitimamente re-selados pela instalação são excluídas desse hash, somenteID/versão comparados; novas fontes/selos conferidos separadamente. parcelas_renovacoes era ausente em produção antes do lote e permaneceu ausente; não foi criada nem anunciada como tabela hashada. A primeira consulta extra falhou42P01 por essa ausência e foi preservada/ajustada somente no instrumento de snapshot, sem alterar SQL37. Os quatro financeiros originais e divergências12/2/6 também permaneceram integralmente iguais. Nenhum DML financeiro/saneamento, operação de teste ou mensagem produtiva.
+
+Push/deploy e smoke oficial37 ainda pendentes deste registro. SQL e código/harness permanecem idênticos ao checkpoint testado; complemento exclusivamente documental.
