@@ -1,0 +1,38 @@
+{
+  "intent": {
+    "idempotencyKey": "67e7d478-4bf7-47ff-852a-7abdefaae057",
+    "request": {
+      "dataOperacao": "2026-11-24",
+      "acao": "criar",
+      "clienteId": 1,
+      "contaCaixaId": 101,
+      "emitente": "Emitente sintético",
+      "numeroCheque": "12345",
+      "banco": null,
+      "agencia": null,
+      "conta": null,
+      "cpfCnpjEmitente": null,
+      "valorNominal": "100.00",
+      "dataVencimento": "2026-11-24",
+      "taxaDesconto": "3.00",
+      "tipoTaxa": "mensal",
+      "observacoes": null
+    }
+  },
+  "response": {
+    "data": {
+      "id": 1001,
+      "regra": "cheques40_v1",
+      "status": "descontado",
+      "success": true,
+      "repetida": false,
+      "operationId": "28c1ca4b-7f75-44f7-b9be-0c42baf99bc6",
+      "valorLiquido": "100.00",
+      "valorDesconto": "0.00",
+      "idempotencyKey": "67e7d478-4bf7-47ff-852a-7abdefaae057",
+      "estornadoNoCaixa": false,
+      "requerConferenciaCaixa": false
+    },
+    "error": null
+  }
+}

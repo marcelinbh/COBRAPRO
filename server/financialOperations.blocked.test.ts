@@ -92,17 +92,15 @@ describe("contenção de operações financeiras não atômicas", () => {
     },
   );
 
-  it("bloqueia despesas e cheques antigos; rejeita payloads legados de telefone antes de mover Caixa", async () => {
+  it("bloqueia despesas antigas; schemas40/41 recusam payloads legados antes de mover Caixa", async () => {
     const caller = appRouter.createCaller(contextoAutenticado());
     await expectSuspensa(caller.contasPagar.pagar({ id: 1, contaCaixaId: 1, dataPagamento: '2026-11-08', idempotencyKey: '11111111-1111-4111-8111-111111111111' }));
     await expectSuspensa(caller.contasPagar.estornar({ id: 1, dataEstorno: '2026-11-08', pagamentoOperationId: '22222222-2222-4222-8222-222222222222', motivo: 'Teste de bloqueio', idempotencyKey: '33333333-3333-4333-8333-333333333333' }));
-    await expectSuspensa(caller.cheques.criar({
-      clienteId: 1, emitente: "Auditoria", valorNominal: 1, dataVencimento: "2026-10-29",
-      taxaDesconto: 1, tipoTaxa: "mensal", contaCaixaId: 1,
-    }));
-    await expectSuspensa(caller.cheques.compensar({ id: 1, contaCaixaId: 1 }));
-    await expectSuspensa(caller.cheques.devolver({ id: 1, motivo: "Auditoria" }));
-    await expectSuspensa(caller.cheques.cancelar({ id: 1 }));
+    // Payloads pré40 são inválidos no envelope estrito; nenhum endpoint legado é restaurado.
+    for (const legacy of [
+      { clienteId: 1, emitente: "Auditoria", valorNominal: 1, dataVencimento: "2026-10-29", taxaDesconto: 1, tipoTaxa: "mensal", contaCaixaId: 1 },
+      { id: 1, contaCaixaId: 1 }, { id: 1, motivo: "Auditoria" }, { id: 1 },
+    ]) await expect(caller.cheques.executar40(legacy as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
     // @ts-expect-error Payload legado é deliberadamente inválido no contrato41 fechado.
     await expect(caller.vendasTelefone.pagarParcela({ parcelaId: 1, valorPago: 1, contaCaixaId: 1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     // @ts-expect-error Exclusão antiga não substitui o cancelamento compensatório41.

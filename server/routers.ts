@@ -15,6 +15,7 @@ import { emprestimosMultimodalRouter } from "./routers/emprestimosMultimodal";
 import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { multaManualRouter } from "./routers/multaManual";
+import { cheques40Procedures } from "./routers/cheques40";
 import { telefone41Writers } from "./routers/telefone41";
 import { caixa37Procedures } from "./routers/caixa37";
 import { listarContasParaCadastro } from "./services/contasCadastro";
@@ -4011,290 +4012,48 @@ const vendasRouter = router({
 const chequesRouter = router({
   listar: protectedProcedure
     .input(z.object({
-      status: z.enum(['aguardando', 'compensado', 'devolvido', 'cancelado', 'todos']).optional(),
+      status: z.enum(['em_carteira', 'descontado', 'compensado', 'devolvido', 'cancelado', 'todos']).optional(),
       clienteId: z.number().optional(),
     }).optional())
     .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (db) {
-        try {
-          const rows = await db.select({
-            id: cheques.id, clienteId: cheques.clienteId, clienteNome: clientes.nome,
-            numeroCheque: cheques.numeroCheque, banco: cheques.banco, emitente: cheques.emitente,
-            cpfCnpjEmitente: cheques.cpfCnpjEmitente, valorNominal: cheques.valorNominal,
-            dataVencimento: cheques.dataVencimento, taxaDesconto: cheques.taxaDesconto,
-            tipoTaxa: cheques.tipoTaxa, valorDesconto: cheques.valorDesconto, valorLiquido: cheques.valorLiquido,
-            status: cheques.status, contaCaixaId: cheques.contaCaixaId, dataCompensacao: cheques.dataCompensacao,
-            motivoDevolucao: cheques.motivoDevolucao, observacoes: cheques.observacoes, createdAt: cheques.createdAt,
-          }).from(cheques).leftJoin(clientes, eq(cheques.clienteId, clientes.id)).where(eq(cheques.userId, ctx.user.id)).orderBy(desc(cheques.createdAt));
-          return rows.filter(r => {
-            if (input?.status && input.status !== 'todos' && r.status !== input.status) return false;
-            if (input?.clienteId && r.clienteId !== input.clienteId) return false;
-            return true;
-          });
-        } catch (err) { console.warn('[cheques.listar] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
-      }
       const supabase = await getSupabaseClientAsync();
-      if (!supabase) return [];
-      let q = supabase.from('cheques').select('*, clientes(nome)').order('createdAt', { ascending: false }).eq('user_id', ctx.user.id);
+      if (!supabase) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Leitura de Cheques indisponível' });
+      let q = supabase.from('cheques').select('id,cliente_id,numero_cheque,banco,agencia,conta,valor_nominal,data_emissao,data_vencimento,taxa_desconto,valor_descontado,valor_liquido,status,conta_caixa_id,cheques40_meta,observacoes,createdAt').order('createdAt', { ascending: false }).eq('user_id', ctx.user.id);
       if (input?.status && input.status !== 'todos') q = q.eq('status', input.status);
       if (input?.clienteId) q = q.eq('cliente_id', input.clienteId);
-      const { data } = await q;
+      const { data, error } = await q;
+      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível ler Cheques com segurança' });
+      const ids = Array.from(new Set((data ?? []).map((r: any) => r.cliente_id).filter((id: unknown) => Number.isInteger(id)))) as number[];
+      const nomes = new Map<number, string>();
+      if (ids.length) {
+        const { data: clientesCheques, error: clientesErro } = await supabase.from('clientes').select('id,nome').eq('user_id', ctx.user.id).in('id', ids);
+        if (clientesErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Vínculos de Cheques indisponíveis' });
+        for (const c of clientesCheques ?? []) nomes.set(c.id, c.nome);
+      }
       return (data ?? []).map((r: any) => ({
-        ...r, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? null,
+        ...r, clienteId: r.cliente_id, clienteNome: nomes.get(r.cliente_id) ?? null,
+        emitente: r.cheques40_meta?.emitente ?? null, cpfCnpjEmitente: r.cheques40_meta?.cpfCnpjEmitente ?? null, novo40: r.cheques40_meta !== null,
         numeroCheque: r.numero_cheque, valorNominal: r.valor_nominal, dataVencimento: r.data_vencimento,
-        taxaDesconto: r.taxa_desconto, tipoTaxa: r.tipo_taxa, valorDesconto: r.valor_desconto,
-        valorLiquido: r.valor_liquido, contaCaixaId: r.conta_caixa_id, dataCompensacao: r.data_compensacao,
-        motivoDevolucao: r.motivo_devolucao,
+        taxaDesconto: r.taxa_desconto, tipoTaxa: r.cheques40_meta?.tipoTaxa ?? null, valorDesconto: r.valor_descontado,
+        valorLiquido: r.valor_liquido, contaCaixaId: r.conta_caixa_id, dataCompensacao: r.cheques40_meta?.dataCompensacao ?? null,
+        motivoDevolucao: r.cheques40_meta?.motivoDevolucao ?? null,
       }));
     }),
 
-  criar: protectedProcedure
-    .input(z.object({
-      clienteId: z.number().int().positive(),
-      numeroCheque: z.string().optional(),
-      banco: z.string().optional(),
-      agencia: z.string().optional(),
-      conta: z.string().optional(),
-      emitente: z.string().min(1),
-      cpfCnpjEmitente: z.string().optional(),
-      valorNominal: z.number().positive().multipleOf(0.01),
-      dataVencimento: z.string(),
-      taxaDesconto: z.number().positive().multipleOf(0.0001),
-      tipoTaxa: z.enum(['diaria', 'mensal', 'anual']).default('mensal'),
-      contaCaixaId: z.number().int().positive(),
-      observacoes: z.string().optional(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('O registro de cheque');
-      await validarClienteDoUsuario(ctx.user.id, input.clienteId);
-      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
-      if (!dataChequeValida(input.dataVencimento)) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'A data de vencimento do cheque é inválida' });
-      }
-      const db = await getDb();
-      const dbAvailable = !!db;
-      const diasAteVencimento = diferencaDiasData(dataHojeBrasilia(), input.dataVencimento);
-      if (diasAteVencimento < 0) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O vencimento do cheque não pode ser anterior à data de hoje em Brasília' });
-      }
-      const { valorLiquido, valorDesconto } = calcularDescontoCheque({
-        valorNominal: input.valorNominal,
-        taxaPercentual: input.taxaDesconto,
-        tipoTaxa: input.tipoTaxa,
-        diasAteVencimento,
-      });
-      if (dbAvailable && db) {
-        try {
-          const result = await db.insert(cheques).values({
-            clienteId: input.clienteId, numeroCheque: input.numeroCheque, banco: input.banco,
-            agencia: input.agencia, conta: input.conta, emitente: input.emitente,
-            cpfCnpjEmitente: input.cpfCnpjEmitente, valorNominal: input.valorNominal.toFixed(2),
-            dataVencimento: input.dataVencimento, taxaDesconto: input.taxaDesconto.toFixed(4),
-            tipoTaxa: input.tipoTaxa as 'diaria' | 'mensal' | 'anual',
-            valorDesconto: valorDesconto.toFixed(2), valorLiquido: valorLiquido.toFixed(2),
-            contaCaixaId: input.contaCaixaId, observacoes: input.observacoes, status: 'aguardando', userId: ctx.user.id,
-          }).returning({ id: cheques.id });
-          await db.insert(transacoesCaixa).values({ contaCaixaId: input.contaCaixaId, tipo: 'saida', categoria: 'outros', valor: valorLiquido.toFixed(2), descricao: descricaoDescontoCheque(result[0].id), dataTransacao: new Date(), userId: ctx.user.id });
-          return { success: true, id: result[0].id, valorLiquido, valorDesconto };
-        } catch (err) {
-          console.error('[cheques.criar] Drizzle failed; aborting to avoid duplicate financial entries:', (err as Error).message);
-          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível registrar o cheque com segurança' });
-        }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: chqData, error: chqErr } = await supabase.from('cheques').insert({ user_id: ctx.user.id,
-        cliente_id: input.clienteId, numero_cheque: input.numeroCheque ?? null, banco: input.banco ?? null,
-        agencia: input.agencia ?? null, conta: input.conta ?? null, emitente: input.emitente,
-        cpf_cnpj_emitente: input.cpfCnpjEmitente ?? null, valor_nominal: input.valorNominal,
-        data_vencimento: input.dataVencimento, taxa_desconto: input.taxaDesconto,
-        tipo_taxa: input.tipoTaxa, valor_desconto: valorDesconto, valor_liquido: valorLiquido,
-        conta_caixa_id: input.contaCaixaId, observacoes: input.observacoes ?? null, status: 'aguardando',
-      }).select('id').single();
-      if (chqErr) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: chqErr.message });
-      const { error: caixaErro } = await supabase.from('transacoes_caixa').insert({
-        conta_caixa_id: input.contaCaixaId, tipo: 'saida', categoria: 'outros', valor: valorLiquido,
-        descricao: descricaoDescontoCheque(chqData.id), data_transacao: dataCivilBrasiliaParaIso(dataHojeBrasilia()), user_id: ctx.user.id,
-      });
-      if (caixaErro) {
-        const { error: rollbackErro } = await supabase.from('cheques').delete().eq('id', chqData.id).eq('user_id', ctx.user.id);
-        if (rollbackErro) console.error('[cheques.criar] falha ao compensar cheque sem lançamento de Caixa:', rollbackErro.message);
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível registrar a saída no Caixa; o cheque foi desfeito' });
-      }
-      return { success: true, id: chqData.id, valorLiquido, valorDesconto };
-    }),
-
-  compensar: protectedProcedure
-    .input(z.object({ id: z.number().int().positive(), contaCaixaId: z.number().int().positive().optional() }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A compensação de cheque');
-      const db = await getDb();
-      if (db) {
-        try {
-          const cheque = await db.select().from(cheques).where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id))).limit(1);
-          if (!cheque[0]) throw new Error('Cheque não encontrado');
-          const contaId = input.contaCaixaId ?? cheque[0].contaCaixaId;
-          if (!contaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cheque sem conta de Caixa vinculada' });
-          await validarContaDoUsuario(ctx.user.id, contaId);
-          await db.update(cheques).set({ status: 'compensado', dataCompensacao: new Date(), contaCaixaId: contaId }).where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id)));
-          await db.insert(transacoesCaixa).values({ contaCaixaId: contaId, tipo: 'entrada', categoria: 'outros', valor: cheque[0].valorNominal, descricao: descricaoCompensacaoCheque(input.id), dataTransacao: new Date(), userId: ctx.user.id });
-          return { success: true };
-        } catch (err: any) {
-          if (err instanceof TRPCError || err.message === 'Cheque não encontrado') throw err;
-          console.error('[cheques.compensar] Drizzle failed; aborting to avoid duplicate financial entries:', err.message);
-          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível compensar o cheque com segurança' });
-        }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: chqData, error: chequeBuscaErro } = await supabase.from('cheques')
-        .select('valor_nominal, emitente, conta_caixa_id, status').eq('id', input.id).eq('user_id', ctx.user.id).single();
-      if (chequeBuscaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: chequeBuscaErro.message });
-      if (!chqData) throw new Error('Cheque não encontrado');
-      if (!podeRegistrarMovimento(chqData.status, ['aguardando'])) {
-        throw new TRPCError({ code: 'CONFLICT', message: 'Este cheque já foi processado' });
-      }
-      const contaId = input.contaCaixaId ?? chqData.conta_caixa_id;
-      if (!contaId) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Cheque sem conta de Caixa vinculada' });
-      await validarContaDoUsuario(ctx.user.id, contaId);
-      const { data: chequeAtualizado, error: chequeAtualizarErro } = await supabase.from('cheques')
-        .update({ status: 'compensado', data_compensacao: new Date().toISOString(), conta_caixa_id: contaId })
-        .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'aguardando').select('id').maybeSingle();
-      if (chequeAtualizarErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: chequeAtualizarErro.message });
-      if (!chequeAtualizado) throw new TRPCError({ code: 'CONFLICT', message: 'Este cheque já foi processado' });
-      const { error: entradaChequeErro } = await supabase.from('transacoes_caixa').insert({
-        conta_caixa_id: contaId, tipo: 'entrada', categoria: 'outros', valor: chqData.valor_nominal,
-        descricao: descricaoCompensacaoCheque(input.id), data_transacao: dataCivilBrasiliaParaIso(dataHojeBrasilia()), user_id: ctx.user.id,
-      });
-      if (entradaChequeErro) {
-        await supabase.from('cheques').update({ status: 'aguardando', data_compensacao: null })
-          .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'compensado');
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível registrar a entrada no Caixa; o cheque voltou para aguardando' });
-      }
-      return { success: true };
-    }),
-
-  devolver: protectedProcedure
-    .input(z.object({ id: z.number().int().positive(), motivo: z.string().trim().min(1).max(255) }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A devolução de cheque');
-      const db = await getDb();
-      if (db) {
-        try {
-          const atualizado = await db.update(cheques).set({ status: 'devolvido', motivoDevolucao: input.motivo })
-            .where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id), eq(cheques.status, 'aguardando'))).returning({ id: cheques.id });
-          if (!atualizado[0]) throw new TRPCError({ code: 'CONFLICT', message: 'Somente cheques aguardando podem ser devolvidos' });
-          return { success: true, requerConferenciaCaixa: true };
-        }
-        catch (err) {
-          if (err instanceof TRPCError) throw err;
-          console.error('[cheques.devolver] Drizzle failed; aborting to avoid duplicate financial entries:', (err as Error).message);
-          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível devolver o cheque com segurança' });
-        }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: cheque, error: buscaErro } = await supabase.from('cheques').select('id, conta_caixa_id')
-        .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'aguardando').maybeSingle();
-      if (buscaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: buscaErro.message });
-      if (!cheque) throw new TRPCError({ code: 'CONFLICT', message: 'Somente cheques aguardando podem ser devolvidos' });
-      const { data: atualizado, error: atualizarErro } = await supabase.from('cheques')
-        .update({ status: 'devolvido', motivo_devolucao: input.motivo }).eq('id', input.id).eq('user_id', ctx.user.id)
-        .eq('status', 'aguardando').select('id').maybeSingle();
-      if (atualizarErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: atualizarErro.message });
-      if (!atualizado) throw new TRPCError({ code: 'CONFLICT', message: 'Este cheque já foi processado' });
-
-      const { data: saida, error: saidaErro } = await supabase.from('transacoes_caixa').select('id, valor, conta_caixa_id')
-        .eq('user_id', ctx.user.id).eq('tipo', 'saida').eq('descricao', descricaoDescontoCheque(input.id)).maybeSingle();
-      if (saidaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: saidaErro.message });
-      if (!saida) return { success: true, requerConferenciaCaixa: Boolean(cheque.conta_caixa_id) };
-
-      const { error: estornoErro } = await supabase.from('transacoes_caixa').insert({
-        conta_caixa_id: saida.conta_caixa_id, tipo: 'entrada', categoria: 'outros', valor: saida.valor,
-        descricao: descricaoEstornoCheque(input.id), data_transacao: dataCivilBrasiliaParaIso(dataHojeBrasilia()), user_id: ctx.user.id,
-      });
-      if (estornoErro) {
-        await supabase.from('cheques').update({ status: 'aguardando', motivo_devolucao: null })
-          .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'devolvido');
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível estornar o desconto; o cheque voltou para aguardando' });
-      }
-      return { success: true, estornadoNoCaixa: true };
-    }),
-
-  cancelar: protectedProcedure
-    .input(z.object({ id: z.number().int().positive() }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('O cancelamento de cheque');
-      const db = await getDb();
-      if (db) {
-        try {
-          const atualizado = await db.update(cheques).set({ status: 'cancelado' })
-            .where(and(eq(cheques.id, input.id), eq(cheques.userId, ctx.user.id), eq(cheques.status, 'aguardando'))).returning({ id: cheques.id });
-          if (!atualizado[0]) throw new TRPCError({ code: 'CONFLICT', message: 'Somente cheques aguardando podem ser cancelados' });
-          return { success: true, requerConferenciaCaixa: true };
-        }
-        catch (err) {
-          if (err instanceof TRPCError) throw err;
-          console.error('[cheques.cancelar] Drizzle failed; aborting to avoid duplicate financial entries:', (err as Error).message);
-          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível cancelar o cheque com segurança' });
-        }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data: cheque, error: buscaErro } = await supabase.from('cheques').select('id, conta_caixa_id')
-        .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'aguardando').maybeSingle();
-      if (buscaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: buscaErro.message });
-      if (!cheque) throw new TRPCError({ code: 'CONFLICT', message: 'Somente cheques aguardando podem ser cancelados' });
-      const { data: atualizado, error: atualizarErro } = await supabase.from('cheques')
-        .update({ status: 'cancelado' }).eq('id', input.id).eq('user_id', ctx.user.id)
-        .eq('status', 'aguardando').select('id').maybeSingle();
-      if (atualizarErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: atualizarErro.message });
-      if (!atualizado) throw new TRPCError({ code: 'CONFLICT', message: 'Este cheque já foi processado' });
-
-      const { data: saida, error: saidaErro } = await supabase.from('transacoes_caixa').select('id, valor, conta_caixa_id')
-        .eq('user_id', ctx.user.id).eq('tipo', 'saida').eq('descricao', descricaoDescontoCheque(input.id)).maybeSingle();
-      if (saidaErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: saidaErro.message });
-      if (!saida) return { success: true, requerConferenciaCaixa: Boolean(cheque.conta_caixa_id) };
-
-      const { error: estornoErro } = await supabase.from('transacoes_caixa').insert({
-        conta_caixa_id: saida.conta_caixa_id, tipo: 'entrada', categoria: 'outros', valor: saida.valor,
-        descricao: descricaoEstornoCheque(input.id), data_transacao: dataCivilBrasiliaParaIso(dataHojeBrasilia()), user_id: ctx.user.id,
-      });
-      if (estornoErro) {
-        await supabase.from('cheques').update({ status: 'aguardando' })
-          .eq('id', input.id).eq('user_id', ctx.user.id).eq('status', 'cancelado');
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível estornar o desconto; o cheque voltou para aguardando' });
-      }
-      return { success: true, estornadoNoCaixa: true };
-    }),
+  ...cheques40Procedures,
 
   resumo: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (!db) {
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) return { totalAguardando: 0, qtdAguardando: 0, totalCompensado: 0, qtdCompensado: 0, totalDevolvido: 0, qtdDevolvido: 0 };
-      const { data: all } = await supabase.from('cheques').select('status, valor_nominal').eq('user_id', ctx.user.id);
-      const ag = (all ?? []).filter((r: any) => r.status === 'aguardando');
-      const co = (all ?? []).filter((r: any) => r.status === 'compensado');
-      const de = (all ?? []).filter((r: any) => r.status === 'devolvido');
-      return {
-        totalAguardando: ag.reduce((s: number, r: any) => s + parseFloat(r.valor_nominal ?? 0), 0), qtdAguardando: ag.length,
-        totalCompensado: co.reduce((s: number, r: any) => s + parseFloat(r.valor_nominal ?? 0), 0), qtdCompensado: co.length,
-        totalDevolvido: de.reduce((s: number, r: any) => s + parseFloat(r.valor_nominal ?? 0), 0), qtdDevolvido: de.length,
-      };
-    }
-    const aguardando = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(and(eq(cheques.status, 'aguardando'), eq(cheques.userId, ctx.user.id)));
-    const compensados = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(and(eq(cheques.status, 'compensado'), eq(cheques.userId, ctx.user.id)));
-    const devolvidos = await db.select({ total: sql<string>`COALESCE(SUM(valor_nominal), 0)`, qtd: sql<number>`COUNT(*)` }).from(cheques).where(and(eq(cheques.status, 'devolvido'), eq(cheques.userId, ctx.user.id)));
-    return {
-      totalAguardando: parseFloat(aguardando[0]?.total ?? '0'),
-      qtdAguardando: aguardando[0]?.qtd ?? 0,
-      totalCompensado: parseFloat(compensados[0]?.total ?? '0'),
-      qtdCompensado: compensados[0]?.qtd ?? 0,
-      totalDevolvido: parseFloat(devolvidos[0]?.total ?? '0'),
-      qtdDevolvido: devolvidos[0]?.qtd ?? 0,
+    const supabase = await getSupabaseClientAsync();
+    if (!supabase) throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Resumo de Cheques indisponível' });
+    const { data: all, error } = await supabase.from('cheques').select('status,valor_nominal').eq('user_id', ctx.user.id);
+    if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Resumo de Cheques não confirmado' });
+    const totals = (status: string) => {
+      const rows = (all ?? []).filter((r: any) => r.status === status);
+      return { total: rows.reduce((sum: number, r: any) => sum + Number(r.valor_nominal), 0), qtd: rows.length };
     };
+    const carteira = totals('em_carteira'), desconto = totals('descontado');
+    const ag = { total: carteira.total + desconto.total, qtd: carteira.qtd + desconto.qtd }, co = totals('compensado'), de = totals('devolvido');
+    return { totalAguardando: ag.total, qtdAguardando: ag.qtd, totalCompensado: co.total, qtdCompensado: co.qtd, totalDevolvido: de.total, qtdDevolvido: de.qtd };
   }),
 
   simular: publicProcedure

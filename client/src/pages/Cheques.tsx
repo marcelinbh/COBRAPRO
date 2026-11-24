@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { decimalCheque40, diaCheque40, type Cheque40Request } from "../../../shared/cheques40";
+import { lerIntencaoCheque40, reservarIntencaoCheque40, concluirIntencaoCheque40, concluirAbandonoCheque40 } from "@/lib/cheques40Intent";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +22,8 @@ import { formatarMoeda } from "../../../shared/finance";
 // STATUS_CONFIG is now a function that returns translated labels
 function getStatusConfig(t: (key: string) => string): Record<string, { label: string; color: string; icon: React.ReactNode }> {
   return {
-    aguardando: { label: t('common.pending'), color: "text-amber-400 bg-amber-400/10 border-amber-400/20", icon: <Clock className="h-3 w-3" /> },
+    em_carteira: { label: 'Em carteira', color: "text-amber-400 bg-amber-400/10 border-amber-400/20", icon: <Clock className="h-3 w-3" /> },
+    descontado: { label: 'Descontado', color: "text-amber-400 bg-amber-400/10 border-amber-400/20", icon: <Clock className="h-3 w-3" /> },
     compensado: { label: t('common.completed'), color: "text-emerald-400 bg-emerald-400/10 border-emerald-400/20", icon: <CheckCircle2 className="h-3 w-3" /> },
     devolvido: { label: t('cheques.returned'), color: "text-red-400 bg-red-400/10 border-red-400/20", icon: <AlertTriangle className="h-3 w-3" /> },
     cancelado: { label: t('common.cancelled'), color: "text-muted-foreground bg-muted/30 border-border", icon: <XCircle className="h-3 w-3" /> },
@@ -28,6 +32,14 @@ function getStatusConfig(t: (key: string) => string): Record<string, { label: st
 
 export default function Cheques() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const [temPendente40, setTemPendente40] = useState(false);
+  const [preparando40, setPreparando40] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    try { setTemPendente40(Boolean(lerIntencaoCheque40(localStorage, user.id))); }
+    catch (e) { setTemPendente40(true); toast.error((e as Error).message); }
+  }, [user?.id]);
   const STATUS_CONFIG = getStatusConfig(t);
   const [filtroStatus, setFiltroStatus] = useState<string>("todos");
   const [dialogAberto, setDialogAberto] = useState(false);
@@ -63,11 +75,12 @@ export default function Cheques() {
   const utils = trpc.useUtils();
   const { data: resumo } = trpc.cheques.resumo.useQuery();
   const { data: listaCheques, isLoading } = trpc.cheques.listar.useQuery(
-    filtroStatus !== "todos" ? { status: filtroStatus as "aguardando" | "compensado" | "devolvido" | "cancelado" } : undefined
+    filtroStatus !== "todos" ? { status: filtroStatus as "em_carteira" | "descontado" | "compensado" | "devolvido" | "cancelado" } : undefined
   );
   const { data: clientesData } = trpc.clientes.list.useQuery({});
   const clientes = clientesData?.clientes ?? [];
-  const { data: contasCaixa } = trpc.caixa.contas.useQuery();
+  const { data: metadataCaixa40 } = trpc.caixa.contasParaOperacao37.useQuery();
+  const contasCaixa = metadataCaixa40?.empresaId === user?.id ? metadataCaixa40?.contas : [];
 
   // Simulação
   const simValor = parseFloat(sim.valorNominal.replace(",", ".")) || 0;
@@ -79,74 +92,79 @@ export default function Cheques() {
     { enabled: simValor > 0 && simTaxa > 0 }
   );
 
-  const criarMutation = trpc.cheques.criar.useMutation({
-    onSuccess: (data) => {
-      utils.cheques.listar.invalidate();
-      utils.cheques.resumo.invalidate();
-      setDialogAberto(false);
-      setForm({ clienteId: "", numeroCheque: "", banco: "", agencia: "", conta: "", emitente: "", cpfCnpjEmitente: "", valorNominal: "", dataVencimento: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0], taxaDesconto: "3", tipoTaxa: "mensal", contaCaixaId: "", observacoes: "" });
-      toast.success(`Cheque registrado! Valor líquido: ${formatarMoeda(data.valorLiquido)}`);
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
-
-  const compensarMutation = trpc.cheques.compensar.useMutation({
-    onSuccess: () => {
-      utils.cheques.listar.invalidate();
-      utils.cheques.resumo.invalidate();
-      toast.success(t('toast_success.cheque_marcado_como_compensado'));
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
-
-  const devolverMutation = trpc.cheques.devolver.useMutation({
-    onSuccess: (resultado) => {
-      utils.cheques.listar.invalidate();
-      utils.cheques.resumo.invalidate();
-      setDialogDevolverAberto(false);
-      setMotivoDevolucao("");
-      if (resultado.requerConferenciaCaixa) toast.warning('Cheque devolvido. Confira o Caixa: este registro legado não possui movimento rastreável para estorno automático.');
-      else toast.success(t('toast_success.cheque_marcado_como_devolvido'));
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
-
-  const cancelarMutation = trpc.cheques.cancelar.useMutation({
-    onSuccess: (resultado) => {
-      utils.cheques.listar.invalidate();
-      utils.cheques.resumo.invalidate();
-      if (resultado.requerConferenciaCaixa) toast.warning('Cheque cancelado. Confira o Caixa: este registro legado não possui movimento rastreável para estorno automático.');
-      else toast.success(t('toast_success.cheque_cancelado'));
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
-
+  const cheque40 = trpc.cheques.executar40.useMutation({ retry: false });
+  const fence40 = trpc.cheques.abandonar40.useMutation({ retry: false });
+  async function enviar40(request?: Cheque40Request) {
+    if (!user || preparando40 || cheque40.isPending || fence40.isPending) return;
+    if (!navigator.locks) { toast.error("Este navegador não oferece bloqueio seguro entre abas. Operação não enviada."); return; }
+    const owner = user.id;
+    setPreparando40(true);
+    try {
+      await navigator.locks.request(`cobrapro.cheques40.${owner}`, async () => {
+        const intent = request
+          ? reservarIntencaoCheque40(localStorage, owner, request, () => crypto.randomUUID())
+          : lerIntencaoCheque40(localStorage, owner);
+        if (!intent) throw new Error("Nenhuma intenção pendente para recuperar.");
+        setTemPendente40(true);
+        // Mesma procedure = recovery transacional da intenção exata; nunca novo UUID.
+        const result = await cheque40.mutateAsync(intent);
+        concluirIntencaoCheque40(localStorage, owner, intent);
+        setTemPendente40(false);
+        if (intent.request.acao === "criar") setForm(current => ({ ...current, clienteId: "", emitente: "", valorNominal: "", numeroCheque: "", observacoes: "" }));
+        await Promise.all([utils.cheques.listar.invalidate(), utils.cheques.resumo.invalidate(), utils.caixa.invalidate()]);
+        setDialogAberto(false); setDialogDevolverAberto(false); setMotivoDevolucao("");
+        toast.success(`Cheque ${result.status}. Movimento no Caixa confirmado${result.repetida ? " (recuperado)" : ""}.`);
+      });
+    } catch (e) {
+      // Qualquer erro preserva a intenção: nem timeout nem resposta inválida demonstram ausência.
+      toast.error((e as Error).message + " A intenção foi preservada; use Recuperar mesma intenção.");
+    } finally { setPreparando40(false); }
+  }
+  async function abandonar40() {
+    if (!user || preparando40 || cheque40.isPending || fence40.isPending || !navigator.locks) return;
+    if (!window.confirm("Confirmar abandono? O servidor recuperará a operação se ela já foi executada. Se não foi, impedirá para sempre a execução desta intenção.")) return;
+    const owner = user.id; setPreparando40(true);
+    try {
+      await navigator.locks.request(`cobrapro.cheques40.${owner}`, async () => {
+        const intent = lerIntencaoCheque40(localStorage, owner);
+        if (!intent) throw new Error("Nenhuma intenção preservada.");
+        const proof = await fence40.mutateAsync(intent);
+        concluirAbandonoCheque40(localStorage, owner, intent, proof);
+        setTemPendente40(false);
+        await Promise.all([utils.cheques.listar.invalidate(), utils.cheques.resumo.invalidate(), utils.caixa.invalidate()]);
+        toast.success(proof.estado === "executada" ? "Operação anterior recuperada; não foi abandonada nem duplicada." : "Ausência confirmada e intenção impedida no servidor. Agora é seguro corrigir os dados.");
+      });
+    } catch (e) { toast.error((e as Error).message + " A intenção continua preservada."); }
+    finally { setPreparando40(false); }
+  }
+  const ocupado40 = preparando40 || cheque40.isPending || fence40.isPending || temPendente40;
   function handleCriar() {
-    const valor = parseFloat(form.valorNominal.replace(",", "."));
-    const taxa = parseFloat(form.taxaDesconto);
-    if (!form.clienteId || !form.emitente || !valor || !taxa || !form.dataVencimento || !form.contaCaixaId) {
-      toast.error('Preencha todos os campos obrigatórios, incluindo a conta de Caixa.');
-      return;
-    }
-    criarMutation.mutate({
-      clienteId: parseInt(form.clienteId),
-      numeroCheque: form.numeroCheque || undefined,
-      banco: form.banco || undefined,
-      agencia: form.agencia || undefined,
-      conta: form.conta || undefined,
-      emitente: form.emitente,
-      cpfCnpjEmitente: form.cpfCnpjEmitente || undefined,
-      valorNominal: valor,
-      dataVencimento: form.dataVencimento,
-      taxaDesconto: taxa,
-      tipoTaxa: form.tipoTaxa,
-      contaCaixaId: parseInt(form.contaCaixaId),
-      observacoes: form.observacoes || undefined,
-    });
+    try {
+      const text = (v: string) => v.trim() || null;
+      const request: Cheque40Request = {
+        acao: "criar", dataOperacao: diaCheque40(), clienteId: Number(form.clienteId), contaCaixaId: Number(form.contaCaixaId),
+        emitente: form.emitente.trim(), numeroCheque: form.numeroCheque.trim(), banco: text(form.banco), agencia: text(form.agencia),
+        conta: text(form.conta), cpfCnpjEmitente: text(form.cpfCnpjEmitente), valorNominal: decimalCheque40(form.valorNominal),
+        dataVencimento: form.dataVencimento, taxaDesconto: decimalCheque40(form.taxaDesconto, 2), tipoTaxa: form.tipoTaxa,
+        observacoes: text(form.observacoes),
+      };
+      void enviar40(request);
+    } catch (e) { toast.error((e as Error).message); }
   }
 
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-6">
+      <div className="rounded border border-amber-500/40 p-3 text-sm" role="status">
+        Cheques novos usam transação única com Caixa compartilhado, inclusive contas com empréstimos e aportes.
+        Cheques legados permanecem somente leitura; nenhuma informação histórica é inferida.
+        {temPendente40 && <p>Existe uma intenção financeira preservada. Não altere o pedido nem envie outra operação.</p>}
+        <Button variant="outline" className="ml-2" onClick={() => void enviar40()} disabled={!temPendente40 || preparando40 || cheque40.isPending}>
+          Recuperar mesma intenção
+        </Button>
+        <Button variant="outline" className="ml-2" onClick={() => void abandonar40()} disabled={!temPendente40 || preparando40 || cheque40.isPending || fence40.isPending}>
+          Confirmar abandono seguro
+        </Button>
+      </div>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -193,7 +211,7 @@ export default function Cheques() {
                   <Input className="bg-background border-border" placeholder="000.000.000-00" value={form.cpfCnpjEmitente} onChange={(e) => setForm({ ...form, cpfCnpjEmitente: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>{t('cheques.checkNumber')}</Label>
+                  <Label>{t('cheques.checkNumber')} *</Label>
                   <Input className="bg-background border-border" placeholder="000000" value={form.numeroCheque} onChange={(e) => setForm({ ...form, numeroCheque: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
@@ -249,8 +267,8 @@ export default function Cheques() {
                   <Textarea className="bg-background border-border resize-none" rows={2} value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} />
                 </div>
               </div>
-              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCriar} disabled={criarMutation.isPending}>
-                {criarMutation.isPending ? t('common.saving') : t('cheques.newCheque')}
+              <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCriar} disabled={ocupado40}>
+                {ocupado40 ? t('common.saving') : t('cheques.newCheque')}
               </Button>
             </div>
           </DialogContent>
@@ -261,7 +279,7 @@ export default function Cheques() {
       <div className="grid grid-cols-3 gap-3">
         <Card className="bg-card border-border">
           <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground mb-1">Aguardando</p>
+            <p className="text-xs text-muted-foreground mb-1">Em carteira / descontados</p>
             <p className="text-xl font-bold text-amber-400">{formatarMoeda(resumo?.totalAguardando ?? 0)}</p>
             <p className="text-xs text-muted-foreground mt-1">{resumo?.qtdAguardando ?? 0} cheques</p>
           </CardContent>
@@ -343,7 +361,7 @@ export default function Cheques() {
 
       {/* Filtros */}
       <div className="flex gap-2 flex-wrap">
-        {["todos", "aguardando", "compensado", "devolvido", "cancelado"].map((s) => (
+        {["todos", "em_carteira", "descontado", "compensado", "devolvido", "cancelado"].map((s) => (
           <Button
             key={s}
             variant={filtroStatus === s ? "default" : "outline"}
@@ -370,7 +388,7 @@ export default function Cheques() {
           </Card>
         ) : (
           listaCheques.map((cheque) => {
-            const statusCfg = STATUS_CONFIG[cheque.status] ?? STATUS_CONFIG.aguardando;
+            const statusCfg = STATUS_CONFIG[cheque.status] ?? { label: cheque.status ?? "Status histórico não informado", color: "text-muted-foreground border-border", icon: null };
             const vencimento = cheque.dataVencimento ? new Date(cheque.dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR') : '-';
             return (
               <Card key={cheque.id} className="bg-card border-border hover:border-border/80 transition-colors">
@@ -378,7 +396,7 @@ export default function Cheques() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-sm">{cheque.emitente}</p>
+                        <p className="font-semibold text-sm">{cheque.emitente ?? "Emitente histórico não informado"}</p>
                         {cheque.numeroCheque && (
                           <span className="text-xs text-muted-foreground">Nº {cheque.numeroCheque}</span>
                         )}
@@ -389,7 +407,7 @@ export default function Cheques() {
                         <span>•</span>
                         <span>Vence: {vencimento}</span>
                         <span>•</span>
-                        <span>Taxa: {parseFloat(cheque.taxaDesconto).toFixed(2)}% {cheque.tipoTaxa}</span>
+                        <span>Taxa: {cheque.taxaDesconto == null ? "não informada" : `${parseFloat(cheque.taxaDesconto).toFixed(2)}%`} {cheque.tipoTaxa ?? "(período histórico não informado)"}</span>
                       </div>
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0">
@@ -399,7 +417,7 @@ export default function Cheques() {
                       </div>
                       <div className="text-right">
                         <p className="text-xs text-muted-foreground">{t('checks.netAmount')}</p>
-                        <p className="font-bold text-base text-emerald-400">{formatarMoeda(parseFloat(cheque.valorLiquido))}</p>
+                        <p className="font-bold text-base text-emerald-400">{cheque.valorLiquido == null ? "Não informado" : formatarMoeda(parseFloat(cheque.valorLiquido))}</p>
                       </div>
                       <Badge className={`text-xs border ${statusCfg.color} flex items-center gap-1`}>
                         {statusCfg.icon}
@@ -409,13 +427,13 @@ export default function Cheques() {
                   </div>
 
                   {/* Ações */}
-                  {cheque.status === "aguardando" && (
+                  {cheque.status === "descontado" && cheque.novo40 && (
                     <div className="flex gap-2 mt-3 pt-3 border-t border-border/50">
                       <Button
                         size="sm"
                         className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1"
-                        onClick={() => compensarMutation.mutate({ id: cheque.id })}
-                        disabled={compensarMutation.isPending}
+                        onClick={() => void enviar40({ acao: "compensar", id: cheque.id, dataOperacao: diaCheque40() })}
+                        disabled={ocupado40}
                       >
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
                         Compensado
@@ -433,7 +451,8 @@ export default function Cheques() {
                         size="sm"
                         variant="outline"
                         className="border-border"
-                        onClick={() => cancelarMutation.mutate({ id: cheque.id })}
+                        disabled={ocupado40}
+                        onClick={() => void enviar40({ acao: "cancelar", id: cheque.id, dataOperacao: diaCheque40() })}
                       >
                         <XCircle className="h-3.5 w-3.5" />
                       </Button>
@@ -472,9 +491,9 @@ export default function Cheques() {
               className="w-full bg-red-600 hover:bg-red-700 text-white"
               onClick={() => {
                 if (!motivoDevolucao.trim()) { toast.error(t('toast_error.informe_o_motivo_da_devolução')); return; }
-                devolverMutation.mutate({ id: chequeIdDevolver!, motivo: motivoDevolucao });
+                void enviar40({ acao: "devolver", id: chequeIdDevolver!, motivo: motivoDevolucao.trim(), dataOperacao: diaCheque40() });
               }}
-              disabled={devolverMutation.isPending}
+              disabled={ocupado40}
             >
               Confirmar Devolução
             </Button>

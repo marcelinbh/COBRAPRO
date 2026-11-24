@@ -104,27 +104,31 @@ describe("operações financeiras - validação de recursos por empresa", () => 
     expect(supabase.from).not.toHaveBeenCalledWith("contas_pagar");
   });
 
-  it("suspende criação de cheque antes de qualquer escrita financeira", async () => {
+  it("recusa criação pré40 no schema estrito antes de acessar cliente ou banco", async () => {
     const supabase = supabaseComRespostas({});
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
-    await expect(appRouter.createCaller(contexto(41)).cheques.criar({
+    await expect(appRouter.createCaller(contexto(41)).cheques.executar40({
       clienteId: 900,
       emitente: "Emitente de teste",
       valorNominal: 500,
       dataVencimento: "2026-11-01",
       taxaDesconto: 1,
       contaCaixaId: 800,
-    })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    } as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
-  it("suspende compensação de cheque antes de qualquer escrita financeira", async () => {
+  it("recusa compensação pré40 no schema estrito antes de acessar cliente ou banco", async () => {
     const supabase = supabaseComRespostas({});
     mocks.getSupabaseClientAsync.mockResolvedValue(supabase);
 
-    await expect(appRouter.createCaller(contexto(41)).cheques.compensar({ id: 700, contaCaixaId: 800 }))
-      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(appRouter.createCaller(contexto(41)).cheques.executar40({ id: 700, contaCaixaId: 800 } as any))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
     expect(supabase.from).not.toHaveBeenCalled();
   });
 
