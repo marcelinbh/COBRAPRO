@@ -7,6 +7,12 @@ import { persistirHistoricoWhatsApp } from "./services/notificacoes.operational.
 type StatusHistoricoEvolution = "aceito_evolution" | "entregue" | "lido";
 type RegistroDesconhecido = Record<string, unknown>;
 
+const NOMES_EVENTOS_CANONICOS = new Map([
+  ["MESSAGES_UPDATE", "MESSAGES_UPDATE"],
+  ["messages.update", "MESSAGES_UPDATE"],
+  ["CONNECTION_UPDATE", "CONNECTION_UPDATE"],
+  ["connection.update", "CONNECTION_UPDATE"],
+]);
 const EVENTOS_ACEITOS = new Set(["MESSAGES_UPDATE", "CONNECTION_UPDATE"]);
 const MAX_ATUALIZACOES_POR_EVENTO = 50;
 const MAX_ID_MENSAGEM = 256;
@@ -241,7 +247,10 @@ async function atualizarStatusMensagem(
 
 export async function processWebhookEvent(payload: unknown): Promise<boolean> {
   if (!ehRegistro(payload)) return false;
-  const event = typeof payload.event === "string" ? payload.event.trim() : "";
+  const event =
+    typeof payload.event === "string"
+      ? (NOMES_EVENTOS_CANONICOS.get(payload.event.trim()) ?? "")
+      : "";
   const instancia =
     typeof payload.instance === "string" ? payload.instance.trim() : "";
   const data = Array.isArray(payload.data)

@@ -62,8 +62,9 @@ async function configurarWebhookDeEntrega(
   }
 
   return request("POST", `/webhook/set/${encodeURIComponent(instanceName)}`, {
-    // A Evolution API suporta headers customizados por instância. O segredo
-    // não deve viajar em query string, que é normalmente retida em logs.
+    enabled: true,
+    // O segredo permanece no header; versões legadas exigem conferir seu suporte
+    // efetivo. Nunca migrar automaticamente a credencial para URLs retidas em logs.
     url: `${baseUrl}/api/webhook/evolution`,
     headers: {
       "x-cobrapro-webhook-token": ENV.evolutionWebhookToken,
