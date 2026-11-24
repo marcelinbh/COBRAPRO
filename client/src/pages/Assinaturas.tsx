@@ -107,7 +107,14 @@ export default function Assinaturas() {
     : Array.isArray(clientesData) ? clientesData as any[] : [];
   const { data: contasCadastro, error: contasErro } = trpc.caixa.contasParaOperacao37.useQuery();
   const contas = contasCadastro?.empresaId === sessao?.id ? contasCadastro?.contas ?? [] : [];
-  const { data: pagamentosExpanded } = trpc.assinaturas.pagamentos.useQuery(
+  const {
+    data: pagamentosExpanded,
+    isPending: pagamentosPending,
+    isFetching: pagamentosFetching,
+    isSuccess: pagamentosSuccess,
+    error: pagamentosErro,
+    refetch: retentarPagamentos,
+  } = trpc.assinaturas.pagamentos.useQuery(
     { assinaturaId: expandedId! },
     { enabled: !!expandedId }
   );
@@ -428,7 +435,21 @@ export default function Assinaturas() {
                 {expandedId === a.id && (
                   <div className="mt-4 pt-4 border-t border-slate-700">
                     <p className="text-sm font-medium text-slate-300 mb-3">Histórico de Pagamentos</p>
-                    {!pagamentosExpanded || pagamentosExpanded.length === 0 ? (
+                    {pagamentosErro ? (
+                      <div className="space-y-2" role="alert">
+                        <p className="text-sm text-red-400">Não foi possível carregar o histórico de pagamentos. Nenhuma ausência foi presumida.</p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={pagamentosFetching}
+                          onClick={() => { void retentarPagamentos(); }}
+                        >
+                          {pagamentosFetching ? 'Tentando novamente...' : 'Tentar novamente'}
+                        </Button>
+                      </div>
+                    ) : pagamentosPending || pagamentosFetching || !pagamentosSuccess || !Array.isArray(pagamentosExpanded) ? (
+                      <p className="text-sm text-slate-400" role="status">Carregando histórico de pagamentos...</p>
+                    ) : pagamentosExpanded.length === 0 ? (
                       <p className="text-sm text-slate-500">Nenhum pagamento registrado</p>
                     ) : (
                       <div className="space-y-2">

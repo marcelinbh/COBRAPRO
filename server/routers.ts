@@ -19,6 +19,7 @@ import { multaManualRouter } from "./routers/multaManual";
 import { manutencaoEmprestimosRouter } from "./routers/manutencaoEmprestimos";
 import { cheques40Procedures } from "./routers/cheques40";
 import { telefone41Writers } from "./routers/telefone41";
+import { lerIndicadoresTelefone41 } from "./services/telefone41ReadModel";
 import { caixa37Procedures } from "./routers/caixa37";
 import { caixaManutencao45Procedures } from "./routers/caixaManutencao45";
 import { listarContasParaCadastro } from "./services/contasCadastro";
@@ -3795,18 +3796,13 @@ const vendasTelefoneRouter = router({
   ...telefone41Writers,
 
   kpis: protectedProcedure.query(async ({ ctx }) => {
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return { totalVendas: 0, capitalInvestido: 0, totalAReceber: 0, lucroBruto: 0, vendasAtivas: 0, vendasQuitadas: 0 };
-    const { data } = await supabase.from('vendas_telefone').select('status, custo, total_a_receber, lucro_bruto, entrada_valor').eq('user_id', ctx.user.id);
-    const all = data ?? [];
-    return {
-      totalVendas: all.length,
-      capitalInvestido: all.reduce((s: number, v: any) => s + parseFloat(v.custo ?? 0), 0),
-      totalAReceber: all.filter((v: any) => v.status === 'ativo').reduce((s: number, v: any) => s + parseFloat(v.total_a_receber ?? 0), 0),
-      lucroBruto: all.reduce((s: number, v: any) => s + parseFloat(v.lucro_bruto ?? 0), 0),
-      vendasAtivas: all.filter((v: any) => v.status === 'ativo').length,
-      vendasQuitadas: all.filter((v: any) => v.status === 'quitado').length,
-    };
+    try {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new Error('Cliente de leitura indisponível');
+      return await lerIndicadoresTelefone41(supabase, ctx.user.id);
+    } catch {
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Indicadores de vendas indisponíveis. Não representam saldo de Caixa ou lucro realizado.' });
+    }
   }),
 });
 

@@ -248,7 +248,7 @@ function calcularSimulacao(custo: number, precoVenda: number, entradaPct: number
   const lucroBruto = totalAReceber - custo;
   const margem = custo > 0 ? (lucroBruto / custo) * 100 : 0;
   const capitalInvestido = custo - entradaValor;
-  const roi = capitalInvestido > 0 ? (lucroBruto / capitalInvestido) * 100 : 0;
+  const roi = capitalInvestido > 0 ? (lucroBruto / capitalInvestido) * 100 : null;
 
   // Payback: mês em que o lucro acumulado supera o capital investido
   let payback = 0;
@@ -426,7 +426,7 @@ export default function VendasTelefone() {
 
   // ── Queries & Mutations ──
   const { data: vendas = [], refetch } = trpc.vendasTelefone.listar.useQuery();
-  const { data: kpis } = trpc.vendasTelefone.kpis.useQuery();
+  const { data: kpis, isLoading: kpisCarregando, isError: kpisFalhou } = trpc.vendasTelefone.kpis.useQuery();
   const { data: contasMetadata41 } = trpc.caixa.contasParaOperacao37.useQuery();
   const contasCaixa = contasMetadata41?.contas ?? [];
   const { data: parcelasVenda = [] } = trpc.vendasTelefone.parcelas.useQuery(
@@ -594,21 +594,23 @@ export default function VendasTelefone() {
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
           {/* KPIs */}
+          <p className="text-xs text-gray-500">Indicadores contratuais sem vendas canceladas: não representam saldo de Caixa ou lucro realizado. A Receber soma o saldo das parcelas pendentes, sem incluir novamente a entrada. Custo contratual é o custo cadastrado; lucro teórico é o total previsto menos esse custo.</p>
+          {kpisFalhou && <p role="alert" className="text-sm text-amber-700">Indicadores indisponíveis; valores desconhecidos não são apresentados como zero.</p>}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {[
-              { label: t('phoneSales.totalSales'), value: kpis?.totalVendas ?? 0, icon: Package, fmt: (v: number) => String(v) },
-              { label: t('phoneSales.activeSales'), value: kpis?.vendasAtivas ?? 0, icon: CheckCircle2, fmt: (v: number) => String(v) },
-              { label: "Vendas Quitadas", value: kpis?.vendasQuitadas ?? 0, icon: TrendingUp, fmt: (v: number) => String(v) },
-              { label: "Capital Investido", value: kpis?.capitalInvestido ?? 0, icon: Banknote, fmt: fmt },
-              { label: "A Receber", value: kpis?.totalAReceber ?? 0, icon: DollarSign, fmt: fmt },
-              { label: "Lucro Bruto", value: kpis?.lucroBruto ?? 0, icon: TrendingUp, fmt: fmt },
+              { label: t('phoneSales.totalSales'), value: kpis?.totalVendas, icon: Package, fmt: (v: number) => String(v) },
+              { label: t('phoneSales.activeSales'), value: kpis?.vendasAtivas, icon: CheckCircle2, fmt: (v: number) => String(v) },
+              { label: "Vendas Quitadas", value: kpis?.vendasQuitadas, icon: TrendingUp, fmt: (v: number) => String(v) },
+              { label: "Custo contratual", value: kpis?.capitalInvestido, icon: Banknote, fmt: fmt },
+              { label: "A Receber", value: kpis?.totalAReceber, icon: DollarSign, fmt: fmt },
+              { label: "Lucro teórico", value: kpis?.lucroBruto, icon: TrendingUp, fmt: fmt },
             ].map(({ label, value, icon: Icon, fmt: f }) => (
               <div key={label} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
                 <div className="flex items-center gap-2 mb-2">
                   <Icon className="w-4 h-4 text-emerald-500" />
                   <span className="text-xs text-gray-500 font-medium">{label}</span>
                 </div>
-                <span className="text-lg font-bold text-gray-900">{f(value)}</span>
+                <span className="text-lg font-bold text-gray-900">{kpisFalhou ? '—' : kpisCarregando ? 'Carregando…' : value === undefined ? '—' : f(value)}</span>
               </div>
             ))}
           </div>
@@ -710,12 +712,8 @@ export default function VendasTelefone() {
                         <p className="text-sm font-bold text-gray-900">{v.num_parcelas}x {fmt(parseFloat(v.valor_parcela))}</p>
                       </div>
                       <div className="bg-emerald-50 rounded-lg p-2 text-center">
-                        <p className="text-xs text-emerald-600">{t('vendaTelefone.grossProfit')}</p>
-                        <p className="text-sm font-bold text-emerald-700">{fmt(parseFloat(v.lucro_bruto))}</p>
-                      </div>
-                      <div className="bg-blue-50 rounded-lg p-2 text-center">
-                        <p className="text-xs text-blue-600">ROI</p>
-                        <p className="text-sm font-bold text-blue-700">{fmtN(parseFloat(v.roi ?? 0), 0)}%</p>
+                        <p className="text-xs text-emerald-600">Lucro teórico</p>
+                        <p className="text-sm font-bold text-emerald-700">{v.status === 'cancelado' ? '—' : fmt(parseFloat(v.lucro_bruto))}</p>
                       </div>
                     </div>
 
@@ -956,13 +954,14 @@ export default function VendasTelefone() {
                   Detalhes da Operação
                 </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <ResultCard icon={DollarSign} label="Lucro Bruto" value={fmt(sim.lucroBruto)} sub={`Margem de ${fmtN(sim.margem, 1)}%`} color="green" />
+                  <ResultCard icon={DollarSign} label="Lucro teórico" value={fmt(sim.lucroBruto)} sub={`Margem projetada de ${fmtN(sim.margem, 1)}%`} color="green" />
                   <ResultCard icon={Clock} label="Payback" value={`${sim.payback} ${sim.payback === 1 ? 'mês' : 'meses'}`} sub={`Recupera no mês ${sim.payback}`} color="green" />
                   <ResultCard icon={Banknote} label="Parcela Mensal" value={fmt(sim.valorParcela)} />
-                  <ResultCard icon={TrendingUp} label="Capital Investido" value={fmt(sim.capitalInvestido)} sub={`Entrada: ${fmt(sim.entradaValor)}`} />
+                  <ResultCard icon={TrendingUp} label="Custo menos entrada" value={fmt(sim.capitalInvestido)} sub={`Entrada prevista: ${fmt(sim.entradaValor)}`} />
                   <ResultCard icon={DollarSign} label="Total de Juros" value={fmt(sim.totalJuros)} />
-                  <ResultCard icon={TrendingUp} label="ROI Total" value={`${fmtN(sim.roi, 0)}%`} color="green" />
+                  {sim.roi !== null && <ResultCard icon={TrendingUp} label="ROI projetado" value={`${fmtN(sim.roi, 0)}%`} sub="Lucro teórico / (custo - entrada); não é ROI realizado" color="green" />}
                 </div>
+                <p className="text-xs text-gray-500 mt-3">Projeções pressupõem recebimento integral e não descontam despesas adicionais, inadimplência ou cancelamentos. Se custo menos entrada não for positivo, o ROI projetado não é exibido. ROI realizado não é certificado pela leitura atual.</p>
               </div>
 
               {/* Gráfico de fluxo */}
@@ -1036,7 +1035,7 @@ export default function VendasTelefone() {
             <div><p className="text-gray-400 text-xs">{t('phoneSales.salePrice')}</p><p className="font-bold">{fmt(precoVenda)}</p></div>
             <div><p className="text-gray-400 text-xs">Entrada</p><p className="font-bold">{fmt(sim.entradaValor)}</p></div>
             <div><p className="text-gray-400 text-xs">Parcelas</p><p className="font-bold">{parcelas}x {fmt(sim.valorParcela)}</p></div>
-            <div><p className="text-gray-400 text-xs">Lucro Bruto</p><p className="font-bold text-emerald-400">{fmt(sim.lucroBruto)}</p></div>
+            <div><p className="text-gray-400 text-xs">Lucro teórico</p><p className="font-bold text-emerald-400">{fmt(sim.lucroBruto)}</p></div>
           </div>
         </div>
 
