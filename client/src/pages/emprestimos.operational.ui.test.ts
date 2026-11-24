@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { QueryClient, QueryObserver, onlineManager } from "@tanstack/react-query";
 const h = vi.hoisted(() => ({ query: {} as any, mutate: vi.fn(), navigate: vi.fn() }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key, i18n: { language: "pt" } }) }));
 vi.mock("wouter", () => ({ useLocation: () => ["/emprestimos", h.navigate], useParams: () => ({ id: '31' }) }));
@@ -34,7 +35,7 @@ function clickCardButton(fragment: string) {
 }
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal("React", React);
-  h.query = { data: [], isLoading: false, isError: false, isFetching: false, refetch: vi.fn() };
+  h.query = { data: [], isPending: false, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() };
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("Empréstimos: novo cadastro independente da leitura e entrada segura de pagamentos", () => {
@@ -55,6 +56,39 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
   it("vazio confirmado continua vazio sem erro inventado", () => {
     const html = renderToStaticMarkup(React.createElement(Emprestimos));
     expect(html).toContain("Nenhum empréstimo encontrado"); expect(html).not.toContain("Não foi possível carregar os empréstimos");
+  });
+  it("observer real pendente/pausado sem dados não apresenta ausência de empréstimos", () => {
+    const client = new QueryClient();
+    const onlineBefore = onlineManager.isOnline();
+    onlineManager.setOnline(false);
+    const queryFn = vi.fn().mockResolvedValue([]);
+    const observer = new QueryObserver(client, { queryKey: ["paused-loan-list"], queryFn, retry: false });
+    const unsubscribe = observer.subscribe(() => {});
+    try {
+      h.query = observer.getCurrentResult();
+      expect(h.query).toMatchObject({ status: "pending", fetchStatus: "paused", isPending: true, isLoading: false, isError: false, data: undefined });
+      const html = renderToStaticMarkup(React.createElement(Emprestimos));
+      expect(html).toContain("Carregando empréstimos...");
+      expect(html).toContain("Novo empréstimo");
+      expect(html).not.toContain("Nenhum empréstimo encontrado");
+      expect(html).not.toContain("loans.manageLoans");
+      expect(queryFn).not.toHaveBeenCalled();
+      expect(h.mutate).not.toHaveBeenCalled();
+    } finally {
+      unsubscribe(); client.clear(); onlineManager.setOnline(onlineBefore);
+    }
+  });
+  it.each([
+    { data: undefined, isPending: false, isLoading: false, isFetching: false },
+    { data: [], isPending: false, isLoading: false, isFetching: true },
+  ])("sem resposta ou vazio em reconferência não é vazio confirmado %j", flags => {
+    Object.assign(h.query, flags);
+    const html = renderToStaticMarkup(React.createElement(Emprestimos));
+    expect(html).toContain("Carregando empréstimos...");
+    expect(html).toContain("Novo empréstimo");
+    expect(html).not.toContain("Nenhum empréstimo encontrado");
+    expect(html).not.toContain("loans.manageLoans");
+    expect(h.mutate).not.toHaveBeenCalled();
   });
   it.each(["t('loans.pay')", "Receber / renovar", "t('loans.details')", "t('loanDetails.editLoan')"])("handler real %s abre a ficha de origem e não faz pagamento antigo", fragment => {
     clickCardButton(fragment);

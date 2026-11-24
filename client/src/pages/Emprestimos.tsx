@@ -2184,7 +2184,7 @@ export default function Emprestimos() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  const { data: emprestimos, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery();
+  const { data: emprestimos, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery();
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: koletores } = trpc.cobradores.list.useQuery();
   const { data: recebimentosData, isLoading: loadingRecebimentos } = trpc.whatsapp.recebimentos.useQuery(
@@ -2285,12 +2285,14 @@ export default function Emprestimos() {
   const capitalNaRua = emprestimos?.reduce((s, e) => s + parseFloat(e.valorPrincipal), 0) ?? 0;
   const totalReceber = emprestimos?.reduce((s, e) => s + e.totalReceber, 0) ?? 0;
 
-  if (isLoading || isError) return <div className="space-y-4">
+  // isLoading exclui pending/paused. Ausência de resposta e vazio em refetch não confirmam ausência de registros.
+  const leituraEmAndamento = isLoading || isPending || (!isError && (!emprestimos || (isFetching && emprestimos.length === 0)));
+  if (leituraEmAndamento || isError) return <div className="space-y-4">
     <div className="flex items-center justify-between gap-2">
       <h1 className="text-2xl font-bold">{t('loans.title')}</h1>
       <Button onClick={() => setLocation('/contratos/novo')}><Plus className="h-4 w-4" /> Novo empréstimo</Button>
     </div>
-    {isLoading ? <p role="status">Carregando empréstimos...</p> : <div role="alert" className="space-y-3 rounded-lg border p-4">
+    {leituraEmAndamento ? <p role="status">Carregando empréstimos...</p> : <div role="alert" className="space-y-3 rounded-lg border p-4">
       <p>Não foi possível carregar os empréstimos. A consulta está indisponível; isso não significa que os registros foram apagados. Não cadastre novamente uma dívida já existente.</p>
       <Button variant="outline" disabled={isFetching} onClick={() => refetch()}>Tentar novamente</Button>
     </div>}
