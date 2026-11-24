@@ -1326,6 +1326,7 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Corrigir corrida REST/cotação que omitia sucessora: reconferência completa dos IDs/vínculos e cotação final do snapshot, sem cálculo parcial ou retry financeiro.
 - [x] Gate final: 3392 testes aprovados/11 opt-in ignorados; 158 arquivos aprovados/3 ignorados, TypeScript/build/diff check. PG17 independente:22 grupos aprovados, sem declarar teste dedicado0031.
 - [x] Migration0036 SHA7194c1f7038eb9e36358330614249b66575075bef465fcfe3c8aca59a4fed21f, 71 predecessoras e3 extensões previstas; SQL anterior intocado.
-- [ ] Checkpoint, instalação produtiva exata, postflight de ACL/RLS/histórico, push fast-forward e deploy Healthy.
+- [x] Checkpoint904e614e e instalação produtiva exata às23h31 BRT: verifiers34/35/36 verdes, RLS75/75/0, ACL36 privadas e zero novas operações/origens36. Hashes integrais das quatro tabelas financeiras idênticos antes/depois;12/2/6 preservados.
+- [ ] Push fast-forward e deploy Healthy da versão certificada.
 - [ ] Smoke no site oficial depois do deploy, sem movimentação financeira nem mensagem real.
 - [ ] Próximos lotes: aporte/transferência37; manutenção de despesas; reparcelamento e trilhos de vendas/veículos/cheques. Não afirmar liberação100% antes da certificação própria.
