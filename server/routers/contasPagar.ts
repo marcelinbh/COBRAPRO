@@ -180,6 +180,9 @@ export const contasPagarRouter = router({
     const despesas = await ler(await fonte(), 'contas_pagar', 'id, user_id, status, valor::text, data_pagamento, data_vencimento', ctx.user.id);
     const hoje = dataHojeBrasilia();
     const mes = hoje.slice(0, 7);
+    if (despesas.some(d => !['pendente', 'pago', 'paga', 'atrasado', 'atrasada', 'cancelado', 'cancelada'].includes(d.status))) {
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Status histórico inválido; resumo requer conferência, não será subcontado como zero.' });
+    }
     if (despesas.some(d => statusNormal(d.status) === 'paga' && (typeof d.data_pagamento !== 'string' || !dataCivilDespesa(d.data_pagamento)))) {
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Data histórica de pagamento inválida; resumo do mês requer conferência, não será subcontado como zero.' });
     }
@@ -201,7 +204,7 @@ export const contasPagarRouter = router({
   capacidades: protectedProcedure.query(() => ({ prospectivasHabilitadas: process.env.ENABLE_RPC_DESPESAS_PROSPECTIVAS === 'true', recorrencia: false as const })),
   reconciliar: protectedProcedure.input(financialIntentRecoveryInput).mutation(async ({ ctx, input }) => {
     if (!input.family.startsWith('despesa_')) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Família divergente.' });
-    return reconcileFinancialIntent(await fonte(true), ctx.user.id, input);
+    return reconcileFinancialIntent(await fonte(), ctx.user.id, input);
   }),
   criar: protectedProcedure.input(criarDespesaInput).mutation(async ({ ctx, input }) => criarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, descricao: input.descricao, categoria: input.categoria, valor: input.valor, dataVencimento: input.dataVencimento, observacoes: input.observacoes })),
   pagar: protectedProcedure.input(pagarDespesaInput).mutation(async ({ ctx, input }) => pagarDespesaAtomica(await fonte(true), { userId: ctx.user.id, idempotencyKey: input.idempotencyKey, despesaId: input.id, contaCaixaId: input.contaCaixaId, dataPagamento: input.dataPagamento })),

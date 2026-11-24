@@ -319,3 +319,70 @@ describe('ContasPagar: isolamento local entre sessões, interação sem navegado
     expect(data.has(storeKey(old, action))).toBe(false); expect(data.has(storeKey(old + 1, 'pagar'))).toBe(true);
   });
 });
+
+describe('B1/B2: regressões privadas sobre a página REAL, sem browser', () => {
+  function gateOff(capabilityError = false) {
+    h.read.mockImplementation(async (name: string, _input: any, owner: number) => {
+      if (name === 'capacidades' && capabilityError) throw new Error('capacidade sintética indisponível');
+      return name === 'listar' ? rows(owner) : name === 'contas' ? accounts(owner) : name === 'capacidades' ? { prospectivasHabilitadas: false } : summary;
+    });
+  }
+  function beginOriginal(owner: number, action: 'pagar' | 'estornar') {
+    const s = new DespesasIntentStore(owner, storage, vi.fn(), () => key);
+    return s.begin(action, action === 'pagar' ? { id: 101, contaCaixaId: 1, dataPagamento: '2026-11-10' } : { id: 102, pagamentoOperationId: op, dataEstorno: '2026-11-11', motivo: 'Devolução sintética' });
+  }
+  it.each(['pagar','estornar'] as const)('gateOFF habilita SOMENTE recovery %s existente, mantém writes/reenvio bloqueados', async action => {
+    const owner = h.user.id, original = beginOriginal(owner,action); gateOff(); await mount();
+    expect(ui.button('Nova despesa').props.disabled).toBe(true);
+    expect(ui.button('Registrar pagamento atômico').props.disabled).toBe(true);
+    expect(ui.button('Estornar pagamento original').props.disabled).toBe(true);
+    expect(ui.button('Reenviar intenção original').props.disabled).toBe(true);
+    expect(ui.button('Reconciliar UUID').props.disabled).toBe(false);
+    // Chamada adversarial ao handler desabilitado também não deve sequer reenviar uma write.
+    ui.button('Reenviar intenção original').props.onClick(); await ui.flush();
+    expect(h.pay).not.toHaveBeenCalled(); expect(h.reverse).not.toHaveBeenCalled(); expect(h.create).not.toHaveBeenCalled();
+    await ui.click('Reconciliar UUID');
+    expect(h.reconcile).toHaveBeenCalledTimes(1); expect(h.reconcile).toHaveBeenCalledWith({ family: `despesa_${action}`, idempotencyKey: original.idempotencyKey, payload: original.payload });
+    expect(data.has(storeKey(owner,action))).toBe(true); expect(ui.text()).toContain('Não execução comprovada');
+    expect(ui.button('Reenviar intenção original').props.disabled).toBe(true);
+    await ui.click('Encerrar após'); expect(data.has(storeKey(owner,action))).toBe(false); expect(ui.button('Nova despesa').props.disabled).toBe(true);
+    expect(h.pay).not.toHaveBeenCalled(); expect(h.reverse).not.toHaveBeenCalled(); expect(h.create).not.toHaveBeenCalled();
+  });
+  it('capacidade indisponível não barra recovery existente; nenhum resend', async () => {
+    beginOriginal(h.user.id,'pagar'); gateOff(true); await mount();
+    expect(ui.text()).toContain('Escritas bloqueadas'); expect(ui.button('Nova despesa').props.disabled).toBe(true);
+    expect(ui.button('Reconciliar UUID').props.disabled).toBe(false); await ui.click('Reconciliar UUID'); expect(h.reconcile).toHaveBeenCalledOnce(); expect(h.pay).not.toHaveBeenCalled();
+  });
+  it('gateOFF recovery confirmed remove apenas intenção original, zero writers', async () => {
+    const owner=h.user.id; beginOriginal(owner,'pagar'); gateOff();
+    h.reconcile.mockImplementation(async request => ({ ...proof(owner,request), status: 'confirmed', fenceId: null, result: { operationId: op } }));
+    await mount(); await ui.click('Reconciliar UUID');
+    expect(data.has(storeKey(owner,'pagar'))).toBe(false); expect(h.success).toHaveBeenCalledWith(expect.stringContaining('nenhuma nova operação enviada'));
+    expect(h.pay).not.toHaveBeenCalled(); expect(h.create).not.toHaveBeenCalled(); expect(h.reverse).not.toHaveBeenCalled();
+  });
+  it('resumo inconclusivo pinta erro explícito sem cards de zero', async () => {
+    h.read.mockImplementation(async (name: string,_input: any,owner: number) => {
+      if (name==='resumo') throw new Error('Status histórico inválido; resumo requer conferência, não será subcontado como zero.');
+      return name==='listar'?rows(owner):name==='contas'?accounts(owner):{prospectivasHabilitadas:false};
+    });
+    await mount(); expect(ui.text()).toContain('Resumo indisponível:'); expect(ui.text()).toContain('Status histórico inválido'); expect(ui.text()).not.toContain('R$ 0,00'); expect(ui.text()).toContain(`owner ${h.user.id}`);
+  });
+  it.each(['not_executed','confirmed','timeout'] as const)('gateOFF recovery A→B→A (%s) antigo não injeta proof, fecha intenção ou libera novo inFlight', async outcome => {
+    const a=h.user.id, b=a+1, response=deferred(), fresh=deferred(); beginOriginal(a,'pagar'); beginOriginal(b,'pagar'); gateOff();
+    h.reconcile.mockReturnValueOnce(response.promise).mockReturnValueOnce(fresh.promise);
+    await mount(); await ui.click('Reconciliar UUID'); const original=h.reconcile.mock.calls[0][0]; const stale=ui.button('Reconciliar UUID').props.onClick;
+    await switchOwner(b); expect(ui.text()).not.toContain(`owner ${a}`); await switchOwner(a);
+    // A antigo mantém lock owner/ação mesmo após A→B→A. Não nasce chamada duplicada.
+    await ui.click('Reconciliar UUID'); expect(h.reconcile).toHaveBeenCalledOnce();
+    const writes=ui.writes;
+    if(outcome==='timeout') response.reject(new Error('timeout antigo'));
+    else response.resolve(outcome==='confirmed'?{...proof(a,original),status:'confirmed',fenceId:null,result:{operationId:op}}:proof(a,original));
+    await ui.flush(); expect(ui.writes).toBe(writes); expect(h.success).not.toHaveBeenCalled(); expect(h.error).not.toHaveBeenCalled(); expect(h.invalidate).not.toHaveBeenCalled();
+    expect(data.has(storeKey(a,'pagar'))).toBe(true); expect(data.has(storeKey(b,'pagar'))).toBe(true); expect(ui.text()).not.toContain('Não execução comprovada');
+    stale(); await ui.flush(); expect(h.reconcile).toHaveBeenCalledOnce();
+    await ui.click('Reconciliar UUID'); expect(h.reconcile).toHaveBeenCalledTimes(2); expect(ui.button('Reconciliar UUID').props.disabled).toBe(true);
+    fresh.resolve(proof(a,h.reconcile.mock.calls[1][0])); await ui.flush(); expect(ui.text()).toContain('Não execução comprovada');
+    expect(data.has(storeKey(a,'pagar'))).toBe(true); await ui.click('Encerrar após'); expect(data.has(storeKey(a,'pagar'))).toBe(false); expect(data.has(storeKey(b,'pagar'))).toBe(true);
+    expect(h.pay).not.toHaveBeenCalled(); expect(h.create).not.toHaveBeenCalled(); expect(h.reverse).not.toHaveBeenCalled();
+  });
+});

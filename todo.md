@@ -1353,6 +1353,7 @@ Kiwify, ofertas, planos, Blacklist e configurações WhatsApp não integram este
 
 ## Fase 77: Manutenção de despesas38 — próximo recorte, ainda não publicado
 
-- [ ] Reproduzir e corrigir omissão silenciosa de statusNULL no resumo e recuperação UUID inacessível quando apenas novas escritas estão desligadas; não inferir obrigação pendente nem permitir reenvio financeiro por conveniência.
+- [x] HotfixAPP B1/B2 separado: statusNULL/desconhecido torna resumo inconclusivo em vez de falsezero; recovery33 acessível com novas escritasOFF, mas criar/pagar/estornar/resend continuam gateados. Reprodução57RED→GREEN, aplicação byte-exata, targeted238PASS/7files comPG17físico33 e fullgate3730PASS/11SKIP/166filesPASS/3SKIP/TSC/build/check37/validatePASS às02h16:39. SemDDL/flags/dinheiro/mensagens; evidências e limites em tests/despesas-b1b2/RESULT.md.
+- [ ] Publicar hotfixB1/B2 por checkpoint/pushFF/deploy exato e smoke oficial somente leitura, sem UUID/recovery fictício ou submit produtivo. Não é manutenção38 entregue.
 - [ ] Congelar contrato38 de retificação cadastral sobreposta/auditada, cancelamento prospectivo não pago e arquivamento reversível, zeroledger. Estorno20/25 já existe; edição física de valor/vencimento, exclusão física e adoção de legado não são funcionalidades desse recorte.
 - [ ] Implementar e certificar manutenção/recuperação/concorrência/isolamento38 emPG17 pós37 e instalação com preflight/reseal restrito governado. Não tocar SQL20–37 congelados nem instalar DDL38 para destravar sem esse gate.

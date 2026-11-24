@@ -90,7 +90,7 @@ export default function ContasPagar() {
   const despesaEstornar = userId ? lista.data?.find(d => d.id === estornarId) : undefined;
 
   async function enviar(intent: IntencaoDespesaPersistida, s: DespesasIntentStore) {
-    if (recovery[intent.idempotencyKey]?.status === 'not_executed') return;
+    if (!habilitado || recovery[intent.idempotencyKey]?.status === 'not_executed') return;
     if (!pertenceSessao() || usuarioAtual.current !== intent.userId || inFlight.current || !s.acquire(intent.action)) return;
     inFlight.current = true; setBusy(true);
     try {
@@ -184,7 +184,7 @@ export default function ContasPagar() {
       {intencoes.filter(i => i.userId === userId).map(i => <div key={i.idempotencyKey} className="space-y-2">
         <p className="text-sm break-all">{i.action} — UUID: {i.idempotencyKey}</p><pre className="text-xs whitespace-pre-wrap break-all bg-muted p-2">{JSON.stringify(i.payload, null, 2)}</pre>
         <Button variant="outline" disabled={busy || !habilitado || !store || recovery[i.idempotencyKey]?.status === 'not_executed'} onClick={() => store && void enviar(i, store)}>Reenviar intenção original (mesma chave)</Button>
-        <Button variant="outline" disabled={busy || !habilitado || !store} onClick={() => store && void reconciliar(i, store)}>Reconciliar UUID no servidor (pode encerrar sem execução)</Button>
+        <Button variant="outline" disabled={busy || !store} onClick={() => store && void reconciliar(i, store)}>Reconciliar UUID no servidor (pode encerrar sem execução)</Button>
         {canCloseRejectedIntent(recovery[i.idempotencyKey], i.userId, { family: `despesa_${i.action}`, idempotencyKey: i.idempotencyKey, payload: i.payload }) && <><p role="status">Não execução comprovada; UUID bloqueado no servidor contra POST atrasado.</p><Button disabled={busy} onClick={() => encerrarRejeitada(i)}>Encerrar após não execução comprovada e escolher outra operação</Button></>}
       </div>)}
     </section>}
