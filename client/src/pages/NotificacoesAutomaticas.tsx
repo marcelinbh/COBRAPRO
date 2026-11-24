@@ -205,7 +205,8 @@ export default function NotificacoesAutomaticas() {
 
   const handleToggleGlobal = (ativo: boolean) => {
     if (!sessaoDisponivel || identidadeMudou || loadingGlobal || loadingAutomacao || erroGlobal || erroAutomacao || salvarAutomacao.isPending || disparar.isPending) return;
-    salvarAutomacao.mutate({ ativo, horario });
+    // Desativar não salva nem valida o rascunho ainda não confirmado do horário.
+    salvarAutomacao.mutate({ ativo, horario: ativo ? horario : automacao?.horario || "09:00" });
   };
 
   const handleSalvarHorario = () => {

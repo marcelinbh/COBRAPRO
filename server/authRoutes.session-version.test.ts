@@ -13,7 +13,15 @@ vi.mock("bcryptjs", () => ({ default: { compare: mocks.compare } }));
 function harness(version: unknown) {
   const state = { version };
   const read = vi.fn(async () => ({ data: { id: 8, openId: "local_test", name: "Teste", email: "teste@example.test", passwordHash: "hash", session_version: state.version }, error: null }));
-  const from = vi.fn(() => ({ select: () => ({ eq: () => ({ limit: () => ({ maybeSingle: read }) }) }), update: () => ({ eq: async () => ({ error: null }) }) }));
+  const readBuilder = { abortSignal: (_signal: AbortSignal) => readBuilder, maybeSingle: read };
+  const writeBuilder = {
+    abortSignal: (_signal: AbortSignal) => writeBuilder,
+    then: (resolve: any, reject: any) => Promise.resolve({ error: null }).then(resolve, reject),
+  };
+  const from = vi.fn(() => ({
+    select: () => ({ eq: () => ({ limit: () => readBuilder }) }),
+    update: () => ({ eq: () => writeBuilder }),
+  }));
   mocks.client.mockResolvedValue({ from });
   const app = { post: vi.fn(), get: vi.fn() };
   registerAuthRoutes(app as any);

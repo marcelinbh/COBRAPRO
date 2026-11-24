@@ -957,3 +957,122 @@ describe("WhatsApp — respostas de owner contraditórias falham fechado", () =>
     }
   );
 });
+
+// Mantém data de referência de hoje mesmo quando o status armazenado ficou
+// vencendo_hoje no dia posterior. Só o banco sintético recebe estas fixtures.
+const openReminderCases = [
+  { label: "dia atual", tipo: "no_vencimento", dias: 0, vencimento: DAY },
+  { label: "overdue", tipo: "apos_vencimento_1", dias: -1, vencimento: "2026-11-15" },
+];
+function unpaidDueToday(db: ReturnType<typeof database>, scenario = openReminderCases[0]) {
+  const parcela = db.tables.parcelas.find(row => row.user_id === TENANT)!;
+  parcela.status = "vencendo_hoje";
+  parcela.data_vencimento = scenario.vencimento;
+  Object.assign(db.tables.notificacoes_automaticas.find(row => row.user_id === TENANT)!, {
+    tipo: scenario.tipo, dias_antes: scenario.dias,
+  });
+  Object.assign(db.tables.whatsapp_outbox.find(row => row.id === outboxId(TENANT, 1))!, {
+    tipo: scenario.tipo,
+    chave_deduplicacao: `lembrete:${TENANT}:${parcela.id}:${scenario.tipo}:${DAY}`,
+  });
+  return parcela;
+}
+
+describe("WhatsApp — regressão operacional vencendo_hoje unpaid com runtime real", () => {
+  it.each(openReminderCases)("produtor aceita vencendo_hoje unpaid $label sem mudar dívida, owner ou chave diária", async scenario => {
+    const db = database();
+    const before = snapshotTenant(db, OTHER);
+    unpaidDueToday(db, scenario);
+    const debtBefore = structuredClone(db.tables.parcelas);
+    db.tables.whatsapp_outbox = db.tables.whatsapp_outbox.filter(row => row.id !== outboxId(TENANT, 1));
+    const first = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
+    expect(first).toEqual({ usuariosNoHorario: 1, elegiveis: 1, enfileiradas: 1, falhasItens: 0 });
+    const second = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
+    expect(second.elegiveis).toBe(1);
+    expect(second.enfileiradas).toBe(0);
+    const reminder = db.tables.whatsapp_outbox.find(row => row.user_id === TENANT && row.status === "pendente")!;
+    expect(reminder.chave_deduplicacao).toBe(`lembrete:${TENANT}:${TENANT * 10 + 3}:${scenario.tipo}:${DAY}`);
+    expect(reminder.data_referencia).toBe(DAY);
+    expect(db.tables.parcelas).toEqual(debtBefore);
+    expect(db.calls.find(call => call.table === "parcelas")!.params.get("data_vencimento")).toBe(`eq.${scenario.vencimento}`);
+    expectOnlyTenant(db, before);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+  });
+
+  it.each(openReminderCases)("worker e pre-send aceitam vencendo_hoje unpaid $label com lease guard e sem reenvio", async scenario => {
+    const db = database();
+    const before = snapshotTenant(db, OTHER);
+    unpaidDueToday(db, scenario);
+    const debtBefore = structuredClone(db.tables.parcelas);
+    const result = await processarFilaWhatsApp(25, false, TENANT);
+    expect(result.processadas).toBe(1);
+    expect(result.enviadas).toBe(1);
+    expect(result.canceladas).toBe(0);
+    expect(result.falhas).toBe(0);
+    expect(mocks.enviar).toHaveBeenCalledTimes(1);
+    expect(db.posts).toHaveLength(1);
+    expect(db.calls.filter(call => call.table === "parcelas" && call.method === "GET")).toHaveLength(2);
+    expect(db.calls.some(call => call.table === "whatsapp_outbox" && call.method === "GET" && call.params.has("lease_expira_em"))).toBe(true);
+    expect(db.tables.notificacoes_log.find(row => row.outbox_id === outboxId(TENANT, 1))!.status).toBe("aceito_evolution");
+    expect(db.tables.parcelas).toEqual(debtBefore);
+    expect((await processarFilaWhatsApp(25, false, TENANT)).processadas).toBe(0);
+    expect(mocks.enviar).toHaveBeenCalledTimes(1);
+    expectOnlyTenant(db, before);
+  });
+
+  it.each(["paga", "cancelada", "renovada", "parcial"])("produtor e worker continuam rejeitando parcela %s", async status => {
+    const db = database();
+    const before = snapshotTenant(db, OTHER);
+    unpaidDueToday(db).status = status;
+    const producer = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
+    expect(producer.elegiveis).toBe(0);
+    expect(producer.enfileiradas).toBe(0);
+    const worker = await processarFilaWhatsApp(25, false, TENANT);
+    expect(worker.canceladas).toBe(1);
+    expect(worker.enviadas).toBe(0);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+    expect(db.posts).toHaveLength(0);
+    expectOnlyTenant(db, before);
+  });
+
+  it.each(["global", "regra"])("vencendo_hoje não ultrapassa %s OFF no produtor nem worker", async policy => {
+    const db = database();
+    const before = snapshotTenant(db, OTHER);
+    unpaidDueToday(db);
+    if (policy === "global") db.tables.configuracoes.find(row => row.user_id === TENANT && row.chave === "notificacoes_auto_ativo")!.valor = "false";
+    else db.tables.notificacoes_automaticas.find(row => row.user_id === TENANT)!.ativo = false;
+    expect((await enfileirarLembretesAutomaticos(NOW, false, TENANT)).elegiveis).toBe(0);
+    const worker = await processarFilaWhatsApp(25, false, TENANT);
+    expect(worker.canceladas).toBe(1);
+    expect(worker.enviadas).toBe(0);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+    expectOnlyTenant(db, before);
+  });
+
+  it.each(["paga", "cancelada", "renovada", "parcial", "contrato-cancelado", "contrato-renovado", "owner-cross", "global-OFF", "regra-OFF", "vencimento-alterado"])(
+    "pre-send barra status/política alterada após primeira revalidação: %s", async change => {
+      const db = database();
+      const before = snapshotTenant(db, OTHER);
+      const parcela = unpaidDueToday(db);
+      mocks.enviar.mockImplementation(async (_userId, _telefone, _mensagem, guard) => {
+        if (["paga", "cancelada", "renovada", "parcial"].includes(change)) parcela.status = change;
+        if (change === "contrato-cancelado" || change === "contrato-renovado")
+          db.tables.contratos.find(row => row.user_id === TENANT)!.status = change === "contrato-cancelado" ? "cancelado" : "renovado";
+        if (change === "owner-cross") parcela.user_id = OTHER;
+        if (change === "global-OFF") db.tables.configuracoes.find(row => row.user_id === TENANT && row.chave === "notificacoes_auto_ativo")!.valor = "false";
+        if (change === "regra-OFF") db.tables.notificacoes_automaticas.find(row => row.user_id === TENANT)!.ativo = false;
+        if (change === "vencimento-alterado") parcela.data_vencimento = "2026-11-17";
+        expect(await guard()).toBe(false);
+        // Alteração concorrente sintética não faz parte das escritas do worker.
+        if (change === "owner-cross") parcela.user_id = TENANT;
+        return { ok: false, disposition: "nao_solicitado", erroCodigo: "GUARD" };
+      });
+      const result = await processarFilaWhatsApp(25, false, TENANT);
+      expect(mocks.enviar).toHaveBeenCalledTimes(1);
+      expect(result.canceladas).toBe(1);
+      expect(result.enviadas).toBe(0);
+      expect(db.posts).toHaveLength(0);
+      expectOnlyTenant(db, before);
+    }
+  );
+});

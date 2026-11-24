@@ -8,6 +8,51 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Eye, EyeOff, Lock, Mail, Infinity, Clock, Zap, BarChart3 } from "lucide-react";
 
+const LOGIN_TIMEOUT_MS = 15_000;
+const LOGIN_UNAVAILABLE_MESSAGE = "Login temporariamente indisponível. Tente novamente.";
+
+/** Deadline inclui o corpo; abort sozinho não garante que uma Promise trave menos. */
+async function requestLogin(email: string, password: string) {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(LOGIN_UNAVAILABLE_MESSAGE));
+      controller.abort();
+    }, LOGIN_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([
+      (async () => {
+        const res = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+          credentials: "include",
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) throw new Error(LOGIN_UNAVAILABLE_MESSAGE);
+        const data: unknown = await res.json();
+        return { res, data };
+      })(),
+      deadline,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function isLoginSuccess(data: unknown): boolean {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return false;
+  const payload = data as Record<string, unknown>;
+  if (payload.success !== true || !payload.user || typeof payload.user !== "object" || Array.isArray(payload.user)) return false;
+  const user = payload.user as Record<string, unknown>;
+  return typeof user.id === "number" && Number.isSafeInteger(user.id) && user.id > 0
+    && (user.name === null || typeof user.name === "string")
+    && typeof user.email === "string" && user.email.length > 0
+    && (user.role === "admin" || user.role === "user");
+}
+
 export default function Login() {
   const { t } = useTranslation();
   const { isAuthenticated, loading } = useAuth();
@@ -26,23 +71,23 @@ export default function Login() {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: form.email, password: form.password }),
-        credentials: "include",
-      });
-
-      const data = await res.json();
+      const { res, data } = await requestLogin(form.email, form.password);
       if (!res.ok) {
-        toast.error(data.error ?? t("toast.incorrectCredentials"));
+        const error = data && typeof data === "object" && !Array.isArray(data)
+          ? (data as Record<string, unknown>).error : undefined;
+        toast.error([400, 401, 403, 429].includes(res.status) && typeof error === "string" && error.length > 0
+          ? error : LOGIN_UNAVAILABLE_MESSAGE);
+        return;
+      }
+      if (res.status !== 200 || !isLoginSuccess(data)) {
+        toast.error(LOGIN_UNAVAILABLE_MESSAGE);
         return;
       }
 
       toast.success(t('toast_success.bemvindo_de_volta'));
       window.location.href = "/dashboard";
     } catch {
-      toast.error(t('toast_error.erro_de_conexão_tente_novamente'));
+      toast.error(LOGIN_UNAVAILABLE_MESSAGE);
     } finally {
       setSubmitting(false);
     }

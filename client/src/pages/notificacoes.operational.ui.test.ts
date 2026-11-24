@@ -139,6 +139,31 @@ function alerts(tree: any) { return elements(tree).filter(node => node.props.rol
 const result = { dryRun: false, elegiveis: 5, enfileiradas: 2, processadas: 4, enviadas: 1, falhas: 0, aguardandoReconexao: 2, ambiguas: 0, canceladas: 1 };
 
 describe("notificações — controles e handlers reais sem serviço externo", () => {
+  it.each(["", "09:01"])("OFF preserva 09:00 salvo apesar do rascunho %j e não ativa nem dispara automaticamente", async draft => {
+    const h = harness();
+    h.queries.getGlobalAtivo.data = true;
+    h.queries.getAutomacao.data.ativo = true;
+    let tree = h.render();
+    element(tree, "Input", props => props.id === "horario-automacao").props.onChange({ target: { value: draft } });
+    tree = h.render();
+    expect(element(tree, "Input", props => props.id === "horario-automacao").props.value).toBe(draft);
+    const toggle = element(tree, "Switch", props => props["aria-label"] === "Ativar automação geral");
+    expect(toggle.props.disabled).toBe(false);
+    toggle.props.onCheckedChange(false);
+    expect(h.mutations.salvarAutomacao.mutate).toHaveBeenCalledTimes(1);
+    expect(h.mutations.salvarAutomacao.mutate).toHaveBeenCalledWith({ ativo: false, horario: "09:00" });
+    await h.settle("salvarAutomacao", { success: true });
+    h.queries.getGlobalAtivo.data = false;
+    h.queries.getAutomacao.data = { ativo: false, horario: "09:00" };
+    tree = h.render();
+    expect(element(tree, "Switch", props => props["aria-label"] === "Ativar automação geral").props.checked).toBe(false);
+    expect(h.mutations.salvarAutomacao.mutate).toHaveBeenCalledTimes(1);
+    expect(h.mutations.dispararDoDia.mutate).not.toHaveBeenCalled();
+    expect(h.mutations.testar.mutate).not.toHaveBeenCalled();
+    expect(h.mutations.toggle.mutate).not.toHaveBeenCalled();
+    expect(h.queries.getAutomacao.data.horario).toBe("09:00");
+    h.unmount(); h.client.clear();
+  });
   it("master desligado permite editar e salvar sem alterar ativo nem ativar automação", () => {
     const h = harness();
     let tree = h.render();

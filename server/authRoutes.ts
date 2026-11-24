@@ -24,6 +24,67 @@ const ORIGENS_PRIMEIRA_PARTE = new Set([
 const limiteDeAutenticacao = new LimitadorDeTentativas();
 const JANELA_LOGIN_MS = 15 * 60 * 1000;
 const JANELA_RESET_MS = 60 * 60 * 1000;
+const LOGIN_READ_TIMEOUT_MS = 8_000;
+const LOGIN_LAST_SIGNED_IN_TIMEOUT_MS = 2_000;
+const LOGIN_UNAVAILABLE_MESSAGE = "Login temporariamente indisponível. Tente novamente.";
+
+class LoginUnavailableError extends Error {}
+
+/** Deadline só do login: cancela REST e limita a espera mesmo se o transporte travar. */
+async function withLoginDeadline<T>(
+  work: (signal: AbortSignal) => PromiseLike<T>,
+  timeoutMs: number,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new LoginUnavailableError());
+      controller.abort();
+    }, timeoutMs);
+  });
+  try {
+    return await Promise.race([Promise.resolve().then(() => work(controller.signal)), deadline]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Caminho exclusivo do login. getDb() está desativado; usa o adaptador REST ativo.
+ * Não altera findUserByEmail, usado também por cadastro/recuperação.
+ * Erro de transporte nunca equivale a uma consulta bem-sucedida sem usuário.
+ */
+async function findLoginUserByEmail(email: string): Promise<typeof users.$inferSelect | null> {
+  const data = await withLoginDeadline(async signal => {
+    let response;
+    try {
+      const supabase = await getSupabaseClientAsync();
+      // Uma inicialização tardia não pode disparar consulta depois do deadline.
+      if (signal.aborted || !supabase) throw new LoginUnavailableError();
+      response = await supabase.from("users").select("*").eq("email", email)
+        .limit(1).abortSignal(signal).maybeSingle();
+    } catch {
+      throw new LoginUnavailableError();
+    }
+    if (signal.aborted || response.error) throw new LoginUnavailableError();
+    return response.data;
+  }, LOGIN_READ_TIMEOUT_MS);
+  // Validação de versão permanece fora da classificação de falhas de transporte.
+  return data === null ? null : mapSupabaseUser(data);
+}
+
+/** Telemetria não crítica: uma tentativa REST abortável, sem retries ou escrita Drizzle
+ * não cancelável. Nunca altera senha, privilégios ou versão da sessão.
+ */
+function updateLoginLastSignedIn(userId: number): void {
+  void withLoginDeadline(async signal => {
+    const supabase = await getSupabaseClientAsync();
+    if (signal.aborted || !supabase) return;
+    const { error } = await supabase.from("users")
+      .update({ lastSignedIn: new Date().toISOString() }).eq("id", userId).abortSignal(signal);
+    if (error) throw new LoginUnavailableError();
+  }, LOGIN_LAST_SIGNED_IN_TIMEOUT_MS).catch(() => { /* non-critical */ });
+}
 
 /**
  * O cabeçalho Origin é controlado pela requisição. Nunca o reflita em e-mails
@@ -244,7 +305,7 @@ export function registerAuthRoutes(app: Express) {
       const chaveLimite = limitarTentativaPublica(req, res, "login", email);
       if (!chaveLimite) return;
 
-      const user = await findUserByEmail(email);
+      const user = await findLoginUserByEmail(email);
 
       if (!user || !user.passwordHash) {
         res.status(401).json({ error: "Email ou senha incorretos" });
@@ -257,19 +318,6 @@ export function registerAuthRoutes(app: Express) {
         return;
       }
 
-      // Atualizar lastSignedIn (best-effort)
-      try {
-        const db = await getDb();
-        if (db) {
-          await db.update(users).set({ lastSignedIn: new Date() }).where(eq(users.id, user.id));
-        } else {
-          const supabase = await getSupabaseClientAsync();
-          if (supabase) {
-            await supabase.from("users").update({ lastSignedIn: new Date().toISOString() }).eq("id", user.id);
-          }
-        }
-      } catch (_) { /* non-critical */ }
-
       await createSessionForUser(user, req, res);
       limiteDeAutenticacao.remover(chaveLimite);
 
@@ -280,7 +328,13 @@ export function registerAuthRoutes(app: Express) {
         success: true,
         user: { id: user.id, name: user.name, email: user.email, role: user.role },
       });
+      // Só iniciar telemetria depois de emitir a resposta autenticada.
+      updateLoginLastSignedIn(user.id);
     } catch (err) {
+      if (err instanceof LoginUnavailableError) {
+        res.status(503).json({ error: LOGIN_UNAVAILABLE_MESSAGE });
+        return;
+      }
       console.error("[Auth] Login error:", err);
       res.status(500).json({ error: "Erro interno ao processar login. Tente novamente." });
     }

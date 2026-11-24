@@ -344,7 +344,7 @@ export async function enfileirarLembretesAutomaticos(
         .eq("contratos.user_id", tenantId)
         .eq("contratos.clientes.user_id", tenantId)
         .eq("data_vencimento", dataAlvo)
-        .in("status", ["pendente", "atrasada"]);
+        .in("status", ["pendente", "atrasada", "vencendo_hoje"]);
       if (parcelasError) {
         falhasItens++;
         continue;
@@ -583,7 +583,7 @@ async function motivoItemObsoleto(
     )
       return "PAGAMENTO_SEM_PROVA_DURAVEL";
   } else {
-    if (!["pendente", "atrasada"].includes(parcela.status))
+    if (!["pendente", "atrasada", "vencendo_hoje"].includes(parcela.status))
       return "PARCELA_NAO_EXIGIVEL";
     if (
       parcela.data_vencimento !== adicionarDiasData(item.data_referencia, dias)
