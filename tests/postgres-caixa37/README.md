@@ -8,7 +8,7 @@ SQL alvo congelado: `drizzle/0037_rpc_aporte_transferencia_caixa.sql`, SHA-256 `
 
 GO local restrito ao contrato37 exercitado, com base em duas freshPG17, runtime56 grupos/zero falhas e convivência38 dedicadas/486 seleções-equivalentes originais/zero falhas. A decisão,26 gaps shadow/36 omissões nominais e a distinção entre regressões integradas e setups baselines estão em RESULT.md. Não são suítes antigas full no schema37, proteção universal dos consumidores antigos isolados, teste financeiro produtivo ou liberação100% da plataforma. NovaConta segue cadastro legado separado. Kiwify/ofertas/planos/Blacklist/configuraçõesWhatsApp não fazem parte do lote.
 
-Gate completo final, checkpoint37, instalação37, push/deploy e smoke oficial ainda precisam de registro factual posterior.36a já instalado/deployLive/Healthy; nenhum dado financeiro foi reparado.
+Gate final, instalação37, push/deploy efe1 e smoke oficial somente leitura agora têm registro factual abaixo e em RESULT.md.36a permanece instalado; nenhum dado financeiro foi reparado. A cotação da sessão administrativa recusou integridade, não foi um positivo financeiro produtivo.
 
 ## Execução local sintética
 
@@ -37,4 +37,10 @@ Checkpoint certificado12ec76b1. apply_migration do payload mecanicamente idênti
 
 Snapshot read-only pré01h35:56→pós01h36:25 comparou mecanicamente hashes e contagens integrais de45 tabelas históricas/financeiras, todos idênticos. Assinaturas dos três manifestos34/35/36 legitimamente re-selados pela instalação são excluídas desse hash, somenteID/versão comparados; novas fontes/selos conferidos separadamente. parcelas_renovacoes era ausente em produção antes do lote e permaneceu ausente; não foi criada nem anunciada como tabela hashada. A primeira consulta extra falhou42P01 por essa ausência e foi preservada/ajustada somente no instrumento de snapshot, sem alterar SQL37. Os quatro financeiros originais e divergências12/2/6 também permaneceram integralmente iguais. Nenhum DML financeiro/saneamento, operação de teste ou mensagem produtiva.
 
-Push/deploy e smoke oficial37 ainda pendentes deste registro. SQL e código/harness permanecem idênticos ao checkpoint testado; complemento exclusivamente documental.
+## Publicação e pós-smoke37 confirmados
+
+Push fast-forward para efe1df2a às01h39:14BRT. DigitalOcean deploy f75e671c-f50d-446d-80ba-144398cd03a7, commit efe1 exato, Success/Live/Healthy às01h46:40. BundleDniMPhp2.js,1289337bytes/SHA0eea85bc4c2e0227fd32d96c04a9796b216525336c6348fbb5aa7aec00cba60b, resposta fresh HTTP200 application/javascript byte-idêntica ao build. Primeira coleta divergente01h43 sem corpo preservado permanece inconclusiva; não inventar causa. Regressores pós-push377PASS/8files/exit0 às01h41:53.
+
+Smoke oficial01h47–01h53: modais/capability/metadados próprios carregados; conta administrativa com livro histórico recusado. Quoteaporte0.01 realmente solicitada; JSON autenticado confirmou PRECONDITION_FAILED/httpStatus412, sem saneamento/fallback. Transferência mesma conta recusada na UI. Só havia uma conta própria ativa; quote entre duas contas/preview negativo produtivo não foram executados. Não confirmar operações nem chamar recovery fictício: nenhum dinheiro/mensagem/fence de teste.
+
+Pós-smoke01h54: fontes129/129zeroDrift/selos34–37PASS,82/82RLS/ACL/cap37 intactos; zeroops/pernas/pins/fences/caps/coex37/36. JSON inteiro de45 hashes/contagens/contexto/ausência preexistente e quatro financeiros/divergências12/2/6 idênticos aos anteriores. Código/SQL/harness frozen. Complemento documental posterior descreve o deploy efe1 observado, não presume um novo commit Live. Manutenção de despesas38 e demais frentes continuam separadas; não plataforma100%.
