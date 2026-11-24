@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ getDb: vi.fn(), getSupabaseClientAsync: vi.fn(), resetDb: vi.fn() }));
 vi.mock("./db", () => mocks);
 import { appRouter } from "./routers";
+import { dataHojeBrasilia } from "./services/businessDate";
 const caller = (user: any = { id: 41 }) => appRouter.createCaller({ user, req: { headers: {} }, res: {} } as any).contratos;
 const contrato = { id: 1, user_id: 41, cliente_id: 2, modalidade: "mensal", status: "ativo", valor_principal: "100.00", valor_parcela: "100.00", numero_parcelas: 1, taxa_juros: "0.00", tipo_taxa: "mensal", data_inicio: "2026-11-01", createdAt: "2026-11-01", etiquetas: "[]" };
 const parcela = { id: 3, user_id: 41, contrato_id: 1, cliente_id: 2, numero_parcela: 1, valor_original: "100.00", valor_pago: "0.00", valor_multa: "0.00", saldo_residual: "0.00", data_vencimento: "2027-01-10", status: "pendente" };
@@ -29,7 +30,8 @@ function fonte() {
       },
     }; return q;
   });
-  return { from, tables, calls, setFault: (fn: typeof fault) => { fault = fn; } };
+  const rpc = vi.fn().mockRejectedValue(Error("RPC inesperada neste fixture"));
+  return { from, rpc, tables, calls, setFault: (fn: typeof fault) => { fault = fn; } };
 }
 beforeEach(() => { vi.clearAllMocks(); mocks.getDb.mockResolvedValue(null); });
 describe("Listagem real de empréstimos: leitura íntegra, nunca cadastro condicionado a saldo", () => {
@@ -252,5 +254,72 @@ describe("Apresentação por parcela: slots persistidos, sem principal proporcio
     f.tables.contratos[0].valor_principal = "100.00"; f.tables.parcelas[0].valor_juros = "100.01";
     await expect(caller().listComParcelas()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     await expect(caller().obterDetalhes({ id: 1 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+  });
+});
+
+const cotacao36 = (extra = {}) => ({ elegivel: true, contratoId: 1, parcelaId: 3, contaCaixaId: 4, totalExigido: "118.75", multa: "7.50", mora: "1.25", jurosEmbutidos: "10.00", valorPagoAcumulado: "0.00", dataPagamento: dataHojeBrasilia(), vencimento: "2001-01-01", status: "atrasada", estadoHash: "a".repeat(64), regra: "recebimento_multa36_brt_v1", ...extra });
+function fonte36() {
+  const f = fonte(); Object.assign(f.tables.parcelas[0], { status: "atrasada", valor_original: "110.00", valor_juros: "10.00", multa_manual: "7.50", valor_multa: "0.00", data_vencimento: "2001-01-01" });
+  f.tables.configuracoes = [{ user_id: 41, chave: "jurosMultaAutomatico", valor: "true" }, { user_id: 41, chave: "multaPadrao", valor: "99" }, { user_id: 41, chave: "multaDiaria", valor: "999" }];
+  f.rpc.mockImplementation(async (name, args) => {
+    if (name === "rpc_identificar_multa36") return { data: { userId: 41, contratoId: 1, parcelaId: args.p_parcela_id, trilho: "multa36", status: f.tables.parcelas.find(p => p.id === args.p_parcela_id)!.status }, error: null };
+    if (name === "rpc_cotar_multa36") return { data: cotacao36({ parcelaId: args.p_parcela_id }), error: null };
+    throw Error("RPC fora da leitura auditada");
+  }); return f;
+}
+describe("Apresentação36 real na lista e ficha — nenhum percentual duplicado ou nova cobrança em residual", () => {
+  it("multa ainda não recebida entra no total exigível, não recebe percentual geral e não inventa Caixa", async () => {
+    const f = fonte36(); const value = await apresentarListaEFicha(f);
+    expect(value).toMatchObject({ totalReceber: 118.75, totalPago: 0, parcelasComAtraso: [{ multaAplicada: 7.5, jurosAtraso: 1.25, totalComAtraso: 118.75 }] });
+    expect(f.tables.parcelas[0].valor_multa).toBe("0.00");
+    expect(f.rpc.mock.calls.every(([name, args]) => ["rpc_identificar_multa36", "rpc_cotar_multa36"].includes(name) && args.p_user_id === 41)).toBe(true);
+  });
+  it("parcial só apresenta residual cotado, sem percentual/mora nova e sem somar principal", async () => {
+    const f = fonte36(); Object.assign(f.tables.parcelas[0], { status: "parcial", valor_pago: "50.00", saldo_residual: "68.75", valor_multa: "7.50" });
+    const old = f.rpc.getMockImplementation()!; f.rpc.mockImplementation(async (name, args) => name === "rpc_cotar_multa36" ? { data: cotacao36({ status: "parcial", totalExigido: "68.75", valorPagoAcumulado: "50.00" }), error: null } : old(name, args));
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 68.75, totalPago: 50, parcelasComAtraso: [{ totalComAtraso: 68.75, multaAplicada: 7.5, jurosAtraso: 1.25 }] });
+  });
+  it("antecessora renovada não duplica principal e sucessora não herda a multa manual", async () => {
+    const f = fonte36(); Object.assign(f.tables.parcelas[0], { status: "cancelada", valor_pago: "18.75", saldo_residual: "100.00" });
+    f.tables.parcelas.push({ ...f.tables.parcelas[0], id: 5, numero_parcela: 2, multa_manual: "0.00", valor_pago: "0.00", saldo_residual: "0.00", data_vencimento: "2099-01-01", status: "pendente" });
+    f.rpc.mockImplementation(async (name, args) => {
+      if (name === "rpc_identificar_multa36") return { data: { userId: 41, contratoId: 1, parcelaId: args.p_parcela_id, trilho: "multa36", status: args.p_parcela_id === 3 ? "renovada" : "pendente" }, error: null };
+      if (name === "rpc_cotar_multa36") return { data: args.p_parcela_id === 3 ? cotacao36({ elegivel: false, status: "renovada", totalExigido: "0.00", valorPagoAcumulado: "18.75" }) : cotacao36({ parcelaId: 5, status: "pendente", totalExigido: "110.00", multa: "0.00", mora: "0.00", vencimento: "2099-01-01" }), error: null };
+      throw Error("RPC fora da leitura auditada");
+    });
+    expect(await apresentarListaEFicha(f)).toMatchObject({ totalReceber: 110, totalPago: 18.75, parcelasAbertas: 1, proximaParcela: { id: 5 }, parcelasComAtraso: [] });
+  });
+  it.each(["timeout", "undefined", "outro-owner", "outro-id", "regra-antiga", "virada-dia"])("recusa de prova %s não retorna zero ou cobrança legada", async mode => {
+    const f = fonte36(); const old = f.rpc.getMockImplementation()!;
+    f.rpc.mockImplementation(async (name, args) => {
+      if (mode === "timeout") throw Error("timeout");
+      if (name === "rpc_identificar_multa36") return mode === "undefined" ? { data: undefined, error: null } : mode === "outro-owner" ? { data: { userId: 99, contratoId: 1, parcelaId: 3, trilho: "multa36", status: "pendente" }, error: null } : old(name, args);
+      return { data: cotacao36(mode === "outro-id" ? { parcelaId: 9 } : mode === "regra-antiga" ? { regra: "recebimento_multimodal_brt_v1" } : mode === "virada-dia" ? { dataPagamento: "2000-01-01" } : {}), error: null };
+    }); mocks.getSupabaseClientAsync.mockResolvedValue(f);
+    await expect(caller().listComParcelas()).rejects.toThrow(); await expect(caller().obterDetalhes({ id: 1 })).rejects.toThrow();
+  });
+  it("ausência explícita36 mantém leitura anterior sem adoção ou pagamento", async () => {
+    const f = fonte36(); f.rpc.mockResolvedValue({ data: null, error: null });
+    const v = await apresentarListaEFicha(f); expect(v.totalReceber).toBe(110);
+    expect(f.rpc.mock.calls.every(c => c[0] === "rpc_identificar_multa36")).toBe(true);
+  });
+});
+
+
+describe("Apresentação36 — renovação concorrente e seleção completa", () => {
+  it.each(["lista", "ficha"])("%s não publica total zero se a sucessora surgir depois da leitura REST", async pagina => {
+    const f = fonte36();
+    f.rpc.mockImplementation(async (name, args) => {
+      if (name === "rpc_identificar_multa36") {
+        Object.assign(f.tables.parcelas[0], { status: "cancelada", valor_pago: "18.75", saldo_residual: "100.00" });
+        if (f.tables.parcelas.length === 1) f.tables.parcelas.push({ ...f.tables.parcelas[0], id: 5, numero_parcela: 2, multa_manual: "0.00", valor_pago: "0.00", saldo_residual: "0.00", data_vencimento: "2099-01-01", status: "pendente" });
+        return { data: { userId: 41, contratoId: 1, parcelaId: 3, trilho: "multa36", status: "renovada" }, error: null };
+      }
+      return { data: cotacao36({ status: "renovada", elegivel: false, totalExigido: "0.00", valorPagoAcumulado: "18.75" }), error: null };
+    });
+    mocks.getSupabaseClientAsync.mockResolvedValue(f);
+    await expect(pagina === "lista" ? caller().listComParcelas() : caller().obterDetalhes({ id: 1 })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(f.calls.filter(c => c.table === "parcelas" && c.fields.includes("cliente_id")).length).toBe(2);
+    expect(f.rpc.mock.calls.every(([name]) => ["rpc_identificar_multa36", "rpc_cotar_multa36"].includes(name))).toBe(true);
   });
 });

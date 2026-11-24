@@ -20,7 +20,7 @@ function useAtualizar(onSuccess?: () => void) {
   };
 }
 /** Cache tRPC não contém owner. Só uma resposta de refetch iniciada nesta geração certifica a cotação. */
-function useCotacaoAtual<T>(geracao: object, enabled: boolean, pedido: string,
+export function useCotacaoAtual<T>(geracao: object, enabled: boolean, pedido: string,
   query: { isError: boolean; isLoading: boolean; isFetching: boolean; refetch: () => Promise<{ data?: unknown; isError?: boolean; isLoading?: boolean; isFetching?: boolean }> }, normalizar: (value: unknown) => T,
 ) {
   const current = useRef({ geracao, enabled, pedido, ativa: false, envio: 0 });

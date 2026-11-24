@@ -235,7 +235,7 @@ it('PG17 multimodal: instalação fail-closed, cinco fórmulas, ciclo completo, 
   });
   await scenario('ponte 0034 só aceita operação privada própria única e posterior inteiro: owner/parcela/valor/data/descrição/createdAt',async()=>{
    const prepare=async()=>{
-    await sql("DELETE FROM parcelas WHERE id=901; UPDATE contratos SET conta_caixa_id=1,num_parcelas=1,numero_parcelas=1,valor_parcela=100 WHERE id=900; UPDATE parcelas SET numero=1,numero_parcela=1,valor=100,valor_original=100,conta_caixa_id=1,valor_pago=100,saldo_residual=0,status='paga',data_pagamento=current_date WHERE id=900");
+    await sql("DELETE FROM parcelas WHERE id=901; UPDATE contratos SET conta_caixa_id=1,num_parcelas=1,numero_parcelas=1,valor_parcela=100 WHERE id=900; UPDATE parcelas SET numero=1,numero_parcela=1,valor=100,valor_original=100,conta_caixa_id=1,valor_pago=100,saldo_residual=0,status='paga',data_pagamento=(clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date WHERE id=900");
     await sql('INSERT INTO legados_estados VALUES(900,1,legados_snapshot(900))');
    };
    const pending=async(uid=1,cid=900,pid=900,aid=1)=>{
@@ -259,7 +259,7 @@ it('PG17 multimodal: instalação fail-closed, cinco fórmulas, ciclo completo, 
     await prepare();const id=await pending();await cap();
     expect((await sql('SELECT posterior FROM multimodal_coexistencia'))[0].posterior).not.toHaveProperty('id');
     const insert=(overrides:object={})=>sql('INSERT INTO transacoes_caixa SELECT (jsonb_populate_record(NULL::transacoes_caixa,$1::jsonb)).*',[{id:2000000,user_id:1,conta_caixa_id:1,contrato_id:900,parcela_id:900,tipo:'entrada',categoria:'pagamento_parcela',valor:'100.00',descricao:`Recebimento legado ${id}`,data_transacao:day,createdAt:created,...overrides}]);
-    const {day,created}=(await sql('SELECT current_date::text AS "day",transaction_timestamp()::text AS created'))[0];
+    const {day,created}=(await sql("SELECT (clock_timestamp() AT TIME ZONE 'America/Sao_Paulo')::date::text AS day,transaction_timestamp()::text AS created"))[0];
     const newParcela=(await sql('SELECT p.id FROM parcelas p JOIN multimodal_origens o ON o.contrato_id=p.contrato_id ORDER BY p.id LIMIT 1'))[0].id;
     for(const overrides of [{valor:'99.00'},{user_id:2},{parcela_id:901},{parcela_id:newParcela},{descricao:'forjada'},{data_transacao:'2020-01-01'},{createdAt:'2020-01-01T00:00:00Z'}]){
      await sql('SAVEPOINT mismatch');await reject(()=>insert(overrides),'42501');await sql('ROLLBACK TO SAVEPOINT mismatch');expect((await sql('SELECT count(*)::int n FROM multimodal_coexistencia'))[0].n).toBe(1);expect((await sql('SELECT count(*)::int n FROM legados_capacidades'))[0].n).toBe(1);

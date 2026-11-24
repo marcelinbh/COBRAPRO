@@ -6,6 +6,7 @@ import { EmprestimoSeguroReceber } from "./EmprestimoSeguroReceber";
 import { EmprestimoSeguroRenovar } from "./EmprestimoSeguroRenovar";
 import { ParcelaLegadaReceber } from "./ParcelaLegadaReceber";
 import { EmprestimoMultimodalReceber, EmprestimoMultimodalRenovar } from "./EmprestimoMultimodalOperacoes";
+import { MultaManualReceber, MultaManualRenovar } from "./MultaManualOperacoes";
 
 export function RecebimentoValidado({ contratoId, parcelaId, onSuccess, permitirRenovacao = false }: {
   contratoId: number; parcelaId: number; onSuccess: () => void; permitirRenovacao?: boolean;
@@ -39,10 +40,15 @@ export function RecebimentoValidado({ contratoId, parcelaId, onSuccess, permitir
   const renovacaoMultimodal = value?.trilho === "multimodal" && permitirRenovacao
     ? <EmprestimoMultimodalRenovar key={`multimodal-renovar:${screenScope}`} contratoId={contratoId} parcelaId={parcelaId} origemUserId={value.userId} status={value.status} onSuccess={concluir} />
     : null;
+  const multa = value?.trilho === "multa36" ? <div className="space-y-3">
+    <p className="text-sm">Ciclo de multa comprovado. Recebimento integral ou parcial e renovação usam a mesma prova financeira; não convertem para trilhos anteriores.</p>
+    <MultaManualReceber key={`multa36-receber:${screenScope}`} contratoId={contratoId} parcelaId={parcelaId} origemUserId={value.userId} status={value.status} onSuccess={concluir} />
+    {permitirRenovacao && <MultaManualRenovar key={`multa36-renovar:${screenScope}`} contratoId={contratoId} parcelaId={parcelaId} origemUserId={value.userId} status={value.status} onSuccess={concluir} />}
+  </div> : null;
   return <>
     <Button size="sm" onClick={e => { e.stopPropagation(); setOpenedScope(screenScope); }}>Receber / conferir</Button>
     <Dialog open={open} onOpenChange={v => setOpenedScope(v ? screenScope : "")}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Recebimento com validação de integridade</DialogTitle></DialogHeader>
-      {!open ? null : !user || origem.isLoading || origem.isFetching ? <p>Conferindo a origem na sessão atual...</p> : !value ? <><p role="alert">Não foi possível comprovar a origem nesta sessão. Nenhum recebimento será executado.</p><Button variant="outline" onClick={() => void origem.refetch()}>Tentar novamente</Button></> : encerrada ? <div className="space-y-3"><p>Esta parcela está {value.status}. Principal transferido não é cobrado novamente. Consulte a parcela sucessora ou o histórico.</p>{renovacao}{value.trilho === "multimodal" && <EmprestimoMultimodalReceber key={`multimodal-receber:${screenScope}`} contratoId={contratoId} parcelaId={parcelaId} origemUserId={value.userId} status={value.status} onSuccess={concluir} />}{renovacaoMultimodal}</div> : value.trilho === "multimodal" ? <div className="space-y-3">
+      {!open ? null : !user || origem.isLoading || origem.isFetching ? <p>Conferindo a origem na sessão atual...</p> : !value ? <><p role="alert">Não foi possível comprovar a origem nesta sessão. Nenhum recebimento será executado.</p><Button variant="outline" onClick={() => void origem.refetch()}>Tentar novamente</Button></> : value.trilho === "multa36" ? <>{encerrada && <p>Esta parcela está {value.status}. Principal transferido não é cobrado novamente. Confira somente a intenção existente ou a parcela sucessora.</p>}{multa}</> : encerrada ? <div className="space-y-3"><p>Esta parcela está {value.status}. Principal transferido não é cobrado novamente. Consulte a parcela sucessora ou o histórico.</p>{renovacao}{value.trilho === "multimodal" && <EmprestimoMultimodalReceber key={`multimodal-receber:${screenScope}`} contratoId={contratoId} parcelaId={parcelaId} origemUserId={value.userId} status={value.status} onSuccess={concluir} />}{renovacaoMultimodal}</div> : value.trilho === "multimodal" ? <div className="space-y-3">
         <p className="text-sm">Origem multimodal comprovada. Conta, parcelas e encargos serão conferidos no mesmo ciclo financeiro; sem conversão para o legado.</p>
         <EmprestimoMultimodalReceber key={`multimodal-receber:${screenScope}`} contratoId={contratoId} parcelaId={parcelaId} origemUserId={value.userId} status={value.status} onSuccess={concluir} />
         {renovacaoMultimodal}

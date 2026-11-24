@@ -22,6 +22,7 @@ import { trpc } from '@/lib/trpc';
 import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
+import { MultaManualAplicar } from '@/components/MultaManualOperacoes';
 
 export default function EmprestimoDetalhes() {
   const { t } = useTranslation();
@@ -34,7 +35,6 @@ export default function EmprestimoDetalhes() {
   const [modalPagar, setModalPagar] = useState(false);
   const [modalPagarJuros, setModalPagarJuros] = useState(false);
   const [modalEditarJuros, setModalEditarJuros] = useState(false);
-  const [modalMulta, setModalMulta] = useState(false);
   const [modalDeletar, setModalDeletar] = useState(false);
 
   // Campos dos modais
@@ -42,7 +42,6 @@ export default function EmprestimoDetalhes() {
   const [valorCustomPagar, setValorCustomPagar] = useState('');
   const [valorCustomJuros, setValorCustomJuros] = useState('');
   const [novaTaxa, setNovaTaxa] = useState('');
-  const [valorMulta, setValorMulta] = useState('');
   const [loadingWpp, setLoadingWpp] = useState(false);
   const [gerandoPDF, setGerandoPDF] = useState(false);
   const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
@@ -128,17 +127,6 @@ export default function EmprestimoDetalhes() {
       utils.contratos.listComParcelas.invalidate();
     },
     onError: (e: any) => toast.error('Erro ao atualizar parcela: ' + e.message),
-  });
-
-  const aplicarMultaMutation = trpc.contratos.aplicarMulta.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.multa_aplicada_com_sucesso'));
-      setModalMulta(false);
-      setValorMulta('');
-      refetch();
-      utils.contratos.listComParcelas.invalidate();
-    },
-    onError: (e) => toast.error('Erro: ' + e.message),
   });
 
   if (isLoading) {
@@ -598,9 +586,7 @@ export default function EmprestimoDetalhes() {
         <Button disabled title="Edição financeira manual bloqueada para preservar a auditoria." className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
           <Edit2 className="h-4 w-4" /> Editar Juros
         </Button>
-        <Button className="gap-2" variant="outline" size="sm" onClick={() => { setValorMulta(''); setModalMulta(true); }} disabled title="Encargos são conferidos na cotação financeira; não há multa manual neste fluxo.">
-          <AlertTriangle className="h-4 w-4" /> Aplicar Multa
-        </Button>
+        <MultaManualAplicar contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
         {emprestimo.clienteWhatsapp && (
           <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp}>
             {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
@@ -814,46 +800,6 @@ export default function EmprestimoDetalhes() {
                 onClick={() => editarJurosMutation.mutate({ id: emprestimo.id, novaTaxa })}
               >
                 {editarJurosMutation.isPending ? 'Salvando...' : 'Salvar'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── MODAL APLICAR MULTA ── */}
-      <Dialog open={modalMulta} onOpenChange={(v) => { setModalMulta(v); if (!v) setValorMulta(''); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>APLICAR MULTA POR ATRASO</DialogTitle>
-            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {isAtrasado && (
-              <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm">
-                <p className="text-red-400 font-semibold">{diasAtraso} dias de atraso</p>
-                <p className="text-xs text-muted-foreground mt-1">{t('loanDetails.fineWillBeAdded')}</p>
-              </div>
-            )}
-            <div>
-              <Label>Valor da Multa (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Ex: 50.00"
-                value={valorMulta}
-                onChange={e => setValorMulta(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setModalMulta(false)}>{t('common.cancel')}</Button>
-              <Button
-                className="flex-1 bg-red-600 hover:bg-red-700"
-                disabled={!valorMulta.trim() || aplicarMultaMutation.isPending}
-                onClick={() => aplicarMultaMutation.mutate({ id: emprestimo.id, multa: valorMulta })}
-              >
-                {aplicarMultaMutation.isPending ? 'Aplicando...' : 'Aplicar Multa'}
               </Button>
             </div>
           </div>

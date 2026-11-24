@@ -1303,7 +1303,7 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Checkpoint, instalação prospectiva 0035 e push fast-forward; `533e131` live/Healthy às 18h25min48. RLS65/65/0, ACLs e 12/2/6 preservados; zero origens novas às 18h33. Proteção de senha 0016 comprovada e preservada.
 - [x] Corrigir envelope booleano `success` do SDK sem aceitar confirmação falsa e refetch circular por montagem; 170 regressões direcionadas e gate completo aprovados.
 - [x] Complemento `46238e2` live/Healthy às 18h41min26; bundle exato e cadastro de cinco modalidades pronto às 18h42. Cotação de ID inexistente NOT_FOUND e ficha null; RLS65/65/0 e 12/2/6 preservados, zero origens novas. Nenhum empréstimo/mensagem criado pelo smoke.
-- [ ] Resolver/atestar frequência da agenda WhatsApp: active/cron*/5, mas último schedule success às 14h39 BRT e ausência de execuções novas por cerca de quatro horas; não certifica entrega contínua. Verificação sem dispatch, alterações ou mensagens.
+- [x] Recuperação da agenda nativa comprovada em 20/11: duas execuções novas success/HTTP200 às 21h36 e 21h37 BRT, sem CONFIGURACOES_INDISPONIVEIS. Enviados/elegíveis zero; comprova execução, não entrega nem frequência contínua.
 - [ ] Revisão humana de dados antigos continua separada. Sem alterações de Kiwify/oferta/Blacklist/WhatsApp/flags e sem correções automáticas de saldos ou tenant.
 
 ## Fase 74: Correções do vídeo e controles WhatsApp — 16/11/2026
@@ -1313,7 +1313,19 @@ Kiwify/ofertas/WhatsApp/QR e flags existentes permanecem sem alterações. O ale
 - [x] Validação WhatsApp sem envio, teste em número explícito e processamento confirmado da própria empresa, com histórico e callbacks segregados por geração.
 - [x] Credencial backend Manus atualizada via formulário seguro e teste negativo HTTP200; nenhum segredo no Git.
 - [x] Certificação final fechada: 2.933 testes aprovados, 11 opt-in ignorados, TypeScript/build/diff check aprovados. Sem DDL/DML produtivos, alteração de flags, Kiwify/oferta ou Blacklist neste lote.
-- [ ] Publicar este lote e confirmar revisão live, bundle, cadastro e controles reais sem envio ou empréstimo sintético persistido.
-- [ ] Publicar a versão Manus que executa a agenda nativa e confirmar execução nova bem-sucedida; logs após atualização da chave ainda apresentaram CONFIGURACOES_INDISPONIVEIS.
+- [x] Lote `b63a6d07` publicado DigitalOcean em 16/11 às 20h12min46 BRT, reconfirmado local/GitHub/live em 20/11. Controles próprios e Validar sem enviar concluídos no site oficial; nenhuma operação financeira ou mensagem produtiva criada.
+- [x] Publicação Manus `b63a6d07` concluída; agenda existente executou novamente em 20/11 às 21h36 e 21h37 BRT com HTTP200, success e sem CONFIGURACOES_INDISPONIVEIS. Sem entrega nova comprovada.
 - [ ] Implementar multa manual fixa RECEBÍVEL nas transições auditadas. Protótipo de registro lateral foi rejeitado e arquivado fora do Git; não instalado nem incluído neste lote. Não declarar multa liberada.
 - [ ] Revisão humana por registro das divergências históricas, sem atribuição automática de empresa/valores.
+
+## Fase 75: Multa manual fixa atômica — 23/11/2026
+
+- [x] Implementar aplicação fixa sem movimento de Caixa, recebimento integral/parcial congelado, renovação elegível com principal único e sucessora limpa.
+- [x] Schemas/SDK/backend/UI strict, UUID/recovery/fence e isolamento de intenção/cache por empresa; recorte apenas origem35 íntegra.
+- [x] Cotação de renovada comprovada preserva pago=juros+multa+mora e total0; cancelada sem prova é recusada.
+- [x] Corrigir corrida REST/cotação que omitia sucessora: reconferência completa dos IDs/vínculos e cotação final do snapshot, sem cálculo parcial ou retry financeiro.
+- [x] Gate final: 3392 testes aprovados/11 opt-in ignorados; 158 arquivos aprovados/3 ignorados, TypeScript/build/diff check. PG17 independente:22 grupos aprovados, sem declarar teste dedicado0031.
+- [x] Migration0036 SHA7194c1f7038eb9e36358330614249b66575075bef465fcfe3c8aca59a4fed21f, 71 predecessoras e3 extensões previstas; SQL anterior intocado.
+- [ ] Checkpoint, instalação produtiva exata, postflight de ACL/RLS/histórico, push fast-forward e deploy Healthy.
+- [ ] Smoke no site oficial depois do deploy, sem movimentação financeira nem mensagem real.
+- [ ] Próximos lotes: aporte/transferência37; manutenção de despesas; reparcelamento e trilhos de vendas/veículos/cheques. Não afirmar liberação100% antes da certificação própria.

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-const h = vi.hoisted(() => ({ db: vi.fn(), rpc: vi.fn(), nova: vi.fn(), antiga: vi.fn(), cotar: vi.fn(), receber: vi.fn() }));
+const h = vi.hoisted(() => ({ db: vi.fn(), rpc: vi.fn(), multa: vi.fn(), nova: vi.fn(), antiga: vi.fn(), cotar: vi.fn(), receber: vi.fn() }));
 vi.mock('../db', () => ({ getSupabaseClientAsync: h.db }));
 vi.mock('../services/recebimentosLegadosRpc', async original => ({ ...await original<any>(), cotarRecebimentoLegado: h.cotar, receberLegadoAtomico: h.receber }));
 import { recebimentosLegadosRouter } from './recebimentosLegados';
@@ -8,12 +8,12 @@ const origem = { userId: 77, contratoId: 1, parcelaId: 2, trilho: 'legado', stat
 const caller = (user: any = { id: 77 }) => recebimentosLegadosRouter.createCaller({ user, req: {}, res: {} } as any);
 beforeEach(() => {
   vi.clearAllMocks(); h.db.mockResolvedValue({ rpc: h.rpc });
-  h.nova.mockResolvedValue({ data: null, error: null }); h.antiga.mockResolvedValue({ data: origem, error: null });
-  h.rpc.mockImplementation((name, args) => name === 'rpc_identificar_emprestimo_multimodal' ? h.nova(args) : name === 'legados_identificar_trilho' ? h.antiga(args) : Promise.reject(new Error('RPC fora do contrato')));
+  h.multa.mockResolvedValue({ data: null, error: null }); h.nova.mockResolvedValue({ data: null, error: null }); h.antiga.mockResolvedValue({ data: origem, error: null });
+  h.rpc.mockImplementation((name, args) => name === 'rpc_identificar_multa36' ? h.multa(args) : name === 'rpc_identificar_emprestimo_multimodal' ? h.nova(args) : name === 'legados_identificar_trilho' ? h.antiga(args) : Promise.reject(new Error('RPC fora do contrato')));
 });
 function noFinancialFallback() {
   expect(h.cotar).not.toHaveBeenCalled(); expect(h.receber).not.toHaveBeenCalled();
-  expect(h.rpc.mock.calls.every(c => ['rpc_identificar_emprestimo_multimodal', 'legados_identificar_trilho'].includes(c[0]))).toBe(true);
+  expect(h.rpc.mock.calls.every(c => ['rpc_identificar_multa36', 'rpc_identificar_emprestimo_multimodal', 'legados_identificar_trilho'].includes(c[0]))).toBe(true);
 }
 describe('origem real — provas específicas, autenticação e tenant SQL', () => {
   it('não autenticado bloqueia antes do DB', async () => { await expect(caller(null).origem(input)).rejects.toMatchObject({ code: 'UNAUTHORIZED' }); expect(h.db).not.toHaveBeenCalled(); expect(h.rpc).not.toHaveBeenCalled(); });
@@ -23,6 +23,7 @@ describe('origem real — provas específicas, autenticação e tenant SQL', () 
   it('tenant vem de ctx; NULL específico precede a classificação antiga', async () => {
     expect(await caller().origem(input)).toEqual(origem);
     expect(h.rpc.mock.calls).toEqual([
+      ['rpc_identificar_multa36', { p_user_id: 77, p_contrato_id: 1, p_parcela_id: 2 }],
       ['rpc_identificar_emprestimo_multimodal', { p_user_id: 77, p_contrato_id: 1, p_parcela_id: 2 }],
       ['legados_identificar_trilho', { p_user_id: 77, p_contrato_id: 1, p_parcela_id: 2 }],
     ]); noFinancialFallback();
@@ -60,4 +61,21 @@ describe('origem real — provas específicas, autenticação e tenant SQL', () 
     expect(await caller().origem(input)).toEqual({ ...origem, trilho: 'multimodal', status }); expect(h.antiga).not.toHaveBeenCalled(); noFinancialFallback();
   });
   it('status renovada antigo preserva prova de principal transferido', async () => { h.antiga.mockResolvedValue({ data: { ...origem, status: 'renovada' }, error: null }); expect(await caller().origem(input)).toMatchObject({ status: 'renovada' }); });
+  it.each(['pendente', 'parcial', 'paga', 'renovada', 'cancelada'])('multa36 %s tem prioridade sobre todas as origens anteriores', async status => {
+    h.multa.mockResolvedValue({ data: { ...origem, trilho: 'multa36', status }, error: null });
+    expect(await caller().origem(input)).toEqual({ ...origem, trilho: 'multa36', status });
+    expect(h.nova).not.toHaveBeenCalled(); expect(h.antiga).not.toHaveBeenCalled(); noFinancialFallback();
+  });
+  it.each([undefined, [], {}, { ...origem }, { ...origem, trilho: 'multa36', userId: 78 }, { ...origem, trilho: 'multa36', parcelaId: 9 }, { ...origem, trilho: 'multa36', contratoId: 9 }, { ...origem, trilho: 'multa36', status: 'ativo' }])('multa36 inválida %j não presume ausência', async response => {
+    h.multa.mockResolvedValue({ data: response, error: null }); await expect(caller().origem(input)).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(h.nova).not.toHaveBeenCalled(); expect(h.antiga).not.toHaveBeenCalled();
+  });
+  it.each(['42501', '42883', 'PGRST202', '23514', '55000'])('recusa36 %s não permite outro trilho', async code => {
+    h.multa.mockResolvedValue({ data: null, error: { code } }); await expect(caller().origem(input)).rejects.toMatchObject({ code: code === '42501' ? 'NOT_FOUND' : 'PRECONDITION_FAILED' });
+    expect(h.nova).not.toHaveBeenCalled(); expect(h.antiga).not.toHaveBeenCalled();
+  });
+  it('timeout36 não permite classificação antiga', async () => {
+    h.multa.mockRejectedValue(Error('timeout')); await expect(caller().origem(input)).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(h.nova).not.toHaveBeenCalled(); expect(h.antiga).not.toHaveBeenCalled();
+  });
 });

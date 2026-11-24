@@ -14,6 +14,7 @@ import { emprestimosProspectivosRouter } from "./routers/emprestimosProspectivos
 import { emprestimosMultimodalRouter } from "./routers/emprestimosMultimodal";
 import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
+import { multaManualRouter } from "./routers/multaManual";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import { getDb, getSupabaseClientAsync, resetDb } from "./db";
@@ -50,6 +51,7 @@ import { lerResumoCaixaDashboard } from "./dashboardLedger";
 import { statusCalendarioParcela } from "../shared/parcelasCalendar";
 import { onboardingCompleteSchema, criarOnboardingCompleteHandler } from "./services/onboardingRpc";
 import { listarRegistrosEmprestimos, falhaLeituraEmprestimos, falhaVinculoEmprestimos } from "./services/emprestimosLeitura";
+import { lerCotacoesApresentacaoMulta } from "./services/multaManualApresentacao";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -929,7 +931,7 @@ const contratosRouter = router({
       if (parcelasVinculos.some((p: any) => !contratosPorId.has(p.contrato_id) ||
           p.cliente_id !== contratosPorId.get(p.contrato_id).cliente_id)) throw falhaVinculo();
       const parcelasData = await lerLista(() => supabase.from('parcelas')
-        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_juros, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
+        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_juros, valor_pago, valor_multa, multa_manual, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
         .eq('user_id', ctx.user.id).in('contrato_id', contratoIds).order('data_vencimento').order('id'));
       const vinculosPorId = new Map<number, any>(parcelasVinculos.map((p: any) => [p.id, p]));
       if (parcelasData.length !== parcelasVinculos.length || parcelasData.some((p: any) =>
@@ -963,12 +965,20 @@ const contratosRouter = router({
         multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
       }
 
-      return filtrados.map((c: any) => {
+      const apresentados = [];
+      // Sequencial por contrato; a leitura36 limita concorrência por parcela no helper.
+      for (const c of filtrados) {
         const cliente = clientesPorId.get(c.cliente_id);
         const parcelasContrato = parcelasPorContrato[c.id] ?? [];
-        const apresentacao = apresentarEmprestimo(c, parcelasContrato, hoje, multaDiaria, multaPercentual);
+        const cotacoes36 = await lerCotacoesApresentacaoMulta(supabase, ctx.user.id, c.id, parcelasContrato, hoje, async () => {
+          const vinculos = await lerLista(() => supabase.from('parcelas')
+            .select('id, user_id, contrato_id, cliente_id', { count: 'exact' }).eq('contrato_id', c.id).order('id'));
+          if (vinculos.some((p: any) => p.contrato_id !== c.id || p.cliente_id !== c.cliente_id)) throw falhaVinculo();
+          return vinculos;
+        });
+        const apresentacao = apresentarEmprestimo(c, parcelasContrato, hoje, multaDiaria, multaPercentual, cotacoes36);
 
-        return {
+        apresentados.push({
           id: c.id,
           clienteId: cliente?.id ?? c.cliente_id,
           clienteNome: cliente?.nome ?? '',
@@ -987,8 +997,9 @@ const contratosRouter = router({
           // KPIs calculados
           ...apresentacao,
           etiquetas: (() => { try { return JSON.parse(c.etiquetas ?? '[]'); } catch { return []; } })(),
-        };
-      });
+        });
+      }
+      return apresentados;
     }),
   obterDetalhes: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -1020,7 +1031,7 @@ const contratosRouter = router({
         .eq('contrato_id', input.id).order('id'));
       if (parcelasVinculos.some((p: any) => p.contrato_id !== input.id || p.cliente_id !== cliente.id)) throw falhaVinculoEmprestimos();
       const parcelasData = await lerLista(() => supabase.from('parcelas')
-        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_juros, valor_pago, valor_multa, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
+        .select('id, user_id, contrato_id, numero_parcela, valor_original, valor_juros, valor_pago, valor_multa, multa_manual, saldo_residual, data_vencimento, data_pagamento, status', { count: 'exact' })
         .eq('contrato_id', input.id).eq('user_id', ctx.user.id).order('data_vencimento').order('id'));
       const vinculosPorId = new Map<number, any>(parcelasVinculos.map((p: any) => [p.id, p]));
       if (parcelasData.length !== parcelasVinculos.length || parcelasData.some((p: any) =>
@@ -1044,7 +1055,13 @@ const contratosRouter = router({
         multaPercentual = Number.isFinite(percentual) && percentual > 0 ? percentual : 0;
       }
 
-      const apresentacao = apresentarEmprestimo(contratoData, parcelasData, hoje, multaDiaria, multaPercentual);
+      const cotacoes36 = await lerCotacoesApresentacaoMulta(supabase, ctx.user.id, contratoData.id, parcelasData, hoje, async () => {
+        const vinculos = await lerLista(() => supabase.from('parcelas')
+          .select('id, user_id, contrato_id, cliente_id', { count: 'exact' }).eq('contrato_id', contratoData.id).order('id'));
+        if (vinculos.some((p: any) => p.contrato_id !== contratoData.id || p.cliente_id !== cliente.id)) throw falhaVinculoEmprestimos();
+        return vinculos;
+      });
+      const apresentacao = apresentarEmprestimo(contratoData, parcelasData, hoje, multaDiaria, multaPercentual, cotacoes36);
 
       return {
         id: contratoData.id,
@@ -4810,6 +4827,7 @@ export const appRouter = router({
   emprestimosMultimodal: emprestimosMultimodalRouter,
   renovacaoProspectiva: renovacaoProspectivaRouter,
   recebimentosLegados: recebimentosLegadosRouter,
+  multaManual: multaManualRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,
   veiculos: veiculosRouter,

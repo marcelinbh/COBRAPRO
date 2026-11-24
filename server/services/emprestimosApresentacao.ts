@@ -1,8 +1,9 @@
 import { TRPCError } from "@trpc/server";
 import { calcularJurosMora, calcularValorAbertoParcela } from "../../shared/finance";
+import { normalizarCotacaoMulta, type CotacaoMulta } from "../../shared/multaManual";
 
 type ParcelaApresentacao = {
-  status: string; data_vencimento: string;
+  id?: number; contrato_id?: number; status: string; data_vencimento: string;
   valor_original: unknown; valor_pago?: unknown; valor_juros?: unknown;
   valor_multa?: unknown; saldo_residual?: unknown;
 };
@@ -36,10 +37,21 @@ function centavosCalculados(valor: number): number {
 export function apresentarEmprestimo<P extends ParcelaApresentacao>(
   contrato: { valor_principal: unknown; status: string },
   registros: P[], hoje: string, multaDiaria = 0, multaPercentual = 0,
+  cotacoes36?: ReadonlyMap<number, CotacaoMulta> | null,
 ) {
   const principal = centavos(contrato.valor_principal);
+  if (cotacoes36 && cotacoes36.size !== registros.length) return falha();
   const todasParcelas = registros.map(p => {
     if (!ENCERRADOS.has(p.status) && !ABERTOS.has(p.status)) return falha();
+    if (cotacoes36) {
+      if (!Number.isSafeInteger(p.id) || !Number.isSafeInteger(p.contrato_id)) return falha();
+      let q: CotacaoMulta;
+      try { q = normalizarCotacaoMulta(cotacoes36.get(p.id!), { contratoId: p.contrato_id!, parcelaId: p.id! }); } catch { return falha(); }
+      if (q.dataPagamento !== hoje) return falha();
+      // A cotação é a apresentação do estado36, não um UPDATE no registro físico.
+      return { ...p, status: q.status, valor_pago: q.valorPagoAcumulado, valor_multa: q.multa,
+        saldo_residual: q.status === "parcial" ? q.totalExigido : p.saldo_residual };
+    }
     const status = ENCERRADOS.has(p.status) || p.status === "parcial" ? p.status
       : p.data_vencimento < hoje ? "atrasada" : p.data_vencimento === hoje ? "vencendo_hoje" : "pendente";
     return { ...p, status };
@@ -60,10 +72,11 @@ export function apresentarEmprestimo<P extends ParcelaApresentacao>(
     // Somente valor_pago registrado é recebimento; status pago sem valor não é prova.
     recebido = somar(recebido, pago);
     const base = p.status === "parcial" && residual > 0 ? residual : somar(somar(original, residual), multa);
-    const aberto = ENCERRADOS.has(p.status) ? 0 : centavosCalculados(calcularValorAbertoParcela({
+    const q = cotacoes36?.get(p.id!);
+    const aberto = q ? centavos(q.totalExigido) : ENCERRADOS.has(p.status) ? 0 : centavosCalculados(calcularValorAbertoParcela({
       status: p.status, valorOriginal: original / 100, saldoResidual: residual / 100, valorMulta: multa / 100,
     }));
-    if (!ENCERRADOS.has(p.status) && aberto !== base) return falha();
+    if (!q && !ENCERRADOS.has(p.status) && aberto !== base) return falha();
     valores.set(p, { original, pago, multa, residual, juros, aberto });
     if (!contratoEncerrado && ABERTOS.has(p.status)) {
       receber = somar(receber, aberto);
@@ -80,6 +93,12 @@ export function apresentarEmprestimo<P extends ParcelaApresentacao>(
   const valorJurosParcela = proximaParcela ? (valores.get(proximaParcela)!.juros ?? 0) / 100 : 0;
   const parcelasComAtraso = parcelasAtrasadas.map(p => {
     const v = valores.get(p)!;
+    const q = cotacoes36?.get(p.id!);
+    if (q) {
+      const diasAtraso = calcularJurosMora(0, q.vencimento, new Date(`${hoje}T12:00:00-03:00`), 0, 0).diasAtraso;
+      return { ...p, diasAtraso, jurosAtraso: centavos(q.mora) / 100, multaAplicada: centavos(q.multa) / 100,
+        totalComAtraso: centavos(q.totalExigido) / 100 };
+    }
     // Residual parcial já contém os encargos da baixa; não somar original/multa outra vez.
     const baseMora = p.status === "parcial" && v.residual > 0 ? v.aberto : v.aberto - v.multa;
     const calculo = calcularJurosMora(baseMora / 100, p.data_vencimento, new Date(`${hoje}T12:00:00-03:00`), multaDiaria, multaPercentual);

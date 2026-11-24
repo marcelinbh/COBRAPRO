@@ -48,6 +48,7 @@ import { RecebimentoValidado } from './RecebimentoValidado';
 import { ParcelaLegadaReceber, lerIntencaoLegada } from './ParcelaLegadaReceber';
 import { EmprestimoSeguroReceber } from './EmprestimoSeguroReceber';
 import { EmprestimoSeguroRenovar } from './EmprestimoSeguroRenovar';
+import { MultaManualReceber, MultaManualRenovar, MultaManualAplicar } from './MultaManualOperacoes';
 import EmprestimoDetalhes from '../pages/EmprestimoDetalhes';
 import Parcelas from '../pages/Parcelas';
 import { REGRA_RECEBIMENTO_LEGADO } from '../../../server/services/recebimentosLegadosRpc';
@@ -128,6 +129,21 @@ describe('RecebimentoValidado — origem autenticada e escolha do trilho', () =>
     expect(r.nodes(EmprestimoSeguroReceber)).toHaveLength(1); expect(r.nodes(ParcelaLegadaReceber)).toHaveLength(0); expect(r.nodes('select')).toHaveLength(0); expect(r.nodes(EmprestimoSeguroRenovar)).toHaveLength(0);
     r.props.permitirRenovacao = true; r.render(); expect(r.nodes(EmprestimoSeguroRenovar)).toHaveLength(1);
     r.nodes(EmprestimoSeguroReceber)[0].props.onSuccess(); expect(h.refetch).toHaveBeenCalledOnce(); expect(h.success).toHaveBeenCalledOnce();
+  });
+  it.each(['pendente', 'parcial', 'paga', 'renovada', 'cancelada'])('multa36 %s monta somente família própria, inclusive conferência encerrada', async status => {
+    h.origem = result(origem({ trilho: 'multa36', status })); const r = gateUI(); r.props.permitirRenovacao = true;
+    await r.click('Receber / conferir');
+    expect(r.nodes(MultaManualReceber)).toHaveLength(1); expect(r.nodes(MultaManualRenovar)).toHaveLength(1); noPaymentChildren(r);
+    expect(r.nodes('select')).toHaveLength(0);
+    expect(h.contasQuery.mock.calls.every(c => c[1].enabled === false)).toBe(true);
+    for (const child of [...r.nodes(MultaManualReceber), ...r.nodes(MultaManualRenovar)]) expect(child.props).toMatchObject({ contratoId: 1, parcelaId: 2, origemUserId: 901, status });
+    expect(h.oldMutation).not.toHaveBeenCalled();
+  });
+  it('multa36 respeita renovação opcional e callback antigo não atravessa sessões', async () => {
+    h.origem = result(origem({ trilho: 'multa36' })); const r = gateUI(); await r.click('Receber / conferir');
+    expect(r.nodes(MultaManualRenovar)).toHaveLength(0); const cb = r.nodes(MultaManualReceber)[0].props.onSuccess;
+    h.user = { id: 902 }; r.render(); h.user = { id: 901 }; r.render(); cb();
+    expect(h.success).not.toHaveBeenCalled(); expect(h.refetch).not.toHaveBeenCalled();
   });
 });
 
@@ -217,5 +233,10 @@ describe('páginas reais montam RecebimentoValidado, nunca o diálogo de pagamen
     const page = new MemoryUI(EmprestimoDetalhes, {}).render(); expect(page.nodes(RecebimentoValidado)[0].props).toMatchObject({ contratoId: 1, parcelaId: 2, permitirRenovacao: true });
     await page.click('Detalhes'); expect(page.nodes(RecebimentoValidado).length).toBeGreaterThanOrEqual(2);
     for (const child of page.nodes(RecebimentoValidado)) expect(child.props).toMatchObject({ contratoId: 1, parcelaId: 2, permitirRenovacao: true }); expect(h.oldMutation).not.toHaveBeenCalled();
+  });
+  it('ficha usa aplicação de multa auditada e não monta o diálogo antigo', () => {
+    const page = new MemoryUI(EmprestimoDetalhes, {}).render();
+    expect(page.nodes(MultaManualAplicar)).toHaveLength(1); expect(page.nodes(MultaManualAplicar)[0].props.contratoId).toBe(1);
+    expect(page.text()).not.toContain('APLICAR MULTA POR ATRASO'); expect(h.oldMutation).not.toHaveBeenCalled();
   });
 });
