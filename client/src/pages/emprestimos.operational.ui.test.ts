@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryObserver, onlineManager } from "@tanstack/react-query";
-const h = vi.hoisted(() => ({ query: {} as any, mutate: vi.fn(), navigate: vi.fn() }));
+const h = vi.hoisted(() => ({ query: {} as any, mutate: vi.fn(), navigate: vi.fn(), legacyFineModal: vi.fn() }));
 vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => key, i18n: { language: "pt" } }) }));
 vi.mock("wouter", () => ({ useLocation: () => ["/emprestimos", h.navigate], useParams: () => ({ id: '31' }) }));
 vi.mock("@/lib/trpc", () => ({ trpc: {
@@ -31,7 +31,7 @@ function clickCardButton(fragment: string) {
   expect(button).toBeDefined();
   const attr = button.openingElement.attributes.properties.find(a => ts.isJsxAttribute(a) && a.name.getText(ast) === "onClick") as ts.JsxAttribute;
   const expr = (attr.initializer as ts.JsxExpression).expression!.getText(ast);
-  new Function("setLocation", "emp", `return (${expr})();`)(h.navigate, { id: 31 });
+  new Function("setLocation", "emp", "setShowAplicarMultaModal", `return (${expr})();`)(h.navigate, { id: 31 }, h.legacyFineModal);
 }
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal("React", React);
@@ -90,9 +90,10 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
     expect(html).not.toContain("loans.manageLoans");
     expect(h.mutate).not.toHaveBeenCalled();
   });
-  it.each(["t('loans.pay')", "Receber / renovar", "t('loans.details')", "t('loanDetails.editLoan')"])("handler real %s abre a ficha de origem e não faz pagamento antigo", fragment => {
+  it.each(["t('loans.pay')", "Receber / renovar", "t('loans.details')", "t('loanDetails.editLoan')", "Aplicar Multa"])("handler real %s abre a ficha de origem e não executa mutação antiga", fragment => {
     clickCardButton(fragment);
     expect(h.navigate).toHaveBeenCalledWith("/emprestimos/31"); expect(h.mutate).not.toHaveBeenCalled();
+    expect(h.legacyFineModal).not.toHaveBeenCalled();
   });
   it("nenhum card monta PagamentoModal ou EditarEmprestimoModal mesmo em modo pasta", () => {
     const mounted = nodesWhere(card, n => (ts.isJsxOpeningElement(n) || ts.isJsxSelfClosingElement(n)) && ["PagamentoModal", "EditarEmprestimoModal"].includes(n.tagName.getText(ast)));

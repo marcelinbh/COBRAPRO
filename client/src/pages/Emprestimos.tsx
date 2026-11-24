@@ -1850,7 +1850,7 @@ function EmprestimoCardCobra({
                 size="sm"
                 variant="outline"
                 className="flex-1 h-8 text-xs gap-1 border-border/50 bg-transparent hover:bg-accent/20 text-emerald-300 hover:text-emerald-200"
-                onClick={() => setShowAplicarMultaModal(emp.id)}
+                onClick={() => setLocation(`/emprestimos/${emp.id}`)}
               >
                 <DollarSign className="w-3 h-3" /> Aplicar Multa
               </Button>
