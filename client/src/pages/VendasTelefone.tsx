@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next';
 import i18n from '../i18n/i18n';
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useLocation } from "wouter";
 import jsPDF from "jspdf";
 import { trpc } from "@/lib/trpc";
+import { decimalTelefone41, type IntencaoTelefone41 } from "../../../shared/telefone41";
+import { prepararJournal41, limparJournal41, listarJournal41, criarEscopo41, escopoAtual41, type Journal41 } from '../lib/telefone41Journal';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -346,6 +348,34 @@ function CustomTooltip({ active, payload, label }: any) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function VendasTelefone() {
   const { t } = useTranslation();
+  const { data: usuarioTelefone41 } = trpc.auth.me.useQuery();
+  const utils41 = trpc.useUtils();
+  const [chavePendente41, setChavePendente41] = useState<string | null>(null);
+  const envioAtivo41 = useRef<object | null>(null);
+  const escopo41 = useRef(criarEscopo41(usuarioTelefone41?.id ?? null));
+  if (escopo41.current.owner !== (usuarioTelefone41?.id ?? null)) {
+    escopo41.current.ativo = false;
+    escopo41.current = criarEscopo41(usuarioTelefone41?.id ?? null);
+  }
+  const owner41 = usuarioTelefone41?.id ?? null;
+  function atualizarPendentes41() {
+    setChavePendente41(owner41 ? listarJournal41(localStorage, owner41)[0] ?? null : null);
+  }
+  useEffect(() => {
+    const scope = escopo41.current;
+    scope.ativo = true;
+    try { atualizarPendentes41(); } catch { setChavePendente41(null); }
+    const changed = () => { if (escopoAtual41(scope, escopo41.current)) atualizarPendentes41(); };
+    window.addEventListener('storage', changed);
+    return () => { scope.ativo = false; window.removeEventListener('storage', changed); };
+  }, [owner41]);
+  function chave41(operacao: string) {
+    if (!owner41) throw new Error('Sessão indisponível');
+    return `cobrapro:telefone41:${owner41}:${operacao}`;
+  }
+  async function atualizar41() {
+    await Promise.all([utils41.vendasTelefone.invalidate(), utils41.caixa.invalidate(), utils41.dashboard.invalidate()]);
+  }
   const [, setLocation] = useLocation();
 
   // Tela atual: "lista" | "simulador" | "formulario"
@@ -397,31 +427,76 @@ export default function VendasTelefone() {
   // ── Queries & Mutations ──
   const { data: vendas = [], refetch } = trpc.vendasTelefone.listar.useQuery();
   const { data: kpis } = trpc.vendasTelefone.kpis.useQuery();
-  const { data: contasCaixa = [] } = trpc.caixa.contas.useQuery();
+  const { data: contasMetadata41 } = trpc.caixa.contasParaOperacao37.useQuery();
+  const contasCaixa = contasMetadata41?.contas ?? [];
   const { data: parcelasVenda = [] } = trpc.vendasTelefone.parcelas.useQuery(
     { vendaId: vendaSelecionada?.id ?? 0 },
     { enabled: !!vendaSelecionada?.id }
   );
 
-  const criarMutation = trpc.vendasTelefone.criar.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.contrato_criado_com_sucesso'));
-      refetch();
-      setTela("lista");
-      resetForm();
-    },
-    onError: (err) => toast.error(t("toast.errorPrefix") + err.message),
-  });
+  // Efeitos de conclusão ficam no fluxo aguardado, sempre vinculados ao owner/mount.
+  const criarMutation = trpc.vendasTelefone.criar.useMutation();
+  const deletarMutation = trpc.vendasTelefone.deletar.useMutation();
+  const pagarMutation = trpc.vendasTelefone.pagarParcela.useMutation();
+  const recovery41 = trpc.vendasTelefone.reconciliar.useMutation();
+  const abandonar41 = trpc.vendasTelefone.abandonar.useMutation();
+  const ocupado41 = criarMutation.isPending || pagarMutation.isPending || deletarMutation.isPending || recovery41.isPending || abandonar41.isPending;
 
-  const deletarMutation = trpc.vendasTelefone.deletar.useMutation({
-    onSuccess: () => { toast.success(t('toast_success.excluído_com_sucesso')); refetch(); },
-    onError: (err) => toast.error(t("toast.errorPrefix") + err.message),
-  });
-
-  const pagarMutation = trpc.vendasTelefone.pagarParcela.useMutation({
-    onSuccess: () => { toast.success(t('toast_success.parcela_paga')); refetch(); },
-    onError: (err) => toast.error(t("toast.errorPrefix") + err.message),
-  });
+  async function operarJournal41(key: string, request?: IntencaoTelefone41['request'], encerrar = false) {
+    if (ocupado41 || envioAtivo41.current) return;
+    const scope = escopo41.current;
+    const atual = () => escopoAtual41(scope, escopo41.current);
+    if (!atual() || !key.startsWith(`cobrapro:telefone41:${scope.owner}:`)) return;
+    const ticket = {}; envioAtivo41.current = ticket;
+    const locks = navigator.locks;
+    async function concluir(journal: Journal41) {
+      if (!atual()) return false;
+      const removed = await limparJournal41(localStorage, journal, locks, atual);
+      if (!atual()) return false;
+      atualizarPendentes41();
+      if (!removed) throw new Error('Journal mudou em outra aba; a intenção atual foi preservada.');
+      await atualizar41();
+      return atual();
+    }
+    try {
+      const journal = await prepararJournal41(localStorage, key, request, locks, atual);
+      if (!atual()) return;
+      setChavePendente41(key);
+      const intent = journal.intent;
+      const proof = encerrar ? await abandonar41.mutateAsync(intent) : await recovery41.mutateAsync(intent);
+      if (!atual()) return;
+      if ('status' in proof && proof.status === 'confirmed') {
+        if (await concluir(journal)) toast.success('Operação anterior confirmada.');
+        return;
+      }
+      if ('status' in proof && proof.status === 'not_executed') {
+        if (await concluir(journal)) toast.info('UUID encerrada permanentemente sem execução. Agora pode corrigir os campos.');
+        return;
+      }
+      if (encerrar) throw new Error('Ausência sem fence não permite descartar intenção.');
+      // Recovery unknown conserva e envia a MESMA UUID/request, nunca campos atuais.
+      if (intent.request.acao === 'criar') await criarMutation.mutateAsync(intent);
+      else if (intent.request.acao === 'receber') await pagarMutation.mutateAsync(intent);
+      else await deletarMutation.mutateAsync(intent);
+      if (!atual() || !await concluir(journal)) return;
+      if (intent.request.acao === 'criar') {
+        toast.success(t('toast_success.contrato_criado_com_sucesso')); setTela('lista'); resetForm();
+      } else if (intent.request.acao === 'receber') toast.success(t('toast_success.parcela_paga'));
+      else toast.success('Venda cancelada com compensações auditadas.');
+    } catch (e) { if (atual()) toast.error(e instanceof Error ? e.message : 'Não foi possível preservar/recuperar a intenção.'); }
+    finally { if (envioAtivo41.current === ticket) envioAtivo41.current = null; }
+  }
+  async function enviar41(operacao: string, request: IntencaoTelefone41['request']) {
+    await operarJournal41(chave41(operacao), request);
+  }
+  async function encerrarPendente41() {
+    if (chavePendente41) await operarJournal41(chavePendente41, undefined, true);
+  }
+  const avisoPendente41 = chavePendente41 && <div className="p-3 border rounded bg-amber-50 text-sm">
+    Há uma intenção pendente preservada.{' '}
+    <Button variant="outline" disabled={ocupado41} onClick={() => void operarJournal41(chavePendente41)}>Retomar tentativa preservada</Button>{' '}
+    <Button variant="outline" disabled={ocupado41} onClick={() => void encerrarPendente41()}>Conferir e encerrar tentativa sem execução</Button>
+  </div>;
 
   // ── Cálculo do simulador ──
   const sim = useMemo(
@@ -451,19 +526,17 @@ export default function VendasTelefone() {
       toast.error("Selecione a conta de Caixa que receberá a entrada.");
       return;
     }
-    criarMutation.mutate({
-      marca, modelo, imei: imei || undefined, cor: cor || undefined, armazenamento: armazenamento || undefined,
-      custo, precoVenda, entradaPercentual: entradaPct, entradaValor: sim.entradaValor,
-      numParcelas: parcelas, jurosMensal, valorParcela: sim.valorParcela,
-      totalJuros: sim.totalJuros, totalAReceber: sim.totalAReceber, lucroBruto: sim.lucroBruto,
-      roi: sim.roi, paybackMeses: sim.payback,
-      compradorNome, compradorCpf: compradorCpf || undefined, compradorRg: compradorRg || undefined,
-      compradorTelefone: compradorTelefone || undefined, compradorEmail: compradorEmail || undefined,
-      compradorEstadoCivil: compradorEstadoCivil || undefined, compradorProfissao: compradorProfissao || undefined,
-      compradorInstagram: compradorInstagram || undefined, compradorCep: compradorCep || undefined,
-      compradorCidade: compradorCidade || undefined, compradorEstado: compradorEstado || undefined,
-      compradorEndereco: compradorEndereco || undefined, compradorLocalTrabalho: compradorLocalTrabalho || undefined,
-      dataPrimeiraParcela, contaCaixaId: contaCaixaId ? Number(contaCaixaId) : undefined,
+    void enviar41('criar', {
+      acao: 'criar', marca: marca.trim(), modelo: modelo.trim(), imei: imei.trim() || null, cor: cor.trim() || null, armazenamento: armazenamento.trim() || null,
+      custo: decimalTelefone41(custo), precoVenda: decimalTelefone41(precoVenda), entradaPercentual: decimalTelefone41(entradaPct),
+      numParcelas: parcelas, jurosMensal: decimalTelefone41(jurosMensal),
+      compradorNome: compradorNome.trim(), compradorCpf: compradorCpf.trim() || null, compradorRg: compradorRg.trim() || null,
+      compradorTelefone: compradorTelefone.trim() || null, compradorEmail: compradorEmail.trim() || null,
+      compradorEstadoCivil: compradorEstadoCivil.trim() || null, compradorProfissao: compradorProfissao.trim() || null,
+      compradorInstagram: compradorInstagram.trim() || null, compradorCep: compradorCep.trim() || null,
+      compradorCidade: compradorCidade.trim() || null, compradorEstado: compradorEstado.trim() || null,
+      compradorEndereco: compradorEndereco.trim() || null, compradorLocalTrabalho: compradorLocalTrabalho.trim() || null,
+      dataPrimeiraParcela, contaCaixaId: contaCaixaId ? Number(contaCaixaId) : null,
     });
   }
 
@@ -495,6 +568,7 @@ export default function VendasTelefone() {
   if (tela === "lista") {
     return (
       <div className="min-h-screen bg-gray-50">
+      {avisoPendente41}
         {/* Header */}
         <div className="bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -675,8 +749,11 @@ export default function VendasTelefone() {
                     <Button
                       size="sm" variant="outline"
                       className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                      disabled={ocupado41 || v.status === 'cancelado'}
+                      title="Cancelar com compensações auditadas (somente vendas novas Telefone41)"
                       onClick={() => {
-                        if (confirm(`Excluir venda de ${v.comprador_nome}?`)) deletarMutation.mutate({ id: v.id });
+                        const motivo = prompt(`Cancelar venda de ${v.comprador_nome}? O livro será preservado. Informe o motivo:`);
+                        if (motivo?.trim()) void enviar41(`cancelar:${v.id}`, { acao: 'cancelar', vendaId: v.id, motivo: motivo.trim() });
                       }}
                     >
                       <Trash2 className="w-3 h-3" />
@@ -714,9 +791,11 @@ export default function VendasTelefone() {
               <Label className="text-sm">Conta de Caixa para os recebimentos *</Label>
               <Select value={contaCaixaPagamentoId} onValueChange={setContaCaixaPagamentoId}>
                 <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
-                <SelectContent>{contasCaixa.filter((conta: any) => conta.ativo !== false).map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}</SelectContent>
+                <SelectContent>{contasCaixa.map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            {avisoPendente41}
+            <p className="text-xs text-amber-700 mb-2">Em caso de erro ou timeout, clique novamente para recuperar a mesma intenção. Não crie uma nova venda. Valores finais são calculados no PostgreSQL; a última parcela ajusta centavos.</p>
             <div className="space-y-2">
               {parcelasVenda.map((p: any) => (
                 <div key={p.id} className={`flex items-center justify-between p-3 rounded-lg border ${p.status === 'paga' ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}>
@@ -732,8 +811,8 @@ export default function VendasTelefone() {
                       <Button
                         size="sm"
                         className="bg-emerald-500 hover:bg-emerald-600 text-white text-xs h-7"
-                        onClick={() => pagarMutation.mutate({ parcelaId: p.id, valorPago: parseFloat(p.valor), contaCaixaId: Number(contaCaixaPagamentoId) })}
-                        disabled={pagarMutation.isPending || !contaCaixaPagamentoId}
+                        onClick={() => void enviar41(`receber:${p.id}`, { acao: 'receber', vendaId: vendaSelecionada.id, parcelaId: p.id, valorPago: decimalTelefone41(Number(p.valor)), contaCaixaId: Number(contaCaixaPagamentoId) })}
+                        disabled={ocupado41 || !contaCaixaPagamentoId || vendaSelecionada?.status === 'cancelado'}
                       >
                         Pagar
                       </Button>
@@ -940,7 +1019,7 @@ export default function VendasTelefone() {
           </div>
           <Button
             onClick={handleCriarContrato}
-            disabled={criarMutation.isPending}
+            disabled={ocupado41 || entradaPct >= 100}
             className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2"
           >
             {criarMutation.isPending ? "Salvando..." : "Confirmar"}
@@ -995,7 +1074,7 @@ export default function VendasTelefone() {
               <Label className="text-sm">Conta de Caixa da entrada *</Label>
               <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
                 <SelectTrigger><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
-                <SelectContent>{contasCaixa.filter((conta: any) => conta.ativo !== false).map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}</SelectContent>
+                <SelectContent>{contasCaixa.map((conta: any) => <SelectItem key={conta.id} value={String(conta.id)}>{conta.nome}</SelectItem>)}</SelectContent>
               </Select>
               {sim.entradaValor <= 0 && <p className="text-xs text-gray-500">Sem entrada, esta seleção é opcional.</p>}
             </div>
@@ -1088,6 +1167,7 @@ export default function VendasTelefone() {
           </div>
         </div>
 
+        {avisoPendente41}
         {/* Botão final */}
         <div className="flex gap-3 pb-8">
           <Button variant="outline" className="flex-1" onClick={() => setTela("simulador")}>
@@ -1096,7 +1176,7 @@ export default function VendasTelefone() {
           <Button
             className="flex-1 bg-emerald-500 hover:bg-emerald-600 text-white"
             onClick={handleCriarContrato}
-            disabled={criarMutation.isPending}
+            disabled={ocupado41 || entradaPct >= 100}
           >
             {criarMutation.isPending ? "Criando contrato..." : "Criar Contrato"}
             <ChevronRight className="w-4 h-4 ml-2" />

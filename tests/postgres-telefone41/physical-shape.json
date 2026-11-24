@@ -1,0 +1,231 @@
+{
+  "vendas_telefone": [
+    [
+      "id",
+      "bigint",
+      true
+    ],
+    [
+      "marca",
+      "character varying(100)",
+      true
+    ],
+    [
+      "modelo",
+      "character varying(200)",
+      true
+    ],
+    [
+      "imei",
+      "character varying(20)",
+      false
+    ],
+    [
+      "cor",
+      "character varying(50)",
+      false
+    ],
+    [
+      "armazenamento",
+      "character varying(20)",
+      false
+    ],
+    [
+      "custo",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "preco_venda",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "entrada_percentual",
+      "numeric(5,2)",
+      true
+    ],
+    [
+      "entrada_valor",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "num_parcelas",
+      "integer",
+      true
+    ],
+    [
+      "juros_mensal",
+      "numeric(5,2)",
+      true
+    ],
+    [
+      "valor_parcela",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "total_juros",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "total_a_receber",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "lucro_bruto",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "roi",
+      "numeric(8,2)",
+      false
+    ],
+    [
+      "payback_meses",
+      "numeric(5,2)",
+      false
+    ],
+    [
+      "comprador_nome",
+      "character varying(200)",
+      true
+    ],
+    [
+      "comprador_cpf",
+      "character varying(14)",
+      false
+    ],
+    [
+      "comprador_rg",
+      "character varying(20)",
+      false
+    ],
+    [
+      "comprador_telefone",
+      "character varying(20)",
+      false
+    ],
+    [
+      "comprador_email",
+      "character varying(320)",
+      false
+    ],
+    [
+      "comprador_estado_civil",
+      "character varying(30)",
+      false
+    ],
+    [
+      "comprador_profissao",
+      "character varying(100)",
+      false
+    ],
+    [
+      "comprador_instagram",
+      "character varying(100)",
+      false
+    ],
+    [
+      "comprador_cep",
+      "character varying(9)",
+      false
+    ],
+    [
+      "comprador_cidade",
+      "character varying(100)",
+      false
+    ],
+    [
+      "comprador_estado",
+      "character varying(2)",
+      false
+    ],
+    [
+      "comprador_endereco",
+      "character varying(300)",
+      false
+    ],
+    [
+      "comprador_local_trabalho",
+      "character varying(200)",
+      false
+    ],
+    [
+      "status",
+      "public.status_venda_telefone",
+      true
+    ],
+    [
+      "data_venda",
+      "timestamp with time zone",
+      true
+    ],
+    [
+      "createdAt",
+      "timestamp with time zone",
+      true
+    ],
+    [
+      "user_id",
+      "integer",
+      false
+    ]
+  ],
+  "parcelas_venda_telefone": [
+    [
+      "id",
+      "bigint",
+      true
+    ],
+    [
+      "venda_id",
+      "bigint",
+      true
+    ],
+    [
+      "numero",
+      "integer",
+      true
+    ],
+    [
+      "valor",
+      "numeric(12,2)",
+      true
+    ],
+    [
+      "vencimento",
+      "timestamp with time zone",
+      true
+    ],
+    [
+      "status",
+      "public.status_parcela",
+      true
+    ],
+    [
+      "pago_em",
+      "timestamp with time zone",
+      false
+    ],
+    [
+      "valor_pago",
+      "numeric(12,2)",
+      false
+    ],
+    [
+      "createdAt",
+      "timestamp with time zone",
+      true
+    ],
+    [
+      "user_id",
+      "integer",
+      false
+    ]
+  ]
+}

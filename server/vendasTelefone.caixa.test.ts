@@ -39,15 +39,18 @@ describe("vendas de telefone e Caixa", () => {
     mocks.getSupabaseClientAsync.mockReset();
   });
 
-  it("suspende o cadastro de venda antes de qualquer lançamento financeiro", async () => {
+  it("rejeita payload legado de cadastro com BAD_REQUEST antes de acessar o banco", async () => {
     mocks.getSupabaseClientAsync.mockResolvedValue({});
+    // @ts-expect-error Payload legado é deliberadamente inválido no contrato41 fechado.
     await expect(appRouter.createCaller(contexto()).vendasTelefone.criar(vendaComEntrada))
-      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
   });
 
-  it("suspende baixa de parcela antes de qualquer lançamento financeiro", async () => {
+  it("rejeita payload legado de baixa com BAD_REQUEST antes de acessar o banco", async () => {
+    // @ts-expect-error Payload legado é deliberadamente inválido no contrato41 fechado.
     await expect(appRouter.createCaller(contexto()).vendasTelefone.pagarParcela({ parcelaId: 12, valorPago: 100, contaCaixaId: 5 }))
-      .rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
   });
 });

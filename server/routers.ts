@@ -15,6 +15,7 @@ import { emprestimosMultimodalRouter } from "./routers/emprestimosMultimodal";
 import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { multaManualRouter } from "./routers/multaManual";
+import { telefone41Writers } from "./routers/telefone41";
 import { caixa37Procedures } from "./routers/caixa37";
 import { listarContasParaCadastro } from "./services/contasCadastro";
 import { publicProcedure, protectedProcedure, adminProcedure, router } from "./_core/trpc";
@@ -4335,7 +4336,7 @@ const vendasTelefoneRouter = router({
     try {
       const { data, error } = await supabase
         .from('vendas_telefone')
-        .select('*')
+        .select('id,user_id,marca,modelo,imei,cor,armazenamento,custo,preco_venda,entrada_percentual,entrada_valor,num_parcelas,juros_mensal,valor_parcela,total_juros,total_a_receber,lucro_bruto,roi,payback_meses,comprador_nome,comprador_cpf,comprador_rg,comprador_telefone,comprador_email,comprador_estado_civil,comprador_profissao,comprador_instagram,comprador_cep,comprador_cidade,comprador_estado,comprador_endereco,comprador_local_trabalho,status,data_venda,createdAt')
         .order('createdAt', { ascending: false })
         .eq('user_id', ctx.user.id);
       if (error) { console.error('[vendasTelefone.listar]', error); return []; }
@@ -4351,7 +4352,7 @@ const vendasTelefoneRouter = router({
       try {
         const { data, error } = await supabase
           .from('vendas_telefone')
-          .select('*')
+          .select('id,user_id,marca,modelo,imei,cor,armazenamento,custo,preco_venda,entrada_percentual,entrada_valor,num_parcelas,juros_mensal,valor_parcela,total_juros,total_a_receber,lucro_bruto,roi,payback_meses,comprador_nome,comprador_cpf,comprador_rg,comprador_telefone,comprador_email,comprador_estado_civil,comprador_profissao,comprador_instagram,comprador_cep,comprador_cidade,comprador_estado,comprador_endereco,comprador_local_trabalho,status,data_venda,createdAt')
           .eq('id', input.id)
           .eq('user_id', ctx.user.id)
           .maybeSingle();
@@ -4371,7 +4372,7 @@ const vendasTelefoneRouter = router({
         if (!venda) return [];
         const { data, error } = await supabase
           .from('parcelas_venda_telefone')
-          .select('*')
+          .select('id,user_id,venda_id,numero,valor,vencimento,status,pago_em,valor_pago,createdAt')
           .eq('venda_id', input.vendaId)
           .eq('user_id', ctx.user.id)
           .order('numero', { ascending: true });
@@ -4380,228 +4381,7 @@ const vendasTelefoneRouter = router({
       } catch (e) { return []; }
     }),
 
-  criar: protectedProcedure
-    .input(z.object({
-      marca: z.string().min(1),
-      modelo: z.string().min(1),
-      imei: z.string().optional(),
-      cor: z.string().optional(),
-      armazenamento: z.string().optional(),
-      custo: z.number().positive(),
-      precoVenda: z.number().positive(),
-      entradaPercentual: z.number().min(0).max(100),
-      entradaValor: z.number().min(0),
-      numParcelas: z.number().int().min(1).max(60),
-      jurosMensal: z.number().min(0),
-      valorParcela: z.number().min(0),
-      totalJuros: z.number().min(0),
-      totalAReceber: z.number().min(0),
-      lucroBruto: z.number(),
-      roi: z.number().optional(),
-      paybackMeses: z.number().optional(),
-      compradorNome: z.string().min(1),
-      compradorCpf: z.string().optional(),
-      compradorRg: z.string().optional(),
-      compradorTelefone: z.string().optional(),
-      compradorEmail: z.string().optional(),
-      compradorEstadoCivil: z.string().optional(),
-      compradorProfissao: z.string().optional(),
-      compradorInstagram: z.string().optional(),
-      compradorCep: z.string().optional(),
-      compradorCidade: z.string().optional(),
-      compradorEstado: z.string().optional(),
-      compradorEndereco: z.string().optional(),
-      compradorLocalTrabalho: z.string().optional(),
-      dataPrimeiraParcela: z.string().optional(),
-      contaCaixaId: z.number().int().positive().optional(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('O registro de venda de telefone');
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      if (input.entradaValor > 0) {
-        if (!input.contaCaixaId) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Selecione a conta de Caixa que receberá a entrada da venda' });
-        }
-        await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
-      }
-
-      const { data: venda, error } = await supabase
-        .from('vendas_telefone')
-        .insert({
-          marca: input.marca,
-          modelo: input.modelo,
-          imei: input.imei ?? null,
-          cor: input.cor ?? null,
-          armazenamento: input.armazenamento ?? null,
-          custo: input.custo,
-          preco_venda: input.precoVenda,
-          entrada_percentual: input.entradaPercentual,
-          entrada_valor: input.entradaValor,
-          num_parcelas: input.numParcelas,
-          juros_mensal: input.jurosMensal,
-          valor_parcela: input.valorParcela,
-          total_juros: input.totalJuros,
-          total_a_receber: input.totalAReceber,
-          lucro_bruto: input.lucroBruto,
-          roi: input.roi ?? null,
-          payback_meses: input.paybackMeses ?? null,
-          comprador_nome: input.compradorNome,
-          comprador_cpf: input.compradorCpf ?? null,
-          comprador_rg: input.compradorRg ?? null,
-          comprador_telefone: input.compradorTelefone ?? null,
-          comprador_email: input.compradorEmail ?? null,
-          comprador_estado_civil: input.compradorEstadoCivil ?? null,
-          comprador_profissao: input.compradorProfissao ?? null,
-          comprador_instagram: input.compradorInstagram ?? null,
-          comprador_cep: input.compradorCep ?? null,
-          comprador_cidade: input.compradorCidade ?? null,
-          comprador_estado: input.compradorEstado ?? null,
-          comprador_endereco: input.compradorEndereco ?? null,
-          comprador_local_trabalho: input.compradorLocalTrabalho ?? null,
-          status: 'ativo',
-          user_id: ctx.user.id,
-        })
-        .select()
-        .single();
-
-      if (error || !venda) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error?.message ?? 'Erro ao criar venda' });
-
-      // Gerar parcelas
-      const primeiraParcela = input.dataPrimeiraParcela ? new Date(input.dataPrimeiraParcela + 'T00:00:00') : (() => { const d = new Date(); d.setMonth(d.getMonth() + 1); return d; })();
-      const parcelasData = Array.from({ length: input.numParcelas }, (_, i) => {
-        const venc = new Date(primeiraParcela);
-        venc.setMonth(venc.getMonth() + i);
-        return {
-          venda_id: venda.id,
-          numero: i + 1,
-          valor: input.valorParcela,
-          vencimento: venc.toISOString(),
-          status: 'pendente',
-          user_id: ctx.user.id,
-        };
-      });
-
-      const { error: parcelasErro } = await supabase.from('parcelas_venda_telefone').insert(parcelasData);
-      if (parcelasErro) {
-        await supabase.from('vendas_telefone').delete().eq('id', venda.id).eq('user_id', ctx.user.id);
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível gerar as parcelas da venda' });
-      }
-
-      // ── Integração com Caixa: registrar entrada da entrada (valor inicial) ──
-      if (input.entradaValor > 0) {
-        const { error: caixaErro } = await supabase.from('transacoes_caixa').insert({
-          conta_caixa_id: input.contaCaixaId,
-          tipo: 'entrada',
-          categoria: 'outros',
-          valor: input.entradaValor,
-          descricao: `Entrada venda #${venda.id} - ${input.marca} ${input.modelo}`,
-          data_transacao: new Date().toISOString(),
-          user_id: ctx.user.id,
-        });
-        if (caixaErro) {
-          // Não permitir contrato ativo sem a entrada que o operador informou.
-          await supabase.from('parcelas_venda_telefone').delete().eq('venda_id', venda.id).eq('user_id', ctx.user.id);
-          await supabase.from('vendas_telefone').delete().eq('id', venda.id).eq('user_id', ctx.user.id);
-          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível registrar a entrada no Caixa; a venda foi desfeita' });
-        }
-      }
-
-      return venda;
-    }),
-   pagarParcela: protectedProcedure
-   .input(z.object({
-      parcelaId: z.number(),
-      valorPago: z.number().positive(),
-      contaCaixaId: z.number().int().positive(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('O recebimento de parcela de venda de telefone');
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await validarContaDoUsuario(ctx.user.id, input.contaCaixaId);
-      // Buscar dados da parcela para obter informações da venda
-      const { data: parcela } = await supabase
-        .from('parcelas_venda_telefone')
-        .select('*, vendas_telefone(marca, modelo, comprador_nome)')
-        .eq('id', input.parcelaId)
-        .eq('user_id', ctx.user.id)
-        .maybeSingle();
-      if (!parcela) throw new TRPCError({ code: 'NOT_FOUND', message: 'Parcela não encontrada' });
-      if (!podeRegistrarMovimento((parcela as any).status, ['pendente', 'atrasada'])) {
-        throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
-      }
-      const valorEsperado = Number((parcela as any).valor);
-      if (!Number.isFinite(valorEsperado) || Math.abs(input.valorPago - valorEsperado) > 0.000001) {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'O pagamento deve corresponder ao valor integral da parcela de venda' });
-      }
-      const { data: parcelaAtualizada, error } = await supabase
-        .from('parcelas_venda_telefone')
-        .update({ status: 'paga', pago_em: new Date().toISOString(), valor_pago: input.valorPago })
-        .eq('id', input.parcelaId).eq('user_id', ctx.user.id).in('status', ['pendente', 'atrasada']).select('id').maybeSingle();
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      if (!parcelaAtualizada) throw new TRPCError({ code: 'CONFLICT', message: 'Esta parcela já foi processada' });
-      // ── Integração com Caixa: uma baixa só é confirmada com sua entrada. ──
-      const venda = (parcela as any)?.vendas_telefone;
-      const descricao = venda
-        ? `Parcela venda #${input.parcelaId} (${(parcela as any)?.numero}) - ${venda.marca} ${venda.modelo}`
-        : `Parcela venda telefone #${input.parcelaId}`;
-      const { error: entradaVendaErro } = await supabase.from('transacoes_caixa').insert({
-        conta_caixa_id: input.contaCaixaId, tipo: 'entrada', categoria: 'pagamento_parcela', valor: input.valorPago,
-        descricao, data_transacao: new Date().toISOString(), user_id: ctx.user.id,
-      });
-      if (entradaVendaErro) {
-        const { error: rollbackErro } = await supabase.from('parcelas_venda_telefone')
-          .update({ status: (parcela as any).status, pago_em: null, valor_pago: null })
-          .eq('id', input.parcelaId).eq('user_id', ctx.user.id).eq('status', 'paga');
-        if (rollbackErro) console.error('[vendasTelefone.pagarParcela] falha ao reverter baixa sem Caixa:', rollbackErro.message);
-        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível registrar o recebimento no Caixa; a baixa foi desfeita' });
-      }
-      // ── Verificar se todas as parcelas foram pagas → marcar venda como quitada ──
-      try {
-        if (parcela) {
-          const vendaId = (parcela as any).venda_id;
-          const { data: todasParcelas } = await supabase
-            .from('parcelas_venda_telefone')
-            .select('id, status')
-            .eq('venda_id', vendaId)
-            .eq('user_id', ctx.user.id);
-          if (todasParcelas && todasParcelas.length > 0) {
-            const todasPagas = todasParcelas.every((p: any) =>
-              p.id === input.parcelaId ? true : p.status === 'paga'
-            );
-            if (todasPagas) {
-              await supabase
-                .from('vendas_telefone')
-                .update({ status: 'quitado' })
-                .eq('id', vendaId)
-                .eq('user_id', ctx.user.id);
-              console.log(`[vendasTelefone] Venda #${vendaId} marcada como QUITADA automaticamente`);
-            }
-          }
-        }
-      } catch (quitadoErr) {
-        console.warn('[vendasTelefone.pagarParcela] Erro ao verificar quitado:', quitadoErr);
-      }
-      return { success: true };
-    }),
-
-  deletar: protectedProcedure
-    .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica('A exclusão de venda de telefone');
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-
-      const { error } = await supabase
-        .from('vendas_telefone')
-        .delete()
-        .eq('id', input.id)
-        .eq('user_id', ctx.user.id);
-
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      return { success: true };
-    }),
+  ...telefone41Writers,
 
   kpis: protectedProcedure.query(async ({ ctx }) => {
     const supabase = await getSupabaseClientAsync();

@@ -92,7 +92,7 @@ describe("contenção de operações financeiras não atômicas", () => {
     },
   );
 
-  it("bloqueia os caminhos antigos de despesas, cheques e venda de telefone antes de mover Caixa", async () => {
+  it("bloqueia despesas e cheques antigos; rejeita payloads legados de telefone antes de mover Caixa", async () => {
     const caller = appRouter.createCaller(contextoAutenticado());
     await expectSuspensa(caller.contasPagar.pagar({ id: 1, contaCaixaId: 1, dataPagamento: '2026-11-08', idempotencyKey: '11111111-1111-4111-8111-111111111111' }));
     await expectSuspensa(caller.contasPagar.estornar({ id: 1, dataEstorno: '2026-11-08', pagamentoOperationId: '22222222-2222-4222-8222-222222222222', motivo: 'Teste de bloqueio', idempotencyKey: '33333333-3333-4333-8333-333333333333' }));
@@ -103,8 +103,12 @@ describe("contenção de operações financeiras não atômicas", () => {
     await expectSuspensa(caller.cheques.compensar({ id: 1, contaCaixaId: 1 }));
     await expectSuspensa(caller.cheques.devolver({ id: 1, motivo: "Auditoria" }));
     await expectSuspensa(caller.cheques.cancelar({ id: 1 }));
-    await expectSuspensa(caller.vendasTelefone.pagarParcela({ parcelaId: 1, valorPago: 1, contaCaixaId: 1 }));
-    await expectSuspensa(caller.vendasTelefone.deletar({ id: 1 }));
+    // @ts-expect-error Payload legado é deliberadamente inválido no contrato41 fechado.
+    await expect(caller.vendasTelefone.pagarParcela({ parcelaId: 1, valorPago: 1, contaCaixaId: 1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    // @ts-expect-error Exclusão antiga não substitui o cancelamento compensatório41.
+    await expect(caller.vendasTelefone.deletar({ id: 1 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
   });
 
   it("libera assinatura somente pela RPC42, com owner da sessão e confirmação ligada à intenção", async () => {
