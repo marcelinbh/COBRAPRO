@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
+import { decimalFormularioAssinatura42, type PagamentoAssinatura42 } from '@shared/assinaturas42';
+import { carregarIntencaoAssinatura42 } from '@shared/assinaturas42Intent';
+import { criarEscopoAssinatura42, executarFluxoAssinatura42 } from '@shared/assinaturas42Flow';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +43,32 @@ function getMesAtual() {
 
 export default function Assinaturas() {
   const { t } = useTranslation();
+  const { data: sessao } = trpc.auth.me.useQuery();
+  const [intencaoPagamento, setIntencaoPagamento] = useState<PagamentoAssinatura42 | null>(null);
+  const [erroIntencao, setErroIntencao] = useState('');
+  const envioPagamento = useRef(false);
+  const escopoPagamento = useRef(criarEscopoAssinatura42());
+  escopoPagamento.current.owner(sessao?.id ?? null);
+  useEffect(() => {
+    escopoPagamento.current.montar();
+    return () => escopoPagamento.current.desmontar();
+  }, []);
+  useEffect(() => {
+    envioPagamento.current = false;
+    setIntencaoPagamento(null); setErroIntencao(''); setModalPagar(null);
+    const owner = sessao?.id;
+    if (!owner) return;
+    const atualizarJournal = () => {
+      try { setIntencaoPagamento(carregarIntencaoAssinatura42(localStorage, owner)); setErroIntencao(''); }
+      catch { setErroIntencao('Intenção preservada ilegível. Nenhum novo envio será feito até a conferência.'); }
+    };
+    atualizarJournal();
+    const onStorage = (event: StorageEvent) => {
+      if (event.storageArea === localStorage && (event.key === null || event.key === 'cobrapro.assinaturas42.pending.' + owner)) atualizarJournal();
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [sessao?.id]);
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'ativa' | 'inadimplente' | 'suspensa' | 'cancelada'>('todas');
   const [modalCriar, setModalCriar] = useState(false);
@@ -76,7 +105,8 @@ export default function Assinaturas() {
   const clientes: any[] = Array.isArray((clientesData as any)?.clientes)
     ? (clientesData as any).clientes
     : Array.isArray(clientesData) ? clientesData as any[] : [];
-  const { data: contas = [] } = trpc.caixa.contas.useQuery();
+  const { data: contasCadastro, error: contasErro } = trpc.caixa.contasParaOperacao37.useQuery();
+  const contas = contasCadastro?.empresaId === sessao?.id ? contasCadastro?.contas ?? [] : [];
   const { data: pagamentosExpanded } = trpc.assinaturas.pagamentos.useQuery(
     { assinaturaId: expandedId! },
     { enabled: !!expandedId }
@@ -94,18 +124,9 @@ export default function Assinaturas() {
     onError: (e) => toast.error('Erro ao criar: ' + e.message),
   });
 
-  const pagarMutation = trpc.assinaturas.registrarPagamento.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.pagamento_registrado'));
-      utils.assinaturas.list.invalidate();
-      utils.assinaturas.kpis.invalidate();
-      if (expandedId) utils.assinaturas.pagamentos.invalidate({ assinaturaId: expandedId });
-      setModalPagar(null);
-      setFormPagamento({ valorPago: '', mesReferencia: getMesAtual(), contaCaixaId: '', observacoes: '' });
-    },
-    onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
-  });
-
+  // Callbacks financeiros passam exclusivamente pelo escopo atual do fluxo abaixo.
+  const pagarMutation = trpc.assinaturas.registrarPagamento.useMutation();
+  const conferirMutation = trpc.assinaturas.conferirPagamento.useMutation();
   const atualizarMutation = trpc.assinaturas.atualizar.useMutation({
     onSuccess: () => {
       toast.success(t('toast_success.assinatura_atualizada'));
@@ -142,21 +163,44 @@ export default function Assinaturas() {
     });
   };
 
-  const handlePagar = (assinatura: any) => {
-    if (!formPagamento.valorPago || !formPagamento.contaCaixaId) {
-      toast.error('Informe o valor pago e a conta de Caixa de recebimento.');
-      return;
-    }
-    pagarMutation.mutate({
-      assinaturaId: assinatura.id,
-      clienteId: assinatura.cliente_id,
-      valorPago: parseFloat(formPagamento.valorPago),
-      mesReferencia: formPagamento.mesReferencia,
-      contaCaixaId: parseInt(formPagamento.contaCaixaId),
-      observacoes: formPagamento.observacoes || undefined,
+  const enviarPagamento = (novo?: PagamentoAssinatura42) => {
+    const owner = sessao?.id;
+    if (!owner || envioPagamento.current || erroIntencao) return;
+    const atual = escopoPagamento.current.capturar(owner);
+    envioPagamento.current = true;
+    void executarFluxoAssinatura42({
+      storage: localStorage, locks: navigator.locks, owner, atual, novo,
+      executar: async (input) => novo
+        ? { estado: 'confirmed', regra: 'assinaturas42_fence_v1', resultado: await pagarMutation.mutateAsync(input) }
+        : conferirMutation.mutateAsync(input),
+      pendente: setIntencaoPagamento,
+      comprovado: (proof) => {
+        setIntencaoPagamento(null); setModalPagar(null);
+        setFormPagamento({ valorPago: '', mesReferencia: getMesAtual(), contaCaixaId: '', observacoes: '' });
+        if (proof.estado === 'confirmed') {
+          toast.success(t('toast_success.pagamento_registrado'));
+          void utils.assinaturas.invalidate(); void utils.caixa.invalidate();
+        } else toast.success('Tentativa fechada sem recebimento. Agora você pode corrigir os dados e iniciar outra intenção.');
+      },
+      erro: (e) => toast.error('Sem confirmação; intenção preservada. ' + String(e)),
+      finalizado: () => { envioPagamento.current = false; },
     });
   };
-
+  const conferirPagamento = () => enviarPagamento();
+  const handlePagar = (assinatura: any) => {
+    if (!sessao?.id || envioPagamento.current || erroIntencao) return;
+    try {
+      if (carregarIntencaoAssinatura42(localStorage, sessao.id)) {
+        toast.error('Há um recebimento pendente. Use Conferir/cancelar tentativa antes de iniciar outro.'); return;
+      }
+      enviarPagamento({
+        assinaturaId: assinatura.id, clienteId: assinatura.cliente_id,
+        valorPago: decimalFormularioAssinatura42(String(formPagamento.valorPago)),
+        mesReferencia: formPagamento.mesReferencia, contaCaixaId: Number(formPagamento.contaCaixaId),
+        observacoes: formPagamento.observacoes || null, idempotencyKey: crypto.randomUUID(),
+      });
+    } catch (e) { toast.error(String(e)); }
+  };
   const assinaturaParaPagar = useMemo(() => {
     if (!modalPagar) return null;
     return assinaturas.find((a: any) => a.id === modalPagar);
@@ -166,6 +210,14 @@ export default function Assinaturas() {
 
   return (
     <div className="space-y-6">
+      {(intencaoPagamento || erroIntencao) && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-2" role="status">
+          <p>{erroIntencao || `Recebimento pendente de confirmação: assinatura #${intencaoPagamento!.assinaturaId}, competência ${intencaoPagamento!.mesReferencia}, R$ ${intencaoPagamento!.valorPago}.`}</p>
+          <p className="text-sm">A intenção fica preservada neste dispositivo. Conferir/cancelar não faz novo recebimento: se já executou, confirma o sucesso; se não executou, fecha o UUID definitivamente antes de liberar outra tentativa. Timeout não autoriza limpar o registro.</p>
+          {intencaoPagamento && <Button disabled={pagarMutation.isPending || conferirMutation.isPending || !sessao?.id} onClick={conferirPagamento}>{conferirMutation.isPending ? 'Conferindo...' : 'Conferir/cancelar tentativa'}</Button>}
+        </div>
+      )}
+      {contasErro && <p role="alert" className="text-red-400">Não foi possível carregar as contas desta empresa. Nenhum saldo foi presumido. Tente novamente.</p>}
       {/* Banner de configuração inicial */}
       {tabelasNaoExistem && (
         <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
@@ -326,11 +378,12 @@ export default function Assinaturas() {
                     <p className="text-xs text-slate-400">/mês</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {a.status !== 'cancelada' && (
+                    {['ativa', 'inadimplente'].includes(a.status) && (
                       <Button
                         size="sm"
                         variant="outline"
                         className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/20 gap-1"
+                        disabled={!!intencaoPagamento || !!erroIntencao || !sessao?.id}
                         onClick={() => {
                           setModalPagar(a.id);
                           setFormPagamento({ valorPago: a.valor_mensal, mesReferencia: getMesAtual(), contaCaixaId: a.conta_caixa_id ? String(a.conta_caixa_id) : '', observacoes: '' });
@@ -514,6 +567,7 @@ export default function Assinaturas() {
                 <p className="text-slate-400 text-sm">{(assinaturaParaPagar as any).clientes?.nome}</p>
                 <p className="text-purple-400 text-sm mt-1">Valor mensal: {fmt(parseFloat(assinaturaParaPagar.valor_mensal))}</p>
               </div>
+              <p className="text-xs text-slate-400">A vigência paga avança até o último dia da competência; receber mês antigo não reduz vigência existente.</p>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-slate-300">Valor Pago (R$) *</Label>
@@ -558,7 +612,7 @@ export default function Assinaturas() {
                 </Button>
                 <Button
                   onClick={() => handlePagar(assinaturaParaPagar)}
-                  disabled={pagarMutation.isPending || !formPagamento.contaCaixaId}
+                  disabled={pagarMutation.isPending || !formPagamento.contaCaixaId || !!intencaoPagamento || !!erroIntencao || !sessao?.id}
                   className="flex-1 bg-emerald-600 hover:bg-emerald-700"
                 >
                   {pagarMutation.isPending ? 'Registrando...' : 'Confirmar Pagamento'}

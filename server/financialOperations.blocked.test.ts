@@ -92,7 +92,7 @@ describe("contenção de operações financeiras não atômicas", () => {
     },
   );
 
-  it("bloqueia despesas, cheques, venda de telefone e assinatura antes de mover Caixa", async () => {
+  it("bloqueia os caminhos antigos de despesas, cheques e venda de telefone antes de mover Caixa", async () => {
     const caller = appRouter.createCaller(contextoAutenticado());
     await expectSuspensa(caller.contasPagar.pagar({ id: 1, contaCaixaId: 1, dataPagamento: '2026-11-08', idempotencyKey: '11111111-1111-4111-8111-111111111111' }));
     await expectSuspensa(caller.contasPagar.estornar({ id: 1, dataEstorno: '2026-11-08', pagamentoOperationId: '22222222-2222-4222-8222-222222222222', motivo: 'Teste de bloqueio', idempotencyKey: '33333333-3333-4333-8333-333333333333' }));
@@ -105,9 +105,41 @@ describe("contenção de operações financeiras não atômicas", () => {
     await expectSuspensa(caller.cheques.cancelar({ id: 1 }));
     await expectSuspensa(caller.vendasTelefone.pagarParcela({ parcelaId: 1, valorPago: 1, contaCaixaId: 1 }));
     await expectSuspensa(caller.vendasTelefone.deletar({ id: 1 }));
-    await expectSuspensa(caller.assinaturas.registrarPagamento({
-      assinaturaId: 1, clienteId: 1, valorPago: 1, mesReferencia: "2026-10", contaCaixaId: 1,
-    }));
+  });
+
+  it("libera assinatura somente pela RPC42, com owner da sessão e confirmação ligada à intenção", async () => {
+    const input = {
+      assinaturaId: 1, clienteId: 1, valorPago: "1.00", mesReferencia: "2026-11", contaCaixaId: 1,
+      observacoes: null, idempotencyKey: "44444444-4444-4444-8444-444444444444",
+    };
+    const rpc = vi.fn().mockResolvedValue({
+      data: { success: true, regra: "assinaturas42_v1", repetida: false,
+        operationId: "55555555-5555-4555-8555-555555555555", idempotencyKey: input.idempotencyKey,
+        assinaturaId: 1, clienteId: 1, contaCaixaId: 1, pagamentoId: "1", transacaoCaixaId: "2",
+        valorPago: "1.00", mesReferencia: "2026-11", vigenciaAte: "2026-11-30", status: "ativa" },
+      error: null,
+    });
+    const from = vi.fn(() => { throw new Error("Writer REST não permitido"); });
+    mocks.getSupabaseClientAsync.mockResolvedValue({ rpc, from });
+    await expect(appRouter.createCaller(contextoAutenticado()).assinaturas.registrarPagamento(input))
+      .resolves.toMatchObject({ success: true, idempotencyKey: input.idempotencyKey });
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc).toHaveBeenCalledWith("rpc_receber_assinatura42", {
+      p_user_id: 999_999, p_chave: input.idempotencyKey, p_assinatura_id: 1, p_cliente_id: 1,
+      p_conta_id: 1, p_valor: "1.00", p_mes: "2026-11", p_observacoes: null,
+    });
+    expect(from).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
+  });
+
+  it("não reativa o writer legado de assinatura nem aceita owner externo", async () => {
+    const caller = appRouter.createCaller(contextoAutenticado());
+    await expect(caller.assinaturas.registrarPagamento({
+      assinaturaId: 1, clienteId: 1, valorPago: "1.00", mesReferencia: "2026-11", contaCaixaId: 1,
+      observacoes: null, idempotencyKey: "44444444-4444-4444-8444-444444444444", userId: 2,
+    } as any)).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+    expect(mocks.getDb).not.toHaveBeenCalled();
   });
 
   it("quando liberado, encaminha o recebimento somente para a RPC transacional", async () => {

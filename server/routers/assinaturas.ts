@@ -2,40 +2,14 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc";
 import { getSupabaseClientAsync } from "../db";
 import { TRPCError } from "@trpc/server";
-import { dataCivilBrasiliaParaIso, dataHojeBrasilia } from "../services/businessDate";
+import { dataHojeBrasilia } from "../services/businessDate";
 import {
-  competenciaElegivel,
   dataCivilValida,
-  mesmoValorMonetario,
-  mesReferenciaValido,
 } from "../services/assinaturasFinanceiras";
-import { bloquearOperacaoFinanceiraNaoAtomica } from "../services/financialSafety";
+import { pagamentoAssinatura42Schema } from "../../shared/assinaturas42";
+import { receberAssinatura42, conferirAssinatura42 } from "../services/assinaturasPagamentoRpc";
 
 type Supabase = NonNullable<Awaited<ReturnType<typeof getSupabaseClientAsync>>>;
-
-function colunaAusente(error: unknown, coluna: string): boolean {
-  const mensagem = String(
-    typeof error === "object" && error && "message" in error
-      ? (error as { message?: unknown }).message
-      : error ?? ""
-  ).toLowerCase();
-  return mensagem.includes(coluna.toLowerCase()) && (
-    mensagem.includes("does not exist") ||
-    mensagem.includes("schema cache") ||
-    mensagem.includes("could not find")
-  );
-}
-
-function integridadeAssinaturaAindaIndisponivel(error: unknown): boolean {
-  const mensagem = String(
-    typeof error === "object" && error && "message" in error
-      ? (error as { message?: unknown }).message
-      : error ?? ""
-  ).toLowerCase();
-  return colunaAusente(error, "pagamento_assinatura_id") ||
-    mensagem.includes("pagamento_assinatura") ||
-    mensagem.includes("invalid input value for enum");
-}
 
 async function obterAssinaturaDoUsuario(supabase: Supabase, userId: number, assinaturaId: number) {
   const { data, error } = await supabase
@@ -197,98 +171,19 @@ export const assinaturasRouter = router({
     }),
 
   registrarPagamento: protectedProcedure
-    .input(z.object({
-      assinaturaId: z.number().int().positive(),
-      clienteId: z.number().int().positive(),
-      valorPago: z.number().positive().multipleOf(0.01),
-      mesReferencia: z.string().regex(/^\d{4}-\d{2}$/),
-      contaCaixaId: z.number().int().positive(),
-      observacoes: z.string().optional(),
-    }))
+    .input(pagamentoAssinatura42Schema)
     .mutation(async ({ ctx, input }) => {
-      bloquearOperacaoFinanceiraNaoAtomica("O recebimento de assinatura");
       const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível" });
-      const assinatura = await obterAssinaturaDoUsuario(supabase, ctx.user.id, input.assinaturaId);
-      if (assinatura.cliente_id !== input.clienteId) {
-        throw new TRPCError({ code: "FORBIDDEN", message: "O cliente informado não pertence a esta assinatura" });
-      }
-      if (!mesReferenciaValido(input.mesReferencia) || !competenciaElegivel(assinatura.data_inicio, input.mesReferencia)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "A competência informada é inválida ou anterior ao início da assinatura" });
-      }
-      if (!['ativa', 'inadimplente'].includes(assinatura.status)) {
-        throw new TRPCError({ code: "CONFLICT", message: "Somente assinaturas ativas ou inadimplentes podem receber pagamento" });
-      }
-      if (!mesmoValorMonetario(input.valorPago, assinatura.valor_mensal)) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: "O pagamento deve corresponder exatamente ao valor mensal da assinatura" });
-      }
-      await validarContaDoUsuario(supabase, ctx.user.id, input.contaCaixaId);
+      if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível; preserve a intenção e UUID para retomar." });
+      return receberAssinatura42(supabase, ctx.user.id, input);
+    }),
 
-      const { data: existente, error: buscaErro } = await supabase.from("pagamentos_assinatura")
-        .select("id").eq("assinatura_id", input.assinaturaId).eq("mes_referencia", input.mesReferencia)
-        .limit(1).maybeSingle();
-      if (buscaErro) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: buscaErro.message });
-      if (existente) throw new TRPCError({ code: "CONFLICT", message: "O pagamento desta assinatura já foi registrado para o mês informado" });
-
-      const payload: Record<string, unknown> = {
-        assinatura_id: input.assinaturaId,
-        cliente_id: assinatura.cliente_id,
-        user_id: ctx.user.id,
-        valor_pago: input.valorPago.toFixed(2),
-        mes_referencia: input.mesReferencia,
-        conta_caixa_id: input.contaCaixaId,
-        observacoes: input.observacoes || null,
-      };
-      let { data: pagamento, error: pagamentoErro } = await supabase.from("pagamentos_assinatura").insert(payload).select().single();
-      // Compatibilidade até a migration 0014 criar user_id no banco produtivo.
-      if (colunaAusente(pagamentoErro, "user_id")) {
-        delete payload.user_id;
-        ({ data: pagamento, error: pagamentoErro } = await supabase.from("pagamentos_assinatura").insert(payload).select().single());
-      }
-      if (pagamentoErro || !pagamento) {
-        const mensagem = pagamentoErro?.message || "Não foi possível registrar o pagamento da assinatura";
-        const code = String(pagamentoErro?.code ?? "");
-        throw new TRPCError({ code: code === "23505" ? "CONFLICT" : "INTERNAL_SERVER_ERROR", message: mensagem });
-      }
-
-      const descricaoCaixa = `Recebimento assinatura #${pagamento.id} — ${assinatura.servico} (${input.mesReferencia})`;
-      const entradaPayload = {
-        conta_caixa_id: input.contaCaixaId,
-        tipo: "entrada",
-        categoria: "pagamento_assinatura",
-        descricao: descricaoCaixa,
-        valor: input.valorPago.toFixed(2),
-        data_transacao: dataCivilBrasiliaParaIso(dataHojeBrasilia()),
-        user_id: ctx.user.id,
-        pagamento_assinatura_id: pagamento.id,
-      };
-      let { data: entradaCaixa, error: entradaErro } = await supabase.from("transacoes_caixa")
-        .insert(entradaPayload).select("id").maybeSingle();
-      // A aplicação só usa o vínculo/categoria após 0014, mas continua
-      // operacional enquanto a base legada aguarda a migration auditada.
-      if (integridadeAssinaturaAindaIndisponivel(entradaErro)) {
-        ({ data: entradaCaixa, error: entradaErro } = await supabase.from("transacoes_caixa").insert({
-          ...entradaPayload,
-          categoria: "outros",
-          pagamento_assinatura_id: undefined,
-        }).select("id").maybeSingle());
-      }
-      if (entradaErro || !entradaCaixa) {
-        const { error: rollbackErro } = await supabase.from("pagamentos_assinatura")
-          .delete().eq("id", pagamento.id).eq("assinatura_id", input.assinaturaId);
-        if (rollbackErro) console.error("[assinaturas.registrarPagamento] falha ao compensar pagamento sem Caixa:", rollbackErro.message);
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível registrar a entrada no Caixa; o pagamento foi desfeito" });
-      }
-
-      const { error: statusErro } = await supabase.from("assinaturas")
-        .update({ status: "ativa", updatedAt: new Date().toISOString() })
-        .eq("id", input.assinaturaId).eq("user_id", ctx.user.id).eq("status", "inadimplente");
-      if (statusErro) {
-        await supabase.from("transacoes_caixa").delete().eq("id", entradaCaixa.id).eq("user_id", ctx.user.id);
-        await supabase.from("pagamentos_assinatura").delete().eq("id", pagamento.id).eq("assinatura_id", input.assinaturaId);
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Não foi possível concluir a baixa; o pagamento foi desfeito" });
-      }
-      return pagamento;
+  conferirPagamento: protectedProcedure
+    .input(pagamentoAssinatura42Schema)
+    .mutation(async ({ ctx, input }) => {
+      const supabase = await getSupabaseClientAsync();
+      if (!supabase) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Banco indisponível; intenção preservada para conferência." });
+      return conferirAssinatura42(supabase, ctx.user.id, input);
     }),
 
   pagamentos: protectedProcedure
