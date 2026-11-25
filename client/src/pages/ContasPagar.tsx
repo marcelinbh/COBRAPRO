@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Receipt, Plus, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CancelamentoPendente from '@/components/CancelamentoPendente';
+import EdicaoDespesa49 from '@/components/EdicaoDespesa49';
 import {
   DespesasIntentStore, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload,
   diaCivilBrt, dinheiroDespesa, moedaDespesa,
@@ -175,7 +176,7 @@ export default function ContasPagar() {
       <div><h1 className="text-2xl font-bold flex gap-2"><Receipt />Contas a Pagar</h1><p className="text-sm text-muted-foreground">Despesas novas no trilho atômico; histórico somente consulta.</p></div>
       <Button disabled={!habilitado || locked('criar')} onClick={() => setNovo(true)}><Plus className="h-4 w-4 mr-2" />Nova despesa</Button>
     </div>
-    <p className="text-sm border rounded-lg p-3">Legado requer conferência. Edição, exclusão e recorrência estão indisponíveis. Cancelamento pendente auditado tem disponibilidade independente abaixo. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
+    <p className="text-sm border rounded-lg p-3">Legado requer conferência. Edição pendente por sucessão20 e cancelamento lógico têm disponibilidade independente abaixo; exclusão física e recorrência continuam bloqueadas. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
     {auth.isError ? <p role="alert">Erro ao identificar a sessão. Nenhuma operação disponível.</p> : auth.isLoading ? <p role="status">Carregando sessão...</p> : !userId ? <p role="alert">Autentique-se para consultar despesas.</p> : null}
     {userId && (capacidades.isError ? <p role="alert">Não foi possível verificar a disponibilidade do trilho. Escritas bloqueadas.</p> : capacidades.isLoading ? <p role="status">Verificando disponibilidade...</p> : !habilitado ? <p role="alert">Despesas prospectivas desabilitadas; nenhum lançamento será feito no legado.</p> : null)}
     {avisoStorage && <p role="alert" className="text-amber-500 border p-3 rounded-lg break-words">{avisoStorage}</p>}
@@ -198,6 +199,7 @@ export default function ContasPagar() {
     </section>
     <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
     {userId && <CancelamentoPendente userId={userId} itens={!lista.isError && lista.data ? lista.data : []} />}
+    {userId && <EdicaoDespesa49 userId={userId} itens={!lista.isError && lista.data ? lista.data : []} />}
     <section aria-label="Lista de despesas" className="space-y-3">
       {!userId ? <p role="status">Consulta indisponível sem sessão.</p> : lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
         : lista.isLoading || !lista.data ? <p role="status">{userId ? 'Carregando despesas...' : 'Consulta indisponível sem sessão.'}</p>

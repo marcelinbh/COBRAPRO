@@ -1393,3 +1393,20 @@ Cada correção só será marcada concluída após sua prova delimitada e public
 - [x] Despesas49v3 preflight REALreadonly303=233finance+70pins estáticos PASS22h10; SQL6b44cc2b28565147605f4183154e42205953b1faee86f35fec9eec22975601bb. Ainda não instalado/habilitado/publicado.
 - [x] Calendário46compat, reparcelamento47real e manutenção48real25 concluídos nas cópias privadas. Não liberados: precisam integração/gate físico/publicação/E2E.47/48 após46 estão em composição estrita, sem reseal de drift.
 - [ ] Não alegar plataforma100%; cheques por último; sem Kiwify/ofertas, saneamento UltraCredi, mistura de empresas, novos envios WhatsApp ou reinício.
+
+## Fechamento50 e incremento49v3 após50 —24/11/2026 22h58 BRT
+- [x] Checkpoint50 f6757db4978d4d39eda64c08a094dc2c1d95c0e6 publicado Manus/GitHub; DO deployment4f688d73-71fd-4bee-b653-e537c0edabbd confirmado Sucesso/Implantação ao vivo/Saudável22h54. Frontend index-dqbLfVlf.js nos dois domínios1343623bytes/SHA256deab2c90a764da7fe22ff2e47286bccb1b7fbad30f189a629dda3b403555ca0d byte-exatos. Backend binário não medido em produção.
+- [x] Registro50 COMMIT máximo1 confirmou row154/chave reservada de projeto/user_idNULL/UIDreal exato. Três execuções naturais22h53/54/55 manualfalse/HTTP200, correlacionadas por janelas únicas com três UUIDs internos, início/conclusão resultadook no projeto e owner4682. Recibos históricos amostrados inalterados; heartbeat não prova entrega/leitura nem cadência prolongada.
+- [x] Pós50: catálogo303 e cinco digests estruturais iguais; financeiro78 inteiro/hash/count inalterado22h56 após execuções naturais. Sem envio manual/replay/saneamento/flags financeiras/roles/Kiwify/ofertas/reinício.
+- [x] Integrados somente16arquivos49v3 após HEAD50 congelado:13originais+3deltas SQL/pre/post installer-only. SQL49 SHA2566b44cc2b28565147605f4183154e42205953b1faee86f35fec9eec22975601bb;15runtime originais byte-exatos. Preflight readonly303/233finance+70extras estáticos+verificadores reconfirmado22h56 sem DDL.
+- [ ] Gate49 fresco oficial PG21/targeted/FULL/TSC sem cache/build/validate/restauração; checkpoint, instalação49 OFF, pós-integridade, push/publicação/habilitação mínima e E2E fictício koletor3 ainda pendentes. Candidato/cotação não é desbloqueio.
+- [ ] Escopo49: descrição/categoria/vencimento/observações/motivo de despesa pendente prospectiva20 por sucessão auditada, valor preservado/Caixa zero. Recorrência, valor, legado e pós-baixa não liberados por este incremento.
+- [ ] Calendário46 e composição reparcelamento47/manutenção48 separados; cheques por último. Não plataforma100%.
+
+## Incremento49v3 — gate final aprovado24/11/2026 23h13 BRT
+
+- [x] PG17 oficial21 cenários PASS; roles privadas NOSUPER/NOBYPASS, cluster parado/status3. As três tabelas49 usam RLS ENABLED, não FORCED; não confundir com tabelas50.
+- [x] Direcionado115PASS/8arquivos e suplemento38c45PASS/1arquivo pela configuração própria; total160 testes direcionados. FULL4138PASS/11SKIP/0FAIL,190arquivosPASS/3SKIP/193total (contagem literal, não suites internas do JSON). TypeScript sem cache, build, validate37, gate e restauração exit0 às23h07:30.
+- [x] 935tracked/14untracked íntegros, drift[]/unexpected[];16arquivos49 byte-exatos. Frontindex-pZlmWM__.js1356792bytes/SHA256d57eeccaca06a7ce0d5f101a92d65e06acb92021033170245b670d94b2d3a5fa; backend local795063bytes/SHA256f3fa2bfd491597cc1f11737ff9fc0f8c0f49789bf4b12fc8b166f11eac08c7f0. SQL49 6b44cc2b28565147605f4183154e42205953b1faee86f35fec9eec22975601bb congelado.
+- [ ] Checkpoint49 antes do DDL; instalação OFF e pós-integridade; push e publicação Manus/DO, habilitação mínima única e E2E despesa fictícia NOVA koletor3. Ainda não entregue nem plataforma100%.
+- [x] Calendário46 pacote privado pronto para integrar só após49 efetivamente liberado. Composição47/48 passou61cenários limitados mas revelou recusas de46 após repricing48 e47 após execução46/48; correção semântica privada em andamento, sem falsa ponte de criação ou remoção de isolamento.
