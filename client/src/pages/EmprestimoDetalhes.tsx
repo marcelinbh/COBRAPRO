@@ -22,9 +22,11 @@ import { trpc } from '@/lib/trpc';
 import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
+import { ManutencaoJuros48 } from '@/components/ManutencaoJuros48';
 import { ManutencaoCalendario } from '@/components/ManutencaoCalendario';
 import { MultaManualAplicar } from '@/components/MultaManualOperacoes';
 
+// Calendário46 posterior à manutenção48 preserva valores atuais, somente após prova fechada criação25→46/48.
 export default function EmprestimoDetalhes() {
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
@@ -596,6 +598,7 @@ export default function EmprestimoDetalhes() {
         <Button disabled title="Edição financeira manual bloqueada para preservar a auditoria." className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
           <Edit2 className="h-4 w-4" /> Editar Juros
         </Button>
+        <ManutencaoJuros48 contratoId={emprestimo.id} parcelasIds={(emprestimo.todasParcelas??[]).map((p: {id:number})=>p.id)} onSuccess={atualizarFinanceiro} />
         <ManutencaoCalendario contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
         <MultaManualAplicar contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
         {emprestimo.clienteWhatsapp && (

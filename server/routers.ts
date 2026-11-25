@@ -1,4 +1,5 @@
 import { reparcelamento43Router } from './routers/reparcelamento43';
+import { reparcelamento47Router } from './routers/reparcelamento47';
 import { despesas49Router } from './routers/despesas49';
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
@@ -17,6 +18,7 @@ import { emprestimosMultimodalRouter } from "./routers/emprestimosMultimodal";
 import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { multaManualRouter } from "./routers/multaManual";
+import { manutencaoFinanceira48Router } from "./routers/manutencaoFinanceira48";
 import { manutencaoEmprestimosRouter } from "./routers/manutencaoEmprestimos";
 import { cheques40Procedures } from "./routers/cheques40";
 import { telefone41Writers } from "./routers/telefone41";
@@ -3984,6 +3986,7 @@ export const appRouter = router({
   configuracoes: configuracoesRouter,
   cobradores: cobradoresRouter,
   reparcelamento: reparcelamento43Router,
+  reparcelamentoAtual: reparcelamento47Router,
   contasPagar: contasPagarProspectivasRouter,
   despesas49: despesas49Router,
   emprestimosProspectivos: emprestimosProspectivosRouter,
@@ -3991,6 +3994,7 @@ export const appRouter = router({
   renovacaoProspectiva: renovacaoProspectivaRouter,
   recebimentosLegados: recebimentosLegadosRouter,
   multaManual: multaManualRouter,
+  manutencaoFinanceira48: manutencaoFinanceira48Router,
   manutencaoEmprestimos: manutencaoEmprestimosRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,

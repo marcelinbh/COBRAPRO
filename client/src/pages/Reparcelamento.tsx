@@ -7,6 +7,7 @@ import {
   reparcelamento43PreviewSchema,conferirCotacao43,intencao43DaCotacao,
   type Reparcelamento43Cotacao,type Reparcelamento43Execucao,type Reparcelamento43Resultado,
 } from '../../../shared/reparcelamento43';
+import {ReparcelamentoAtual47} from '@/components/ReparcelamentoAtual47';
 import {lerIntencao43} from '../../../shared/reparcelamento43Intencao';
 import {enviarIntencao43,recuperarIntencao43} from '../../../shared/reparcelamento43Fluxo';
 
@@ -42,17 +43,17 @@ export default function Reparcelamento() {
   function refresh(uid:number){if(identity.current===uid)setPending(lerIntencao43(localStorage,uid));}
   async function cotar(){
     if(!owner||click.current||pending||erro)return;
-    const uid=owner,version=epoch.current,atual=guard(uid,version),key=requestKey;
+    const uid=owner,version=epoch.current,atual=guard(uid,version),key=currentForm.current;
     click.current=true;setBusy(true);setErro('');setQ(undefined);
     try{const input=reparcelamento43PreviewSchema.parse(request);const response=await quoteSource.refetch();
-      if(response.isError)throw new Error('Cotação indisponível; nenhuma execução enviada.');
+      if(response.isError)throw new Error(response.error?.message??'Cotação indisponível; nenhuma execução enviada.');
       const quote=conferirCotacao43(response.data,uid,input);
       if(atual()&&currentForm.current===key)setQ(quote);
     }catch(error){if(atual())setErro(error instanceof Error?error.message:'Falha ao cotar.');}
     finally{click.current=false;if(atual())setBusy(false);}
   }
   async function enviar(){
-    if(!owner||!visible||click.current||pending||!q||!account||erro||JSON.stringify(q.request)!==requestKey)return;
+    if(!owner||!visible||click.current||pending||!q||q.regra!=='reparcelamento43_v1'||!account||erro||JSON.stringify(q.request)!==requestKey)return;
     const uid=owner,version=epoch.current,atual=guard(uid,version);
     click.current=true;setBusy(true);setErro('');
     try{
@@ -74,8 +75,10 @@ export default function Reparcelamento() {
   }
   if(!visible)return <main className="p-6"><p>Conferindo sessão da empresa atual...</p></main>;
   return <main className="p-6 space-y-5 max-w-4xl">
-    <h1 className="text-2xl font-semibold">Reparcelamento mensal</h1>
-    <p>Legado mensal inteiramente aberto. Transfere principal para sucessora, sem novo desembolso ou recebimento na origem. Parcial/pago e demais modalidades permanecem recusados.</p>
+    <h1 className="text-2xl font-semibold">Reparcelamento</h1>
+    <ReparcelamentoAtual47 key={owner} owner={owner!} permitido={!pending}/>
+    <h2 className="text-xl font-semibold">Legado43 — fluxo separado</h2>
+    <p>O fluxo43 permanece restrito ao legado inteiramente aberto; nenhum fallback atual25 para origem21 ou43.</p>
     {erro&&<div role="alert"><p>{erro}</p>{!pending&&<Button variant="outline" disabled={busy} onClick={()=>setErro('')}>Voltar à conferência</Button>}</div>}
     {pending ? <section className="border p-4 space-y-3"><h2>Intenção preservada nesta empresa</h2><p>UUID: <code>{pending.idempotencyKey}</code> — origem #{pending.contratoId}</p><p>Não inicie outra execução. A conferência aguarda o mesmo lockUUID e confirma o commit ou grava fence permanente de não execução.</p><Button disabled={busy} onClick={()=>void conferir()}>Conferir mesma intenção no servidor</Button></section> : <>
       <fieldset disabled={busy} className="grid gap-3 border p-4">
@@ -87,11 +90,11 @@ export default function Reparcelamento() {
         <Button disabled={!!erro} onClick={()=>void cotar()}>Cotar no servidor</Button>
       </fieldset>
       {q&&<section className="border p-4 space-y-3"><h2>Cotação vinculada #{q.contratoId}</h2>
-        <p>Principal transferido: R$ {q.saldoDevedor}; encargos incluídos: R$ {q.encargos}; juros novos: R$ {q.jurosNovos}; total: R$ {q.totalNovo}.</p>
+        <p>Saldo para nova agenda: R$ {q.saldoDevedor}; encargos incluídos: R$ {q.encargos}; juros novos: R$ {q.jurosNovos}; total: R$ {q.totalNovo}.</p>
         <p>Conta de origem preservada: #{q.contaCaixaId} {account?.nome??'— metadados desta empresa indisponíveis'}. Nenhum débito novo.</p>
         <table className="w-full"><thead><tr><th>Parcela</th><th>Vencimento</th><th>Principal</th><th>Juros</th><th>Total</th></tr></thead><tbody>{q.parcelas.map(p=><tr key={p.numero}><td>{p.numero}</td><td>{p.vencimento}</td><td>{p.principal}</td><td>{p.juros}</td><td>{p.valor}</td></tr>)}</tbody></table>
         <p>A última parcela pode diferir em centavos. Revise a tabela exata antes de confirmar.</p>
-        <Button disabled={busy||!!erro||!account} onClick={()=>void enviar()}>Confirmar transferência sem desembolso</Button>
+        <Button disabled={busy||!!erro||!account} onClick={()=>void enviar()}>Confirmar transferência43 sem desembolso</Button>
       </section>}
     </>}
     {result&&result.userId===owner&&<section className="border p-4 space-y-4"><h2>Sucessora #{result.contratoId} confirmada</h2><p>Origem #{result.contratoOrigemId}, raiz #{result.raizId}. Desembolso R$0,00. Receba cada parcela pelo fluxo transacional existente abaixo.</p>{result.parcelasIds.map(id=><div key={id}><h3>Parcela #{id}</h3><RecebimentoValidado contratoId={result.contratoId} parcelaId={id} permitirRenovacao={false} onSuccess={()=>{}} /></div>)}</section>}
