@@ -395,20 +395,32 @@ export default function NotificacoesAutomaticas() {
         <Card className="border-border bg-muted/20">
           <CardContent className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-5">
             {[
-              ["Pendentes", saude?.pendentes ?? 0, "text-amber-400"],
-              ["Enviando", saude?.enviando ?? 0, "text-blue-400"],
-              ["Falhas", saude?.falhas ?? 0, "text-red-400"],
-              ["Revisar", saude?.ambiguas ?? 0, "text-orange-400"],
+              ["Pendentes", saude?.pendentes, "text-amber-400"],
+              ["Enviando", saude?.enviando, "text-blue-400"],
+              ["Falhas", saude?.falhas, "text-red-400"],
+              ["Revisar", saude?.ambiguas, "text-orange-400"],
             ].map(([label, valor, cor]) => (
               <div key={String(label)} className="rounded-lg border border-border bg-background/40 p-3">
                 <p className="text-xs text-muted-foreground">{label}</p>
-                <p className={`mt-1 text-lg font-semibold ${cor}`}>{loadingSaude ? "…" : erroSaude ? "—" : valor}</p>
+                <p className={`mt-1 text-lg font-semibold ${cor}`}>{loadingSaude ? "…" : erroSaude || !saude ? "—" : valor}</p>
               </div>
             ))}
             <div className="col-span-2 rounded-lg border border-border bg-background/40 p-3 sm:col-span-1">
-              <p className="text-xs text-muted-foreground">Último envio</p>
+              <p className="text-xs text-muted-foreground">Último aceite Evolution</p>
               <p className="mt-1 truncate text-xs font-medium text-foreground">
-                {loadingSaude ? "Carregando…" : erroSaude ? "Indisponível" : saude?.ultimoEnvioEm ? new Date(saude.ultimoEnvioEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Sem envio"}
+                {loadingSaude ? "Carregando…" : erroSaude || !saude ? "Indisponível" : saude.ultimoEnvioEm ? new Date(saude.ultimoEnvioEm).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }) : "Sem aceite registrado"}
+              </p>
+            </div>
+            <div className="col-span-2 rounded-lg border border-border bg-background/40 p-3 sm:col-span-5">
+              <p className="text-xs font-medium">Última execução observada da agenda</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {loadingSaude ? "Carregando…" : erroSaude || !saude || saude.heartbeat === undefined ? "Indisponível" : saude.heartbeat
+                  ? `${new Date(saude.heartbeat.observedAt).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })} · ${saude.heartbeat.origem} / ${saude.heartbeat.escopo} · ${saude.heartbeat.fase} / ${saude.heartbeat.resultado}${saude.heartbeat.dryRun ? " · simulação" : ""}`
+                  : "Nenhuma execução registrada para sua conta"}
+              </p>
+              <p className="mt-2 text-xs text-muted-foreground">A cadência real não está certificada neste painel. HTTP 200 e heartbeat não comprovam envio nem entrega e não ligam a automação OFF. Aceite Evolution, entrega e leitura são evidências distintas.</p>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {loadingSaude || erroSaude || !saude?.recibos ? "Recibos indisponíveis" : `Amostra de até ${saude.recibos.limiteAmostra} registros: ${saude.recibos.aceitosSemRecibo} aceites sem recibo · ${saude.recibos.entregues} entregues · ${saude.recibos.lidos} lidos.`}
               </p>
             </div>
           </CardContent>

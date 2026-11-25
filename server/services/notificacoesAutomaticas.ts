@@ -363,9 +363,12 @@ export async function enfileirarLembretesAutomaticos(
             throw new Error("PROPRIEDADE_DIVERGENTE");
           const telefone = cliente.whatsapp || cliente.telefone || "";
           elegiveis++;
-          const valor = Number(parcela.valor_original);
-          if (!Number.isFinite(valor) || valor <= 0)
+          const valorBruto = String(parcela.valor_original);
+          if (!/^(0|[1-9][0-9]{0,12})(\.[0-9]{1,2})?$/.test(valorBruto) ||
+              /^0(?:\.0{1,2})?$/.test(valorBruto))
             throw new Error("VALOR_INVALIDO");
+          const [inteiro, fracao = ""] = valorBruto.split(".");
+          const valor = `${inteiro}.${fracao.padEnd(2, "0")}`;
           const mensagem = substituirVariaveis(regra.mensagem_template, {
             nome: cliente.nome,
             valor,
@@ -908,28 +911,83 @@ export async function processarFilaWhatsApp(
   };
 }
 export async function obterSaudeNotificacoes(userId: number) {
+  if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error("USUARIO_ESCOPO_INVALIDO");
   const sb = await getSupabaseClientAsync();
-  if (!sb)
-    return {
-      pendentes: 0,
-      enviando: 0,
-      falhas: 0,
-      ambiguas: 0,
-      ultimoEnvioEm: null as string | null,
-    };
+  if (!sb) throw new Error("SAUDE_NOTIFICACOES_INDISPONIVEL");
+  const observabilidade = await obterObservabilidadeNotificacoes(sb, userId);
   const { data, error } = await sb
     .from("whatsapp_outbox")
-    .select("status, enviado_em")
+    .select("user_id, status, enviado_em")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) throw new Error("SAUDE_NOTIFICACOES_INDISPONIVEL");
   const linhas = data ?? [];
+  if (linhas.some((row: any) => row.user_id !== userId)) throw new Error("SAUDE_NOTIFICACOES_OWNER_DIVERGENTE");
   return {
+    ...observabilidade,
     pendentes: linhas.filter((x: any) => x.status === "pendente").length,
     enviando: linhas.filter((x: any) => x.status === "enviando").length,
     falhas: linhas.filter((x: any) => x.status === "falhou").length,
     ambiguas: linhas.filter((x: any) => x.status === "desconhecido").length,
     ultimoEnvioEm: linhas.find((x: any) => x.enviado_em)?.enviado_em ?? null,
+  };
+}
+
+
+export type HeartbeatNotificacoes = {
+  observedAt: string; runId: string; origem: "github_actions" | "http_secret" | "manus_task";
+  escopo: "global" | "project" | "tenant" | "legado";
+  dryRun: boolean; fase: "iniciada" | "concluida" | "falhou";
+  resultado: "iniciada" | "ok" | "parcial" | "falhou";
+};
+function parseHeartbeat(raw: unknown, owner: number): HeartbeatNotificacoes | null {
+  try {
+    if (typeof raw !== "string") return null;
+    const value = JSON.parse(raw);
+    if (value?.version !== 1 || value.userId !== owner ||
+      typeof value.runId !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.runId) ||
+      !["github_actions", "http_secret", "manus_task"].includes(value.origem) ||
+      (value.escopo !== undefined && (!["global", "project", "tenant"].includes(value.escopo) ||
+        (value.origem === "manus_task" ? value.escopo === "global" : value.escopo !== "global"))) ||
+      typeof value.dryRun !== "boolean" ||
+      !["iniciada", "concluida", "falhou"].includes(value.fase) ||
+      !["iniciada", "ok", "parcial", "falhou"].includes(value.resultado) ||
+      typeof value.observedAt !== "string" || !Number.isFinite(Date.parse(value.observedAt)) ||
+      new Date(value.observedAt).toISOString() !== value.observedAt ||
+      (value.fase === "iniciada" && value.resultado !== "iniciada") ||
+      (value.fase === "concluida" && !["ok", "parcial"].includes(value.resultado)) ||
+      (value.fase === "falhou" && value.resultado !== "falhou")) return null;
+    return { observedAt: value.observedAt, runId: value.runId, origem: value.origem, escopo: value.escopo ?? "legado", dryRun: value.dryRun, fase: value.fase, resultado: value.resultado };
+  } catch { return null; }
+}
+
+/** Observabilidade não enfileira, não envia, não certifica cron. Snapshot
+ * limitado é explicitamente uma amostra, e erro de banco nunca vira zero. */
+export async function obterObservabilidadeNotificacoes(sb: BancoWhatsApp, userId: number) {
+  if (!Number.isSafeInteger(userId) || userId <= 0) throw new Error("USUARIO_ESCOPO_INVALIDO");
+  const [{ data: events, error: eventError }, { data: receipts, error: receiptError }] = await Promise.all([
+    sb.from("whatsapp_eventos").select("instancia, payload, criado_em")
+      .eq("instancia", `user-${userId}`).eq("evento", "SCHEDULED_NOTIFICACOES")
+      .order("criado_em", { ascending: false, nullsFirst: false }).limit(100),
+    sb.from("notificacoes_log").select("user_id, status")
+      .eq("user_id", userId).order("createdAt", { ascending: false }).limit(200),
+  ]);
+  if (eventError || receiptError) throw new Error("OBSERVABILIDADE_NOTIFICACOES_INDISPONIVEL");
+  if ((events ?? []).some(row => row.instancia !== `user-${userId}`) ||
+    (receipts ?? []).some(row => row.user_id !== userId)) throw new Error("OBSERVABILIDADE_OWNER_DIVERGENTE");
+  const heartbeats = (events ?? []).map(row => parseHeartbeat(row.payload, userId)).filter((value): value is HeartbeatNotificacoes => Boolean(value))
+    .sort((a, b) => b.observedAt.localeCompare(a.observedAt) || (a.fase === "iniciada" ? 1 : -1));
+  return {
+    heartbeat: heartbeats[0] ?? null,
+    cadencia: "nao_verificada" as const,
+    recibos: {
+      aceitosSemRecibo: (receipts ?? []).filter(row => ["enviado", "aceito_evolution"].includes(row.status)).length,
+      entregues: (receipts ?? []).filter(row => row.status === "entregue").length,
+      lidos: (receipts ?? []).filter(row => row.status === "lido").length,
+      limiteAmostra: 200,
+    },
+    limiteEventos: 100,
   };
 }

@@ -7,6 +7,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { registerAuthRoutes } from "../authRoutes";
 import { registerWebhookRoutes } from "../webhookRoutes";
+import { registerNotificacoesScheduledRoutes } from "../notificacoesScheduledRoutes";
 import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
 import { registerBlackListPhotoRoutes } from "../blacklistPhotoRoutes";
 import { appRouter } from "../routers";
@@ -88,108 +89,8 @@ async function startServer() {
     }
   }
 
-  app.post('/api/scheduled/notificacoes/health', async (req, res) => {
-    if (!(await autenticarDisparadorDeAutomacao(req))) {
-      return res.status(403).json({ ok: false, error: 'Acesso exclusivo para automação autorizada' });
-    }
-    const { getSupabaseClientAsync } = await import('../db');
-    const sb = await getSupabaseClientAsync();
-    if (!sb) return res.status(503).json({ ok: false, service: 'notificacoes-automaticas', database: 'indisponivel' });
-    const { error } = await sb.from('whatsapp_outbox').select('id').limit(1);
-    return res.status(error ? 503 : 200).json({ ok: !error, service: 'notificacoes-automaticas', database: error ? 'erro' : 'ok' });
-  });
-
-
-  // ─── Endpoint para tarefa agendada: disparar notificações automáticas do dia ───
-  // Chamado a cada cinco minutos pelo agendamento externo e filtrado pelo horário
-  // escolhido por cada assinante, no fuso horário de Brasília.
-  app.post('/api/scheduled/notificacoes', async (req, res) => {
-    try {
-      const { getSupabaseClientAsync } = await import('../db');
-      const { gerarMensagemRelatorio } = await import('../routers/relatorioDiario');
-      const { dataHojeBrasilia } = await import('../services/businessDate');
-      const { enfileirarLembretesAutomaticos, enfileirarMensagemWhatsApp, processarFilaWhatsApp } = await import('../services/notificacoesAutomaticas');
-      const { deveEnviarRelatorioDiario } = await import('../services/relatorioDiarioAutomatico');
-
-      if (!(await autenticarDisparadorDeAutomacao(req))) {
-        return res.status(403).json({ error: 'Acesso exclusivo para automação autorizada' });
-      }
-
-      const dryRun = req.body?.dryRun === true;
-
-      const sb = await getSupabaseClientAsync();
-      if (!sb) return res.status(500).json({ error: 'DB indisponível' });
-
-      const producaoLembretes = await enfileirarLembretesAutomaticos(new Date(), dryRun);
-      let relatoriosElegiveis = 0;
-      let relatoriosComErro = 0;
-      const agora = new Date();
-      const dataHoje = dataHojeBrasilia(agora);
-
-      // Relatório diário do gestor: utiliza uma configuração própria e não depende
-      // de as mensagens automáticas para clientes estarem habilitadas.
-      const { data: configuracoesRelatorio } = await sb
-        .from('configuracoes')
-        .select('user_id, chave, valor')
-        .in('chave', [
-          'relatorio_diario_ativo',
-          'relatorio_diario_horario',
-          'relatorio_diario_telefone',
-          'relatorio_diario_ultimo_envio',
-        ]);
-
-      const relatoriosPorUsuario = new Map<number, Record<string, string>>();
-      for (const item of configuracoesRelatorio || []) {
-        const configuracao = relatoriosPorUsuario.get(item.user_id) || {};
-        configuracao[item.chave] = item.valor;
-        relatoriosPorUsuario.set(item.user_id, configuracao);
-      }
-
-      for (const [userId, configuracao] of Array.from(relatoriosPorUsuario.entries())) {
-        const deveEnviar = deveEnviarRelatorioDiario({
-          ativo: configuracao.relatorio_diario_ativo,
-          horario: configuracao.relatorio_diario_horario,
-          telefone: configuracao.relatorio_diario_telefone,
-          ultimoEnvio: configuracao.relatorio_diario_ultimo_envio,
-        }, agora);
-        if (!deveEnviar) continue;
-
-        relatoriosElegiveis++;
-        const mensagem = await gerarMensagemRelatorio(userId);
-        if (!mensagem) {
-          relatoriosComErro++;
-          continue;
-        }
-
-        await enfileirarMensagemWhatsApp({
-          userId, tipo: 'relatorio_diario', telefone: configuracao.relatorio_diario_telefone,
-          mensagem, dataReferencia: dataHoje,
-          chaveDeduplicacao: `relatorio:${userId}:${dataHoje}`,
-        }, dryRun);
-      }
-
-      const processamento = await processarFilaWhatsApp(25, dryRun);
-
-      res.json({
-        success: true,
-        dryRun,
-        enviados: processamento.enviadas,
-        elegiveis: producaoLembretes.elegiveis,
-        processados: producaoLembretes.usuariosNoHorario,
-        enfileiradas: producaoLembretes.enfileiradas,
-        fila: processamento,
-        relatorios: {
-          enviados: processamento.relatoriosConcluidos,
-          elegiveis: relatoriosElegiveis,
-          erros: relatoriosComErro,
-        },
-        data: dataHoje,
-      });
-    } catch (err) {
-      console.error('[scheduled/notificacoes] Erro:', err);
-      res.status(500).json({ error: String(err) });
-    }
-  });
+  // A rota existente agora resolve taskUid/owner e persiste observação sem PII.
+  registerNotificacoesScheduledRoutes(app);
 
   // ─── Heartbeat de status: sem escrita financeira ───────────────────────────
   // O status civil é derivado na listagem. Este endpoint não altera parcelas

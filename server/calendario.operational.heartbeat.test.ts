@@ -39,6 +39,8 @@ describe("heartbeat de status sem escrita financeira", () => {
     const keepalive = source.split("app.post('/api/scheduled/supabase-keepalive'")[1].split("// tRPC API")[0];
     expect(keepalive).toContain("autenticarDisparadorDeAutomacao(req)");
     expect(keepalive).toContain("sb.from('users').select('id').limit(1)");
-    expect(source).toContain("app.post('/api/scheduled/notificacoes/health'");
+    expect(source).toContain("registerNotificacoesScheduledRoutes(app)");
+    const scheduled = readFileSync(new URL("./notificacoesScheduledRoutes.ts", import.meta.url), "utf8");
+    expect(scheduled).toContain('app.post("/api/scheduled/notificacoes/health"');
   });
 });

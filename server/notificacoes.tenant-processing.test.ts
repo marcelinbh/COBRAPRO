@@ -347,6 +347,25 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 describe("WhatsApp — escopo opcional por tenant com SDK real sem rede", () => {
+  it("produtor mantém NUMERIC(15,2) máximo textual sem perda por float", async () => {
+    const db = database();
+    db.tables.parcelas.find(row => row.user_id === TENANT)!.valor_original = "9999999999999.99";
+    db.tables.whatsapp_outbox = db.tables.whatsapp_outbox.filter(row => row.id !== outboxId(TENANT, 1));
+    const r = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
+    expect(r.enfileiradas).toBe(1);
+    const message = db.tables.whatsapp_outbox.find(row => row.user_id === TENANT && row.status === "pendente")!.mensagem;
+    expect(message).toContain("9.999.999.999.999,99");
+    expect(mocks.enviar).not.toHaveBeenCalled();
+  });
+  it.each(["0.00", "1.001", "1e3", "99999999999999.99", "-1.00"])("valor %s inválido não cria lembrete", async valor => {
+    const db = database();
+    db.tables.parcelas.find(row => row.user_id === TENANT)!.valor_original = valor;
+    db.tables.whatsapp_outbox = db.tables.whatsapp_outbox.filter(row => row.id !== outboxId(TENANT, 1));
+    const r = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
+    expect(r.enfileiradas).toBe(0);
+    expect(r.falhasItens).toBe(1);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+  });
   const operations = [
     {
       name: "produtor",

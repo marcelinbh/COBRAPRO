@@ -464,3 +464,28 @@ describe("notificações — sessão e callbacks de mutação do SDK real", () =
     unsubscribe(); h.client.clear();
   });
 });
+
+describe("painel50 — compatibilidade de resposta durante publicação incremental", () => {
+  it("resposta antiga não quebra controles nem inventa recibos ou ausência de execução", () => {
+    const h = harness();
+    const tree = h.render();
+    expect(text(tree)).toContain("Recibos indisponíveis");
+    expect(text(tree)).not.toContain("Nenhuma execução registrada para sua conta");
+    expect(text(tree)).not.toContain("aceites sem recibo ·");
+    expect(button(tree, "Validar sem enviar").props.disabled).toBe(false);
+    expect(h.mutations.dispararDoDia.mutate).not.toHaveBeenCalled();
+    expect(h.mutations.testar.mutate).not.toHaveBeenCalled();
+    h.unmount(); h.client.clear();
+  });
+  it("resposta50 distingue aceite sem recibo, entrega, leitura e heartbeat ausente confirmado", () => {
+    const h = harness();
+    h.queries.saude.data = { ...h.queries.saude.data, heartbeat: null, recibos: { limiteAmostra: 200, aceitosSemRecibo: 3, entregues: 2, lidos: 1 } };
+    const tree = h.render();
+    expect(text(tree)).toContain("Amostra de até 200 registros: 3 aceites sem recibo · 2 entregues · 1 lidos.");
+    expect(text(tree)).toContain("Nenhuma execução registrada para sua conta");
+    expect(text(tree)).toContain("cadência real não está certificada");
+    expect(h.mutations.dispararDoDia.mutate).not.toHaveBeenCalled();
+    expect(h.mutations.testar.mutate).not.toHaveBeenCalled();
+    h.unmount(); h.client.clear();
+  });
+});
