@@ -22,7 +22,7 @@ const MAX_ESTADO_CONEXAO = 64;
  * isolamento: nunca aceitamos um evento sem conseguir associá-lo ao assinante. */
 function userIdDaInstancia(instancia: unknown): number | null {
   const match =
-    typeof instancia === "string" ? /^user-(\d+)$/.exec(instancia) : null;
+    typeof instancia === "string" ? /^user-([1-9]\d*)$/.exec(instancia) : null;
   const userId = match ? Number(match[1]) : NaN;
   return Number.isSafeInteger(userId) && userId > 0 ? userId : null;
 }
@@ -34,6 +34,7 @@ function ehRegistro(valor: unknown): valor is RegistroDesconhecido {
 export function statusHistoricoEvolution(
   valor: unknown
 ): StatusHistoricoEvolution | null {
+  if (typeof valor !== "string" && typeof valor !== "number") return null;
   const status = String(valor ?? "")
     .trim()
     .toUpperCase();
@@ -72,7 +73,7 @@ function extrairAtualizacoes(
 ): RegistroDesconhecido[] {
   const candidatas = Array.isArray(data.updates)
     ? data.updates
-    : data.key && (data.update || data.status)
+    : (data.key || data.keyId) && (data.update || data.status !== undefined)
       ? [data]
       : [];
   return candidatas.filter(ehRegistro).slice(0, MAX_ATUALIZACOES_POR_EVENTO);
@@ -83,12 +84,22 @@ function atualizacaoRastreavel(
 ): { messageId: string; status: StatusHistoricoEvolution } | null {
   const key = ehRegistro(update.key) ? update.key : null;
   const updateData = ehRegistro(update.update) ? update.update : update;
-  const messageId = typeof key?.id === "string" ? key.id.trim() : "";
+  // Evolution 1.8.6 envia { keyId, status } plano. Não inventar key/fromMe
+  // nem permitir dois IDs diferentes no mesmo recibo autenticado.
+  const nestedId = typeof key?.id === "string" ? key.id.trim() : "";
+  const flatId = typeof update.keyId === "string" ? update.keyId.trim() : "";
+  if (key?.id !== undefined && !nestedId) return null;
+  if (update.keyId !== undefined && !flatId) return null;
+  if (nestedId && flatId && nestedId !== flatId) return null;
+  const messageId = nestedId || flatId;
   const status = statusHistoricoEvolution(updateData.status ?? update.status);
+  if (updateData !== update && update.status !== undefined &&
+      statusHistoricoEvolution(update.status) !== status) return null;
   // A Evolution pode omitir fromMe em algumas versões. Se vier explicitamente
   // como false, o evento é de uma mensagem recebida e não pertence à nossa outbox.
   if (
     key?.fromMe === false ||
+    update.fromMe === false ||
     !messageId ||
     messageId.length > MAX_ID_MENSAGEM ||
     !status
@@ -144,7 +155,8 @@ export function tokenDoWebhookEvolution(
   queryToken: unknown,
   allowLegacyQuery = false
 ): string | undefined {
-  if (typeof headerToken === "string" && headerToken.trim()) return headerToken;
+  if (headerToken !== undefined)
+    return typeof headerToken === "string" && headerToken.trim() ? headerToken : undefined;
   return allowLegacyQuery && typeof queryToken === "string" && queryToken.trim()
     ? queryToken
     : undefined;
@@ -228,6 +240,8 @@ async function atualizarStatusMensagem(
     throw new Error(
       "Outbox ainda não vinculada ao recibo; solicitar retry seguro"
     );
+  if (outbox.some(item => item.user_id !== userId || typeof item.id !== "string"))
+    throw new Error("OUTBOX_RECIBO_PROPRIEDADE_DIVERGENTE");
 
   for (const item of outbox ?? []) {
     const outboxId = String(item.id);

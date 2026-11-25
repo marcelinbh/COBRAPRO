@@ -373,3 +373,45 @@ describe("webhook Evolution - mapa fechado e processamento real, fixtures user-3
     expect(db.upsert).not.toHaveBeenCalled();
   });
 });
+
+describe("Evolution 1.8.6 plano / aliases HH — fixtures sem mensagem real", () => {
+  it.each([
+    { event: "MESSAGES_UPDATE", status: "DELIVERY_ACK", expected: "entregue" },
+    { event: "messages.update", status: "READ", expected: "lido" },
+    { event: "messages.update", status: 2, expected: "aceito_evolution" },
+    { event: "MESSAGES_UPDATE", status: 3, expected: "entregue" },
+  ])("callback plano $event/$status vincula owner+keyId exatos", async ({ event, status, expected }) => {
+    const body = { event, instance: INSTANCE, user_id: 999, data: { keyId: PROVIDER_ID, status, remoteJid: "fixture-sensitive-jid", owner: 999 } };
+    const r = await invokeRealRoute({ header: TOKEN, body });
+    expectOnceWith(r.status, 200);
+    expect(db.selectionFilters).toEqual([["user_id", USER_ID], ["provider_message_id", PROVIDER_ID]]);
+    expect(mocks.persistirHistoricoWhatsApp.mock.calls[0][2]).toBe(expected);
+    expect(JSON.parse(db.events[0].payload).updates).toEqual([{ messageId: PROVIDER_ID, status: expected }]);
+    expect(db.events[0].payload).not.toContain("sensitive");
+  });
+  it.each([
+    { key: { id: PROVIDER_ID }, keyId: "fake-provider-other", status: "READ" },
+    { key: { id: PROVIDER_ID }, update: { status: "READ" }, status: "DELIVERED" },
+    { keyId: PROVIDER_ID, status: "READ", fromMe: false },
+    { keyId: 42, status: "READ" },
+  ])("recibo contraditório/inbound não avança %j", async data => {
+    expect(await processWebhookEvent({ event: "messages.update", instance: INSTANCE, data })).toBe(true);
+    expect(db.select).not.toHaveBeenCalled();
+    expect(mocks.persistirHistoricoWhatsApp).not.toHaveBeenCalled();
+  });
+  it("instância user-03 não é alias da instância exata user-3", async () => {
+    expect(await processWebhookEvent({ event: "messages.update", instance: "user-03", data: { keyId: PROVIDER_ID, status: "READ" } })).toBe(false);
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
+  it.each([{ status: ['READ'] }, { status: { value: 'READ' } }, { status: true }, { status: null }])("status não escalar não é convertido em recibo válido %j", async ({ status }) => {
+    expect(await processWebhookEvent({ event: "messages.update", instance: INSTANCE, data: { keyId: PROVIDER_ID, status } })).toBe(true);
+    expect(db.select).not.toHaveBeenCalled();
+    expect(mocks.persistirHistoricoWhatsApp).not.toHaveBeenCalled();
+  });
+  it.each(['', '   '])("header explicitamente vazio não cai para query válida %j", async header => {
+    mocks.env.evolutionWebhookAllowLegacyQuery = true;
+    const res = await invokeRealRoute({ header, query: TOKEN });
+    expectOnceWith(res.status, 401);
+    expect(mocks.getSupabaseClientAsync).not.toHaveBeenCalled();
+  });
+});
