@@ -17,12 +17,13 @@ describe('superfície44 limitada',()=>{
  });
  it('owner vem exclusivamente ctx.user e inputs fechados; namespace não vem do request',()=>{
   const source=read('server/routers/manutencaoEmprestimos.ts');
-  expect(source.match(/ctx\.user\.id/g)).toHaveLength(3);expect(source).not.toContain('input.user');
+  expect(source.match(/ctx\.user\.id/g)).toHaveLength(12);expect(source).not.toContain('input.user');
+  expect(source).toContain('origemCalendario: protectedProcedure.input(cotarCalendarioSchema).query');
   expect(read('server/services/manutencaoEmprestimos.ts')).toContain('client.rpc(facades44[name], args)');
  });
  it('UI persiste antes de rede e só encerra com prova terminal completa sob mesmo Web Lock',()=>{
   const source=read('client/src/components/ManutencaoCalendario.tsx');
-  expect(source.indexOf('localStorage.setItem(storageKey, raw)')).toBeLessThan(source.indexOf('await execute.mutateAsync(intent)'));
+  expect(source.indexOf('localStorage.setItem(storageKey, raw)')).toBeLessThan(source.indexOf('await execute46.mutateAsync(scoped)'));
   expect(source).toContain('if (!terminal || !pending || busy || flight.current || !navigator.locks) return');expect(source).toContain('navigator.locks.request(storageKey');expect(source).toContain('mesma UUID');
  });
  it('migration só instala 3 facades exatas, testemunha predecessores e não substitui guardas nem apaga livro',()=>{

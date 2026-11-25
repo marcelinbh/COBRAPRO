@@ -11,24 +11,34 @@ import { encerrarJournal44 } from "../../../shared/calendario44Journal";
 export function ManutencaoCalendario({ contratoId, onSuccess }: { contratoId: number; onSuccess?: () => void }) {
   const auth = trpc.auth.me.useQuery(undefined, { refetchOnMount: true });
   const userId = !auth.isFetching && !auth.isError ? auth.data?.id : undefined;
-  return userId ? <CalendarioSessao key={`${userId}:${contratoId}`} userId={userId} contratoId={contratoId} onSuccess={onSuccess} /> : <Button disabled variant="outline">Conferindo sessão...</Button>;
+  const scope = trpc.manutencaoEmprestimos.sessao46.useQuery(undefined, { enabled: !!userId, retry: false, staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true });
+  const sessionScope = !scope.isFetching && !scope.isError && scope.data && scope.data.userId === userId ? scope.data.sessionScope : undefined;
+  return userId && sessionScope ? <CalendarioSessao key={`${userId}:${sessionScope}:${contratoId}`} userId={userId} sessionScope={sessionScope} contratoId={contratoId} onSuccess={onSuccess} /> : <Button disabled variant="outline">Conferindo sessão...</Button>;
 }
-function CalendarioSessao({ userId, contratoId, onSuccess }: { userId: number; contratoId: number; onSuccess?: () => void }) {
+function CalendarioSessao({ userId, sessionScope, contratoId, onSuccess }: { userId: number; sessionScope: string; contratoId: number; onSuccess?: () => void }) {
   const [open, setOpen] = useState(false);
   const [datas, setDatas] = useState<string[]>([]), [motivo, setMotivo] = useState("");
   const [pending, setPending] = useState<Calendario44 | null>(null), [terminal, setTerminal] = useState<Closure44 | null>(null);
   const [ready, setReady] = useState(false), [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const storageKey = `cobrapro:calendario44:${userId}:${contratoId}`;
+  const legacyKey = `cobrapro:calendario44:${userId}:${contratoId}`;
+  const scopedKey = `cobrapro:calendario46:${userId}:${sessionScope}:${contratoId}`;
+  // Never migrate/delete old44 intentions. They have their own original writer/recovery.
+  const [storageKey, setStorageKey] = useState(scopedKey);
+  const [legacyPending, setLegacyPending] = useState(false);
   const active = useRef(true), flight = useRef(false), disk = useRef<string | null>(null);
-  const quote = trpc.manutencaoEmprestimos.cotarCalendario.useQuery({ contratoId }, { enabled: open && ready && !pending && !error, retry: false, staleTime: 0, refetchOnWindowFocus: false });
-  const execute = trpc.manutencaoEmprestimos.alterarCalendario.useMutation();
-  const recover = trpc.manutencaoEmprestimos.conferirCalendario.useMutation();
-  const busy = execute.isPending || recover.isPending;
+  const supported = ready && !legacyPending;
+  const quote = trpc.manutencaoEmprestimos.cotarCalendario46.useQuery({ contratoId, sessionScope }, { enabled: open && ready && !pending && !error && supported, retry: false, staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: false });
+  const execute46 = trpc.manutencaoEmprestimos.alterarCalendario46.useMutation();
+  const recover46 = trpc.manutencaoEmprestimos.conferirCalendario46.useMutation();
+  const busy = execute46.isPending || recover46.isPending;
   useEffect(() => {
     active.current = true;
     try {
-      const raw = localStorage.getItem(storageKey); disk.current = raw;
+      const old = localStorage.getItem(legacyKey), current = localStorage.getItem(scopedKey);
+      if (old && current) throw Error("Há intenções44 e46 simultâneas. Preserve ambas para conferência; nenhuma nova operação autorizada.");
+      const key = old ? legacyKey : scopedKey, raw = old ?? current;
+      setStorageKey(key); setLegacyPending(!!old); disk.current = raw;
       if (raw) {
         const parsed = calendario44Schema.parse(JSON.parse(raw));
         if (parsed.contratoId !== contratoId) throw Error("Intenção local pertence a outro contrato.");
@@ -37,7 +47,7 @@ function CalendarioSessao({ userId, contratoId, onSuccess }: { userId: number; c
       setReady(true);
     } catch { setError("Não foi possível validar a intenção persistida. Nenhuma nova operação foi autorizada. Preserve o armazenamento para conferência."); }
     return () => { active.current = false; };
-  }, [storageKey, contratoId]);
+  }, [legacyKey, scopedKey, contratoId]);
   useEffect(() => { if (quote.data && !pending) setDatas([...quote.data.vencimentos]); }, [quote.data, pending]);
   function checkDisk() {
     if (localStorage.getItem(storageKey) !== disk.current) throw Error("Intenção alterada em outra aba. Não sobrescreva nem gere nova UUID.");
@@ -55,7 +65,7 @@ function CalendarioSessao({ userId, contratoId, onSuccess }: { userId: number; c
       checkDisk();
       let intent = pending;
       if (!intent) {
-        if (conferir || !quote.data || quote.isFetching || quote.isError) return;
+        if (conferir || !supported || !quote.data || quote.isFetching || quote.isError) return;
         intent = calendario44Schema.parse({ contratoId, idempotencyKey: crypto.randomUUID(), estadoHash: quote.data.estadoHash, vencimentos: datas, motivo });
         const raw = JSON.stringify(intent);
         // Read-back obrigatório ANTES de solicitar a mutação. Payload nunca muda no retry.
@@ -63,7 +73,8 @@ function CalendarioSessao({ userId, contratoId, onSuccess }: { userId: number; c
         if (localStorage.getItem(storageKey) !== raw) throw Error("Intenção não persistiu. Nenhum envio autorizado.");
         disk.current = raw; setPending(intent);
       }
-      const r = conferir ? await recover.mutateAsync(intent) : await execute.mutateAsync(intent);
+      const scoped = { sessionScope, intent };
+      const r = conferir ? await recover46.mutateAsync(scoped) : await execute46.mutateAsync(scoped);
       if (!active.current) return;
       checkDisk();
       const proof = validarClosure44(r, intent);
@@ -83,7 +94,7 @@ function CalendarioSessao({ userId, contratoId, onSuccess }: { userId: number; c
       if (!active.current) return;
       checkDisk();
       encerrarJournal44(localStorage, storageKey, pending, terminal);
-      disk.current = null; setPending(null); setTerminal(null); setMotivo(""); setMessage(""); setOpen(false);
+      disk.current = null; setStorageKey(scopedKey); setLegacyPending(false); setPending(null); setTerminal(null); setMotivo(""); setMessage(""); setOpen(false);
       void quote.refetch();
     } catch (e) { setError((e as Error).message); }
     finally { flight.current = false; }
@@ -92,19 +103,19 @@ function CalendarioSessao({ userId, contratoId, onSuccess }: { userId: number; c
   return <>
     <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Calendário / conferir</Button>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Calendário mensal auditado</DialogTitle></DialogHeader>
-      <p>Somente empréstimo prospectivo mensal sem recebimentos, renovação ou multa manual. Não altera valores, juros ou número de parcelas. Não apaga lançamentos.</p>
+      <p>Somente contrato mensal integralmente aberto com datas futuras, origem real25 ou21, sem recebimentos, renovação ou multa manual. Não altera valores, juros ou número de parcelas. Não apaga lançamentos.</p>
       {error && <p role="alert">{error}</p>}
       {!ready && !error && <p role="status">Conferindo intenção preservada...</p>}
       {pending ? <div><p>Conferir confirma um commit existente ou impede definitivamente qualquer execução atrasada desta UUID.</p><p className="break-all">UUID: <code>{pending.idempotencyKey}</code></p><p>Agenda preservada: {pending.vencimentos.join(", ")}</p><p>Motivo: {pending.motivo}</p></div> : <>
         {quote.isFetching && <p role="status">Conferindo elegibilidade no banco...</p>}
-        {quote.isError && <p role="alert">Calendário indisponível ou contrato fora do incremento certificado. Nenhuma alteração enviada.</p>}
-        {quote.data?.parcelasIds.map((id, i) => <label key={id}>Parcela {i + 1}<Input type="date" value={datas[i] ?? ""} disabled={busy || !ready} onChange={e => setDatas(prev => prev.map((d, k) => i === k ? e.target.value : d))} /></label>)}
-        <label>Motivo auditável<Input value={motivo} maxLength={500} disabled={busy || !ready} onChange={e => setMotivo(e.target.value)} /></label>
+        {supported && quote.isError && <p role="alert">Calendário indisponível ou contrato fora do incremento certificado. Nenhuma alteração enviada.</p>}
+        {supported && !quote.isFetching && !quote.isError && quote.data?.parcelasIds.map((id, i) => <label key={id}>Parcela {i + 1}<Input type="date" value={datas[i] ?? ""} disabled={busy || !ready} onChange={e => setDatas(prev => prev.map((d, k) => i === k ? e.target.value : d))} /></label>)}
+        {supported && <label>Motivo auditável<Input value={motivo} maxLength={500} disabled={busy || !ready} onChange={e => setMotivo(e.target.value)} /></label>}
       </>}
       {message && <p role="status">{message}</p>}
       {terminal ? <Button onClick={closeConfirmed}>Arquivar confirmação / fence</Button> : <div className="flex flex-wrap gap-2">
         {pending && <Button variant="outline" disabled={busy || !ready || !!error} onClick={() => void send(true)}>Conferir / encerrar intenção no servidor</Button>}
-        <Button disabled={busy || !ready || !!error || (!pending && (!quote.data || quote.isError || quote.isFetching))} onClick={() => void send(false)}>{busy ? "Conferindo..." : pending ? "Repetir a mesma intenção" : "Confirmar calendário"}</Button>
+        <Button disabled={busy || !ready || !!error || (!pending && (!supported || !quote.data || quote.isError || quote.isFetching))} onClick={() => void send(false)}>{busy ? "Conferindo..." : pending ? "Repetir a mesma intenção" : "Confirmar calendário"}</Button>
       </div>}
     </DialogContent></Dialog>
   </>;
