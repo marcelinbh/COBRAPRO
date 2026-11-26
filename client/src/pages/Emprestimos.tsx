@@ -1,3 +1,4 @@
+import { noArquivo51, contagensParcelas51, referenciaMonetaria51, statusContrato51, REFERENCIA51, type Arquivo51 } from "@/lib/obrigacoes51Apresentacao";
 import { useTranslation } from 'react-i18next';
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
@@ -19,12 +20,12 @@ import {
   Edit2, History, Pencil, CreditCard
 } from "lucide-react";
 import { formatarMoeda, formatarData } from "../../../shared/finance";
-import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 import { badgeContrato } from "@/lib/statusEmprestimoBadge";
 import { useLocation } from "wouter";
 import { rotaReparcelamentoAtual } from "@/lib/legacyFinanceNavigation";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { EmprestimosListaSeguraFallback } from "@/components/EmprestimosListaSeguraFallback";
+import { DeleteEmprestimoDialog } from "@/components/DeleteEmprestimoDialog";
 import { deveUsarListaSegura } from "../../../shared/emprestimosListaSegura";
 
 type EmprestimoCard = {
@@ -35,6 +36,11 @@ type EmprestimoCard = {
   clienteChavePix: string | null;
   modalidade: string;
   status: string;
+  statusObrigacao?: string;
+  statusFinanceiroOriginal?: string;
+  arquivado?: boolean;
+  obrigacaoAtual?: string;
+  obrigacaoAdicional?: string;
   valorPrincipal: string;
   valorParcela: string;
   numeroParcelas: number;
@@ -85,9 +91,10 @@ function EmprestimoCardCobra({
   const { t } = useTranslation();
   const [, setLocation] = useLocation();
   const [showEtiquetasModal, setShowEtiquetasModal] = useState(false);
+  const [cancelarAberto, setCancelarAberto] = useState(false);
   const [novaEtiquetaNome, setNovaEtiquetaNome] = useState("");
   const [novaEtiquetaCor, setNovaEtiquetaCor] = useState("#6366f1");
-  const [gerandoPDF, setGerandoPDF] = useState(false);
+  const [gerandoPDF] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: todasEtiquetas = [] } = trpc.etiquetas.listar.useQuery();
@@ -105,15 +112,7 @@ function EmprestimoCardCobra({
     onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
   });
 
-  const deletarMutation = trpc.contratos.deletar.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.empréstimo_deletado'));
-      onRefresh();
-      utils.contratos.listComParcelas.invalidate();
-      utils.dashboard.kpis.invalidate();
-    },
-    onError: (e) => toast.error(t("toast.errorPrefix") + e.message),
-  });
+
 
   const parcela = emp.proximaParcela ?? emp.parcelasComAtraso[0];
   const parcelaComAtraso = emp.parcelasComAtraso.length > 0 ? emp.parcelasComAtraso[0] : null;
@@ -121,7 +120,8 @@ function EmprestimoCardCobra({
   const jurosAtraso = parcelaComAtraso?.jurosAtraso ?? 0;
   const totalComAtraso = parcelaComAtraso?.totalComAtraso ?? 0;
 
-  const statusBadge = badgeContrato(emp.status, diasAtraso > 0);
+  const contagens = contagensParcelas51(emp.todasParcelas);
+  const statusBadge = badgeContrato(statusContrato51(emp), diasAtraso > 0);
 
   const initials = emp.clienteNome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500'];
@@ -130,6 +130,7 @@ function EmprestimoCardCobra({
   const [loadingWpp, setLoadingWpp] = useState(false);
 
   const handleWhatsApp = async (tipo: 'atraso' | 'preventivo' = 'atraso') => {
+    if (emp.arquivado || emp.statusObrigacao !== 'ativo') { toast.info('Cobrança indisponível para obrigação encerrada ou não confirmada.'); return; }
     if (!emp.clienteWhatsapp) {
       toast.error(t('toast_error.telefone_whatsapp_não_cadastrado'));
       return;
@@ -158,25 +159,8 @@ function EmprestimoCardCobra({
   };
 
   const handleGerarComprovante = async () => {
-    setGerandoPDF(true);
-    try {
-      const parcelaPaga = emp.todasParcelas?.find((p: any) => p.status === 'paga') || emp.todasParcelas?.[0];
-      await gerarComprovantePDF({
-        clienteNome: emp.clienteNome,
-        contratoId: emp.id,
-        parcelaNumero: parcelaPaga?.numero_parcela ?? 1,
-        valorOriginal: parcelaPaga?.valor_original ?? emp.valorPrincipal,
-        juros: parcelaPaga?.valor_juros ?? 0,
-        valorPago: parcelaPaga?.valor_pago ?? parcelaPaga?.valor_original ?? emp.valorPrincipal,
-        dataPagamento: parcelaPaga?.data_pagamento ?? new Date().toISOString(),
-        modalidade: emp.modalidade,
-      });
-      toast.success(t('toast_success.comprovante_gerado'));
-    } catch {
-      toast.error(t('toast_error.erro_ao_gerar_comprovante'));
-    } finally {
-      setGerandoPDF(false);
-    }
+    // Status/primeira parcela nunca prova pagamento: não fabricar recibo histórico.
+    toast.info('Comprovante indisponível nesta lista sem prova financeira por operação. Abra a ficha e consulte Receber / conferir.');
   };
 
   return (
@@ -205,7 +189,7 @@ function EmprestimoCardCobra({
               </div>
               <div className="flex flex-col gap-0.5">
                 <span className={`text-xs font-semibold ${statusBadge.variant === 'destructive' ? 'text-red-400' : statusBadge.variant === 'default' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
-                  {statusBadge.label}
+                  {statusBadge.label}{emp.arquivado ? ' · Arquivado' : ''}
                 </span>
                 <Badge className={`text-[10px] px-1.5 py-0 h-4 ${emp.tipoTaxa === 'quinzenal' ? 'bg-cyan-700' : emp.tipoTaxa === 'semanal' ? 'bg-purple-700' : emp.tipoTaxa === 'diaria' ? 'bg-orange-700' : emp.tipoTaxa === 'diario' ? 'bg-orange-700' : 'bg-blue-700'} text-white border-0`}>
                   {emp.tipoTaxa?.toUpperCase()}
@@ -262,6 +246,7 @@ function EmprestimoCardCobra({
         <div className="px-4 py-4 text-center border-b border-border/40">
           <div className="text-3xl font-bold text-emerald-400">{formatarMoeda(emp.totalReceber)}</div>
           <div className="text-xs text-muted-foreground mt-0.5">{t('loans.remainingToReceive')}</div>
+          <div className="text-xs text-muted-foreground mt-1">Obrigação registrada51: {referenciaMonetaria51(emp.obrigacaoAtual)}</div>
           {diasAtraso > 0 && (
             <div className="text-xs text-red-400 mt-1 font-medium">
               contém {formatarMoeda(jurosAtraso)} de juros por atraso
@@ -311,6 +296,11 @@ function EmprestimoCardCobra({
           </div>
         </div>
 
+        <div className="mx-4 my-3 text-xs text-muted-foreground">
+          <p>A — obrigação adicional não desembolsada: {referenciaMonetaria51(emp.obrigacaoAdicional)} (não é capital, juros ou lucro).</p>
+          <p>{contagens.pagas} pagas reais · {contagens.canceladas} canceladas · {contagens.arquivadas} arquivadas (atributo separado).</p>
+          <p>{REFERENCIA51}</p>
+        </div>
         {/* ── SÓ JUROS ── */}
         <div className="mx-4 my-3 px-4 py-2.5 rounded-lg bg-purple-900/30 border border-purple-500/30 flex items-center justify-between">
           <span className="text-sm text-purple-200">{t('loans.onlyInterest')}:</span>
@@ -366,7 +356,8 @@ function EmprestimoCardCobra({
                 size="sm"
                 variant="ghost"
                 className="h-8 w-8 p-0 text-muted-foreground hover:text-red-400"
-                onClick={() => { if (confirm('Deletar este empréstimo?')) deletarMutation.mutate({ id: emp.id }); }}
+                title="Cancelar obrigação / arquivar sem apagar o histórico"
+                onClick={() => setCancelarAberto(true)}
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </Button>
@@ -436,7 +427,7 @@ function EmprestimoCardCobra({
               className={`h-9 w-9 p-0 border-border/50 bg-transparent hover:bg-accent/20 ${diasAtraso > 0 ? 'text-red-400 hover:text-red-300' : 'text-emerald-400 hover:text-emerald-300'}`}
               title={diasAtraso > 0 ? t('loans.collectWhatsApp') : t('loans.preventiveCollection')}
               onClick={() => handleWhatsApp(diasAtraso > 0 ? 'atraso' : 'preventivo')}
-              disabled={loadingWpp}
+              disabled={loadingWpp || emp.arquivado || emp.statusObrigacao !== 'ativo'}
             >
               {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
             </Button>
@@ -445,8 +436,8 @@ function EmprestimoCardCobra({
             <Button
               size="sm"
               className="h-9 w-9 p-0 bg-red-700 hover:bg-red-800 text-white border-0"
-              title={t('loanDetails.deleteLoan')}
-              onClick={() => { if (confirm('Tem certeza que deseja deletar este empréstimo?')) deletarMutation.mutate({ id: emp.id }); }}
+              title="Cancelar obrigação / arquivar sem estorno"
+              onClick={() => setCancelarAberto(true)}
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -454,6 +445,10 @@ function EmprestimoCardCobra({
         </div>
 
       </div>
+
+      <DeleteEmprestimoDialog emprestimoId={emp.id} clienteNome={emp.clienteNome}
+        open={cancelarAberto} onOpenChange={setCancelarAberto}
+        onSuccess={() => { onRefresh(); }} />
 
       {showEtiquetasModal && (
         <Dialog open={true} onOpenChange={() => setShowEtiquetasModal(false)}>
@@ -513,6 +508,7 @@ function EmprestimoCardCobra({
 export default function Emprestimos() {
   const { t, i18n } = useTranslation();
   const [busca, setBusca] = useState("");
+  const [arquivo, setArquivo] = useState<Arquivo51>("operacional");
   const [abaSelecionada, setAbaSelecionada] = useState("emprestimos");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroKoletor, setFiltroKoletor] = useState("todos");
@@ -524,7 +520,7 @@ export default function Emprestimos() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  const { data: emprestimos, error: erroLista, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery(undefined, {
+  const { data: emprestimos, error: erroLista, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery({ arquivo: 'todos' }, {
     retry: (failureCount, error) => !deveUsarListaSegura(error) && failureCount < 3,
   });
   const { data: contas } = trpc.caixa.contas.useQuery();
@@ -559,13 +555,13 @@ export default function Emprestimos() {
   };
 
   const selecionarTodosAtrasados = () => {
-    const atrasadosIds = (emprestimos ?? []).filter(e => e.parcelasComAtraso.length > 0).map(e => e.id);
+    const atrasadosIds = (emprestimos ?? []).filter(e => e.statusObrigacao === 'ativo' && !e.arquivado && e.parcelasComAtraso.length > 0).map(e => e.id);
     setSelecionados(atrasadosIds);
   };
 
   const emprestimosFiltrados = useMemo(() => {
     if (!emprestimos) return [];
-    let resultado = emprestimos;
+    let resultado = emprestimos.filter(e => noArquivo51(e, arquivo));
 
     if (busca) {
       resultado = resultado.filter(e =>
@@ -586,7 +582,7 @@ export default function Emprestimos() {
     }
 
     return resultado;
-  }, [emprestimos, busca, filtroStatus, filtroKoletor]);
+  }, [emprestimos, busca, filtroStatus, filtroKoletor, arquivo]);
 
   // Agrupar empréstimos por cliente
   const emprestimosAgrupados = useMemo(() => {
@@ -617,7 +613,7 @@ export default function Emprestimos() {
       grupos[e.clienteId].totalCapital += parseFloat(e.valorPrincipal);
       grupos[e.clienteId].totalReceber += e.totalReceber;
       if (e.parcelasComAtraso.length > 0) grupos[e.clienteId].totalAtrasados += 1;
-      else grupos[e.clienteId].totalEmDia += 1;
+      else if (e.statusObrigacao === 'ativo' && !e.arquivado) grupos[e.clienteId].totalEmDia += 1;
     });
     return Object.values(grupos).sort((a, b) => a.clienteNome.localeCompare(b.clienteNome));
   }, [emprestimosFiltrados]);
@@ -672,12 +668,15 @@ export default function Emprestimos() {
         </div>
       </div>
 
+      <div role="group" aria-label="Arquivo dos empréstimos" className="flex gap-2">
+        {(['operacional', 'historico', 'todos'] as const).map(a => <Button key={a} variant={arquivo === a ? 'default' : 'outline'} aria-pressed={arquivo === a} onClick={() => { setArquivo(a); setSelecionados([]); }}>{a === 'operacional' ? 'Operacionais' : a === 'historico' ? 'Histórico' : 'Todos'}</Button>)}
+      </div>
       {/* Abas */}
       <div className="flex gap-1 sm:gap-4 border-b border-border overflow-x-auto">
         {[
-          { id: 'emprestimos', label: t('loans.title'), count: emprestimos?.filter(e => e.modalidade !== 'diario' && e.modalidade !== 'emprestimo_diario' && e.modalidade !== 'tabela_price').length ?? 0 },
-          { id: 'diario', label: t('loans.daily'), count: emprestimos?.filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').length ?? 0 },
-          { id: 'price', label: t('loans.fixedInstallment'), count: emprestimos?.filter(e => e.modalidade === 'tabela_price').length ?? 0 },
+          { id: 'emprestimos', label: t('loans.title'), count: emprestimos?.filter(e => noArquivo51(e, arquivo)).filter(e => e.modalidade !== 'diario' && e.modalidade !== 'emprestimo_diario' && e.modalidade !== 'tabela_price').length ?? 0 },
+          { id: 'diario', label: t('loans.daily'), count: emprestimos?.filter(e => noArquivo51(e, arquivo)).filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').length ?? 0 },
+          { id: 'price', label: t('loans.fixedInstallment'), count: emprestimos?.filter(e => noArquivo51(e, arquivo)).filter(e => e.modalidade === 'tabela_price').length ?? 0 },
           { id: 'recebimentos', label: t('loans.receipts'), count: recebimentosData?.total ?? 0 },
         ].map(aba => (
           <button
@@ -868,7 +867,7 @@ export default function Emprestimos() {
                                 {temAtraso ? (
                                   <span className="text-xs bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded-full shrink-0">🔴 {grupo.totalAtrasados} atrasado{grupo.totalAtrasados > 1 ? 's' : ''}</span>
                                 ) : (
-                                  <span className="text-xs bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full shrink-0">🟢 Em Dia</span>
+                                  <span className="text-xs bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded-full shrink-0">{grupo.totalEmDia > 0 ? 'Em Dia' : 'Histórico / encerrados'}</span>
                                 )}
                               </div>
                               <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground">
@@ -972,7 +971,7 @@ export default function Emprestimos() {
       {abaSelecionada === 'diario' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(emprestimos ?? []).filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').map(emp => (
+            {(emprestimos ?? []).filter(e => noArquivo51(e, arquivo)).filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').map(emp => (
               <EmprestimoCardCobra
                 key={emp.id}
                 emp={emp}
@@ -981,7 +980,7 @@ export default function Emprestimos() {
               />
             ))}
           </div>
-          {(emprestimos ?? []).filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').length === 0 && (
+          {(emprestimos ?? []).filter(e => noArquivo51(e, arquivo)).filter(e => e.modalidade === 'diario' || e.modalidade === 'emprestimo_diario').length === 0 && (
             <div className="p-8 text-center text-muted-foreground">{t('loans.noLoansFound')}</div>
           )}
         </>
@@ -991,7 +990,7 @@ export default function Emprestimos() {
       {abaSelecionada === 'price' && (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(emprestimos ?? []).filter(e => e.modalidade === 'tabela_price').map(emp => (
+            {(emprestimos ?? []).filter(e => noArquivo51(e, arquivo)).filter(e => e.modalidade === 'tabela_price').map(emp => (
               <EmprestimoCardCobra
                 key={emp.id}
                 emp={emp}
@@ -1000,7 +999,7 @@ export default function Emprestimos() {
               />
             ))}
           </div>
-          {(emprestimos ?? []).filter(e => e.modalidade === 'tabela_price').length === 0 && (
+          {(emprestimos ?? []).filter(e => noArquivo51(e, arquivo)).filter(e => e.modalidade === 'tabela_price').length === 0 && (
             <div className="p-8 text-center text-muted-foreground">{t('loans.noLoansFound')}</div>
           )}
         </>

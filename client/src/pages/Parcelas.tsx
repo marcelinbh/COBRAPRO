@@ -1,3 +1,4 @@
+import { arquivada51, parcelaAberta51, valorOperacional51, rotuloValorOperacional51, somaOperacional51, contagensParcelas51, referenciaMonetaria51, valorConfirmado51, statusParcela51, REFERENCIA51, type Arquivo51 } from "@/lib/obrigacoes51Apresentacao";
 import { useTranslation } from 'react-i18next';
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
@@ -15,7 +16,7 @@ import { toast } from "sonner";
 import {
   Search, MessageCircle, CheckCircle, Clock, AlertTriangle, Filter, Download, FileSpreadsheet, FileText, ArrowLeft
 } from "lucide-react";
-import { formatarMoeda, formatarData, calcularJurosMora, dataHojeBrasilia, dataVencimentoCivil, diferencaDiasCivis } from "../../../shared/finance";
+import { formatarMoeda, formatarData, dataHojeBrasilia, dataVencimentoCivil, diferencaDiasCivis } from "../../../shared/finance";
 import { protegerValorDePlanilha } from "@/lib/spreadsheetSafety";
 import { RecebimentoValidado } from "@/components/RecebimentoValidado";
 // Excel e PDF são carregados sob demanda para reduzir o bundle inicial.
@@ -135,6 +136,12 @@ type ParcelaRow = {
   dataVencimento: Date;
   dataPagamento: Date | null;
   status: string;
+  statusObrigacao?: string;
+  statusFinanceiroOriginal?: string;
+  obrigacaoAtual?: string;
+  componenteAdicional?: string;
+  arquivada?: boolean;
+  valorAtualizado?: number;
   modalidade: string;
   numeroParcelas: number;
   taxaJuros?: string | null;
@@ -146,6 +153,7 @@ type ParcelaRow = {
 export default function Parcelas() {
   const { t, i18n } = useTranslation();
   const [busca, setBusca] = useState("");
+  const [arquivo, setArquivo] = useState<Arquivo51>("operacional");
   const [filtroStatus, setFiltroStatus] = useState("todos");
   const [filtroModalidade, setFiltroModalidade] = useState("todas");
 
@@ -156,10 +164,11 @@ export default function Parcelas() {
     return val ? parseInt(val, 10) : undefined;
   }, []);
 
-  const { data: parcelas, isLoading, refetch } = trpc.parcelas.list.useQuery({
+  const { data: parcelas, isLoading, isPending, isError, isFetching, refetch } = trpc.parcelas.list.useQuery({
     status: filtroStatus !== "todos" ? filtroStatus : undefined,
     modalidade: filtroModalidade !== "todas" ? filtroModalidade : undefined,
     contratoId: contratoIdFiltro,
+    arquivo,
   });
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: configData } = trpc.configuracoes.get.useQuery();
@@ -168,11 +177,14 @@ export default function Parcelas() {
     !busca || p.clienteNome.toLowerCase().includes(busca.toLowerCase())
   );
 
+  const contagens = contagensParcelas51(parcelas ?? []);
   const statusCount = {
     atrasada: parcelas?.filter(p => p.status === 'atrasada').length ?? 0,
     vencendo_hoje: parcelas?.filter(p => p.status === 'vencendo_hoje').length ?? 0,
     pendente: parcelas?.filter(p => p.status === 'pendente').length ?? 0,
-    paga: parcelas?.filter(p => p.status === 'paga').length ?? 0,
+    paga: contagens.pagas,
+    cancelada: contagens.canceladas,
+    arquivada: contagens.arquivadas,
   };
 
   // Contadores por modalidade (apenas pendentes/atrasadas)
@@ -185,7 +197,7 @@ export default function Parcelas() {
   const modalidadeCount = MODALIDADES.map(m => ({
     ...m,
     qtd: parcelas?.filter(p => p.modalidade === m.key && ['pendente','atrasada','vencendo_hoje','parcial'].includes(p.status)).length ?? 0,
-    valor: parcelas?.filter(p => p.modalidade === m.key && ['pendente','atrasada','vencendo_hoje','parcial'].includes(p.status)).reduce((s, p) => s + parseFloat(p.valorOriginal), 0) ?? 0,
+    valor: parcelas ? somaOperacional51(parcelas.filter(p => p.modalidade === m.key)) : null,
   }));
 
   // Funções de exportação (lazy loading para reduzir bundle inicial em ~1.1MB)
@@ -198,7 +210,10 @@ export default function Parcelas() {
       modalidade: protegerValorDePlanilha(p.modalidade ?? '-'),
       vencimento: formatarData(p.dataVencimento),
       valorOriginal: parseFloat(p.valorOriginal),
-      valorPago: parseFloat(p.valorPago ?? '0'),
+      valorPago: p.valorPago == null ? 'Não registrado' : parseFloat(p.valorPago),
+      obrigacaoAtual: protegerValorDePlanilha(String(p.obrigacaoAtual ?? 'Não confirmada')),
+      adicional: protegerValorDePlanilha(String(p.componenteAdicional ?? 'Não confirmado')),
+      arquivada: arquivada51(p) ? 'Sim' : 'Não',
       status: protegerValorDePlanilha(p.status),
       dataPagamento: p.dataPagamento ? formatarData(p.dataPagamento) : '-',
     }));
@@ -209,7 +224,10 @@ export default function Parcelas() {
       { header: 'Parcela', key: 'parcela', width: 14 },
       { header: 'Modalidade', key: 'modalidade', width: 15 },
       { header: 'Vencimento', key: 'vencimento', width: 16 },
-      { header: 'Valor Original', key: 'valorOriginal', width: 17 },
+      { header: 'Original histórico', key: 'valorOriginal', width: 17 },
+      { header: 'Obrigação registrada51 (não cotação)', key: 'obrigacaoAtual', width: 35 },
+      { header: 'A não desembolsada', key: 'adicional', width: 22 },
+      { header: 'Arquivada', key: 'arquivada', width: 12 },
       { header: 'Valor Pago', key: 'valorPago', width: 15 },
       { header: 'Status', key: 'status', width: 15 },
       { header: 'Data Pagamento', key: 'dataPagamento', width: 18 },
@@ -251,14 +269,16 @@ export default function Parcelas() {
     doc.text(`Gerado em: ${new Date().toLocaleString(i18n.language === 'es' ? 'es-ES' : 'pt-BR')} — Total: ${filtradas.length} parcelas`, 14, filtroInfo ? 30 : 24);
     autoTable(doc, {
       startY: filtroInfo ? 36 : 30,
-      head: [['Cliente', 'Parcela', 'Modalidade', 'Vencimento', 'Valor', 'Status']],
+      head: [['Cliente', 'Parcela', 'Modalidade', 'Vencimento', 'Original histórico', 'Referência51', 'A', 'Status / arquivo']],
       body: filtradas.map(p => [
         p.clienteNome,
         `${p.numeroParcela}/${p.numeroParcelas}`,
         p.modalidade ?? '-',
         formatarData(p.dataVencimento),
         formatarMoeda(p.valorOriginal),
-        p.status,
+        referenciaMonetaria51(p.obrigacaoAtual),
+        referenciaMonetaria51(p.componenteAdicional),
+        statusParcela51(p) + (arquivada51(p) ? ' / Arquivada' : ''),
       ]),
       styles: { fontSize: 8 },
       headStyles: { fillColor: [30, 30, 30] },
@@ -268,6 +288,11 @@ export default function Parcelas() {
     toast.success(t('toast_success.pdf_exportado_com_sucesso'));
   };
 
+  // Nenhum cache/zero/vazio financeiro é certificado durante erro ou ausência.
+  if (isError || isPending || isLoading || parcelas === undefined || (isFetching && parcelas.length === 0)) return <div role={isError ? 'alert' : 'status'} className="space-y-3">
+    <h1>Parcelas</h1><p>{isError ? 'Consulta indisponível; valores não confirmados. Não cadastre novamente uma dívida existente.' : 'Confirmando parcelas...'}</p>
+    <Button disabled={isFetching} onClick={() => refetch()}>Tentar novamente</Button>
+  </div>;
   return (
     <div className="space-y-6">
       {/* Banner de filtro por contrato (Bug #4 corrigido) */}
@@ -304,6 +329,11 @@ export default function Parcelas() {
       </div>
 
       <p className="text-sm text-muted-foreground">Recebimentos de empréstimos novos e parcelas antigas íntegras exigem cotação validada e disponibilidade do fluxo seguro. Registros inconsistentes ficam bloqueados para revisão. A primeira renovação mensal prospectiva elegível pode ser acessada em Receber / conferir; parcelas renovadas permitem somente conferir/repetir uma intenção já preservada na sessão, sem cobrar principal novamente. Descontos e alterações financeiras manuais continuam indisponíveis. Os valores originais da listagem não representam saldos atualizados após pagamentos parciais; confirme a cotação do diálogo. Cobrar nesta listagem permanece bloqueado porque não há cotação autoritativa vinculada à mensagem. Lembretes manuais sem total permanecem disponíveis.</p>
+      <p className="text-sm text-muted-foreground">{REFERENCIA51} A é exibida separadamente, nunca como capital/juros/lucro.</p>
+      <div role="group" aria-label="Arquivo das parcelas" className="flex gap-2">
+        {(['operacional', 'historico', 'todos'] as const).map(a => <Button key={a} aria-pressed={arquivo === a} variant={arquivo === a ? 'default' : 'outline'} onClick={() => setArquivo(a)}>{a === 'operacional' ? 'Operacionais' : a === 'historico' ? 'Histórico' : 'Todos'}</Button>)}
+      </div>
+      <p>{contagens.pagas} pagas reais · {contagens.canceladas} canceladas · {contagens.arquivadas} arquivadas (atributo separado).</p>
       {/* Contador por Modalidade */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {modalidadeCount.map(m => (
@@ -314,7 +344,7 @@ export default function Parcelas() {
           >
             <div className={`font-display text-2xl ${m.textColor}`}>{m.qtd}</div>
             <div className="text-xs text-muted-foreground">{m.label}</div>
-            {m.qtd > 0 && <div className={`text-xs font-medium ${m.textColor} mt-0.5`}>{formatarMoeda(m.valor)}</div>}
+            {m.qtd > 0 && <div className={`text-xs font-medium ${m.textColor} mt-0.5`}>{valorConfirmado51(m.valor)}</div>}
           </button>
         ))}
       </div>
@@ -368,6 +398,7 @@ export default function Parcelas() {
             <SelectItem value="vencendo_hoje">{t('parcelas.dueTodayLabel')}</SelectItem>
             <SelectItem value="pendente">{t('parcelas.pending')}</SelectItem>
             <SelectItem value="paga">{t('parcelas.paidPlural')}</SelectItem>
+            <SelectItem value="cancelada">Canceladas</SelectItem>
             <SelectItem value="parcial">{t('common.partial')}</SelectItem>
           </SelectContent>
         </Select>
@@ -393,33 +424,10 @@ export default function Parcelas() {
 
       <div className="space-y-2">
         {filtradas?.map(parcela => {
-          const { total: totalAtualizado, diasAtraso } = calcularJurosMora(
-            parseFloat(parcela.valorOriginal),
-            new Date(parcela.dataVencimento),
-            new Date()
-          );
-          const { juros: jurosCalc, multa: multaCalc } = calcularJurosMora(
-            parseFloat(parcela.valorOriginal),
-            new Date(parcela.dataVencimento),
-            new Date()
-          );
-          const mensagem = gerarMensagemCobranca(
-            parcela.clienteNome,
-            parcela.numeroParcela,
-            parcela.numeroParcelas,
-            parcela.valorOriginal,
-            parcela.dataVencimento,
-            diasAtraso,
-            jurosCalc,
-            multaCalc,
-            totalAtualizado,
-            parcela.clienteChavePix,
-            configData?.assinaturaWhatsapp ?? '',
-            configData?.fechamentoWhatsapp ?? 'Regularize hoje e evite mais juros!'
-          );
-          const whatsappUrl = parcela.clienteWhatsapp
-            ? `https://wa.me/55${parcela.clienteWhatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(mensagem)}`
-            : null;
+          const valorAtual = valorOperacional51(parcela);
+          const diasAtraso = parcelaAberta51(parcela) ? Math.max(0, -diferencaDiasCivis(dataHojeBrasilia(), dataVencimentoCivil(parcela.dataVencimento))) : 0;
+          // Cobrança continua bloqueada: nenhum valor/encargo fictício monta mensagem.
+          const temWhatsapp = !!parcela.clienteWhatsapp;
 
           return (
             <Card
@@ -437,7 +445,8 @@ export default function Parcelas() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-medium text-foreground text-sm">{parcela.clienteNome}</span>
-                        <StatusBadge status={parcela.status} />
+                        <StatusBadge status={statusParcela51(parcela)} />
+                        {arquivada51(parcela) && <span className="text-xs text-muted-foreground">Arquivada</span>}
                         {diasAtraso > 0 && (
                           <span className="text-xs text-primary">+{diasAtraso} dias</span>
                         )}
@@ -451,15 +460,17 @@ export default function Parcelas() {
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right hidden sm:block">
                       <div className={`font-semibold text-sm ${diasAtraso > 0 ? 'text-primary' : 'text-foreground'}`}>
-                        {formatarMoeda(parcela.valorOriginal)}
+                        {valorConfirmado51(valorAtual)}
                       </div>
-                      <div className="text-xs text-muted-foreground">Valor original · sem cotação</div>
+                      <div className="text-xs text-muted-foreground">{rotuloValorOperacional51(parcela)}</div>
+                      <div className="text-xs text-muted-foreground">Original histórico: {formatarMoeda(parcela.valorOriginal)} · Pago: {parcela.valorPago == null ? 'Não registrado' : formatarMoeda(parcela.valorPago)}</div>
+                      <div className="text-xs text-muted-foreground">A não desembolsada: {referenciaMonetaria51(parcela.componenteAdicional)}</div>
                     </div>
 
                     {parcela.status === 'paga' && <RecebimentoValidado contratoId={parcela.contratoId} parcelaId={parcela.id} permitirRenovacao onSuccess={() => refetch()} />}
                     {parcela.status !== 'paga' && (
                       <div className="flex gap-2">
-                        {whatsappUrl && (
+                        {temWhatsapp && (
                           <span title="Cobrança bloqueada: a listagem não tem cotação autoritativa atual para validar total, encargos e saldo parcial.">
                             <Button disabled size="sm" variant="outline" className="gap-1 h-7 text-xs border-success/30 text-success">
                               <MessageCircle className="h-3 w-3" />

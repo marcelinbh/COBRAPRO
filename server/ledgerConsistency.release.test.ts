@@ -18,9 +18,40 @@ const base = (extra: Record<string, any[]> = {}) => ({ contas_caixa: [conta()], 
 
 /** Mock projeta apenas as colunas requisitadas e aplica filtros ANTES de range.
  * Não devolve dados ocultos que mascarariam ausência de user_id/conta_caixa_id. */
+
+/** Envelope sintético RPC51; não substitui nenhum reader/validador produtivo.
+ * A seleção é completa (inclui pagas, canceladas e transferidas), não filtrada. */
+function estadoFixture51(tabelas: Record<string, any[]>, args: any) {
+  expect(args.p_user_id).toBe(41);
+  const c = (tabelas.contratos ?? []).find(c => c.id === args.p_contrato_id);
+  if (!c || c.user_id !== 41) throw Error("Contrato RPC51 fora do fixture próprio");
+  const cents = (v: any) => {
+    const s = String(v ?? "0");
+    if (!/^\d+(?:\.\d{1,2})?$/.test(s)) throw Error("Valor de fixture inválido");
+    const [i, d = ""] = s.split("."); return BigInt(i) * 100n + BigInt(d.padEnd(2, "0"));
+  };
+  const money = (v: bigint) => `${v / 100n}.${String(v % 100n).padStart(2, "0")}`;
+  const parcelas = (tabelas.parcelas ?? []).filter(p => p.contrato_id === c.id).map(p => {
+    let due: string;
+    try { due = money(p.status === "parcial" ? cents(p.saldo_residual) : cents(p.valor_original ?? p.valor) + cents(p.saldo_residual) + cents(p.valor_multa)); }
+    catch { due = "INVALID"; } // Envelope inválido é recusado pelo reader real; jamais fabrica valor válido.
+    const closed = ["quitado", "cancelado", "cancelada", "encerrado"].includes(c.status);
+    const statusObrigacao = ["paga", "pago"].includes(p.status) ? "paga" : p.status === "renovada" ? "transferida"
+      : closed || ["cancelada", "cancelado"].includes(p.status) || (due === "0.00" && p.status !== "parcial") ? "cancelada" : "aberta";
+    return { parcelaId: p.id, statusFinanceiroOriginal: p.status, statusObrigacao,
+      obrigacaoAtual: statusObrigacao === "aberta" ? due : "0.00", componenteAdicional: "0.00", arquivada: false };
+  });
+  return { data: { versao: "obrigacoes51_v1", userId: 41, contratoId: c.id,
+    statusObrigacao: parcelas.some(p => p.statusObrigacao === "aberta") ? "ativo" : parcelas.some(p => p.statusObrigacao === "cancelada") ? "encerrado_por_cancelamento" : "quitado",
+    arquivado: false, obrigacaoAdicional: "0.00", parcelas }, error: null };
+}
+
 function fonteRest(tabelas: Record<string, any[]>, opcoes: Opcoes = {}) {
   const consultas: Consulta[] = [];
-  const fonte = { from(tabela: string) {
+  const rpc = vi.fn(async (name: string, args: any) => {
+    expect(name).toBe("rpc_estado_obrigacoes51"); return estadoFixture51(tabelas, args);
+  });
+  const fonte = { rpc, from(tabela: string) {
     const q: Consulta = { tabela, colunas: "", filtros: [], inicio: 0, fim: 499 };
     const builder: any = {
       select(colunas: string, options?: any) { q.colunas = colunas; q.count = options?.count; return builder; },
@@ -45,7 +76,7 @@ function fonteRest(tabelas: Record<string, any[]>, opcoes: Opcoes = {}) {
     for (const metodo of ["insert", "update", "delete", "upsert", "rpc"]) builder[metodo] = () => { throw new Error(`Write proibido: ${metodo}`); };
     return builder;
   } };
-  return { fonte, consultas };
+  return { fonte, consultas, tabelas, rpc };
 }
 const integridade = (q: Consulta) => q.tabela === "transacoes_caixa" && q.colunas === "id, user_id, conta_caixa_id";
 const valores = (q: Consulta) => q.tabela === "transacoes_caixa" && q.colunas.split(",").map(c => c.trim()).includes("valor");

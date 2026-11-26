@@ -1,4 +1,10 @@
 import { TRPCError } from "@trpc/server";
+import { listarParcelasEfetivas51 } from "./services/parcelas51Leitura";
+import type { FonteLeitura51 } from "./services/obrigacoes51Leitura";
+/** Apenas carteira; livro-caixa continua usando seu leitor/auditoria original. */
+export async function listarCarteiraEfetivaDashboard51(fonte: FonteLeitura51 | null, userId: number, hoje: string) {
+  return listarParcelasEfetivas51(fonte, userId, { arquivo: "operacional" }, hoje);
+}
 
 export function exigirFonteDashboard<T>(fonte: T | null): T {
   if (!fonte) throw new TRPCError({ code: "SERVICE_UNAVAILABLE", message: "Fonte do dashboard indisponível; valores não calculados." });

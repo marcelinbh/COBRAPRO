@@ -1,4 +1,7 @@
 import { TRPCError } from "@trpc/server";
+import type { Projection51 } from "../shared/obrigacoes51";
+import { lerEstadoVinculado51 } from "./services/obrigacoes51Leitura";
+import { projetarParcela51 } from "../shared/obrigacoes51Projection";
 import {
   abertoCentavosRelatorio, adicionarDiasRelatorio, atrasadaRelatorio, centavosRelatorio,
   dataRelatorio, formatarDataRelatorio, hojeRelatorio, leituraValidada,
@@ -74,7 +77,9 @@ function mapParcela(p: any) {
   dataRelatorio(p.data_vencimento);
   return { id: p.id, contratoId: p.contrato_id, clienteId: p.cliente_id, numeroParcela: p.numero_parcela,
     status: p.status, valor: p.valor, valorOriginal: p.valor_original, saldoResidual: p.saldo_residual,
-    valorMulta: p.valor_multa, dataVencimento: p.data_vencimento };
+    valorMulta: p.valor_multa, dataVencimento: p.data_vencimento,
+    statusFinanceiroOriginal: p.statusFinanceiroOriginal, statusObrigacao: p.statusObrigacao,
+    obrigacaoAtual: p.obrigacaoAtual, componenteAdicional: p.componenteAdicional, arquivada: p.arquivada };
 }
 const mapMovimento = (m: any) => ({ ...m, dataTransacao: m.data_transacao });
 
@@ -108,7 +113,11 @@ export async function lerLedgerFinancialReporting(fonte: any, userId: number, in
 
 export async function lerDividasFinancialReporting(fonte: any, userId: number, hoje: string, configurar?: (q: any) => any) {
   const rows = await listarFinancialReporting(fonte, "parcelas", COLUNAS_PARCELAS, userId, configurar);
-  const parcelas = rows.map(mapParcela);
+  // Período/status podem selecionar parte da carteira, nunca os IDs completos
+  // necessários à prova51. O helper reconfere os vínculos originais completos.
+  const proofs = new Map<number, Projection51>();
+  for (const cid of [...new Set(rows.map(p => p.contrato_id))]) proofs.set(cid, await lerEstadoVinculado51(fonte, userId, cid));
+  const parcelas = rows.map(p => mapParcela(projetarParcela51(p, proofs.get(p.contrato_id)!, hoje)));
   return { ...resumirDividasRelatorio(parcelas, hoje), parcelas };
 }
 

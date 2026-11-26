@@ -18,6 +18,7 @@ vi.mock('@/lib/trpc', () => ({ trpc: {
 // These tests render the actual details page and actual badges. Financial children
 // are inert boundaries: this is SSR presentation coverage, NOT mounted auth/E2E.
 vi.mock('@/components/DeleteEmprestimoDialog', () => ({ DeleteEmprestimoDialog: () => null }));
+vi.mock('@/components/OperacoesObrigacao51', () => ({ OperacoesObrigacao51: () => null }));
 vi.mock('@/components/RecebimentoValidado', () => ({ RecebimentoValidado: () => null }));
 vi.mock('@/components/ManutencaoJuros48', () => ({ ManutencaoJuros48: () => null }));
 vi.mock('@/components/ManutencaoCalendario', () => ({ ManutencaoCalendario: () => null }));

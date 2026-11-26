@@ -5,6 +5,7 @@ import { appRouter } from './routers';
 import { listarEmprestimosSeguros } from './services/emprestimosListaSegura';
 import { apresentarEmprestimo } from './services/emprestimosApresentacao';
 import { dataHojeBrasilia } from './services/businessDate';
+import { projection51Test } from './services/projection51TestSource';
 const caller = (user: any = { id: 41 }) => appRouter.createCaller({ user, req: { headers: {} }, res: {} } as any).contratos;
 const contract = { id: 1, user_id: 41, cliente_id: 2, koletor_id: null, modalidade: 'mensal', status: 'ativo', valor_principal: '100.00' };
 const parcel = { id: 3, user_id: 41, contrato_id: 1, cliente_id: 2, numero_parcela: 1, valor_original: '100.00', valor_juros: '10.00', valor_pago: '0.00', valor_multa: '0.00', multa_manual: '0.00', saldo_residual: '0.00', data_vencimento: '2027-01-10', data_pagamento: null, status: 'pendente' };
@@ -31,11 +32,25 @@ function source() {
       },
     }; return q;
   });
-  const rpc = vi.fn().mockRejectedValue(new Error('RPC inesperada'));
-  return { from, rpc, tables, calls, setFault: (fn: typeof fault) => { fault = fn; } };
+  const rpc = vi.fn();
+  const backend = { from, rpc: async (name: string, args: Record<string, unknown>) => {
+    if (name === 'rpc_estado_obrigacoes51') {
+      const p = projection51Test(); p.contratoId = Number(args.p_contrato_id); p.obrigacaoAdicional = '0.00';
+      p.parcelas = tables.parcelas.filter(row => row.contrato_id === p.contratoId).map(row => ({
+        parcelaId: row.id, statusFinanceiroOriginal: row.status,
+        statusObrigacao: ['paga', 'pago'].includes(row.status) ? 'paga' : ['cancelada', 'cancelado'].includes(row.status) ? 'cancelada' : row.status === 'renovada' ? 'transferida' : 'aberta',
+        obrigacaoAtual: ['paga', 'pago', 'cancelada', 'cancelado', 'renovada'].includes(row.status) ? '0.00' : row.status === 'parcial' ? String(row.saldo_residual) : String(row.valor_original),
+        componenteAdicional: '0.00', arquivada: false,
+      }));
+      p.statusObrigacao = p.parcelas.some(row => row.statusObrigacao === 'aberta') ? 'ativo' : p.parcelas.some(row => row.statusObrigacao === 'cancelada') ? 'encerrado_por_cancelamento' : 'quitado';
+      return { data: p, error: null };
+    }
+    return rpc(name, args);
+  } };
+  return { from, rpc, backend, tables, calls, setFault: (fn: typeof fault) => { fault = fn; } };
 }
 const moneyCalls = (f: ReturnType<typeof source>) => f.calls.filter(c => /valor_original|valor_principal/.test(c.fields));
-const safe = async (f: ReturnType<typeof source>) => { dbMock.getSupabaseClientAsync.mockResolvedValue(f); return caller().listLeituraSegura(); };
+const safe = async (f: ReturnType<typeof source>) => { dbMock.getSupabaseClientAsync.mockResolvedValue(f.backend); return caller().listLeituraSegura(); };
 function addBadOwn(f: ReturnType<typeof source>) {
   f.tables.contratos.push({ ...contract, id: 42, cliente_id: 43, valor_principal: '987654.32' });
   f.tables.clientes.push({ id: 43, user_id: 41, nome: 'Nome próprio indisponível não exposto' });
@@ -57,7 +72,7 @@ describe('Caller real: lista segura isolada', () => {
   });
   it('saudável usa apresentação corrente e escopo próprio, sem caixa/writer', async () => {
     const f = source(), result = await safe(f), expected = apresentarEmprestimo(contract, [parcel], dataHojeBrasilia());
-    expect(result.userId).toBe(41); expect(result.items).toEqual([{ kind: 'validated', id: 1, clienteId: 2, clienteNome: 'Cliente sintético', modalidade: 'mensal', status: 'ativo', capital: 100, totalReceber: expected.totalReceber, totalPago: expected.totalPago }]);
+    expect(result.userId).toBe(41); expect(result.items).toMatchObject([{ kind: 'validated', id: 1, clienteId: 2, clienteNome: 'Cliente sintético', modalidade: 'mensal', status: 'ativo', capital: 100, totalReceber: expected.totalReceber, totalPago: expected.totalPago }]);
     expect(result.coverage).toMatchObject({ complete: true, validatedContracts: 1, unavailableContracts: 0 }); expect(result.warning).toBeNull();
     expect(f.calls[0]).toMatchObject({ table: 'koletores', filters: [['user_id', 41], ['ativo', true]] });
     expect(moneyCalls(f).every(c => c.filters.some(([k, v]) => k === 'user_id' && v === 41))).toBe(true);
@@ -222,7 +237,7 @@ describe('Caller real: lista segura isolada', () => {
     const f = source(); await expect(listarEmprestimosSeguros(f, 41, '2026-99-99')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' }); expect(f.from).not.toHaveBeenCalled();
   });
   it('endpoint estrito original CONTINUA recusando o mesmo vínculo, enquanto o novo mostra OWN placeholder', async () => {
-    const f = source(); addBadOwn(f); dbMock.getSupabaseClientAsync.mockResolvedValue(f);
+    const f = source(); addBadOwn(f); dbMock.getSupabaseClientAsync.mockResolvedValue(f.backend);
     await expect(caller().listComParcelas()).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
     expect((await caller().listLeituraSegura()).items.map(i => i.kind)).toEqual(['validated', 'unavailable']);
   });

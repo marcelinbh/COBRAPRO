@@ -25,6 +25,10 @@ describe("status civil de parcelas sem escritas em consultas", () => {
     const source = readFileSync(new URL("./routers.ts", import.meta.url), "utf8");
     const listagem = source.split("const parcelasRouter = router({")[1].split("registrarPagamento: protectedProcedure")[0];
     expect(listagem).not.toMatch(/db\.update\(parcelas\)|\.update\(\{\s*status/);
-    expect(listagem).toContain("statusCalendarioParcela");
+    expect(listagem).toContain("listarParcelasEfetivas51");
+    const reader = readFileSync(new URL("./services/parcelas51Leitura.ts", import.meta.url), "utf8");
+    const projection = readFileSync(new URL("../shared/obrigacoes51Projection.ts", import.meta.url), "utf8");
+    expect(reader).toContain("projetarParcela51"); expect(projection).toContain("statusCalendarioParcela");
+    expect(reader + projection).not.toMatch(/\.update\(|\.insert\(|rpc_executar|rpc_cotar/);
   });
 });

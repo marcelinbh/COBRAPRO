@@ -7,6 +7,11 @@ export type EmprestimoValidadoLista = {
   clienteNome: string;
   modalidade: string;
   status: string;
+  statusFinanceiroOriginal: string;
+  statusObrigacao: "ativo" | "quitado" | "encerrado_por_cancelamento";
+  arquivado: boolean;
+  obrigacaoAdicional: string;
+  obrigacaoAtual: string;
   capital: number;
   totalReceber: number;
   totalPago: number;

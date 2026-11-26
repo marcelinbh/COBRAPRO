@@ -6,6 +6,10 @@ export const STATUS_ABERTOS_DASHBOARD = ["pendente", "atrasada", "vencendo_hoje"
 type Valor = number | string | null | undefined;
 export type ParcelaDashboard = {
   status: string;
+  statusFinanceiroOriginal?: string;
+  obrigacaoAtual?: string;
+  componenteAdicional?: string;
+  arquivada?: boolean;
   valorOriginal: Valor;
   valor?: Valor;
   saldoResidual?: Valor;
@@ -45,7 +49,11 @@ export function valorBaseDashboard(parcela: Pick<ParcelaDashboard, "valorOrigina
 }
 
 export function valorAbertoDashboard(parcela: ParcelaDashboard): number {
-  if (!(STATUS_ABERTOS_DASHBOARD as readonly string[]).includes(parcela.status)) return 0;
+  if (!(STATUS_ABERTOS_DASHBOARD as readonly string[]).includes(parcela.status) || parcela.arquivada) return 0;
+  if (parcela.obrigacaoAtual !== undefined) {
+    if (!/^(0|[1-9][0-9]{0,9})\.[0-9]{2}$/.test(parcela.obrigacaoAtual)) throw new Error("Estado51 monetário inválido.");
+    return Number(parcela.obrigacaoAtual);
+  }
   const base = valorBaseDashboard(parcela);
   const residual = numeroDashboard(parcela.saldoResidual, "saldo residual", true);
   const multa = numeroDashboard(parcela.valorMulta, "multa", true);
@@ -69,7 +77,7 @@ export function resumirCarteiraDashboard(parcelas: readonly ParcelaDashboard[], 
   let qtdVenceHoje = 0;
   const clientes = new Set<number>();
   for (const parcela of parcelas) {
-    if (!(STATUS_ABERTOS_DASHBOARD as readonly string[]).includes(parcela.status)) continue;
+    if (!(STATUS_ABERTOS_DASHBOARD as readonly string[]).includes(parcela.status) || parcela.arquivada) continue;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(parcela.dataVencimento)) {
       throw new Error("Dados financeiros inconsistentes: vencimento civil inválido; revisão necessária.");
     }
@@ -80,7 +88,7 @@ export function resumirCarteiraDashboard(parcelas: readonly ParcelaDashboard[], 
       inadimplente += valor;
       if (valor > 0 && parcela.clienteId != null) clientes.add(parcela.clienteId);
     }
-    if (["atrasada", "parcial"].includes(parcela.status)) {
+    if (["atrasada", "parcial"].includes(parcela.status) && Number(parcela.componenteAdicional ?? 0) === 0) {
       juros += centavos(numeroDashboard(parcela.valorJuros, "juros", true));
     }
     if (parcela.dataVencimento === hoje && ["pendente", "vencendo_hoje"].includes(parcela.status)) {

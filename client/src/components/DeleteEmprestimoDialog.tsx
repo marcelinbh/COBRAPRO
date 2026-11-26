@@ -1,16 +1,18 @@
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { OperacoesObrigacao51 } from '@/components/OperacoesObrigacao51';
 
-/** Nunca chamar contratos.deletar: exclusão exige compensação auditada ainda não certificada. */
-export function DeleteEmprestimoDialog({ clienteNome, open, onOpenChange }: {
+/** Não exclui base financeira: o mesmo protocolo exato cancela obrigação ou arquiva alvo encerrado. */
+export function DeleteEmprestimoDialog({ emprestimoId, clienteNome, open, onOpenChange, onSuccess }: {
   emprestimoId: number; clienteNome: string; open: boolean;
-  onOpenChange: (open: boolean) => void; onSuccess?: () => void;
+  onOpenChange: (open: boolean) => void; onSuccess?: () => void | Promise<void>;
 }) {
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent>
-    <DialogHeader><DialogTitle>Exclusão financeira indisponível</DialogTitle></DialogHeader>
-    <p>Cliente: <strong>{clienteNome}</strong></p>
-    <p>O contrato, as parcelas e o livro-caixa não serão apagados. O cancelamento com estorno compensatório precisa de um fluxo transacional auditado ainda não certificado.</p>
-    <p>Alterar o calendário não cancela a dívida nem desfaz pagamentos.</p>
-    <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
+  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+    <DialogHeader><DialogTitle>Cancelar obrigação / arquivar contrato encerrado</DialogTitle></DialogHeader>
+    <p>Cliente: <strong>{clienteNome}</strong>. Contrato #{emprestimoId}.</p>
+    <p>Não é exclusão: histórico, dinheiro pago e caixa permanecem. Cancelar é renúncia à obrigação aberta, sem estorno. Para ocultar contrato já encerrado, escolha Arquivar.</p>
+    {open && <OperacoesObrigacao51 key={emprestimoId} inline contratoId={emprestimoId}
+      alvoInicial={{ tipo: 'contrato' }} acaoInicial="cancelar" onSuccess={onSuccess} />}
+    <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar (não cancela pedido enviado)</Button>
   </DialogContent></Dialog>;
 }

@@ -1,0 +1,26 @@
+{
+  "userId": 1,
+  "versao": "obrigacoes51_v1",
+  "parcelas": [
+    {
+      "arquivada": false,
+      "parcelaId": 957001,
+      "obrigacaoAtual": "50.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 957002,
+      "obrigacaoAtual": "50.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    }
+  ],
+  "arquivado": false,
+  "contratoId": 957,
+  "statusObrigacao": "ativo",
+  "obrigacaoAdicional": "0.00"
+}

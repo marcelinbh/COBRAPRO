@@ -6,6 +6,7 @@ import * as jsxRuntime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as finance from "../shared/finance";
 import { statusCalendarioParcela } from "../shared/parcelasCalendar";
+import * as apresentacao51 from "../client/src/lib/obrigacoes51Apresentacao";
 
 const calendarioSource = readFileSync(new URL("../client/src/pages/Calendario.tsx", import.meta.url), "utf8");
 const parcelasSource = readFileSync(new URL("../client/src/pages/Parcelas.tsx", import.meta.url), "utf8");
@@ -38,20 +39,22 @@ const mensagemSource = blocosMensagem.statements.filter(s => {
 const { gerarMensagemCobranca } = carregar(mensagemSource, finance);
 
 const fixtures = [
-  { id: 1, clienteNome: "Cliente sintético", numeroParcela: 1, numeroParcelas: 3, dataVencimento: "2026-11-10", valorOriginal: "100", status: "pendente" },
-  { id: 2, numeroParcela: 2, numeroParcelas: 3, dataVencimento: "2026-12-01", valorOriginal: "200", status: "pendente" },
-  { id: 3, numeroParcela: 3, numeroParcelas: 3, dataVencimento: "2027-01-01", valorOriginal: "300", status: "pendente" },
+  // DTO51 sintético: o resumo usa obrigação registrada, nunca valorOriginal como saldo.
+  { id: 1, clienteNome: "Cliente sintético", numeroParcela: 1, numeroParcelas: 3, dataVencimento: "2026-11-10", valorOriginal: "100", status: "pendente", statusObrigacao: "aberta", obrigacaoAtual: "100.00", componenteAdicional: "0.00", arquivada: false },
+  { id: 2, numeroParcela: 2, numeroParcelas: 3, dataVencimento: "2026-12-01", valorOriginal: "200", status: "pendente", statusObrigacao: "aberta", obrigacaoAtual: "200.00", componenteAdicional: "0.00", arquivada: false },
+  { id: 3, numeroParcela: 3, numeroParcelas: 3, dataVencimento: "2027-01-01", valorOriginal: "300", status: "pendente", statusObrigacao: "aberta", obrigacaoAtual: "300.00", componenteAdicional: "0.00", arquivada: false },
 ];
 const noOp = vi.fn();
 const componente = ({ children }: { children?: React.ReactNode }) => React.createElement("div", null, children);
 function carregarCalendario(opcoes: { modo?: string; dia?: number; parcelas?: unknown[] } = {}) {
   let stateIndex = 0;
   return carregar(calendarioSource, {
-    ...finance, statusCalendarioParcela,
+    ...finance, ...apresentacao51, statusCalendarioParcela,
     useMemo: (fn: () => unknown) => fn(),
     useState: (initial: unknown) => {
       const index = stateIndex++;
-      const value = index === 2 ? (opcoes.modo ?? initial) : index === 5 ? (opcoes.dia ?? initial) : initial;
+      // mes, ano, modo, semanaOffset, arquivo, filtroKoletor, diaSelecionado.
+      const value = index === 2 ? (opcoes.modo ?? initial) : index === 6 ? (opcoes.dia ?? initial) : initial;
       return [value, noOp];
     },
     useTranslation: () => ({ t: (s: string) => s }),
@@ -167,7 +170,8 @@ describe("proteções do fluxo de mensagem", () => {
     expect(parcelasSource).toContain("<Button disabled size=");
     expect(parcelasSource).toContain("Cobrar bloqueado");
     expect(parcelasSource).toContain("não há cotação autoritativa vinculada à mensagem");
-    expect(parcelasSource).toContain("Valor original · sem cotação");
+    expect(parcelasSource).toContain("{rotuloValorOperacional51(parcela)}");
+    expect(apresentacao51.rotuloValorOperacional51(fixtures[0])).toBe("Referência registrada51 · não cotação");
     expect(parcelasSource).toContain("<RecebimentoValidado");
     expect(parcelasSource).not.toContain("<PagamentoDialog");
     const seletor = readFileSync(new URL("../client/src/components/RecebimentoValidado.tsx", import.meta.url), "utf8");

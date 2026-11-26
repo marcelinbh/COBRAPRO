@@ -51,13 +51,20 @@ describe('Uso dos rótulos na fonte real de apresentação (não teste React mon
   const details = readFileSync(new URL('../pages/EmprestimoDetalhes.tsx', import.meta.url), 'utf8');
   const list = readFileSync(new URL('../pages/Emprestimos.tsx', import.meta.url), 'utf8');
   it('cabeçalho e card usam o helper de status explícito', () => {
-    expect(details).toContain('badgeContrato(emprestimo.status, isAtrasado)');
+    expect(details).toContain('badgeContrato(statusContrato51(emprestimo), isAtrasado)');
     expect(details).toContain('<Badge variant={statusBadge.variant}>');
-    expect(list).toContain('badgeContrato(emp.status, diasAtraso > 0)');
+    expect(list).toContain('badgeContrato(statusContrato51(emp), diasAtraso > 0)');
     expect(list).toContain('{statusBadge.label}');
+    expect(details).toContain("{statusBadge.label}{emprestimo.arquivado ? ' · Arquivado' : ''}");
+    expect(details).toContain('A — obrigação adicional não desembolsada: {referenciaMonetaria51(emprestimo.obrigacaoAdicional)}. Não compõe capital, juros ou lucro.');
+    expect(list).toContain('A — obrigação adicional não desembolsada: {referenciaMonetaria51(emp.obrigacaoAdicional)} (não é capital, juros ou lucro).');
   });
   it('a tabela ativa usa o rótulo explícito de parcela; o modal antigo foi removido', () => {
-    expect(details.match(/\{badgeParcela\(p.status, emprestimo.status\)\.label\}/g)).toHaveLength(1);
+    expect(details.match(/\{badgeParcela\(statusParcela51\(p\), emprestimo.status\)\.label\}/g)).toHaveLength(1);
+    expect(details).toContain('<Badge variant={badgeParcela(statusParcela51(p), emprestimo.status).variant}>');
+    expect(details).toContain("{p.arquivada ? ' · Arquivada' : ''}");
+    expect(details).toContain("Pago histórico: {p.valor_pago == null ? 'Não registrado' : formatarMoeda(p.valor_pago)}");
+    expect(details).toContain('A: {referenciaMonetaria51(p.componenteAdicional)} (não desembolsada)');
     expect(details).not.toContain("{p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}");
   });
   it('o texto secundário de juros não apresenta cancelado como Em dia', () => {

@@ -1,4 +1,5 @@
 import { getSupabaseClientAsync } from "../db";
+import { lerCobrancaExigivel51 } from "./obrigacoes51Leitura";
 import {
   enviarMensagemEvolution,
   normalizarTelefoneWhatsApp,
@@ -123,6 +124,12 @@ export async function enfileirarMensagemWhatsApp(
       prova.clienteId !== item.clienteId
     )
       throw new Error("PAGAMENTO_SEM_PROVA_DURAVEL");
+  }
+  // Confirmação já provada NÃO é nova cobrança, mesmo após cancelamento.
+  if (item.tipo in DIAS_LEMBRETE) {
+    if (!item.parcelaId || !item.clienteId) throw new Error("COBRANCA_SEM_VINCULO");
+    const atual = await lerCobrancaExigivel51(sb, item.userId, item.parcelaId, item.clienteId);
+    if (!atual.exigivel) return { criada: false, chave: item.chaveDeduplicacao };
   }
   if (dryRun) return { criada: false, chave: item.chaveDeduplicacao };
   const { data, error } = await sb
@@ -338,7 +345,7 @@ export async function enfileirarLembretesAutomaticos(
       const { data: parcelas, error: parcelasError } = await sb
         .from("parcelas")
         .select(
-          "id, user_id, valor_original, numero_parcela, cliente_id, contrato_id, contratos!inner(user_id, numero_parcelas, cliente_id, clientes!inner(id, user_id, nome, whatsapp, telefone))"
+          "id, user_id, valor_original, numero_parcela, cliente_id, contrato_id, contratos!inner(id, user_id, status, numero_parcelas, cliente_id, clientes!inner(id, user_id, nome, whatsapp, telefone))"
         )
         .eq("user_id", tenantId)
         .eq("contratos.user_id", tenantId)
@@ -358,12 +365,18 @@ export async function enfileirarLembretesAutomaticos(
             !ownerValido(parcela.contratos, tenantId) ||
             !ownerValido(cliente, tenantId) ||
             parcela.cliente_id !== cliente.id ||
+            parcela.contrato_id !== parcela.contratos.id ||
             parcela.contratos.cliente_id !== cliente.id
           )
             throw new Error("PROPRIEDADE_DIVERGENTE");
+          // Defesa original continua necessária: prova51 aberta não autoriza
+          // cobrar contrato encerrado/transferido ou status desconhecido.
+          if (!["ativo", "inadimplente"].includes(parcela.contratos.status)) continue;
+          const atual51 = await lerCobrancaExigivel51(sb, tenantId, parcela.id, cliente.id);
+          if (!atual51.exigivel) continue;
           const telefone = cliente.whatsapp || cliente.telefone || "";
           elegiveis++;
-          const valorBruto = String(parcela.valor_original);
+          const valorBruto = atual51.obrigacaoAtual;
           if (!/^(0|[1-9][0-9]{0,12})(\.[0-9]{1,2})?$/.test(valorBruto) ||
               /^0(?:\.0{1,2})?$/.test(valorBruto))
             throw new Error("VALOR_INVALIDO");
@@ -621,8 +634,12 @@ async function motivoItemObsoleto(
     contrato.cliente_id !== cliente.id
   )
     return "PROPRIEDADE_DIVERGENTE";
-  if (item.tipo !== "confirmacao_pagamento" && contrato.status !== "ativo")
-    return "CONTRATO_NAO_EXIGIVEL";
+  if (item.tipo !== "confirmacao_pagamento") {
+    // Confirmação durável não é cobrança e permanece fora desta barreira.
+    if (!["ativo", "inadimplente"].includes(contrato.status)) return "CONTRATO_NAO_EXIGIVEL";
+    const atual51 = await lerCobrancaExigivel51(sb, item.user_id, parcela.id, cliente.id);
+    if (!atual51.exigivel) return "OBRIGACAO51_NAO_EXIGIVEL";
+  }
   try {
     if (
       normalizarTelefoneWhatsApp(cliente.whatsapp || cliente.telefone || "") !==

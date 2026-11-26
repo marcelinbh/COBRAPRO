@@ -1,0 +1,111 @@
+{
+  "q": {
+    "origem": "multimodal35",
+    "userId": 1,
+    "versao": "obrigacoes51_v1",
+    "proposta": {
+      "acao": "cancelar",
+      "alvo": {
+        "tipo": "parcela",
+        "parcelaId": 1007
+      },
+      "reconhecoSemEstorno": true
+    },
+    "contratoId": 1003,
+    "estadoHash": "fa97a117df89fe486f6963362bc8db870b09e056923efa174925cd961e550384",
+    "totalAntes": "360.00",
+    "dataCalculo": "2026-11-26",
+    "idsAfetados": [
+      1007
+    ],
+    "totalDepois": "360.00",
+    "valorExigido": "0.00",
+    "contaDestinoId": null,
+    "caixaPreservado": true,
+    "obrigacaoAdicional": "0.00"
+  },
+  "r": {
+    "status": "confirmed",
+    "userId": 1,
+    "versao": "obrigacoes51_v1",
+    "request": {
+      "motivo": "Teste fictício51",
+      "proposta": {
+        "acao": "cancelar",
+        "alvo": {
+          "tipo": "parcela",
+          "parcelaId": 1007
+        },
+        "reconhecoSemEstorno": true
+      },
+      "contratoId": 1003,
+      "estadoHash": "fa97a117df89fe486f6963362bc8db870b09e056923efa174925cd961e550384",
+      "dataCalculo": "2026-11-26"
+    },
+    "resultado": {
+      "acao": "cancelar",
+      "contratoId": 1003,
+      "idsAfetados": [
+        1007
+      ],
+      "operationId": "8c3f3e62-63cf-4197-bb62-8f48dd98805d",
+      "valorRecebido": "0.00",
+      "contaDestinoId": null,
+      "caixaPreservado": true
+    },
+    "idempotencyKey": "49e9473e-32ab-47ee-b980-94e7c409c34c",
+    "sameIntentOnly": true
+  },
+  "projection": {
+    "userId": 1,
+    "versao": "obrigacoes51_v1",
+    "parcelas": [
+      {
+        "arquivada": false,
+        "parcelaId": 1007,
+        "obrigacaoAtual": "0.00",
+        "statusObrigacao": "cancelada",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "pendente"
+      },
+      {
+        "arquivada": false,
+        "parcelaId": 1008,
+        "obrigacaoAtual": "180.00",
+        "statusObrigacao": "aberta",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "pendente"
+      }
+    ],
+    "arquivado": false,
+    "contratoId": 1003,
+    "statusObrigacao": "ativo",
+    "obrigacaoAdicional": "0.00"
+  },
+  "after": {
+    "userId": 1,
+    "versao": "obrigacoes51_v1",
+    "parcelas": [
+      {
+        "arquivada": false,
+        "parcelaId": 1007,
+        "obrigacaoAtual": "0.00",
+        "statusObrigacao": "cancelada",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "pendente"
+      },
+      {
+        "arquivada": false,
+        "parcelaId": 1008,
+        "obrigacaoAtual": "0.00",
+        "statusObrigacao": "paga",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "paga"
+      }
+    ],
+    "arquivado": false,
+    "contratoId": 1003,
+    "statusObrigacao": "encerrado_por_cancelamento",
+    "obrigacaoAdicional": "0.00"
+  }
+}

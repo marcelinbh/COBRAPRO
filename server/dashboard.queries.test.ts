@@ -10,13 +10,50 @@ import { listarDashboard } from "./dashboardQueries";
 
 type Filtro = { metodo: string; coluna: string; valor: any };
 type Consulta = { tabela: string; colunas: string; filtros: Filtro[]; inicio?: number; fim?: number; limite?: number; ordem?: string };
+
+/** Envelope sintético RPC51; não substitui nenhum reader/validador produtivo.
+ * A seleção é completa (inclui pagas, canceladas e transferidas), não filtrada. */
+function estadoFixture51(tabelas: Record<string, any[]>, args: any) {
+  expect(args.p_user_id).toBe(41);
+  const c = (tabelas.contratos ?? []).find(c => c.id === args.p_contrato_id);
+  if (!c || c.user_id !== 41) throw Error("Contrato RPC51 fora do fixture próprio");
+  const cents = (v: any) => {
+    const s = String(v ?? "0");
+    if (!/^\d+(?:\.\d{1,2})?$/.test(s)) throw Error("Valor de fixture inválido");
+    const [i, d = ""] = s.split("."); return BigInt(i) * 100n + BigInt(d.padEnd(2, "0"));
+  };
+  const money = (v: bigint) => `${v / 100n}.${String(v % 100n).padStart(2, "0")}`;
+  const parcelas = (tabelas.parcelas ?? []).filter(p => p.contrato_id === c.id).map(p => {
+    let due: string;
+    try { due = money(p.status === "parcial" ? cents(p.saldo_residual) : cents(p.valor_original ?? p.valor) + cents(p.saldo_residual) + cents(p.valor_multa)); }
+    catch { due = "INVALID"; } // Envelope inválido é recusado pelo reader real; jamais fabrica valor válido.
+    const closed = ["quitado", "cancelado", "cancelada", "encerrado"].includes(c.status);
+    const statusObrigacao = ["paga", "pago"].includes(p.status) ? "paga" : p.status === "renovada" ? "transferida"
+      : closed || ["cancelada", "cancelado"].includes(p.status) || (due === "0.00" && p.status !== "parcial") ? "cancelada" : "aberta";
+    return { parcelaId: p.id, statusFinanceiroOriginal: p.status, statusObrigacao,
+      obrigacaoAtual: statusObrigacao === "aberta" ? due : "0.00", componenteAdicional: "0.00", arquivada: false };
+  });
+  return { data: { versao: "obrigacoes51_v1", userId: 41, contratoId: c.id,
+    statusObrigacao: parcelas.some(p => p.statusObrigacao === "aberta") ? "ativo" : parcelas.some(p => p.statusObrigacao === "cancelada") ? "encerrado_por_cancelamento" : "quitado",
+    arquivado: false, obrigacaoAdicional: "0.00", parcelas }, error: null };
+}
+
 function fonteRest(tabelas: Record<string, any[]> = {}, falha?: (q: Consulta) => boolean) {
   // Fixtures de ledger devem ter uma conta própria explícita, como no catálogo físico.
   if (!("contas_caixa" in tabelas) && tabelas.transacoes_caixa?.some(row => row.user_id === 41)) {
     tabelas = { ...tabelas, contas_caixa: [{ id: 1, user_id: 41, ativo: true, saldo: "0.00" }] };
   }
+  if (tabelas.parcelas?.length) {
+    if (!("contratos" in tabelas)) tabelas = { ...tabelas, contratos: [{ id: 1, user_id: 41, cliente_id: 1, status: "ativo", modalidade: "mensal", valor_principal: "100" }] };
+    tabelas = { ...tabelas, contratos: (tabelas.contratos ?? []).map(c => ({ cliente_id: 1, modalidade: "mensal", ...c })) };
+    if (!("clientes" in tabelas)) tabelas = { ...tabelas, clientes: [{ id: 1, user_id: 41, nome: "Sintético" }] };
+  }
   const consultas: Consulta[] = [];
+  const rpc = vi.fn(async (name: string, args: any) => {
+    expect(name).toBe("rpc_estado_obrigacoes51"); return estadoFixture51(tabelas, args);
+  });
   const fonte = {
+    rpc,
     from(tabela: string) {
       const q: Consulta = { tabela, colunas: "", filtros: [] };
       const builder: any = {
@@ -48,7 +85,7 @@ function fonteRest(tabelas: Record<string, any[]> = {}, falha?: (q: Consulta) =>
       return builder;
     },
   };
-  return { fonte, consultas };
+  return { fonte, consultas, tabelas, rpc };
 }
 
 function contexto(): TrpcContext {
@@ -58,10 +95,12 @@ function contexto(): TrpcContext {
   };
 }
 const caller = () => appRouter.createCaller(contexto()).dashboard;
-const parcelaRest = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, cliente_id: 1, numero_parcela: 1, status: "pendente", valor: "100", valor_original: null, saldo_residual: "0", valor_multa: "0", valor_juros: "0", data_vencimento: "2026-11-06", clientes: { nome: "Sintético", user_id: 41 }, ...extra });
+const parcelaRest = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, contrato_id: 1, cliente_id: 1, numero_parcela: 1, status: "pendente", valor: "100", valor_original: null, saldo_residual: "0", valor_multa: "0", valor_juros: "0", data_vencimento: "2026-11-06", clientes: { nome: "Sintético", user_id: 41 }, ...extra });
 const movimentoRest = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, conta_caixa_id: extra.user_id && extra.user_id !== 41 ? 2 : 1, tipo: "entrada", categoria: "pagamento_parcela", valor: "25", data_transacao: "2026-11-06", ...extra });
 function conferirTenant(q: Consulta) {
-  if (q.colunas === "id, user_id, conta_caixa_id") {
+  if (q.tabela === "parcelas" && q.colunas === "id, user_id, contrato_id, cliente_id") {
+    expect(q.filtros).toContainEqual({ metodo: "in", coluna: "contrato_id", valor: [1] });
+  } else if (q.colunas === "id, user_id, conta_caixa_id") {
     expect(q.filtros).toEqual([{ metodo: "in", coluna: "conta_caixa_id", valor: [1] }]);
   } else expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
 }
@@ -82,13 +121,14 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
     const rest = fonteRest({
       contas_caixa: [{ id: 1, user_id: 41, ativo: true, saldo: "100" }, { id: 2, user_id: 99, ativo: true, saldo: "9000" }],
       contratos: [{ id: 1, user_id: 41, status: "ativo", valor_principal: "100" }, { id: 2, user_id: 99, status: "ativo", valor_principal: "9000" }],
-      parcelas: [parcelaRest(), parcelaRest({ id: 2, status: "parcial", saldo_residual: "40", valor_multa: "15", data_vencimento: "2026-11-05" }), parcelaRest({ id: 3, user_id: 99, status: "atrasada", valor: "9000" }), parcelaRest({ id: 4, status: "cancelada", valor: "9000" })],
+      parcelas: [parcelaRest(), parcelaRest({ id: 2, status: "parcial", saldo_residual: "40", valor_multa: "15", data_vencimento: "2026-11-05" }), parcelaRest({ id: 3, user_id: 99, contrato_id: 2, status: "atrasada", valor: "9000" }), parcelaRest({ id: 4, status: "cancelada", valor: "9000" })],
       transacoes_caixa: [movimentoRest(), movimentoRest({ id: 2, user_id: 99, valor: "9000" }), movimentoRest({ id: 3, tipo: "saida", valor: "5" }), movimentoRest({ id: 4, data_transacao: "2026-11-07", valor: "10" })],
     });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     expect(await caller().kpis()).toEqual({ saldoTotal: 130, capitalCirculacao: 100, totalReceber: 140, totalInadimplente: 40, qtdInadimplentes: 1, jurosPendentes: 0, qtdVenceHoje: 1, valorVenceHoje: 100, recebidoHoje: 25, contratosAtivos: 1 });
     for (const q of rest.consultas) conferirTenant(q);
-    expect(rest.consultas.find(q => q.tabela === "parcelas")?.colunas).toContain("valor,");
+    expect(rest.consultas.filter(q => q.tabela === "parcelas").some(q => q.colunas.includes("valor_original"))).toBe(true);
+    expect(rest.rpc).toHaveBeenCalledTimes(2);
   });
 
   it.each(["kpis", "resumoCaixa", "fluxoMensal", "tendenciaJuros"] as const)("%s recusa owner divergente fora do período antes de agregar ou ler valores", async procedimento => {
@@ -113,7 +153,7 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
 
   it("sinaliza residual inválido em KPI em vez de retornar dívida inventada", async () => {
     mocks.getSupabaseClientAsync.mockResolvedValue(fonteRest({ parcelas: [parcelaRest({ status: "parcial", saldo_residual: "-10" })] }).fonte);
-    await expect(caller().kpis()).rejects.toThrow(/residual/);
+    await expect(caller().kpis()).rejects.toThrow(/Estado efetivo51 não confirmado/);
   });
 
   it("residual inválido não impede consultar o Caixa de fonte independente válida", async () => {
@@ -124,7 +164,7 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
       transacoes_caixa: [movimentoRest(), movimentoRest({ id: 2, user_id: 99, valor: "9000" })],
     });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
-    await expect(caller().kpis()).rejects.toThrow(/residual/);
+    await expect(caller().kpis()).rejects.toThrow(/Estado efetivo51 não confirmado/);
     rest.consultas.length = 0;
     expect(await caller().resumoCaixa()).toEqual({ saldoTotal: 125, capitalCirculacao: 200, recebidoHoje: 25, contratosAtivos: 1 });
     expect(rest.consultas.some(q => q.tabela === "parcelas")).toBe(false);
@@ -159,13 +199,12 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
       parcelaRest({ id: 4, status: "paga" }),
       parcelaRest({ id: 5, data_vencimento: "2026-10-07", status: "atrasada", saldo_residual: "20", valor_multa: "10" }),
       parcelaRest({ id: 6, data_vencimento: "2026-10-08", status: "atrasada" }),
-      parcelaRest({ id: 7, data_vencimento: "2026-10-07", status: "atrasada", user_id: 99 }),
+      parcelaRest({ id: 7, contrato_id: 2, data_vencimento: "2026-10-07", status: "atrasada", user_id: 99 }),
     ] });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     expect(await caller().precisaAtencao()).toEqual({ venceSemana: { qtd: 2, valor: 205 }, atrasados30: { qtd: 1, valor: 130 } });
-    expect(rest.consultas[0].filtros).toContainEqual({ metodo: "gte", coluna: "data_vencimento", valor: "2026-11-06" });
-    expect(rest.consultas[0].filtros).toContainEqual({ metodo: "lte", coluna: "data_vencimento", valor: "2026-11-13" });
-    expect(rest.consultas[1].filtros).toContainEqual({ metodo: "lte", coluna: "data_vencimento", valor: "2026-10-07" });
+    expect(rest.consultas.filter(q => q.tabela === "parcelas").every(q => !q.filtros.some(f => f.coluna === "data_vencimento" || f.coluna === "status"))).toBe(true);
+    expect(rest.rpc).toHaveBeenCalledTimes(2); // Fronteiras BRT são aplicadas após estado51 completo.
   });
 
   it("tendência preserva fevereiro em 31/03 e filtra entradas de parcela por DATE", async () => {
@@ -182,32 +221,32 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
   });
 
   it("joins REST restringem explicitamente tenant do cliente, mesmo com parcela própria", async () => {
-    const rest = fonteRest({ parcelas: [parcelaRest(), parcelaRest({ id: 3, user_id: 99 })], clientes: [{ id: 1, nome: "Sintético", user_id: 41 }, { id: 2, nome: "Alheio", user_id: 99 }] });
+    const rest = fonteRest({ parcelas: [parcelaRest(), parcelaRest({ id: 3, user_id: 99, contrato_id: 2 })], clientes: [{ id: 1, nome: "Sintético", user_id: 41 }, { id: 2, nome: "Alheio", user_id: 99 }] });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     const lista = await caller().parcelasHoje();
     expect(lista).toHaveLength(1);
-    expect(lista[0]).toMatchObject({ id: 1, clienteNome: "Sintético", numeroParcela: 1, valorOriginal: "100" });
+    expect(lista[0]).toMatchObject({ id: 1, clienteNome: "Sintético", numeroParcela: 1, valorOriginal: null, obrigacaoAtual: "100.00", valorAtualizado: 100 });
     expect(rest.consultas[0].colunas).not.toContain("clientes!");
     const clientes = rest.consultas.find(q => q.tabela === "clientes")!;
     expect(clientes.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
     expect(clientes.filtros).toContainEqual({ metodo: "in", coluna: "id", valor: [1] });
-    expect(clientes.limite).toBe(20);
+    expect(clientes.inicio).toBe(0); expect(clientes.fim).toBe(999); // Vínculos completos precedem slice(0,20).
   });
 
   it("parcela própria com cliente de outra empresa falha sem expor nome nem inventar vínculo", async () => {
     const rest = fonteRest({ parcelas: [parcelaRest({ cliente_id: 2 })], clientes: [{ id: 2, nome: "Alheio não expor", user_id: 99 }] });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
-    await expect(caller().parcelasHoje()).rejects.toThrow(/sem vínculo de cliente confirmado/);
+    await expect(caller().parcelasHoje()).rejects.toThrow(/vínculos\/estado51/);
   });
 
   it("falha na consulta separada de cliente não vira lista vazia de sucesso", async () => {
     const rest = fonteRest({ parcelas: [parcelaRest()] }, q => q.tabela === "clientes");
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
-    await expect(caller().parcelasHoje()).rejects.toThrow(/Falha na consulta/);
+    await expect(caller().parcelasHoje()).rejects.toThrow(/carregar os empréstimos/);
   });
 
   it("dias de atraso não avançam às 21h BRT, inclusive no segundo zero UTC", async () => {
-    const rest = fonteRest({ parcelas: [parcelaRest({ status: "atrasada", data_vencimento: "2026-11-05" }), parcelaRest({ id: 2, user_id: 99, status: "atrasada" })], clientes: [{ id: 1, nome: "Sintético", user_id: 41 }] });
+    const rest = fonteRest({ parcelas: [parcelaRest({ status: "atrasada", data_vencimento: "2026-11-05" }), parcelaRest({ id: 2, user_id: 99, contrato_id: 2, status: "atrasada" })], clientes: [{ id: 1, nome: "Sintético", user_id: 41 }] });
     mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     const lista = await caller().parcelasAtrasadas();
     expect(lista).toHaveLength(1);
@@ -229,12 +268,12 @@ describe("dashboard REST: consultas somente leitura e isoladas", () => {
 
   it.each(["kpis", "resumoCaixa", "parcelasHoje", "parcelasAtrasadas", "precisaAtencao", "tendenciaJuros", "fluxoMensal"] as const)("erro REST não vira zero/lista vazia em %s", async (procedimento) => {
     mocks.getSupabaseClientAsync.mockResolvedValue(fonteRest({}, () => true).fonte);
-    await expect(caller()[procedimento]()).rejects.toThrow(/Falha na consulta/);
+    await expect(caller()[procedimento]()).rejects.toThrow(["parcelasHoje", "parcelasAtrasadas", "precisaAtencao"].includes(procedimento) ? /carregar os empréstimos/ : /Falha na consulta/);
   });
 
   it.each(["contas_caixa", "contratos", "parcelas", "transacoes_caixa"])("falha isolada na fonte %s bloqueia os KPIs", async tabela => {
-    mocks.getSupabaseClientAsync.mockResolvedValue(fonteRest({}, q => q.tabela === tabela).fonte);
-    await expect(caller().kpis()).rejects.toThrow(/valores não calculados/);
+    mocks.getSupabaseClientAsync.mockResolvedValue(fonteRest({ contratos: [{ id: 1, user_id: 41, cliente_id: 1, status: "ativo", valor_principal: "100" }], clientes: [{ id: 1, user_id: 41, nome: "Sintético" }], parcelas: [parcelaRest()] }, q => q.tabela === tabela).fonte);
+    await expect(caller().kpis()).rejects.toThrow(tabela === "parcelas" ? /carregar os empréstimos/ : /valores não calculados/);
   });
 });
 
@@ -301,6 +340,8 @@ describe("dashboard Drizzle: filtros explícitos e paridade", () => {
   it("KPIs e resumo usam o mesmo ledger conferido e preservam a carteira", async () => {
     const drizzle = fonteDrizzle(fixtureSQL());
     mocks.getDb.mockResolvedValue(drizzle.db);
+    const rest = fonteRest({ parcelas: [parcelaRest(), parcelaRest({ id: 2, status: "parcial", saldo_residual: "40", valor_multa: "15", data_vencimento: "2026-11-05" })] });
+    mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
     expect(await caller().kpis()).toEqual({ saldoTotal: 120, capitalCirculacao: 100, totalReceber: 140, totalInadimplente: 40, qtdInadimplentes: 1, jurosPendentes: 0, qtdVenceHoje: 1, valorVenceHoje: 100, recebidoHoje: 25, contratosAtivos: 1 });
     drizzle.consultas.forEach(conferirConsultaSQL);
     expect(drizzle.consultas.some(q => compilar(q.where).sql.includes('"conta_caixa_id" in'))).toBe(true);
@@ -317,17 +358,15 @@ describe("dashboard Drizzle: filtros explícitos e paridade", () => {
 
   it.each(["parcelasHoje", "parcelasAtrasadas"] as const)("join de %s inclui tenant, e contagem de parcelas também", async procedimento => {
     const drizzle = fonteDrizzle([[]]);
-    mocks.getDb.mockResolvedValue(drizzle.db);
-    await caller()[procedimento]();
-    const q = drizzle.consultas[0];
-    expect(compilar(q.join).sql).toContain('"clientes"."user_id"');
-    expect(compilar(q.join).params).toContain(41);
-    expect(compilar(q.where).sql).toContain('"parcelas"."user_id"');
-    if (procedimento === "parcelasHoje") {
-      const subquery = compilar(q.selecao!.totalParcelas);
-      expect(subquery.sql).toContain("p2.user_id");
-      expect(subquery.params).toEqual([41]);
-    }
+    const rest = fonteRest({ parcelas: [parcelaRest({ data_vencimento: procedimento === "parcelasHoje" ? "2026-11-06" : "2026-11-05" })] });
+    mocks.getDb.mockResolvedValue(drizzle.db); mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    const rows = await caller()[procedimento]();
+    expect(rows).toHaveLength(1); expect(rows[0].totalParcelas).toBe(1);
+    expect(drizzle.consultas).toHaveLength(0); // Literal de roteamento: carteira não usa mais join Drizzle.
+    const customer = rest.consultas.find(q => q.tabela === "clientes")!;
+    expect(customer.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
+    expect(rest.consultas.filter(q => q.tabela === "parcelas" && q.colunas.includes("valor_original")).every(q => q.filtros.some(f => f.coluna === "user_id" && f.valor === 41))).toBe(true);
+    expect(rest.rpc).toHaveBeenCalledTimes(2);
   });
 
   it("fluxo Drizzle termina no dia BRT e todas consultas incluem tenant", async () => {
@@ -339,8 +378,64 @@ describe("dashboard Drizzle: filtros explícitos e paridade", () => {
 
   it.each(["kpis", "resumoCaixa", "parcelasHoje", "parcelasAtrasadas", "fluxoMensal"] as const)("falha Drizzle em %s não é mascarada por fallback vazio", async procedimento => {
     mocks.getDb.mockResolvedValue(fonteDrizzle([], true).db);
-    mocks.getSupabaseClientAsync.mockResolvedValue(fonteRest().fonte);
-    await expect(caller()[procedimento]()).rejects.toThrow(/Transporte Drizzle/);
+    mocks.getSupabaseClientAsync.mockResolvedValue(fonteRest({}, ["parcelasHoje", "parcelasAtrasadas"].includes(procedimento) ? () => true : undefined).fonte);
+    await expect(caller()[procedimento]()).rejects.toThrow(["parcelasHoje", "parcelasAtrasadas"].includes(procedimento) ? /carregar os empréstimos/ : /Transporte Drizzle/);
     expect(mocks.resetDb).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("Dashboard — provas reais de reader51 e metadados próprios", () => {
+  it.each(["kpis", "parcelasHoje", "parcelasAtrasadas", "precisaAtencao"] as const)("%s recusa RPC51 ausente mesmo com REST/ledger íntegros", async procedimento => {
+    const rest = fonteRest({ parcelas: [parcelaRest()] });
+    rest.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202" } } as any);
+    mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    await expect(caller()[procedimento]()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(rest.rpc).toHaveBeenCalledTimes(1);
+  });
+  it.each([99, null])("owner %s na parcela de contrato próprio não pode ser ocultado por filtro de tenant", async owner => {
+    const rest = fonteRest({ parcelas: [parcelaRest(), parcelaRest({ id: 2, user_id: owner })] });
+    mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    await expect(caller().kpis()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(rest.rpc).not.toHaveBeenCalled();
+    const metadata = rest.consultas.find(q => q.tabela === "parcelas")!;
+    expect(metadata.colunas).toBe("id, user_id, contrato_id, cliente_id");
+    expect(metadata.filtros).toEqual([{ metodo: "in", coluna: "contrato_id", valor: [1] }]);
+    expect(rest.consultas.filter(q => q.tabela === "parcelas").some(q => q.colunas.includes("valor_original"))).toBe(false);
+  });
+  it("obrigação atual51 diferente do original guia KPI/atenção/lista, sem alterar ledger ou fixtures", async () => {
+    const rest = fonteRest({ parcelas: [parcelaRest({ valor_original: "100", valor: "100", valor_juros: "10" })], transacoes_caixa: [movimentoRest()] });
+    const original = structuredClone(rest.tabelas);
+    rest.rpc.mockImplementation(async (name, args) => {
+      expect(name).toBe("rpc_estado_obrigacoes51"); const r = estadoFixture51(rest.tabelas, args);
+      r.data.obrigacaoAdicional = "50.00";
+      Object.assign(r.data.parcelas[0], { obrigacaoAtual: "50.00", componenteAdicional: "50.00" }); return r;
+    }); mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    expect(await caller().kpis()).toMatchObject({ totalReceber: 50, valorVenceHoje: 50, jurosPendentes: 0, recebidoHoje: 25, saldoTotal: 25 });
+    expect(await caller().precisaAtencao()).toMatchObject({ venceSemana: { qtd: 1, valor: 50 } });
+    expect(await caller().parcelasHoje()).toMatchObject([{ valorOriginal: "100", obrigacaoAtual: "50.00", valorAtualizado: 50 }]);
+    expect(rest.tabelas).toEqual(original); expect(rest.rpc).toHaveBeenCalledTimes(6);
+  });
+  it("estado51 alterado na reconferência não publica KPI calculado sobre snapshot antigo", async () => {
+    const rest = fonteRest({ parcelas: [parcelaRest()] }); let reads = 0;
+    rest.rpc.mockImplementation(async (name, args) => {
+      expect(name).toBe("rpc_estado_obrigacoes51"); const r = estadoFixture51(rest.tabelas, args);
+      if (++reads === 2) r.data.parcelas[0].obrigacaoAtual = "101.00"; return r;
+    }); mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    await expect(caller().kpis()).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    expect(rest.rpc).toHaveBeenCalledTimes(2);
+  });
+});
+
+
+describe("Dashboard — limite de apresentação não trunca prova51", () => {
+  it("21 parcelas próprias conferidas mantêm totalParcelas=21 e somente 20 itens hoje", async () => {
+    const rest = fonteRest({ parcelas: Array.from({ length: 21 }, (_, i) => parcelaRest({ id: i + 1, numero_parcela: i + 1 })) });
+    mocks.getSupabaseClientAsync.mockResolvedValue(rest.fonte);
+    const rows = await caller().parcelasHoje();
+    expect(rows).toHaveLength(20); expect(rows.map(p => p.id)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+    expect(rows.every(p => p.totalParcelas === 21 && p.valorAtualizado === 100)).toBe(true);
+    expect(rest.rpc).toHaveBeenCalledTimes(2);
+    expect(rest.consultas.filter(q => q.tabela === "parcelas").every(q => q.limite === undefined && !q.filtros.some(f => f.coluna === "status" || f.coluna === "data_vencimento"))).toBe(true);
   });
 });

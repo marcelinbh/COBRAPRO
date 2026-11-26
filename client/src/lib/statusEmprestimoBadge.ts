@@ -15,6 +15,7 @@ export function badgeContrato(status: unknown, emAtraso = false): StatusBadge {
     // sem marcador de origem no DTO, não inferir reparcelamento para o 47.
     case 'renegociado': return { label: 'REPARCELADO', variant: 'secondary' };
     case 'quitado': return { label: 'QUITADO', variant: 'secondary' };
+    case 'encerrado_por_cancelamento': return { label: 'ENCERRADO POR CANCELAMENTO', variant: 'secondary' };
     case 'encerrado': return { label: 'ENCERRADO', variant: 'secondary' };
     case 'inadimplente': return { label: 'INADIMPLENTE', variant: 'destructive' };
     case 'atrasado': return { label: 'ATRASADO', variant: 'destructive' };

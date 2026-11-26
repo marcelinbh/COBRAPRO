@@ -59,14 +59,16 @@ export function reaisRelatorio(centavos: number): number {
 export const STATUS_ABERTOS_RELATORIO = ["pendente", "atrasada", "vencendo_hoje", "parcial"] as const;
 export function parcelaAbertaRelatorio(p: ParcelaDashboard): boolean {
   // Renovada não é paga: seu residual pertence ao sucessor, não ao antecessor.
-  if (![...STATUS_ABERTOS_RELATORIO, "paga", "cancelada", "renovada"].includes(p.status as any)) throw new Error("Status de parcela desconhecido; revisão necessária.");
-  return (STATUS_ABERTOS_RELATORIO as readonly string[]).includes(p.status);
+  if (![...STATUS_ABERTOS_RELATORIO, "paga", "pago", "cancelada", "cancelado", "renovada"].includes(p.status as any)) throw new Error("Status de parcela desconhecido; revisão necessária.");
+  return !p.arquivada && (STATUS_ABERTOS_RELATORIO as readonly string[]).includes(p.status);
 }
 
 export function abertoCentavosRelatorio(p: ParcelaDashboard): number {
   dataRelatorio(p.dataVencimento);
   if (!parcelaAbertaRelatorio(p)) return 0;
   // Validar todos os componentes antes de reutilizar o guard da carteira.
+  if (p.arquivada) return 0;
+  if (p.obrigacaoAtual !== undefined) return centavosRelatorio(p.obrigacaoAtual);
   const base = centavosRelatorio(p.valorOriginal ?? p.valor);
   const residual = p.saldoResidual == null ? 0 : centavosRelatorio(p.saldoResidual);
   const multa = p.valorMulta == null ? 0 : centavosRelatorio(p.valorMulta);
@@ -77,7 +79,7 @@ export function abertoCentavosRelatorio(p: ParcelaDashboard): number {
 export function atrasadaRelatorio(p: ParcelaDashboard, hoje: string): boolean {
   dataRelatorio(p.dataVencimento);
   dataRelatorio(hoje);
-  return parcelaAbertaRelatorio(p) && (p.status === "atrasada" || p.dataVencimento < hoje);
+  return parcelaAbertaRelatorio(p) && (p.status === "atrasada" || p.statusFinanceiroOriginal === "atrasada" || p.dataVencimento < hoje);
 }
 
 export function resumirDividasRelatorio(parcelas: readonly ParcelaDashboard[], hoje: string) {

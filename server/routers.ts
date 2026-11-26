@@ -19,6 +19,7 @@ import { renovacaoProspectivaRouter } from "./routers/renovacaoProspectiva";
 import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { multaManualRouter } from "./routers/multaManual";
 import { manutencaoFinanceira48Router } from "./routers/manutencaoFinanceira48";
+import { obrigacoes51Router } from './routers/obrigacoes51';
 import { manutencaoEmprestimosRouter } from "./routers/manutencaoEmprestimos";
 import { cheques40Procedures } from "./routers/cheques40";
 import { telefone41Writers } from "./routers/telefone41";
@@ -63,6 +64,9 @@ import { statusCalendarioParcela } from "../shared/parcelasCalendar";
 import { onboardingCompleteSchema, criarOnboardingCompleteHandler } from "./services/onboardingRpc";
 import { listarRegistrosEmprestimos, falhaLeituraEmprestimos, falhaVinculoEmprestimos } from "./services/emprestimosLeitura";
 import { lerCotacoesApresentacaoMulta } from "./services/multaManualApresentacao";
+import { lerProjecaoVinculada51 } from "./services/obrigacoes51Leitura";
+import { listarParcelasEfetivas51 } from "./services/parcelas51Leitura";
+import { listarCarteiraEfetivaDashboard51 } from "./dashboardQueries";
 
 function contaPagarPodeSerProcessada(status: string | null | undefined): boolean {
   return status === "pendente" || status === "atrasada";
@@ -209,113 +213,39 @@ const dashboardRouter = router({
     // A mesma conferência do Caixa é obrigatória, inclusive quando a carteira
     // está íntegra: não esconder lançamentos divergentes com filtro de owner.
     const caixa = await lerResumoCaixaDashboard(db, fonte, ctx.user.id, hojeStr);
-    let carteira;
-    if (db) {
-      const parcelasData = await db.select({
-        status: parcelas.status, valorOriginal: parcelas.valorOriginal,
-        valor: sql<string>`valor`, saldoResidual: parcelas.saldoResidual,
-        valorMulta: parcelas.valorMulta, valorJuros: parcelas.valorJuros,
-        dataVencimento: parcelas.dataVencimento, clienteId: parcelas.clienteId,
-      }).from(parcelas).where(and(inArray(parcelas.status, [...STATUS_ABERTOS_DASHBOARD]), eq(parcelas.userId, ctx.user.id)));
-      carteira = resumirCarteiraDashboard(parcelasData, hojeStr);
-    } else {
-      const parcelasData = await listarDashboard(fonte, 'parcelas',
-        'valor, valor_original, valor_juros, valor_multa, saldo_residual, status, data_vencimento, cliente_id',
-        ctx.user.id, q => q.in('status', [...STATUS_ABERTOS_DASHBOARD]));
-      carteira = resumirCarteiraDashboard(parcelasData.map(p => ({
-        status: p.status, valor: p.valor, valorOriginal: p.valor_original,
-        saldoResidual: p.saldo_residual, valorMulta: p.valor_multa, valorJuros: p.valor_juros,
-        dataVencimento: p.data_vencimento, clienteId: p.cliente_id,
-      })), hojeStr);
-    }
+    const parcelasEfetivas = await listarCarteiraEfetivaDashboard51(exigirFonteDashboard(await getSupabaseClientAsync()), ctx.user.id, hojeStr);
+    const carteira = resumirCarteiraDashboard(parcelasEfetivas, hojeStr);
     return { ...caixa, ...carteira };
   }),
 
   parcelasHoje: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (db) {
-      try {
-        const hoje = dataHojeBrasilia();
-        const rows = await db.select({
-          id: parcelas.id, clienteId: parcelas.clienteId, clienteNome: clientes.nome,
-          numeroParcela: parcelas.numeroParcela, valorOriginal: parcelas.valorOriginal,
-          valor: sql<string>`valor`,
-          dataVencimento: parcelas.dataVencimento, status: parcelas.status,
-          totalParcelas: sql<number>`(SELECT COUNT(*) FROM parcelas p2 WHERE p2.contrato_id = ${parcelas.contratoId} AND p2.user_id = ${ctx.user.id})`,
-        }).from(parcelas).innerJoin(clientes, and(eq(parcelas.clienteId, clientes.id), eq(clientes.userId, ctx.user.id)))
-          .where(and(eq(sql`DATE(${parcelas.dataVencimento})`, hoje), inArray(parcelas.status, ['pendente', 'vencendo_hoje']), eq(parcelas.userId, ctx.user.id)))
-          .orderBy(parcelas.dataVencimento).limit(20);
-        return rows.map(r => ({ ...r, valorOriginal: String(valorBaseDashboard(r)) }));
-      } catch (err) { throw err; }
-    }
-    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const hoje = dataHojeBrasilia();
-    const resultado = await supabase.from('parcelas').select('id, cliente_id, numero_parcela, valor, valor_original, data_vencimento, status')
-      .eq('data_vencimento', hoje).in('status', ['pendente', 'vencendo_hoje']).eq('user_id', ctx.user.id).order('data_vencimento').limit(20);
-    const registros = await vincularClientesDashboard(supabase, dadosDashboard(resultado), ctx.user.id);
-    return registros.map((r: any) => ({ id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes.nome, numeroParcela: r.numero_parcela, valorOriginal: String(valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor })), dataVencimento: r.data_vencimento, status: r.status, totalParcelas: 0 }));
+    const rows = await listarCarteiraEfetivaDashboard51(exigirFonteDashboard(await getSupabaseClientAsync()), ctx.user.id, hoje);
+    return rows.filter(p => p.dataVencimento === hoje && ['pendente', 'vencendo_hoje'].includes(p.status))
+      .slice(0, 20).map(p => ({ ...p, valorAtualizado: Number(p.obrigacaoAtual) }));
   }),
-
   parcelasAtrasadas: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (db) {
-      try {
-        const rows = await db.select({
-          id: parcelas.id, clienteId: parcelas.clienteId, clienteNome: clientes.nome,
-          numeroParcela: parcelas.numeroParcela, valorOriginal: parcelas.valorOriginal,
-          valor: sql<string>`valor`,
-          saldoResidual: parcelas.saldoResidual, valorMulta: parcelas.valorMulta,
-          dataVencimento: parcelas.dataVencimento, status: parcelas.status,
-        }).from(parcelas).innerJoin(clientes, and(eq(parcelas.clienteId, clientes.id), eq(clientes.userId, ctx.user.id)))
-          .where(and(inArray(parcelas.status, [...STATUS_ABERTOS_DASHBOARD]), or(eq(parcelas.status, 'atrasada'), lt(parcelas.dataVencimento, dataHojeBrasilia())), eq(parcelas.userId, ctx.user.id))).orderBy(parcelas.dataVencimento).limit(20);
-        return rows.map(r => {
-          const base = valorBaseDashboard(r);
-          const valorAtualizado = valorAbertoDashboard(r);
-          const diasAtraso = Math.max(0, diferencaDiasData(r.dataVencimento, dataHojeBrasilia()));
-          return { ...r, valorOriginal: String(base), valorAtualizado, diasAtraso };
-        });
-      } catch (err) { throw err; }
-    }
-    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
-    const abertas = await listarDashboard(supabase, 'parcelas', 'id, cliente_id, numero_parcela, valor, valor_original, saldo_residual, valor_multa, data_vencimento, status', ctx.user.id,
-      q => q.in('status', [...STATUS_ABERTOS_DASHBOARD]));
-    const elegiveis = abertas.filter(r => r.status === 'atrasada' || r.data_vencimento < dataHojeBrasilia())
-      .sort((a, b) => a.data_vencimento.localeCompare(b.data_vencimento) || a.id - b.id).slice(0, 20);
-    const registros = await vincularClientesDashboard(supabase, elegiveis, ctx.user.id);
-    return registros.map((r: any) => {
-      const base = valorBaseDashboard({ valorOriginal: r.valor_original, valor: r.valor });
-      const valorAtualizado = valorAbertoDashboard({ status: r.status, valor: r.valor, valorOriginal: r.valor_original, saldoResidual: r.saldo_residual, valorMulta: r.valor_multa, dataVencimento: r.data_vencimento });
-      const diasAtraso = Math.max(0, diferencaDiasData(r.data_vencimento, dataHojeBrasilia()));
-      return { id: r.id, clienteId: r.cliente_id, clienteNome: r.clientes?.nome ?? '', numeroParcela: r.numero_parcela, valorOriginal: String(base), dataVencimento: r.data_vencimento, status: r.status, valorAtualizado, diasAtraso };
-    });
+    const hoje = dataHojeBrasilia();
+    const rows = await listarCarteiraEfetivaDashboard51(exigirFonteDashboard(await getSupabaseClientAsync()), ctx.user.id, hoje);
+    return rows.filter(p => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)
+      && (p.status === 'atrasada' || p.statusFinanceiroOriginal === 'atrasada' || p.dataVencimento < hoje))
+      .slice(0, 20).map(p => ({ ...p, valorAtualizado: Number(p.obrigacaoAtual), diasAtraso: Math.max(0, diferencaDiasData(p.dataVencimento, hoje)) }));
   }),
-
   scoreNegocio: protectedProcedure.query(async ({ ctx }) => {
     const { lerScoreFinancialReporting } = await import('./financialReporting');
     return lerScoreFinancialReporting(await getSupabaseClientAsync(), ctx.user.id);
   }),
 
   precisaAtencao: protectedProcedure.query(async ({ ctx }) => {
-    const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
-    const userId = ctx.user.id;
     const { hoje, em7Dias, ha30Dias } = calendarioDashboard();
-    const colunas = 'valor, valor_original, saldo_residual, valor_multa, status, data_vencimento, cliente_id';
-    const [semana, atrasados] = await Promise.all([
-      listarDashboard(supabase, 'parcelas', colunas, userId, q => q
-        .in('status', [...STATUS_ABERTOS_DASHBOARD]).gte('data_vencimento', hoje).lte('data_vencimento', em7Dias)),
-      listarDashboard(supabase, 'parcelas', colunas, userId, q => q
-        .in('status', [...STATUS_ABERTOS_DASHBOARD]).lte('data_vencimento', ha30Dias))
-    ]);
-    const somarAbertos = (registros: any[]) => registros.reduce((s: number, p: any) => s + Math.round(valorAbertoDashboard({
-      status: p.status, valor: p.valor, valorOriginal: p.valor_original,
-      saldoResidual: p.saldo_residual, valorMulta: p.valor_multa, dataVencimento: p.data_vencimento,
-    }) * 100), 0) / 100;
-    return {
-      venceSemana: { qtd: semana.length, valor: somarAbertos(semana) },
-      atrasados30: { qtd: new Set(atrasados.map((p: any) => p.cliente_id)).size, valor: somarAbertos(atrasados) }
-    };
+    const rows = (await listarCarteiraEfetivaDashboard51(exigirFonteDashboard(await getSupabaseClientAsync()), ctx.user.id, hoje))
+      .filter(p => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status));
+    const semana = rows.filter(p => p.dataVencimento >= hoje && p.dataVencimento <= em7Dias);
+    const atrasados = rows.filter(p => p.dataVencimento <= ha30Dias);
+    const somar = (ps: typeof rows) => ps.reduce((sum, p) => sum + Math.round(Number(p.obrigacaoAtual) * 100), 0) / 100;
+    return { venceSemana: { qtd: semana.length, valor: somar(semana) },
+      atrasados30: { qtd: new Set(atrasados.map(p => p.clienteId)).size, valor: somar(atrasados) } };
   }),
-
   tendenciaJuros: protectedProcedure.query(async ({ ctx }) => {
     const supabase = exigirFonteDashboard(await getSupabaseClientAsync());
     const userId = ctx.user.id;
@@ -887,6 +817,7 @@ const contratosRouter = router({
       status: z.string().optional(),
       modalidade: z.string().optional(),
       busca: z.string().optional(),
+      arquivo: z.enum(["operacional", "historico", "todos"]).default("operacional"),
     }).optional())
     .query(async ({ ctx, input }) => {
       const falhaLeitura = falhaLeituraEmprestimos;
@@ -908,7 +839,7 @@ const contratosRouter = router({
           .select('id, user_id, cliente_id, modalidade, status, valor_principal, valor_parcela, numero_parcelas, taxa_juros, tipo_taxa, data_inicio, data_vencimento_primeira, "createdAt", etiquetas', { count: 'exact' })
           .eq('user_id', ctx.user.id).order('createdAt', { ascending: false }).order('id', { ascending: false });
         if (myKoletorIdForList !== null) query = query.eq('koletor_id', myKoletorIdForList);
-        if (input?.status && input.status !== 'todos') query = query.eq('status', input.status);
+        // status efetivo51 é filtrado somente depois da prova, nunca por base REST.
         if (input?.modalidade) query = query.eq('modalidade', input.modalidade);
         return query;
       });
@@ -989,7 +920,14 @@ const contratosRouter = router({
           if (vinculos.some((p: any) => p.contrato_id !== c.id || p.cliente_id !== c.cliente_id)) throw falhaVinculo();
           return vinculos;
         });
-        const apresentacao = apresentarEmprestimo(c, parcelasContrato, hoje, multaDiaria, multaPercentual, cotacoes36);
+        const estado51 = await lerProjecaoVinculada51(supabase, ctx.user.id, c.id,
+          parcelasVinculos.filter(p => p.contrato_id === c.id), async () => {
+            const vinculos = await lerLista(() => supabase.from('parcelas')
+              .select('id, user_id, contrato_id, cliente_id', { count: 'exact' }).eq('contrato_id', c.id).order('id'));
+            if (vinculos.some(p => p.contrato_id !== c.id || p.cliente_id !== c.cliente_id)) throw falhaVinculo();
+            return vinculos;
+          });
+        const apresentacao = apresentarEmprestimo(c, parcelasContrato, hoje, multaDiaria, multaPercentual, cotacoes36, estado51);
 
         apresentados.push({
           id: c.id,
@@ -1012,7 +950,9 @@ const contratosRouter = router({
           etiquetas: (() => { try { return JSON.parse(c.etiquetas ?? '[]'); } catch { return []; } })(),
         });
       }
-      return apresentados;
+      const arquivo = input?.arquivo ?? 'operacional';
+      return apresentados.filter(c => (!input?.status || input.status === 'todos' || c.status === input.status) &&
+        (arquivo === 'todos' || (arquivo === 'historico' ? c.arquivado : !c.arquivado)));
     }),
   obterDetalhes: protectedProcedure
     .input(z.object({ id: z.number().int().positive() }))
@@ -1074,7 +1014,13 @@ const contratosRouter = router({
         if (vinculos.some((p: any) => p.contrato_id !== contratoData.id || p.cliente_id !== cliente.id)) throw falhaVinculoEmprestimos();
         return vinculos;
       });
-      const apresentacao = apresentarEmprestimo(contratoData, parcelasData, hoje, multaDiaria, multaPercentual, cotacoes36);
+      const estado51 = await lerProjecaoVinculada51(supabase, ctx.user.id, contratoData.id, parcelasVinculos, async () => {
+        const vinculos = await lerLista(() => supabase.from('parcelas')
+          .select('id, user_id, contrato_id, cliente_id', { count: 'exact' }).eq('contrato_id', contratoData.id).order('id'));
+        if (vinculos.some(p => p.contrato_id !== contratoData.id || p.cliente_id !== cliente.id)) throw falhaVinculoEmprestimos();
+        return vinculos;
+      });
+      const apresentacao = apresentarEmprestimo(contratoData, parcelasData, hoje, multaDiaria, multaPercentual, cotacoes36, estado51);
 
       return {
         id: contratoData.id,
@@ -1760,159 +1706,12 @@ const contratosRouter = router({
 // ─── PARCELAS ────────────────────────────────────────────────────────────────
 const parcelasRouter = router({
   list: protectedProcedure
-    .input(z.object({
-      status: z.string().optional(),
-      clienteId: z.number().optional(),
-      contratoId: z.number().optional(),
-      dataInicio: z.string().optional(),
-      dataFim: z.string().optional(),
-      modalidade: z.string().optional(),
+    .input(z.object({ status: z.string().optional(), clienteId: z.number().int().positive().optional(),
+      contratoId: z.number().int().positive().optional(), dataInicio: z.string().optional(),
+      dataFim: z.string().optional(), modalidade: z.string().optional(),
+      arquivo: z.enum(['operacional', 'historico', 'todos']).default('operacional'),
     }).optional())
-    .query(async ({ ctx, input }) => {
-      const db = await getDb();
-      const hoje = dataHojeBrasilia();
-
-      if (db) {
-        try {
-          // Consulta não altera dados: o calendário é derivado só na apresentação.
-          const rows = await db.select({
-            id: parcelas.id,
-            contratoId: parcelas.contratoId,
-            clienteId: parcelas.clienteId,
-            clienteNome: clientes.nome,
-            clienteWhatsapp: clientes.whatsapp,
-            clienteChavePix: clientes.chavePix,
-            numeroParcela: parcelas.numeroParcela,
-            valorOriginal: parcelas.valorOriginal,
-            valorPago: parcelas.valorPago,
-            valorJuros: parcelas.valorJuros,
-            valorMulta: parcelas.valorMulta,
-            saldoResidual: parcelas.saldoResidual,
-            dataVencimento: parcelas.dataVencimento,
-            dataPagamento: parcelas.dataPagamento,
-            status: parcelas.status,
-            modalidade: contratos.modalidade,
-            numeroParcelas: contratos.numeroParcelas,
-            taxaJuros: contratos.taxaJuros,
-            tipoTaxa: contratos.tipoTaxa,
-            valorPrincipal: contratos.valorPrincipal,
-            koletorId: contratos.koletorId,
-          }).from(parcelas)
-            .innerJoin(clientes, eq(parcelas.clienteId, clientes.id))
-            .innerJoin(contratos, eq(parcelas.contratoId, contratos.id))
-            .where(eq(parcelas.userId, ctx.user.id))
-            .orderBy(parcelas.dataVencimento);
-          // Buscar perfil do cobrador (se for cobrador, filtrar apenas suas parcelas)
-          let myKoletorId: number | null = null;
-          try {
-            const supabaseForPerfil = await getSupabaseClientAsync();
-            if (supabaseForPerfil) {
-              const { data: koletorData } = await supabaseForPerfil.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
-              if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
-            }
-          } catch (_) { /* não é cobrador */ }
-          return rows.map(r => ({ ...r, status: statusCalendarioParcela(r.status, r.dataVencimento, hoje) })).filter(r => {
-            if (myKoletorId !== null) {
-              // Verificar se a parcela pertence ao cobrador via contrato
-              const contratoDoKoletor = rows.some(row => row.contratoId === r.contratoId && row.koletorId === myKoletorId);
-              if (!contratoDoKoletor) return false;
-            }
-            if (input?.status && r.status !== input.status) return false;
-            if (input?.clienteId && r.clienteId !== input.clienteId) return false;
-            if (input?.contratoId && r.contratoId !== input.contratoId) return false;
-            if (input?.modalidade && r.modalidade !== input.modalidade) return false;
-            return true;
-          });
-        } catch (err) {
-          console.warn('[parcelas.list] Drizzle failed, trying REST:', (err as Error).message);
-          resetDb();
-        }
-      }
-
-       // Fallback: Supabase REST
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) return [];
-      // Buscar perfil do cobrador
-      let myKoletorId: number | null = null;
-      try {
-        const { data: koletorData } = await supabase.from('koletores').select('id, perfil').eq('user_id', ctx.user.id).single();
-        if (koletorData?.perfil === 'koletor') myKoletorId = koletorData.id;
-      } catch (_) { /* não é cobrador */ }
-      // Nenhuma escrita em GET; filtros de status usam o dia civil de Brasília.
-      let pQuery = supabase.from('parcelas')
-        .select('id, contrato_id, cliente_id, numero_parcela, valor_original, valor_pago, valor_juros, valor_multa, saldo_residual, data_vencimento, data_pagamento, status, contratos(koletor_id)')
-        .order('data_vencimento')
-        .eq('user_id', ctx.user.id);
-      if (input?.status && ['pendente', 'vencendo_hoje', 'atrasada'].includes(input.status)) {
-        pQuery = pQuery.in('status', ['pendente', 'vencendo_hoje', 'atrasada']);
-      } else if (input?.status) pQuery = pQuery.eq('status', input.status);
-      if (input?.clienteId) pQuery = (pQuery as any).eq('cliente_id', input.clienteId);
-      if (input?.contratoId) pQuery = (pQuery as any).eq('contrato_id', input.contratoId);
-      if (myKoletorId !== null) pQuery = (pQuery as any).eq('contratos.koletor_id', myKoletorId);
-
-      const { data: pData, error: pError } = await pQuery;
-      if (pError) { console.error('[parcelas.list] REST error:', pError.message); return []; }
-      const parcelasData = (pData || []).filter((p: any) => {
-        if (myKoletorId !== null && p.contratos?.koletor_id !== myKoletorId) return false;
-        if (input?.status && statusCalendarioParcela(p.status, p.data_vencimento, hoje) !== input.status) return false;
-        return true;
-      });
-      // Filtro de modalidade no REST (aplicado após buscar contratos)
-      // Será aplicado após montar contratosMap abaixo
-
-      // Buscar clientes e contratos relacionados
-      const clienteIds = Array.from(new Set(parcelasData.map((r: any) => r.cliente_id).filter(Boolean)));
-      const contratoIds = Array.from(new Set(parcelasData.map((r: any) => r.contrato_id).filter(Boolean)));
-
-      const clientesMap: Record<number, any> = {};
-      const contratosMap: Record<number, any> = {};
-
-      if (clienteIds.length > 0) {
-        const { data: cData } = await supabase.from('clientes').select('id, nome, whatsapp, chave_pix').in('id', clienteIds).eq('user_id', ctx.user.id);
-        (cData || []).forEach((c: any) => { clientesMap[c.id] = c; });
-      }
-      if (contratoIds.length > 0) {
-        const { data: ctData } = await supabase.from('contratos').select('id, modalidade, numero_parcelas, taxa_juros, tipo_taxa, valor_principal').in('id', contratoIds).eq('user_id', ctx.user.id);
-        (ctData || []).forEach((c: any) => { contratosMap[c.id] = c; });
-      }
-
-      const resultData = input?.modalidade
-        ? parcelasData.filter((r: any) => contratosMap[r.contrato_id]?.modalidade === input.modalidade)
-        : parcelasData;
-
-      // Calcular o total real de parcelas por contrato (maior numero_parcela existente)
-      const totalParcelasMap: Record<number, number> = {};
-      parcelasData.forEach((r: any) => {
-        const contratoId = r.contrato_id;
-        const num = r.numero_parcela ?? 0;
-        if (!totalParcelasMap[contratoId] || num > totalParcelasMap[contratoId]) {
-          totalParcelasMap[contratoId] = num;
-        }
-      });
-
-      return resultData.map((r: any) => ({
-        id: r.id,
-        contratoId: r.contrato_id,
-        clienteId: r.cliente_id,
-        clienteNome: clientesMap[r.cliente_id]?.nome ?? '',
-        clienteWhatsapp: clientesMap[r.cliente_id]?.whatsapp ?? null,
-        clienteChavePix: clientesMap[r.cliente_id]?.chave_pix ?? null,
-        numeroParcela: r.numero_parcela,
-        valorOriginal: r.valor_original,
-        valorPago: r.valor_pago,
-        valorJuros: r.valor_juros,
-        valorMulta: r.valor_multa,
-        saldoResidual: r.saldo_residual,
-        dataVencimento: r.data_vencimento,
-        dataPagamento: r.data_pagamento,
-        status: statusCalendarioParcela(r.status, r.data_vencimento, hoje),
-        modalidade: contratosMap[r.contrato_id]?.modalidade ?? null,
-        numeroParcelas: totalParcelasMap[r.contrato_id] ?? contratosMap[r.contrato_id]?.numero_parcelas ?? null,
-        taxaJuros: contratosMap[r.contrato_id]?.taxa_juros ?? null,
-        tipoTaxa: contratosMap[r.contrato_id]?.tipo_taxa ?? null,
-        valorPrincipal: contratosMap[r.contrato_id]?.valor_principal ?? null,
-      }));
-    }),
+    .query(async ({ ctx, input }) => listarParcelasEfetivas51(await getSupabaseClientAsync(), ctx.user.id, input)),
 
   registrarPagamento: protectedProcedure
     .input(z.object({
@@ -3958,6 +3757,7 @@ export const appRouter = router({
   recebimentosLegados: recebimentosLegadosRouter,
   multaManual: multaManualRouter,
   manutencaoFinanceira48: manutencaoFinanceira48Router,
+  obrigacoes51: obrigacoes51Router,
   manutencaoEmprestimos: manutencaoEmprestimosRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,

@@ -1,5 +1,6 @@
 // Endpoint novo, somente leitura. O endpoint estrito, fichas e writers não são alterados.
 import { TRPCError } from "@trpc/server";
+import { lerProjecaoVinculada51 } from "./obrigacoes51Leitura";
 import { apresentarEmprestimo } from "./emprestimosApresentacao";
 import { lerCotacoesApresentacaoMulta } from "./multaManualApresentacao";
 import { dataHojeBrasilia } from "./businessDate";
@@ -165,11 +166,18 @@ export async function listarEmprestimosSeguros(client: Client | null | undefined
       if (!sameMetadata(safeMeta.filter(p => p.contrato_id === c.id), review, ['id', 'user_id', 'contrato_id', 'cliente_id'])) return failLink();
       return review as any;
     });
+    const estado51 = await lerProjecaoVinculada51(db, userId, c.id, safeMeta.filter(p => p.contrato_id === c.id).map(p => ({ id: p.id, user_id: p.user_id, contrato_id: p.contrato_id, cliente_id: p.cliente_id })), async () => {
+      const review = await metadataRead([c.id]);
+      if (!sameMetadata(safeMeta.filter(p => p.contrato_id === c.id), review, ['id', 'user_id', 'contrato_id', 'cliente_id'])) return failLink();
+      return review.map(p => ({ id: p.id, user_id: p.user_id, contrato_id: p.contrato_id, cliente_id: p.cliente_id }));
+    });
     // Reuso da apresentação corrente; não adota dívida nem reconstrói fórmula financeira.
-    const presentation = apresentarEmprestimo(c as any, ps as any[], hoje, daily, percentage, quotes), capital = cents(c.valor_principal);
+    const presentation = apresentarEmprestimo(c as any, ps as any[], hoje, daily, percentage, quotes, estado51), capital = cents(c.valor_principal);
     capitalCents = sumSafe(capitalCents, capital); receiveCents = sumSafe(receiveCents, cents(presentation.totalReceber)); paidCents = sumSafe(paidCents, cents(presentation.totalPago));
     validatedById.set(c.id, { kind: 'validated', id: c.id, clienteId: c.cliente_id, clienteNome: namesById.get(c.cliente_id)!.nome,
-      modalidade: c.modalidade, status: c.status, capital: capital / 100, totalReceber: presentation.totalReceber, totalPago: presentation.totalPago });
+      modalidade: c.modalidade, status: presentation.status!, statusFinanceiroOriginal: c.status, statusObrigacao: estado51.statusObrigacao,
+      arquivado: estado51.arquivado, obrigacaoAdicional: estado51.obrigacaoAdicional, obrigacaoAtual: presentation.obrigacaoAtual!,
+      capital: capital / 100, totalReceber: presentation.totalReceber, totalPago: presentation.totalPago });
   }
   // Mudanças observáveis invalidam TODA a resposta. Não elimina TOCTOU/ABA sem SQL transacional.
   const collectorsFinal = await own(collectorQuery, META_COLLECTOR, collectorValid);

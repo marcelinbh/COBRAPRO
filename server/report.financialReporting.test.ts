@@ -9,9 +9,40 @@ import { gerarPreviewRelatorioDiario, lerRelatorioFinancialReporting, lerScoreFi
 import { abertoCentavosRelatorio, adicionarDiasRelatorio, centavosRelatorio, dataRelatorio, hojeRelatorio, leituraValidada, reaisRelatorio, resumirLedgerRelatorio, scoreRelatorio } from "../shared/reporting";
 
 type Consulta = { tabela: string; colunas: string; filtros: { metodo: string; coluna: string; valor: any }[]; inicio: number; fim: number; count?: string; limite?: number };
+
+/** Envelope sintético RPC51; não substitui nenhum reader/validador produtivo.
+ * A seleção é completa (inclui pagas, canceladas e transferidas), não filtrada. */
+function estadoFixture51(tabelas: Record<string, any[]>, args: any) {
+  expect(args.p_user_id).toBe(41);
+  const c = (tabelas.contratos ?? []).find(c => c.id === args.p_contrato_id);
+  if (!c || c.user_id !== 41) throw Error("Contrato RPC51 fora do fixture próprio");
+  const cents = (v: any) => {
+    const s = String(v ?? "0");
+    if (!/^\d+(?:\.\d{1,2})?$/.test(s)) throw Error("Valor de fixture inválido");
+    const [i, d = ""] = s.split("."); return BigInt(i) * 100n + BigInt(d.padEnd(2, "0"));
+  };
+  const money = (v: bigint) => `${v / 100n}.${String(v % 100n).padStart(2, "0")}`;
+  const parcelas = (tabelas.parcelas ?? []).filter(p => p.contrato_id === c.id).map(p => {
+    let due: string;
+    try { due = money(p.status === "parcial" ? cents(p.saldo_residual) : cents(p.valor_original ?? p.valor) + cents(p.saldo_residual) + cents(p.valor_multa)); }
+    catch { due = "INVALID"; } // Envelope inválido é recusado pelo reader real; jamais fabrica valor válido.
+    const closed = ["quitado", "cancelado", "cancelada", "encerrado"].includes(c.status);
+    const statusObrigacao = ["paga", "pago"].includes(p.status) ? "paga" : p.status === "renovada" ? "transferida"
+      : closed || ["cancelada", "cancelado"].includes(p.status) || (due === "0.00" && p.status !== "parcial") ? "cancelada" : "aberta";
+    return { parcelaId: p.id, statusFinanceiroOriginal: p.status, statusObrigacao,
+      obrigacaoAtual: statusObrigacao === "aberta" ? due : "0.00", componenteAdicional: "0.00", arquivada: false };
+  });
+  return { data: { versao: "obrigacoes51_v1", userId: 41, contratoId: c.id,
+    statusObrigacao: parcelas.some(p => p.statusObrigacao === "aberta") ? "ativo" : parcelas.some(p => p.statusObrigacao === "cancelada") ? "encerrado_por_cancelamento" : "quitado",
+    arquivado: false, obrigacaoAdicional: "0.00", parcelas }, error: null };
+}
+
 function fonteRest(tabelas: Record<string, any[]> = {}, opcoes: { falha?: (q: Consulta) => boolean; teto?: number; count?: (q: Consulta, count: number) => number | null; repetir?: boolean; ownerErrado?: boolean } = {}) {
   const consultas: Consulta[] = [];
-  const fonte = { from(tabela: string) {
+  const rpc = vi.fn(async (name: string, args: any) => {
+    expect(name).toBe("rpc_estado_obrigacoes51"); return estadoFixture51(tabelas, args);
+  });
+  const fonte = { rpc, from(tabela: string) {
     const q: Consulta = { tabela, colunas: "", filtros: [], inicio: 0, fim: 999 };
     const builder: any = {
       select(colunas: string, options?: any) { q.colunas = colunas; q.count = options?.count; return builder; },
@@ -43,7 +74,7 @@ function fonteRest(tabelas: Record<string, any[]> = {}, opcoes: { falha?: (q: Co
     for (const metodo of ["insert", "update", "delete", "upsert", "rpc"]) builder[metodo] = () => { throw new Error(`Mutação proibida: ${metodo}`); };
     return builder;
   } };
-  return { fonte, consultas };
+  return { fonte, consultas, tabelas, rpc };
 }
 const parcela = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, contrato_id: 1, cliente_id: 1, numero_parcela: 1, status: "pendente", valor: "100.00", valor_original: null, saldo_residual: "0.00", valor_multa: "0.00", data_vencimento: "2026-11-10", ...extra });
 const movimento = (extra: Record<string, any> = {}) => ({ id: 1, user_id: 41, conta_caixa_id: extra.user_id && extra.user_id !== 41 ? 99 : 1, tipo: "entrada", categoria: "pagamento_parcela", valor: "60.00", data_transacao: "2026-11-10", parcela_id: 1, contrato_id: 1, ...extra });
@@ -106,7 +137,9 @@ describe("report: REST completo antes de agregação", () => {
     expect(consultas.map(q => [q.inicio, q.fim])).toEqual([[0, 499], [500, 999], [1000, 1499]]);
     for (const q of rest.consultas) {
       expect(q.colunas).not.toBe("*"); expect(q.colunas).not.toContain("(");
-      if (q.colunas === "id, user_id, conta_caixa_id") {
+      if (q.tabela === "parcelas" && q.colunas === "id, user_id, contrato_id, cliente_id") {
+        expect(q.filtros).toEqual([{ metodo: "eq", coluna: "contrato_id", valor: 1 }]); // Integridade sem owner-filter, apenas contrato próprio.
+      } else if (q.colunas === "id, user_id, conta_caixa_id") {
         expect(q.filtros).toEqual([{ metodo: "in", coluna: "conta_caixa_id", valor: [1] }]);
       } else expect(q.filtros).toContainEqual({ metodo: "eq", coluna: "user_id", valor: 41 });
     }
@@ -183,7 +216,8 @@ describe("report: ambos diários confiáveis e sem envio", () => {
     expect(preview.mensagem).toBe(url.mensagem);
     expect(url).toMatchObject({ completo: true, totalRecebidoHoje: 60, totalVencendoHoje: 1, valorVencendoHoje: 40, totalAtrasadas: 1 });
     expect(url.mensagem).toContain("10/11/2026 (Brasília)"); expect(url.mensagem).toContain("Clientes ativos: 1");
-    expect(rest.consultas.filter(q => q.tabela === "clientes").every(q => q.filtros.some(f => f.coluna === "ativo" && f.valor === true))).toBe(true);
+    expect(rest.consultas.filter(q => q.tabela === "clientes" && q.colunas === "id, user_id, ativo").every(q => q.filtros.some(f => f.coluna === "ativo" && f.valor === true))).toBe(true);
+    expect(rest.consultas.filter(q => q.tabela === "clientes" && q.colunas === "id, user_id").every(q => q.filtros.some(f => f.coluna === "user_id" && f.valor === 41))).toBe(true);
     expect(mocks.enviar).not.toHaveBeenCalled();
   });
   it("diário pagina 1001 recebimentos e não usa data_pagamento nem status para recebimento", async () => {
@@ -212,6 +246,35 @@ describe("report: ambos diários confiáveis e sem envio", () => {
     expect((await caller().dashboard.precisaAtencao()).atrasados30).toMatchObject({ qtd: 1, valor: 140 });
     const atrasadas = await caller().dashboard.parcelasAtrasadas();
     expect(atrasadas.map(p => p.valorAtualizado)).toEqual([100, 40]);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("Reporting — estado51 autoritativo, nunca recebimento inferido", () => {
+  it("obrigação atual51 diferente de original altera dívida/score/projeção, não ledger", async () => {
+    const rest = fonteRest(tabelas({ parcelas: [parcela({ valor_original: "100.00" })] }));
+    const original = structuredClone(rest.tabelas);
+    rest.rpc.mockImplementation(async (name, args) => {
+      expect(name).toBe("rpc_estado_obrigacoes51"); const r = estadoFixture51(rest.tabelas, args);
+      r.data.obrigacaoAdicional = "40.00";
+      Object.assign(r.data.parcelas[0], { obrigacaoAtual: "40.00", componenteAdicional: "40.00" }); return r;
+    });
+    const r = await lerRelatorioFinancialReporting(rest.fonte, 41, { inicio: "2026-11-10", fim: "2026-11-10", clienteId: 1 });
+    expect(r.completo).toBe(true); expect(r.dividas).toMatchObject({ status: "validado", dados: { aberto: 40, parcelas: [{ valorOriginal: "100.00", obrigacaoAtual: "40.00" }] } });
+    expect(r.projecao).toMatchObject({ status: "validado", dados: { aberto: 40 } });
+    expect(r.extrato).toMatchObject({ status: "validado", dados: { recebidoPeriodo: 60 } });
+    expect(await lerScoreFinancialReporting(rest.fonte, 41)).toMatchObject({ totalRecebido: 60, totalAberto: 40, denominador: 100 });
+    expect(rest.tabelas).toEqual(original);
+  });
+  it("RPC51 ausente deixa dívida/projeção/extrato indisponíveis, mantém ledger validado e bloqueia score/diários", async () => {
+    const rest = fonteRest(tabelas()); rest.rpc.mockResolvedValue({ data: null, error: { code: "PGRST202" } } as any);
+    const r = await lerRelatorioFinancialReporting(rest.fonte, 41, { inicio: "2026-11-10", fim: "2026-11-10", clienteId: 1 });
+    expect(r.completo).toBe(false);
+    for (const l of [r.dividas, r.projecao, r.extrato]) { expect(l).toMatchObject({ status: "indisponivel", completo: false }); expect(l).not.toHaveProperty("dados"); }
+    expect(r.ledger).toMatchObject({ status: "validado", dados: { recebido: 60 } });
+    await expect(lerScoreFinancialReporting(rest.fonte, 41)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    await expect(gerarPreviewRelatorioDiario(rest.fonte, 41)).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(mocks.enviar).not.toHaveBeenCalled();
   });
 });

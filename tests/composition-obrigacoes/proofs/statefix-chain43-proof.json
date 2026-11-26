@@ -1,0 +1,113 @@
+{
+  "q": {
+    "regra": "reparcelamento43_v1",
+    "userId": 1,
+    "request": {
+      "tipoTaxa": "mensal",
+      "taxaJuros": "5.00",
+      "contratoId": 955,
+      "dataInicio": "2027-04-10",
+      "incluirMultas": false,
+      "numeroParcelas": 2
+    },
+    "encargos": "0.00",
+    "parcelas": [
+      {
+        "juros": "5.00",
+        "valor": "55.00",
+        "numero": 1,
+        "principal": "50.00",
+        "vencimento": "2027-04-10"
+      },
+      {
+        "juros": "5.00",
+        "valor": "55.00",
+        "numero": 2,
+        "principal": "50.00",
+        "vencimento": "2027-05-10"
+      }
+    ],
+    "totalNovo": "110.00",
+    "contratoId": 955,
+    "estadoHash": "8041f006eb630cd76689c65bbb5d697646f2f8d5fcb5e071f4633dc2fef80f88",
+    "jurosNovos": "10.00",
+    "cotacaoHash": "42c6583c896cbc1859278915dc63f53a332f76092235872565f5300901427b70",
+    "dataCalculo": "2026-11-26",
+    "contaCaixaId": 6,
+    "saldoDevedor": "100.00",
+    "valorNovaParcela": "55.00",
+    "qtdParcelasAbertas": 2
+  },
+  "r": {
+    "regra": "reparcelamento43_v1",
+    "raizId": 955,
+    "userId": 1,
+    "success": true,
+    "repetida": false,
+    "totalNovo": "110.00",
+    "contratoId": 1012,
+    "desembolso": "0.00",
+    "estadoHash": "8041f006eb630cd76689c65bbb5d697646f2f8d5fcb5e071f4633dc2fef80f88",
+    "cotacaoHash": "42c6583c896cbc1859278915dc63f53a332f76092235872565f5300901427b70",
+    "operationId": "faed582e-d68f-4ce3-a055-0d6a7b9d67e2",
+    "parcelasIds": [
+      1031,
+      1032
+    ],
+    "idempotencyKey": "20e22618-f7f1-4c61-b506-09d854e58969",
+    "contratoOrigemId": 955,
+    "principalTransferido": "100.00"
+  },
+  "origin": {
+    "userId": 1,
+    "versao": "obrigacoes51_v1",
+    "parcelas": [
+      {
+        "arquivada": false,
+        "parcelaId": 955001,
+        "obrigacaoAtual": "0.00",
+        "statusObrigacao": "cancelada",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "cancelada"
+      },
+      {
+        "arquivada": false,
+        "parcelaId": 955002,
+        "obrigacaoAtual": "0.00",
+        "statusObrigacao": "cancelada",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "cancelada"
+      }
+    ],
+    "arquivado": false,
+    "contratoId": 955,
+    "statusObrigacao": "encerrado_por_cancelamento",
+    "obrigacaoAdicional": "0.00"
+  },
+  "successor": {
+    "userId": 1,
+    "versao": "obrigacoes51_v1",
+    "parcelas": [
+      {
+        "arquivada": false,
+        "parcelaId": 1031,
+        "obrigacaoAtual": "55.00",
+        "statusObrigacao": "aberta",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "pendente"
+      },
+      {
+        "arquivada": false,
+        "parcelaId": 1032,
+        "obrigacaoAtual": "55.00",
+        "statusObrigacao": "aberta",
+        "componenteAdicional": "0.00",
+        "statusFinanceiroOriginal": "pendente"
+      }
+    ],
+    "arquivado": false,
+    "contratoId": 1012,
+    "statusObrigacao": "ativo",
+    "obrigacaoAdicional": "0.00"
+  }
+}

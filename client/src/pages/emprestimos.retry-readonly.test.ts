@@ -299,9 +299,9 @@ describe("strict loan-list read-only retry policy (real TanStack observer, offli
     expect(queryFn).toHaveBeenCalledTimes(1);
   });
 
-  it("production query options are local: undefined input and only retry; no additional query settings", () => {
+  it("production query options are local: exact historical filter input and only retry; no additional query settings", () => {
     expect(strictQuery.arguments).toHaveLength(2);
-    expect(strictQuery.arguments[0].getText(ast)).toBe("undefined");
+    expect(evaluate(strictQuery.arguments[0], {})).toEqual({ arquivo: "todos" });
     expect(Object.keys(productionOptions)).toEqual(["retry"]);
     expect(typeof productionOptions.retry).toBe("function");
   });

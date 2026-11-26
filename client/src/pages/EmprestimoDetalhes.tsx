@@ -1,4 +1,5 @@
 'use client';
+import { arquivada51, contagensParcelas51, referenciaMonetaria51, statusContrato51, statusParcela51, REFERENCIA51 } from "@/lib/obrigacoes51Apresentacao";
 import { useTranslation } from 'react-i18next';
 import { useState } from 'react';
 import { useLocation, useParams } from 'wouter';
@@ -13,6 +14,7 @@ import { formatarMoeda, formatarData } from '../../../shared/finance';
 import { trpc } from '@/lib/trpc';
 import { badgeContrato, badgeParcela } from '@/lib/statusEmprestimoBadge';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
+import { OperacoesObrigacao51 } from '@/components/OperacoesObrigacao51';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
 import { ManutencaoJuros48 } from '@/components/ManutencaoJuros48';
 import { ManutencaoCalendario } from '@/components/ManutencaoCalendario';
@@ -30,7 +32,7 @@ export default function EmprestimoDetalhes() {
   const [modalDeletar, setModalDeletar] = useState(false);
   const [loadingWpp, setLoadingWpp] = useState(false);
   const [gerandoPDF] = useState(false);
-  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada'>('todas');
+  const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada' | 'cancelada' | 'arquivada'>('todas');
 
   const utils = trpc.useUtils();
   const { data: config } = trpc.configuracoes.get.useQuery();
@@ -80,10 +82,11 @@ export default function EmprestimoDetalhes() {
     );
   }
 
+  const contagens = contagensParcelas51(emprestimo.todasParcelas ?? []);
   const diasAtraso = emprestimo.parcelasComAtraso?.[0]?.diasAtraso ?? 0;
   const jurosAtraso = emprestimo.parcelasComAtraso?.[0]?.jurosAtraso ?? 0;
   const isAtrasado = diasAtraso > 0;
-  const statusBadge = badgeContrato(emprestimo.status, isAtrasado);
+  const statusBadge = badgeContrato(statusContrato51(emprestimo), isAtrasado);
   const parcela = emprestimo.todasParcelas?.find((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)) ?? emprestimo.todasParcelas?.find((p: any) => ['paga', 'pago'].includes(p.status));
   const atualizarFinanceiro = () => {
     void refetch();
@@ -93,6 +96,7 @@ export default function EmprestimoDetalhes() {
     void utils.parcelas.invalidate();
   };
   const handleWhatsApp = async (tipo: 'atraso' | 'preventivo' = 'atraso') => {
+    if (emprestimo.arquivado || emprestimo.statusObrigacao !== 'ativo') { toast.info('Cobrança indisponível para obrigação encerrada ou não confirmada.'); return; }
     if (!emprestimo.clienteWhatsapp) { toast.error(t('toast_error.telefone_whatsapp_não_cadastrado')); return; }
     setLoadingWpp(true);
     try {
@@ -136,7 +140,7 @@ export default function EmprestimoDetalhes() {
           </div>
         </div>
         <Badge variant={statusBadge.variant}>
-          {statusBadge.label}
+          {statusBadge.label}{emprestimo.arquivado ? ' · Arquivado' : ''}
         </Badge>
       </div>
 
@@ -154,6 +158,12 @@ export default function EmprestimoDetalhes() {
         </div>
       </div>
 
+      <section aria-label="Composição da obrigação" className="rounded-lg border p-3 text-sm space-y-1">
+        <p>Obrigação registrada51: {referenciaMonetaria51(emprestimo.obrigacaoAtual)}</p>
+        <p>A — obrigação adicional não desembolsada: {referenciaMonetaria51(emprestimo.obrigacaoAdicional)}. Não compõe capital, juros ou lucro.</p>
+        <p>{contagens.pagas} pagas reais · {contagens.canceladas} canceladas · {contagens.arquivadas} arquivadas (atributo separado).</p>
+        <p className="text-xs text-muted-foreground">{REFERENCIA51} Restante a receber acima conserva a apresentação validada do reader.</p>
+      </section>
       {/* Abas */}
       <div className="border-b border-border">
         <div className="flex gap-2">
@@ -230,11 +240,16 @@ export default function EmprestimoDetalhes() {
 
         {aba === 'detalhes' && (
           <div className="space-y-4">
+            <div className="rounded border p-3 space-y-2">
+              <h2 className="font-semibold">Editar / operações do contrato</h2>
+              <OperacoesObrigacao51 contratoId={emprestimo.id} alvoInicial={{ tipo: 'contrato' }} onSuccess={atualizarFinanceiro} />
+              <p className="text-sm text-muted-foreground">Adicionar parcela manual é obrigação adicional não desembolsada. Reparcelamento redistribui dívida existente; não substitui inclusão.</p>
+            </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
               {[
                 { label: 'Total a Receber', value: formatarMoeda(emprestimo.totalReceber) },
                 { label: 'Total Pago', value: formatarMoeda(emprestimo.totalPago), cls: 'text-green-500' },
-                { label: 'Parcelas Pagas', value: `${emprestimo.parcelasPagas}/${emprestimo.numeroParcelas}` },
+                { label: 'Parcelas Pagas', value: `${contagens.pagas}/${emprestimo.todasParcelas?.length ?? emprestimo.numeroParcelas}` },
                 { label: 'Taxa de Juros', value: `${emprestimo.taxaJuros}% ${emprestimo.tipoTaxa}` },
                 { label: 'Parcelas Abertas', value: String(emprestimo.parcelasAbertas) },
                 { label: 'Data de Criação', value: formatarData(emprestimo.dataCriacao) },
@@ -249,7 +264,7 @@ export default function EmprestimoDetalhes() {
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-foreground">Todas as Parcelas</p>
                 <div className="flex gap-1">
-                  {(['todas', 'pendente', 'paga', 'atrasada'] as const).map(f => (
+                  {(['todas', 'pendente', 'paga', 'atrasada', 'cancelada', 'arquivada'] as const).map(f => (
                     <button
                       key={f}
                       onClick={() => setFiltroStatus(f)}
@@ -259,7 +274,7 @@ export default function EmprestimoDetalhes() {
                           : 'border-border text-muted-foreground hover:bg-muted/50'
                       }`}
                     >
-                      {f === 'todas' ? 'Todas' : f === 'pendente' ? 'Pendentes' : f === 'paga' ? 'Pagas' : 'Atrasadas'}
+                      {f === 'todas' ? 'Todas' : f === 'pendente' ? 'Pendentes' : f === 'paga' ? 'Pagas' : f === 'cancelada' ? 'Canceladas' : f === 'arquivada' ? 'Arquivadas' : 'Atrasadas'}
                     </button>
                   ))}
                 </div>
@@ -270,7 +285,7 @@ export default function EmprestimoDetalhes() {
                     <tr className="border-b border-border">
                       <th className="text-left px-3 py-2 text-muted-foreground font-medium">#</th>
                       <th className="text-left px-3 py-2 text-muted-foreground font-medium">{t('common.dueDate')}</th>
-                      <th className="text-right px-3 py-2 text-muted-foreground font-medium">Valor</th>
+                      <th className="text-right px-3 py-2 text-muted-foreground font-medium">Obrigação registrada / histórico</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Status</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Editar</th>
                       <th className="text-center px-3 py-2 text-muted-foreground font-medium">Pagar</th>
@@ -278,19 +293,22 @@ export default function EmprestimoDetalhes() {
                   </thead>
                   <tbody>
                     {emprestimo.todasParcelas
-                      ?.filter((p: any) => filtroStatus === 'todas' || p.status === filtroStatus)
+                      ?.filter((p: any) => filtroStatus === 'todas' || (filtroStatus === 'arquivada' ? arquivada51(p) : statusParcela51(p) === filtroStatus))
                       .map((p: any) => (
                           <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
                             <td className="px-3 py-2 text-foreground">#{p.numero_parcela}</td>
                             <td className="px-3 py-2 text-foreground">{formatarData(p.data_vencimento)}</td>
-                            <td className="px-3 py-2 text-right text-foreground">{formatarMoeda(p.valor_original)}</td>
+                            <td className="px-3 py-2 text-right text-foreground">{referenciaMonetaria51(p.obrigacaoAtual)}
+                              <div className="text-xs text-muted-foreground">Original histórico: {formatarMoeda(p.valor_original)} · Pago histórico: {p.valor_pago == null ? 'Não registrado' : formatarMoeda(p.valor_pago)}</div>
+                              <div className="text-xs text-muted-foreground">A: {referenciaMonetaria51(p.componenteAdicional)} (não desembolsada)</div>
+                            </td>
                             <td className="px-3 py-2 text-center">
-                              <Badge variant={badgeParcela(p.status, emprestimo.status).variant}>
-                                {badgeParcela(p.status, emprestimo.status).label}
+                              <Badge variant={badgeParcela(statusParcela51(p), emprestimo.status).variant}>
+                                {badgeParcela(statusParcela51(p), emprestimo.status).label}{p.arquivada ? ' · Arquivada' : ''}
                               </Badge>
                             </td>
                             <td className="px-3 py-2 text-center">
-                              <a href="#manutencao-financeira" className="text-sm underline" title="Usar calendário completo ou manutenção de valores futuros">Alterar datas / valores</a>
+                              <OperacoesObrigacao51 contratoId={emprestimo.id} alvoInicial={{ tipo: 'parcela', parcelaId: p.id }} acaoInicial="editar" label="Editar / cancelar / arquivar parcela" onSuccess={atualizarFinanceiro} />
                             </td>
                             <td className="px-3 py-2 text-center">
                               <RecebimentoValidado contratoId={emprestimo.id} parcelaId={p.id} permitirRenovacao onSuccess={atualizarFinanceiro} />
@@ -300,7 +318,7 @@ export default function EmprestimoDetalhes() {
                   </tbody>
                 </table>
               </div>
-              <p className="text-sm text-muted-foreground">Para uma nova quantidade de parcelas, simule o reparcelamento mensal. Para renovar pagando juros, abra Receber / conferir na parcela; a origem determina a operação disponível.</p>
+              <p className="text-sm text-muted-foreground">Para incluir obrigação nova não desembolsada, use Adicionar parcela manual em Operações do contrato. Reparcelamento redistribui a dívida existente, não inclui nova obrigação. Para renovar pagando juros, abra Receber / conferir na parcela; a origem determina a operação disponível.</p>
               <Button variant="outline" onClick={() => setLocation(rotaReparcelamentoAtual(emprestimo.id))}>Simular reparcelamento mensal</Button>
             </div>
           </div>
@@ -332,15 +350,16 @@ export default function EmprestimoDetalhes() {
         {parcela && <RecebimentoValidado contratoId={emprestimo.id} parcelaId={parcela.id} permitirRenovacao onSuccess={atualizarFinanceiro} />}
         <ManutencaoJuros48 contratoId={emprestimo.id} parcelasIds={(emprestimo.todasParcelas??[]).map((p: {id:number})=>p.id)} onSuccess={atualizarFinanceiro} />
         <ManutencaoCalendario contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
+        <OperacoesObrigacao51 contratoId={emprestimo.id} alvoInicial={{ tipo: 'contrato' }} label="Adicionar parcela / editar obrigação / quitar" onSuccess={atualizarFinanceiro} />
         <MultaManualAplicar contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
         <Button variant="outline" size="sm" onClick={() => setLocation(rotaReparcelamentoAtual(emprestimo.id))}>Reparcelar mensal</Button>
         {emprestimo.clienteWhatsapp && (
-          <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp}>
+          <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp || emprestimo.arquivado || emprestimo.statusObrigacao !== 'ativo'}>
             {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
             Cobrar (WhatsApp)
           </Button>
         )}
-        <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp || !emprestimo.clienteWhatsapp}>
+        <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp || !emprestimo.clienteWhatsapp || emprestimo.arquivado || emprestimo.statusObrigacao !== 'ativo'}>
           {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           Enviar Cobrança
         </Button>
@@ -348,8 +367,8 @@ export default function EmprestimoDetalhes() {
           <FileText className="h-4 w-4" />
           {gerandoPDF ? 'Gerando...' : 'Comprovante'}
         </Button>
-        <Button disabled title="Exclusão financeira sem estorno auditado está bloqueada." className="gap-2" variant="destructive" size="sm" onClick={() => setModalDeletar(true)}>
-          <Trash2 className="h-4 w-4" /> Deletar
+        <Button title="Renúncia sem estorno ou arquivo de contrato encerrado; nunca exclusão do histórico." className="gap-2" variant="destructive" size="sm" onClick={() => setModalDeletar(true)}>
+          <Trash2 className="h-4 w-4" /> Cancelar / arquivar
         </Button>
       </div>
 

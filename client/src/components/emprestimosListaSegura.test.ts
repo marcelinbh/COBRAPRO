@@ -7,7 +7,7 @@ vi.mock('../lib/trpc', () => ({ trpc: { auth: { me: { useQuery: query.auth } }, 
 import { EmprestimosListaSegura } from './EmprestimosListaSegura';
 import { EmprestimosListaSeguraFallback } from './EmprestimosListaSeguraFallback';
 import { AVISO_LISTA_INCOMPLETA, deveUsarListaSegura, type ListaSeguraEmprestimos } from '../../../shared/emprestimosListaSegura';
-const partial: ListaSeguraEmprestimos = { version: 'loan_list_read_v1', userId: 41, items: [{ kind: 'validated', id: 1, clienteId: 2, clienteNome: 'Cliente próprio <script>alert(1)</script>', modalidade: 'mensal', status: 'ativo', capital: 100, totalReceber: 80, totalPago: 20 }, { kind: 'unavailable', id: 42, message: 'Empréstimo indisponível: não foi possível confirmar seus vínculos.' }], coverage: { scopedContracts: 2, validatedContracts: 1, unavailableContracts: 1, complete: false, label: 'validados somente' }, totals: { label: 'validados somente', values: { capital: 100, totalReceber: 80, totalPago: 20 } }, warning: AVISO_LISTA_INCOMPLETA };
+const partial: ListaSeguraEmprestimos = { version: 'loan_list_read_v1', userId: 41, items: [{ kind: 'validated', id: 1, clienteId: 2, clienteNome: 'Cliente próprio <script>alert(1)</script>', modalidade: 'mensal', status: 'ativo', statusFinanceiroOriginal: 'ativo', statusObrigacao: 'ativo', arquivado: false, obrigacaoAdicional: '0.00', obrigacaoAtual: '80.00', capital: 100, totalReceber: 80, totalPago: 20 }, { kind: 'unavailable', id: 42, message: 'Empréstimo indisponível: não foi possível confirmar seus vínculos.' }], coverage: { scopedContracts: 2, validatedContracts: 1, unavailableContracts: 1, complete: false, label: 'validados somente' }, totals: { label: 'validados somente', values: { capital: 100, totalReceber: 80, totalPago: 20 } }, warning: AVISO_LISTA_INCOMPLETA };
 const render = (data: ListaSeguraEmprestimos) => renderToStaticMarkup(React.createElement(EmprestimosListaSegura, { data, onRefresh: () => {} }));
 beforeEach(() => { vi.clearAllMocks(); query.auth.mockReturnValue({ data: { id: 41 }, isFetching: false, isError: false, isPending: false, isLoading: false }); });
 describe('Fallback local da lista, sem estado financeiro autorizado', () => {
@@ -53,7 +53,7 @@ describe('Fallback local da lista, sem estado financeiro autorizado', () => {
   it('hunk da página preserva badge e query estrita e só monta após PRECONDITION_FAILED', () => {
     const src = readFileSync(new URL('../pages/Emprestimos.tsx', import.meta.url), 'utf8');
     expect(src).toContain('import { badgeContrato }'); expect(src).toContain('if (isError && deveUsarListaSegura(erroLista)) return <EmprestimosListaSeguraFallback');
-    expect(src).toContain('trpc.contratos.listComParcelas.useQuery(undefined, {');
+    expect(src).toContain("trpc.contratos.listComParcelas.useQuery({ arquivo: 'todos' }, {");
     expect(src).toContain('retry: (failureCount, error) => !deveUsarListaSegura(error) && failureCount < 3,');
     expect(src).not.toContain('listLeituraSegura.useQuery');
     expect(src.indexOf('if (isError && deveUsarListaSegura')).toBeLessThan(src.indexOf('if (leituraEmAndamento || isError)'));

@@ -1,3 +1,4 @@
+import { arquivada51, parcelaAberta51, valorOperacional51, rotuloValorOperacional51, somaOperacional51, somaAdicional51, somaRecebidoHistorico51, contagensParcelas51, referenciaMonetaria51, valorConfirmado51, statusParcela51, REFERENCIA51, type Arquivo51 } from "@/lib/obrigacoes51Apresentacao";
 import { useTranslation } from 'react-i18next';
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
@@ -62,11 +63,12 @@ export default function Calendario() {
   const [ano, setAno] = useState(anoHoje);
   const [modo, setModo] = useState<"mensal" | "semanal" | "lista">("mensal");
   const [semanaOffset, setSemanaOffset] = useState(0);
+  const [arquivo, setArquivo] = useState<Arquivo51>("operacional");
   const [filtroKoletor, setFiltroKoletor] = useState<string>("todos");
   const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
-  const { data: parcelasRaw, refetch } = trpc.parcelas.list.useQuery({});
+  const { data: parcelasRaw, isPending, isLoading, isError, isFetching, refetch } = trpc.parcelas.list.useQuery({ arquivo });
   const { data: koletores } = (trpc as any).koletores?.list?.useQuery?.() ?? { data: [] };
   // Filtrar por cobrador
   const parcelas = useMemo(() => {
@@ -76,7 +78,7 @@ export default function Calendario() {
       .filter((p: Parcela) => filtroKoletor === "todos" || p.koletorId === koletorId)
       .map((p: Parcela) => {
         try {
-          return { ...p, status: statusCalendarioParcela(p.status, dataVencimentoCivil(p.dataVencimento), hoje) };
+          return { ...p, status: statusCalendarioParcela(statusParcela51(p), dataVencimentoCivil(p.dataVencimento), hoje) };
         } catch { return p; }
       });
   }, [parcelasRaw, filtroKoletor, hoje]);
@@ -109,7 +111,7 @@ export default function Calendario() {
     const vencendo = ps.filter(p => p.status === 'vencendo_hoje').length;
     const pendentes = ps.filter(p => p.status === 'pendente').length;
     const pagas = ps.filter(p => p.status === 'paga').length;
-    const total = ps.reduce((sum, p) => sum + parseFloat(p.valorOriginal), 0);
+    const total = somaOperacional51(ps);
     return { ps, atrasadas, vencendo, pendentes, pagas, total };
   };
 
@@ -122,8 +124,10 @@ export default function Calendario() {
   const parcelasMes = Array.from(parcelasPorDia.entries())
     .filter(([data]) => data.startsWith(chaveCalendario(ano, mes, 1).slice(0, 7) + "-"))
     .flatMap(([, ps]) => ps);
-  const totalMes = parcelasMes.reduce((sum: number, p: Parcela) => sum + parseFloat(p.valorOriginal), 0);
-  const recebidoMes = parcelasMes.filter((p: Parcela) => p.status === 'paga').reduce((sum: number, p: Parcela) => sum + parseFloat(p.valorPago ?? p.valorOriginal), 0);
+  const contagens = contagensParcelas51(parcelasMes);
+  const totalMes = somaOperacional51(parcelasMes);
+  const adicionalMes = somaAdicional51(parcelasMes);
+  const recebidoMes = somaRecebidoHistorico51(parcelasMes);
 
   // Parcelas do dia selecionado
   const parcelasDiaSelecionado = diaSelecionado
@@ -131,17 +135,25 @@ export default function Calendario() {
     : [];
 
   const statusBadge = (status: string) => {
-    if (status === 'paga') return <Badge className="bg-success/20 text-success border-success/30 text-[10px]">Paga</Badge>;
+    if (status === 'cancelada') return <Badge variant="secondary">Cancelada</Badge>;
+    if (status === 'renovada') return <Badge variant="secondary">Principal transferido</Badge>;
+    if (status === 'parcial') return <Badge variant="secondary">Parcial</Badge>;
+    if (status === 'paga' || status === 'pago') return <Badge className="bg-success/20 text-success border-success/30 text-[10px]">Paga</Badge>;
     if (status === 'atrasada') return <Badge className="bg-destructive/20 text-destructive border-destructive/30 text-[10px]">Atrasada</Badge>;
     if (status === 'vencendo_hoje') return <Badge className="bg-warning/20 text-warning border-warning/30 text-[10px]">Hoje</Badge>;
-    return <Badge className="bg-muted text-muted-foreground text-[10px]">Pendente</Badge>;
+    return <Badge className="bg-muted text-muted-foreground text-[10px]">{status === 'pendente' ? 'Pendente' : 'Status não confirmado'}</Badge>;
   };
 
   const abrirWhatsApp = (parcela: Parcela) => {
+    if (!parcelaAberta51(parcela)) return;
     const msg = mensagemCalendario(parcela);
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
   };
 
+  if (isError || isPending || isLoading || parcelasRaw === undefined || (isFetching && parcelasRaw.length === 0)) return <div role={isError ? 'alert' : 'status'} className="space-y-3">
+    <h1>Calendário</h1><p>{isError ? 'Consulta indisponível; valores não confirmados. Não cadastre novamente uma dívida existente.' : 'Confirmando calendário...'}</p>
+    <Button disabled={isFetching} onClick={() => refetch()}>Tentar novamente</Button>
+  </div>;
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -194,27 +206,32 @@ export default function Calendario() {
         </div>
       </div>
 
+      <div role="group" aria-label="Arquivo do calendário" className="flex gap-2">
+        {(['operacional', 'historico', 'todos'] as const).map(a => <Button key={a} aria-pressed={arquivo === a} variant={arquivo === a ? 'default' : 'outline'} onClick={() => setArquivo(a)}>{a === 'operacional' ? 'Operacionais' : a === 'historico' ? 'Histórico' : 'Todos'}</Button>)}
+      </div>
+      <p className="text-xs text-muted-foreground">{REFERENCIA51}</p>
+      <p className="text-sm">A não desembolsada no mês: {valorConfirmado51(adicionalMes)} (não é capital/juros/lucro). {contagens.canceladas} canceladas · {contagens.arquivadas} arquivadas (atributo separado).</p>
       {/* KPIs do mês */}
       <div className="grid grid-cols-3 gap-4">
         <Card className="border-border">
           <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">A Receber no Mês</div>
-            <div className="font-display text-xl text-foreground">{formatarMoeda(totalMes)}</div>
+            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Obrigação registrada no Mês</div>
+            <div className="font-display text-xl text-foreground">{valorConfirmado51(totalMes)}</div>
             <div className="text-xs text-muted-foreground mt-1">{parcelasMes.length} parcelas</div>
           </CardContent>
         </Card>
         <Card className="border-border">
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Já Recebido</div>
-            <div className="font-display text-xl text-success">{formatarMoeda(recebidoMes)}</div>
-            <div className="text-xs text-muted-foreground mt-1">{parcelasMes.filter((p: Parcela) => p.status === 'paga').length} pagas</div>
+            <div className="font-display text-xl text-success">{valorConfirmado51(recebidoMes)}</div>
+            <div className="text-xs text-muted-foreground mt-1">{contagens.pagas} pagas reais</div>
           </CardContent>
         </Card>
         <Card className="border-border">
           <CardContent className="p-4">
             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Pendente</div>
-            <div className="font-display text-xl text-warning">{formatarMoeda(totalMes - recebidoMes)}</div>
-            <div className="text-xs text-muted-foreground mt-1">{parcelasMes.filter((p: Parcela) => p.status !== 'paga').length} pendentes</div>
+            <div className="font-display text-xl text-warning">{valorConfirmado51(totalMes)}</div>
+            <div className="text-xs text-muted-foreground mt-1">{contagens.abertas} abertas</div>
           </CardContent>
         </Card>
       </div>
@@ -282,9 +299,9 @@ export default function Calendario() {
                                 {pendentes} pend.
                               </div>
                             )}
-                            {total > 0 && (
+                            {(total === null || total > 0) && (
                               <div className="text-[10px] text-muted-foreground truncate">
-                                {formatarMoeda(total)}
+                                {valorConfirmado51(total)}
                               </div>
                             )}
                           </div>
@@ -371,8 +388,8 @@ export default function Calendario() {
                             {ps.length > 3 && (
                               <div className="text-[10px] text-muted-foreground">+{ps.length - 3} mais</div>
                             )}
-                            {total > 0 && (
-                              <div className="text-[10px] font-medium text-foreground mt-1">{formatarMoeda(total)}</div>
+                            {(total === null || total > 0) && (
+                              <div className="text-[10px] font-medium text-foreground mt-1">{valorConfirmado51(total)}</div>
                             )}
                           </div>
                         )}
@@ -419,7 +436,7 @@ export default function Calendario() {
                             <div className="text-xs text-muted-foreground">{ps.length} parcela{ps.length > 1 ? 's' : ''}</div>
                           </div>
                         </div>
-                        <div className="text-sm font-display">{formatarMoeda(total)}</div>
+                        <div className="text-sm font-display">{valorConfirmado51(total)}</div>
                       </div>
                       {diaSelecionado === dia && ps.map((p: Parcela) => (
                         <div key={p.id} className="flex items-center justify-between px-4 py-2 bg-muted/20 border-t border-border/50">
@@ -429,12 +446,13 @@ export default function Calendario() {
                             </div>
                             <div>
                               <div className="text-xs font-medium">{p.clienteNome || `Parcela ${p.numeroParcela}/${p.totalParcelas}`}</div>
-                              <div className="text-[10px] text-muted-foreground">{formatarMoeda(parseFloat(p.valorOriginal))}</div>
+                              <div className="text-[10px] text-muted-foreground">{valorConfirmado51(valorOperacional51(p))} · {rotuloValorOperacional51(p)}
+                                <span className="block text-muted-foreground">Original histórico: {formatarMoeda(p.valorOriginal)} · Pago: {p.valorPago == null ? 'Não registrado' : formatarMoeda(p.valorPago)} · A: {referenciaMonetaria51(p.componenteAdicional)}</span></div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {statusBadge(p.status)}
-                            {p.status !== 'paga' && (
+                            {statusBadge(statusParcela51(p))}{arquivada51(p) && <Badge variant="secondary">Arquivada</Badge>}
+                            {parcelaAberta51(p) && (
                               <Button size="sm" variant="ghost" className="h-6 w-6 p-0" onClick={() => abrirWhatsApp(p)}>
                                 <MessageCircle className="h-3 w-3 text-success" />
                               </Button>
@@ -464,16 +482,16 @@ export default function Calendario() {
                   </Button>
                 </div>
                 <div className="text-xs text-muted-foreground">
-                  {parcelasDiaSelecionado.length} parcela{parcelasDiaSelecionado.length > 1 ? 's' : ''} • {formatarMoeda(parcelasDiaSelecionado.reduce((s: number, p: Parcela) => s + parseFloat(p.valorOriginal), 0))}
+                  {parcelasDiaSelecionado.length} parcela{parcelasDiaSelecionado.length > 1 ? 's' : ''} • {valorConfirmado51(somaOperacional51(parcelasDiaSelecionado))}
                 </div>
               </CardHeader>
               <CardContent className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
                 {/* Envio em massa */}
-                {parcelasDiaSelecionado.filter((p: Parcela) => p.status !== 'paga').length > 1 && (
+                {parcelasDiaSelecionado.filter((p: Parcela) => parcelaAberta51(p)).length > 1 && (
                   <button
                     className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-green-600/15 border border-green-600/30 text-green-500 text-xs font-medium hover:bg-green-600/25 transition-colors"
                     onClick={() => {
-                      const pendentes = parcelasDiaSelecionado.filter((p: Parcela) => p.status !== 'paga');
+                      const pendentes = parcelasDiaSelecionado.filter((p: Parcela) => parcelaAberta51(p));
                       pendentes.forEach((p: Parcela, idx: number) => {
                         setTimeout(() => {
                           const msg = mensagemCalendario(p);
@@ -483,34 +501,33 @@ export default function Calendario() {
                     }}
                   >
                     <MessageCircle className="h-3.5 w-3.5" />
-                    Enviar WhatsApp para todos ({parcelasDiaSelecionado.filter((p: Parcela) => p.status !== 'paga').length} pendentes)
+                    Enviar WhatsApp para todos ({parcelasDiaSelecionado.filter((p: Parcela) => parcelaAberta51(p)).length} pendentes)
                   </button>
                 )}
                 {parcelasDiaSelecionado.map((p: Parcela) => (
                   <div key={p.id} className="p-2 rounded-lg border border-border bg-muted/10 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-medium truncate flex-1">{p.clienteNome || `Contrato #${p.contratoId}`}</div>
-                      {statusBadge(p.status)}
+                      {statusBadge(statusParcela51(p))}{arquivada51(p) && <Badge variant="secondary">Arquivada</Badge>}
                     </div>
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
                       <span>Parcela {p.numeroParcela}/{p.totalParcelas}</span>
-                      <span className="font-medium text-foreground">{formatarMoeda(parseFloat(p.valorOriginal))}</span>
+                      <span className="font-medium text-foreground">{valorConfirmado51(valorOperacional51(p))} · {rotuloValorOperacional51(p)}
+                                <span className="block text-muted-foreground">Original histórico: {formatarMoeda(p.valorOriginal)} · Pago: {p.valorPago == null ? 'Não registrado' : formatarMoeda(p.valorPago)} · A: {referenciaMonetaria51(p.componenteAdicional)}</span></span>
                     </div>
-                    {p.status !== 'paga' && (
-                      <div className="flex gap-1 pt-1">
-                        <Button
+                    <div className="flex gap-1 pt-1">
+                        {parcelaAberta51(p) && <Button
                           size="sm"
                           variant="outline"
                           className="flex-1 h-6 text-[10px] gap-1"
                           onClick={() => abrirWhatsApp(p)}
                         >
                           <MessageCircle className="h-3 w-3" /> WhatsApp
-                        </Button>
+                        </Button>}
                         {Number.isInteger(p.contratoId) && p.contratoId > 0 && Number.isInteger(p.id) && p.id > 0
                           ? <RecebimentoValidado contratoId={p.contratoId} parcelaId={p.id} permitirRenovacao onSuccess={() => { void refetch(); }} />
                           : <span role="alert">Parcela sem identificação de contrato válida; atualize a consulta.</span>}
                       </div>
-                    )}
                     {p.contratoId && (
                       <Button
                         size="sm"

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Projection51 } from "../shared/obrigacoes51";
 
 const mocks = vi.hoisted(() => ({ db: vi.fn(), enviar: vi.fn() }));
 vi.mock("./db", () => ({ getSupabaseClientAsync: mocks.db }));
@@ -10,6 +11,7 @@ vi.mock("./services/evolutionClient", async importOriginal => ({
 
 import {
   enfileirarLembretesAutomaticos,
+  enfileirarMensagemWhatsApp,
   processarFilaWhatsApp,
   recuperarLeasesExpiradosWhatsApp,
   sincronizarMarcadoresDeRelatorioDiario,
@@ -54,6 +56,7 @@ function project(row: Row, select: string): Row {
   if (select === "*") return structuredClone(row);
   return Object.fromEntries(
     splitColumns(select).map(column => {
+      column = column.trim();
       const nested = /^([^!(]+)(?:!inner)?\((.*)\)$/.exec(column);
       if (nested)
         return [
@@ -176,6 +179,18 @@ function seed(): Record<string, Row[]> {
 function database() {
   const tables = seed();
   const calls: Call[] = [];
+  // Prova autoritativa separada de REST: nunca calcula dívida/status a partir
+  // de valor_original ou dos joins. Cada cenário financeiro altera a prova.
+  const projections = new Map<number, Projection51>([TENANT, OTHER].map(userId => [
+    userId * 10 + 2,
+    { versao: "obrigacoes51_v1", userId, contratoId: userId * 10 + 2,
+      statusObrigacao: "ativo", arquivado: false, obrigacaoAdicional: "0.00",
+      parcelas: [{ parcelaId: userId * 10 + 3, statusFinanceiroOriginal: "pendente",
+        statusObrigacao: "aberta", obrigacaoAtual: "150.00", componenteAdicional: "0.00", arquivada: false }] },
+  ]));
+  const rpcCalls: { name: string; method: string; body: Row }[] = [];
+  let rpcFault: ((projection: Projection51, index: number) => unknown) | undefined;
+  let rpcUnavailable = false;
   const posts: { userId: number; telefone: string; mensagem: string }[] = [];
   let fault: Fault | undefined;
   const fetchMock = vi.fn(
@@ -183,13 +198,28 @@ function database() {
       const url = new URL(String(input));
       expect(url.origin).toBe("https://postgrest.invalid");
       const table = url.pathname.split("/").at(-1)!;
-      expect(tables).toHaveProperty(table);
       const method = init?.method ?? "GET";
       const body = init?.body ? JSON.parse(String(init.body)) : null;
       const params = url.searchParams;
+      if (url.pathname.startsWith("/rest/v1/rpc/")) {
+        expect(table).toBe("rpc_estado_obrigacoes51");
+        expect(method).toBe("POST");
+        expect(Object.keys(body).sort()).toEqual(["p_contrato_id", "p_user_id"]);
+        rpcCalls.push({ name: table, method, body: structuredClone(body) });
+        const proof = projections.get(body.p_contrato_id);
+        if (rpcUnavailable || !proof || proof.userId !== body.p_user_id)
+          return new Response(JSON.stringify({ code: "PGRST202", message: "RPC51 indisponível sintética" }), { status: 404, headers: { "content-type": "application/json" } });
+        // Leitura NUMERIC(15,2) comprovada pelo harness PostgreSQL51 real.
+        // Propostas dos novos writers continuam limitadas a NUMERIC(12,2).
+        if (proof.parcelas.some(row => /^\d{14,}\./.test(row.obrigacaoAtual)))
+          return new Response(JSON.stringify({ code: "22003", message: "numeric field overflow sintético da leitura15" }), { status: 400, headers: { "content-type": "application/json" } });
+        const payload = rpcFault ? rpcFault(structuredClone(proof), rpcCalls.length) : proof;
+        return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
+      }
+      expect(tables).toHaveProperty(table);
       const matches = (row: Row) =>
         [...params.entries()].every(([column, expression]) => {
-          if (["select", "order", "limit", "on_conflict"].includes(column))
+          if (["select", "order", "limit", "offset", "on_conflict"].includes(column))
             return true;
           const value = column.split(".").reduce((r, key) => r?.[key], row);
           const dot = expression.indexOf(".");
@@ -205,8 +235,10 @@ function database() {
           throw new Error(`Filtro sintético não implementado: ${expression}`);
         });
       let affected: Row[] = [];
+      let count = 0;
       if (method === "GET" || method === "PATCH") {
         affected = tables[table].filter(matches);
+        count = affected.length;
         const order = params.get("order");
         if (order) {
           const [column, direction] = order.split(".");
@@ -217,6 +249,8 @@ function database() {
           );
         }
         const limit = params.get("limit");
+        const offset = Number(params.get("offset") ?? 0);
+        if (offset) affected = affected.slice(offset);
         if (limit) affected = affected.slice(0, Number(limit));
         if (method === "PATCH")
           affected.forEach(row => Object.assign(row, body));
@@ -260,9 +294,14 @@ function database() {
       const payload = accept?.includes("vnd.pgrst.object")
         ? (returned[0] ?? null)
         : returned;
+      const responseHeaders: Record<string, string> = { "content-type": "application/json" };
+      if ((new Headers(init?.headers).get("prefer") ?? "").includes("count=exact")) {
+        const offset = Number(params.get("offset") ?? 0);
+        responseHeaders["content-range"] = `${offset}-${offset + returned.length - 1}/${count}`;
+      }
       return new Response(JSON.stringify(payload), {
         status: 200,
-        headers: { "content-type": "application/json" },
+        headers: responseHeaders,
       });
     }
   );
@@ -295,6 +334,10 @@ function database() {
   return {
     tables,
     calls,
+    projections,
+    rpcCalls,
+    setRpcUnavailable: () => { rpcUnavailable = true; },
+    setRpcFault: (next: typeof rpcFault) => { rpcFault = next; },
     posts,
     fetchMock,
     setFault: (next: Fault) => {
@@ -319,10 +362,13 @@ function expectOnlyTenant(
   expect(snapshotTenant(db, OTHER)).toEqual(otherBefore);
   expect(db.calls.length).toBeGreaterThan(0);
   for (const call of db.calls) {
-    if (call.method === "GET" || call.method === "PATCH")
-      expect(call.params.get("user_id"), `${call.method} ${call.table}`).toBe(
-        `eq.${TENANT}`
-      );
+    if (call.method === "GET" || call.method === "PATCH") {
+      // O helper geral também procura irmãs contraditórias pelo contrato, sem
+      // ocultá-las com filtro owner; segue conferindo owner de TODA resposta.
+      if (call.table === "parcelas" && call.params.get("select") === "id,user_id,contrato_id,cliente_id" && !call.params.has("id"))
+        expect(call.params.get("contrato_id")).toBe(`eq.${TENANT * 10 + 2}`);
+      else expect(call.params.get("user_id"), `${call.method} ${call.table}`).toBe(`eq.${TENANT}`);
+    }
     if (call.body?.user_id !== undefined)
       expect(call.body.user_id).toBe(TENANT);
     for (const row of call.affected) {
@@ -330,6 +376,10 @@ function expectOnlyTenant(
         expect(row.outbox_id).toBe(outboxId(TENANT, 1));
       else expect(row.user_id, `${call.method} ${call.table}`).toBe(TENANT);
     }
+  }
+  for (const call of db.rpcCalls) {
+    expect(call.name).toBe("rpc_estado_obrigacoes51");
+    expect(call.body).toEqual({ p_user_id: TENANT, p_contrato_id: TENANT * 10 + 2 });
   }
   expect(
     db.posts.every(
@@ -350,6 +400,7 @@ describe("WhatsApp — escopo opcional por tenant com SDK real sem rede", () => 
   it("produtor mantém NUMERIC(15,2) máximo textual sem perda por float", async () => {
     const db = database();
     db.tables.parcelas.find(row => row.user_id === TENANT)!.valor_original = "9999999999999.99";
+    db.projections.get(TENANT * 10 + 2)!.parcelas[0].obrigacaoAtual = "9999999999999.99";
     db.tables.whatsapp_outbox = db.tables.whatsapp_outbox.filter(row => row.id !== outboxId(TENANT, 1));
     const r = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
     expect(r.enfileiradas).toBe(1);
@@ -360,6 +411,7 @@ describe("WhatsApp — escopo opcional por tenant com SDK real sem rede", () => 
   it.each(["0.00", "1.001", "1e3", "99999999999999.99", "-1.00"])("valor %s inválido não cria lembrete", async valor => {
     const db = database();
     db.tables.parcelas.find(row => row.user_id === TENANT)!.valor_original = valor;
+    db.projections.get(TENANT * 10 + 2)!.parcelas[0].obrigacaoAtual = valor;
     db.tables.whatsapp_outbox = db.tables.whatsapp_outbox.filter(row => row.id !== outboxId(TENANT, 1));
     const r = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
     expect(r.enfileiradas).toBe(0);
@@ -540,7 +592,7 @@ describe("WhatsApp — escopo opcional por tenant com SDK real sem rede", () => 
     expect(db.tables.whatsapp_outbox).toEqual(before);
     expect(
       db.calls
-        .filter(call => call.table === "parcelas")
+        .filter(call => call.table === "parcelas" && call.params.has("data_vencimento"))
         .map(call => call.params.get("user_id"))
     ).toEqual([`eq.${TENANT}`, `eq.${OTHER}`]);
   });
@@ -987,6 +1039,7 @@ function unpaidDueToday(db: ReturnType<typeof database>, scenario = openReminder
   const parcela = db.tables.parcelas.find(row => row.user_id === TENANT)!;
   parcela.status = "vencendo_hoje";
   parcela.data_vencimento = scenario.vencimento;
+  db.projections.get(TENANT * 10 + 2)!.parcelas[0].statusFinanceiroOriginal = "vencendo_hoje";
   Object.assign(db.tables.notificacoes_automaticas.find(row => row.user_id === TENANT)!, {
     tipo: scenario.tipo, dias_antes: scenario.dias,
   });
@@ -1030,7 +1083,9 @@ describe("WhatsApp — regressão operacional vencendo_hoje unpaid com runtime r
     expect(result.falhas).toBe(0);
     expect(mocks.enviar).toHaveBeenCalledTimes(1);
     expect(db.posts).toHaveLength(1);
-    expect(db.calls.filter(call => call.table === "parcelas" && call.method === "GET")).toHaveLength(2);
+    expect(db.calls.filter(call => call.table === "parcelas" && call.method === "GET" && call.params.get("select") === "id,user_id,status,cliente_id,contrato_id,data_vencimento")).toHaveLength(2);
+    expect(db.calls.filter(call => call.table === "parcelas" && call.params.get("select") === "id,user_id,contrato_id,cliente_id")).toHaveLength(6);
+    expect(db.rpcCalls).toHaveLength(4);
     expect(db.calls.some(call => call.table === "whatsapp_outbox" && call.method === "GET" && call.params.has("lease_expira_em"))).toBe(true);
     expect(db.tables.notificacoes_log.find(row => row.outbox_id === outboxId(TENANT, 1))!.status).toBe("aceito_evolution");
     expect(db.tables.parcelas).toEqual(debtBefore);
@@ -1094,4 +1149,118 @@ describe("WhatsApp — regressão operacional vencendo_hoje unpaid com runtime r
       expectOnlyTenant(db, before);
     }
   );
+});
+
+
+function reminderInput51() {
+  return { userId: TENANT, tipo: "no_vencimento", telefone: phone(TENANT), mensagem: "fixture51",
+    chaveDeduplicacao: `lembrete:${TENANT}:${TENANT * 10 + 3}:no_vencimento:${DAY}`,
+    dataReferencia: DAY, parcelaId: TENANT * 10 + 3, clienteId: TENANT * 10 + 1 };
+}
+
+function closeProjection51(db: ReturnType<typeof database>, state: string) {
+  const proof = db.projections.get(TENANT * 10 + 2)!;
+  if (state === "arquivo-contrato") { proof.arquivado = true; proof.parcelas[0].arquivada = true; }
+  else if (state === "arquivo-parcela") proof.parcelas[0].arquivada = true;
+  else {
+    proof.statusObrigacao = state === "paga" ? "quitado" : "encerrado_por_cancelamento";
+    proof.parcelas[0].statusObrigacao = state === "paga" ? "paga" : "cancelada";
+    proof.parcelas[0].obrigacaoAtual = "0.00";
+    if (state === "paga") {
+      proof.parcelas[0].statusFinanceiroOriginal = "paga";
+      db.tables.parcelas.find(row => row.user_id === TENANT)!.status = "paga";
+    }
+  }
+}
+
+describe("Cobrança51 — prova autoritativa com SDK real, sem fallback", () => {
+  it("mensagem usa valor efetivo51 diferente de REST e reconfirma antes de enqueue", async () => {
+    const db = database(), before = snapshotTenant(db, OTHER);
+    db.projections.get(TENANT * 10 + 2)!.parcelas[0].obrigacaoAtual = "40.01";
+    db.tables.whatsapp_outbox = db.tables.whatsapp_outbox.filter(row => row.id !== outboxId(TENANT, 1));
+    const debt = structuredClone(db.tables.parcelas);
+    expect(await enfileirarLembretesAutomaticos(NOW, false, TENANT)).toEqual({ usuariosNoHorario: 1, elegiveis: 1, enfileiradas: 1, falhasItens: 0 });
+    expect(db.tables.whatsapp_outbox.find(row => row.user_id === TENANT && row.status === "pendente")!.mensagem).toContain("40,01");
+    expect(db.rpcCalls).toHaveLength(4);
+    expect(db.tables.parcelas).toEqual(debt);
+    expectOnlyTenant(db, before);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+  });
+  it.each(["cancelada", "paga", "arquivo-contrato", "arquivo-parcela"])("produtor/enqueue/worker não cobram prova51 %s", async state => {
+    const db = database(), before = snapshotTenant(db, OTHER);
+    closeProjection51(db, state);
+    expect((await enfileirarLembretesAutomaticos(NOW, false, TENANT)).enfileiradas).toBe(0);
+    expect(await enfileirarMensagemWhatsApp(reminderInput51())).toEqual({ criada: false, chave: reminderInput51().chaveDeduplicacao });
+    expect(db.calls.some(call => call.table === "whatsapp_outbox" && call.method === "POST")).toBe(false);
+    const worker = await processarFilaWhatsApp(25, false, TENANT);
+    expect(worker.canceladas).toBe(1);
+    expect(worker.enviadas).toBe(0);
+    expect(db.posts).toHaveLength(0);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+    expectOnlyTenant(db, before);
+  });
+  it.each(["cancelada", "paga", "arquivo-contrato", "arquivo-parcela"])("pré-envio revalida estado51 %s após reserva", async state => {
+    const db = database(), before = snapshotTenant(db, OTHER);
+    mocks.enviar.mockImplementation(async (_u, _t, _m, guard) => {
+      closeProjection51(db, state);
+      expect(await guard()).toBe(false);
+      return { ok: false, disposition: "nao_solicitado", erroCodigo: "GUARD" };
+    });
+    const worker = await processarFilaWhatsApp(25, false, TENANT);
+    expect(worker.canceladas).toBe(1);
+    expect(worker.enviadas).toBe(0);
+    expect(mocks.enviar).toHaveBeenCalledTimes(1);
+    expect(db.posts).toHaveLength(0);
+    expectOnlyTenant(db, before);
+  });
+  it("RPC51 ausente bloqueia produtor/enqueue/worker; nunca usa valor REST ou reenvia", async () => {
+    const db = database(), before = snapshotTenant(db, OTHER);
+    db.setRpcUnavailable();
+    expect(await enfileirarLembretesAutomaticos(NOW, false, TENANT)).toEqual({ usuariosNoHorario: 1, elegiveis: 0, enfileiradas: 0, falhasItens: 1 });
+    await expect(enfileirarMensagemWhatsApp(reminderInput51())).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
+    const first = await processarFilaWhatsApp(25, false, TENANT);
+    expect(first.enviadas).toBe(0);
+    expect(first.ambiguas).toBe(2); // lease antigo + revalidação sem confirmação
+    expect((await processarFilaWhatsApp(25, false, TENANT)).processadas).toBe(0);
+    expect(db.posts).toHaveLength(0);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+    expect(db.calls.some(call => call.table === "whatsapp_outbox" && call.method === "POST")).toBe(false);
+    expectOnlyTenant(db, before);
+  });
+  it.each(["owner", "contrato", "ausente", "duplicada", "valor", "mudanca"])("RPC51 contraditória %s não enfileira", async source => {
+    const db = database();
+    db.setRpcFault((proof, index) => {
+      if (source === "owner") proof.userId = OTHER;
+      if (source === "contrato") proof.contratoId = OTHER * 10 + 2;
+      if (source === "ausente") proof.parcelas = [];
+      if (source === "duplicada") proof.parcelas.push({ ...proof.parcelas[0] });
+      if (source === "valor") proof.parcelas[0].obrigacaoAtual = "1e3";
+      if (source === "mudanca" && index === 2) proof.parcelas[0].obrigacaoAtual = "149.00";
+      return proof;
+    });
+    expect((await enfileirarLembretesAutomaticos(NOW, false, TENANT)).falhasItens).toBe(1);
+    expect(db.calls.some(call => call.table === "whatsapp_outbox" && call.method === "POST")).toBe(false);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+  });
+  it.each(["cancelado", "quitado", "renovado", "renegociado", "encerrado", "desconhecido"])("produtor/worker bloqueiam contrato original %s mesmo com prova51 aberta", async status => {
+    const db = database(), before = snapshotTenant(db, OTHER);
+    db.tables.contratos.find(row => row.user_id === TENANT)!.status = status;
+    db.tables.whatsapp_outbox = db.tables.whatsapp_outbox.filter(row => row.id !== outboxId(TENANT, 1));
+    const producer = await enfileirarLembretesAutomaticos(NOW, false, TENANT);
+    expect(producer.enfileiradas).toBe(0);
+    expect(producer.elegiveis).toBe(0);
+    // Reintroduz apenas candidata já existente para testar barreira no worker.
+    const pending = seed().whatsapp_outbox.find(row => row.id === outboxId(TENANT, 1))!;
+    db.tables.whatsapp_outbox.push(pending);
+    expect((await processarFilaWhatsApp(25, false, TENANT)).canceladas).toBe(1);
+    expect(db.posts).toHaveLength(0);
+    expect(mocks.enviar).not.toHaveBeenCalled();
+    expectOnlyTenant(db, before);
+  });
+  it("produtor mantém contrato inadimplente legítimo elegível", async () => {
+    const db = database();
+    db.tables.contratos.find(row => row.user_id === TENANT)!.status = "inadimplente";
+    expect((await enfileirarLembretesAutomaticos(NOW, true, TENANT)).elegiveis).toBe(1);
+    expect((await processarFilaWhatsApp(25, false, TENANT)).enviadas).toBe(1);
+  });
 });

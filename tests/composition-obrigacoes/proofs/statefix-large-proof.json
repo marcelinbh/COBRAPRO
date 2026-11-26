@@ -1,0 +1,4106 @@
+{
+  "userId": 1,
+  "versao": "obrigacoes51_v1",
+  "parcelas": [
+    {
+      "arquivada": false,
+      "parcelaId": 956001,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956002,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956003,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956004,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956005,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956006,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956007,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956008,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956009,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956010,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956011,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956012,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956013,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956014,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956015,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956016,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956017,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956018,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956019,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956020,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956021,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956022,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956023,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956024,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956025,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956026,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956027,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956028,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956029,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956030,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956031,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956032,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956033,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956034,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956035,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956036,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956037,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956038,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956039,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956040,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956041,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956042,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956043,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956044,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956045,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956046,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956047,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956048,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956049,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956050,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956051,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956052,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956053,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956054,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956055,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956056,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956057,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956058,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956059,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956060,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956061,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956062,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956063,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956064,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956065,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956066,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956067,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956068,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956069,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956070,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956071,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956072,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956073,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956074,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956075,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956076,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956077,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956078,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956079,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956080,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956081,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956082,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956083,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956084,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956085,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956086,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956087,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956088,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956089,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956090,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956091,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956092,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956093,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956094,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956095,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956096,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956097,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956098,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956099,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956100,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956101,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956102,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956103,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956104,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956105,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956106,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956107,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956108,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956109,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956110,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956111,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956112,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956113,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956114,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956115,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956116,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956117,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956118,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956119,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956120,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956121,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956122,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956123,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956124,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956125,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956126,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956127,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956128,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956129,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956130,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956131,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956132,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956133,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956134,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956135,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956136,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956137,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956138,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956139,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956140,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956141,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956142,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956143,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956144,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956145,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956146,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956147,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956148,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956149,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956150,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956151,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956152,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956153,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956154,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956155,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956156,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956157,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956158,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956159,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956160,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956161,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956162,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956163,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956164,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956165,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956166,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956167,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956168,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956169,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956170,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956171,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956172,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956173,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956174,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956175,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956176,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956177,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956178,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956179,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956180,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956181,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956182,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956183,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956184,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956185,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956186,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956187,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956188,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956189,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956190,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956191,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956192,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956193,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956194,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956195,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956196,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956197,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956198,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956199,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956200,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956201,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956202,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956203,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956204,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956205,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956206,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956207,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956208,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956209,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956210,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956211,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956212,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956213,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956214,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956215,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956216,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956217,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956218,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956219,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956220,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956221,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956222,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956223,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956224,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956225,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956226,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956227,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956228,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956229,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956230,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956231,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956232,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956233,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956234,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956235,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956236,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956237,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956238,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956239,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956240,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956241,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956242,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956243,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956244,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956245,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956246,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956247,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956248,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956249,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956250,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956251,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956252,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956253,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956254,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956255,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956256,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956257,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956258,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956259,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956260,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956261,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956262,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956263,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956264,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956265,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956266,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956267,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956268,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956269,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956270,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956271,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956272,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956273,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956274,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956275,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956276,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956277,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956278,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956279,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956280,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956281,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956282,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956283,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956284,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956285,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956286,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956287,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956288,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956289,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956290,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956291,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956292,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956293,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956294,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956295,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956296,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956297,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956298,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956299,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956300,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956301,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956302,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956303,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956304,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956305,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956306,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956307,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956308,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956309,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956310,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956311,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956312,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956313,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956314,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956315,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956316,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956317,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956318,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956319,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956320,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956321,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956322,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956323,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956324,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956325,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956326,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956327,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956328,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956329,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956330,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956331,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956332,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956333,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956334,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956335,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956336,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956337,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956338,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956339,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956340,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956341,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956342,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956343,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956344,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956345,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956346,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956347,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956348,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956349,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956350,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956351,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956352,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956353,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956354,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956355,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956356,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956357,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956358,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956359,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956360,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956361,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956362,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956363,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956364,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956365,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956366,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956367,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956368,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956369,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956370,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956371,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956372,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956373,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956374,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956375,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956376,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956377,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956378,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956379,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956380,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956381,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956382,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956383,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956384,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956385,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956386,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956387,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956388,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956389,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956390,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956391,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956392,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956393,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956394,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956395,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956396,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956397,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956398,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956399,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956400,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956401,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956402,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956403,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956404,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956405,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956406,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956407,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956408,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956409,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956410,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956411,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956412,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956413,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956414,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956415,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956416,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956417,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956418,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956419,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956420,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956421,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956422,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956423,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956424,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956425,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956426,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956427,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956428,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956429,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956430,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956431,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956432,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956433,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956434,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956435,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956436,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956437,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956438,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956439,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956440,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956441,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956442,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956443,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956444,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956445,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956446,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956447,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956448,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956449,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956450,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956451,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956452,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956453,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956454,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956455,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956456,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956457,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956458,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956459,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956460,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956461,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956462,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956463,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956464,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956465,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956466,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956467,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956468,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956469,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956470,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956471,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956472,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956473,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956474,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956475,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956476,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956477,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956478,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956479,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956480,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956481,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956482,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956483,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956484,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956485,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956486,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956487,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956488,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956489,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956490,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956491,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956492,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956493,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956494,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956495,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956496,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956497,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956498,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956499,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956500,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956501,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956502,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956503,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956504,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956505,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956506,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956507,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956508,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956509,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956510,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956511,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    },
+    {
+      "arquivada": false,
+      "parcelaId": 956512,
+      "obrigacaoAtual": "1.00",
+      "statusObrigacao": "aberta",
+      "componenteAdicional": "0.00",
+      "statusFinanceiroOriginal": "pendente"
+    }
+  ],
+  "arquivado": false,
+  "contratoId": 956,
+  "statusObrigacao": "ativo",
+  "obrigacaoAdicional": "0.00"
+}
