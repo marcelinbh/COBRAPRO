@@ -4,14 +4,14 @@ import {Button} from '@/components/ui/button';
 import {Input} from '@/components/ui/input';
 import {RecebimentoValidado} from '@/components/RecebimentoValidado';
 import {conferirCotacao47,intencao47DaCotacao,type Reparcelamento47Cotacao,type Reparcelamento47Resultado} from '../../../shared/reparcelamento47';
-import {enviarIntencao47,recuperarIntencao47,lerIntencao47} from '../../../shared/reparcelamento47Fluxo';
+import {enviarIntencao47,recuperarIntencao47,lerIntencao47,lerUltimoResultado47} from '../../../shared/reparcelamento47Fluxo';
 export function ReparcelamentoAtual47({owner,permitido=true}:{owner:number;permitido?:boolean}){
  const [contrato,setContrato]=useState(''),[n,setN]=useState('3'),[taxa,setTaxa]=useState('5.00'),[data,setData]=useState('');
  const [q,setQ]=useState<Reparcelamento47Cotacao>(),[result,setResult]=useState<Reparcelamento47Resultado>(),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const [pending,setPending]=useState<ReturnType<typeof lerIntencao47>>(null);
  const session=useRef(crypto.randomUUID()),identity=useRef(owner),mounted=useRef(true),sending=useRef(false),generation=useRef(0),permission=useRef(permitido);permission.current=permitido;
  if(identity.current!==owner){identity.current=owner;generation.current++;}
- useEffect(()=>{mounted.current=true;try{setPending(lerIntencao47(localStorage,owner));}catch{setError('Journal47 inválido; preservar para conferência.');}return()=>{mounted.current=false;generation.current++;};},[owner]);
+ useEffect(()=>{mounted.current=true;try{const journal=lerIntencao47(localStorage,owner);setPending(journal);setResult(journal?undefined:lerUltimoResultado47(localStorage,owner)??undefined);}catch{setResult(undefined);setError('Journal/recibo47 inválido; preservar para conferência.');}return()=>{mounted.current=false;generation.current++;};},[owner]);
  const input={contratoId:Number(contrato),numeroParcelas:Number(n),taxaJuros:taxa,tipoTaxa:'mensal' as const,dataInicio:data,incluirMultas:false};
  const key=JSON.stringify(input),form=useRef(key);form.current=key;
  useEffect(()=>{setQ(undefined);},[key]);
@@ -30,6 +30,6 @@ export function ReparcelamentoAtual47({owner,permitido=true}:{owner:number;permi
  <fieldset disabled={busy||!permitido} className="grid gap-3"><label>Contrato atual25<Input value={contrato} onChange={e=>setContrato(e.target.value)}/></label><label>Parcelas (1–60)<Input value={n} onChange={e=>setN(e.target.value)}/></label><label>Taxa mensal explícita<Input value={taxa} onChange={e=>setTaxa(e.target.value)}/></label><label>Primeiro vencimento<Input type="date" value={data} onChange={e=>setData(e.target.value)}/></label><Button disabled={!!error} onClick={()=>void quote()}>Simular e persistir cotação47</Button></fieldset>
  {q&&<div><p>Principal original R$ {q.principalOriginal}; juros líquidos atuais R$ {q.jurosEmbutidos}; saldo R$ {q.saldoDevedor}; juros novos R$ {q.jurosNovos}; total R$ {q.totalNovo}.</p><p>Cotação UUID {q.cotacaoId}; origem25 operação {q.origemOperationId}. Desembolso R$0,00.</p><table><thead><tr><th>Parcela</th><th>Vencimento</th><th>Principal</th><th>Juros</th><th>Valor</th></tr></thead><tbody>{q.parcelas.map(p=><tr key={p.numero}><td>{p.numero}</td><td>{p.vencimento}</td><td>{p.principal}</td><td>{p.juros}</td><td>{p.valor}</td></tr>)}</tbody></table><Button disabled={busy||!!error||!permitido} onClick={()=>void send()}>Confirmar reparcelar47 sem dinheiro recebido</Button><p>Execução depende de flag47 instalada e autorizada. OFF não apaga intenção; recovery continua permitido.</p></div>}
  </>}
- {result&&result.userId===owner&&<div><h3>Sucessor47 #{result.contratoId} confirmado</h3><p>Origem #{result.contratoOrigemId}; sem desembolso. Recebimentos abaixo geram entrada real pelo writer atual25/35, não renovação.</p>{result.parcelasIds.map(id=><RecebimentoValidado key={id} contratoId={result.contratoId} parcelaId={id} permitirRenovacao={false} onSuccess={()=>{}}/>)}</div>}
+ {result&&result.userId===owner&&<div><h3>Sucessor47 #{result.contratoId} confirmado</h3><p>Resultado confirmado desta empresa, preservado localmente; não é consulta atual de saldo/status. Origem #{result.contratoOrigemId}; sem desembolso. Recebimentos abaixo geram entrada real pelo writer atual25/35, não renovação.</p>{result.parcelasIds.map(id=><RecebimentoValidado key={id} contratoId={result.contratoId} parcelaId={id} permitirRenovacao={false} revalidarSessaoAoMontar={false} onSuccess={()=>{}}/>)}</div>}
  </section>;
 }

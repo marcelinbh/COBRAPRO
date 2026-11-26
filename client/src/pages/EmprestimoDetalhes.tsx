@@ -20,6 +20,7 @@ import {
 import { formatarMoeda, formatarData } from '../../../shared/finance';
 import { trpc } from '@/lib/trpc';
 import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
+import { badgeContrato, badgeParcela } from '@/lib/statusEmprestimoBadge';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
 import { ManutencaoJuros48 } from '@/components/ManutencaoJuros48';
@@ -177,6 +178,7 @@ export default function EmprestimoDetalhes() {
   const totalComAtraso = emprestimo.parcelasComAtraso?.[0]?.totalComAtraso ?? 0;
   const isAtrasado = diasAtraso > 0;
   const isQuitado = emprestimo.status === 'quitado';
+  const statusBadge = badgeContrato(emprestimo.status, isAtrasado);
   const parcela = emprestimo.todasParcelas?.find((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)) ?? emprestimo.todasParcelas?.find((p: any) => ['paga', 'pago'].includes(p.status));
   const atualizarFinanceiro = () => {
     void refetch();
@@ -277,8 +279,8 @@ export default function EmprestimoDetalhes() {
             <p className="text-sm text-muted-foreground mt-1">{emprestimo.modalidade}</p>
           </div>
         </div>
-        <Badge variant={isQuitado ? 'secondary' : isAtrasado ? 'destructive' : 'default'}>
-          {isQuitado ? 'QUITADO' : isAtrasado ? 'ATRASADO' : 'EM DIA'}
+        <Badge variant={statusBadge.variant}>
+          {statusBadge.label}
         </Badge>
       </div>
 
@@ -292,7 +294,7 @@ export default function EmprestimoDetalhes() {
         <div className="p-6 rounded-lg bg-gradient-to-br from-orange-500/10 to-yellow-500/10 border border-orange-500/20">
           <p className="text-sm text-muted-foreground mb-2">Juros por Atraso</p>
           <p className="text-4xl font-bold text-orange-400 mb-1">{isAtrasado ? formatarMoeda(jurosAtraso) : 'R$ 0,00'}</p>
-          <p className="text-xs text-muted-foreground">{isAtrasado ? `${diasAtraso} dias de atraso` : 'Em dia'}</p>
+          <p className="text-xs text-muted-foreground">{emprestimo.status !== 'ativo' ? statusBadge.label : isAtrasado ? `${diasAtraso} dias de atraso` : 'Em dia'}</p>
         </div>
       </div>
 
@@ -445,8 +447,8 @@ export default function EmprestimoDetalhes() {
                               />
                             </td>
                             <td className="px-3 py-2 text-center">
-                              <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
-                                {p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
+                              <Badge variant={badgeParcela(p.status, emprestimo.status).variant}>
+                                {badgeParcela(p.status, emprestimo.status).label}
                               </Badge>
                             </td>
                             <td className="px-3 py-2 text-center">{/* Pagar - modo edição */}</td>
@@ -480,8 +482,8 @@ export default function EmprestimoDetalhes() {
                             <td className="px-3 py-2 text-foreground">{formatarData(p.data_vencimento)}</td>
                             <td className="px-3 py-2 text-right text-foreground">{formatarMoeda(p.valor_original)}</td>
                             <td className="px-3 py-2 text-center">
-                              <Badge variant={p.status === 'paga' ? 'default' : p.status === 'atrasada' ? 'destructive' : 'secondary'}>
-                                {p.status === 'renovada' ? 'Renovada: principal transferido' : p.status === 'parcial' ? 'Parcial' : ['cancelada', 'cancelado'].includes(p.status) ? 'Cancelada' : ['paga', 'pago'].includes(p.status) ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}
+                              <Badge variant={badgeParcela(p.status, emprestimo.status).variant}>
+                                {badgeParcela(p.status, emprestimo.status).label}
                               </Badge>
                             </td>
                             <td className="px-3 py-2 text-center">

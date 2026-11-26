@@ -878,7 +878,9 @@ const clientesRouter = router({
 import { clienteCreateInput, clienteUpdateInput, clienteCorrespondeBusca } from '../shared/clientesInput';
 // ─── CONTRATOS ────────────────────────────────────────────────────────────────
 import { apresentarEmprestimo } from './services/emprestimosApresentacao';
+import { listaSeguraEmprestimosProcedure } from './routers/emprestimosListaSegura';
 const contratosRouter = router({
+  listLeituraSegura: listaSeguraEmprestimosProcedure,
   // Lista contratos com dados agregados das parcelas para os cards de Empréstimos
   listComParcelas: protectedProcedure
     .input(z.object({

@@ -21,10 +21,13 @@ import {
 import { formatarMoeda, formatarData } from "../../../shared/finance";
 import { gerarComprovantePDF } from "@/lib/gerarComprovante";
 import { avisoDePendenciasPosPagamento } from "@/lib/pagamentoConfirmado";
+import { badgeContrato } from "@/lib/statusEmprestimoBadge";
 import { useLocation } from "wouter";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
 import { EmprestimoDetalhesModal } from "@/components/EmprestimoDetalhesModal";
 import { DeleteEmprestimoDialog } from "@/components/DeleteEmprestimoDialog";
+import { EmprestimosListaSeguraFallback } from "@/components/EmprestimosListaSeguraFallback";
+import { deveUsarListaSegura } from "../../../shared/emprestimosListaSegura";
 
 type EmprestimoCard = {
   id: number;
@@ -1615,6 +1618,8 @@ function EmprestimoCardCobra({
   const jurosAtraso = parcelaComAtraso?.jurosAtraso ?? 0;
   const totalComAtraso = parcelaComAtraso?.totalComAtraso ?? 0;
 
+  const statusBadge = badgeContrato(emp.status, diasAtraso > 0);
+
   const initials = emp.clienteNome.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   const colors = ['bg-red-500', 'bg-blue-500', 'bg-purple-500', 'bg-pink-500', 'bg-orange-500'];
   const bgColor = colors[emp.clienteId % colors.length];
@@ -1696,8 +1701,8 @@ function EmprestimoCardCobra({
                 {initials}
               </div>
               <div className="flex flex-col gap-0.5">
-                <span className={`text-xs font-semibold ${diasAtraso > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
-                  {diasAtraso > 0 ? 'Atrasado' : 'Em Dia'}
+                <span className={`text-xs font-semibold ${statusBadge.variant === 'destructive' ? 'text-red-400' : statusBadge.variant === 'default' ? 'text-emerald-400' : 'text-muted-foreground'}`}>
+                  {statusBadge.label}
                 </span>
                 <Badge className={`text-[10px] px-1.5 py-0 h-4 ${emp.tipoTaxa === 'quinzenal' ? 'bg-cyan-700' : emp.tipoTaxa === 'semanal' ? 'bg-purple-700' : emp.tipoTaxa === 'diaria' ? 'bg-orange-700' : emp.tipoTaxa === 'diario' ? 'bg-orange-700' : 'bg-blue-700'} text-white border-0`}>
                   {emp.tipoTaxa?.toUpperCase()}
@@ -2184,7 +2189,7 @@ export default function Emprestimos() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  const { data: emprestimos, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery();
+  const { data: emprestimos, error: erroLista, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery();
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: koletores } = trpc.cobradores.list.useQuery();
   const { data: recebimentosData, isLoading: loadingRecebimentos } = trpc.whatsapp.recebimentos.useQuery(
@@ -2284,6 +2289,10 @@ export default function Emprestimos() {
   const emDia = (emprestimos?.length ?? 0) - atrasados;
   const capitalNaRua = emprestimos?.reduce((s, e) => s + parseFloat(e.valorPrincipal), 0) ?? 0;
   const totalReceber = emprestimos?.reduce((s, e) => s + e.totalReceber, 0) ?? 0;
+
+  // Fallback separado: não mistura dados/totais parciais com cards ou ações estritos.
+  if (isError && deveUsarListaSegura(erroLista)) return <EmprestimosListaSeguraFallback
+    onRetryStrict={() => { void refetch(); }} isRetryingStrict={isFetching} />;
 
   // isLoading exclui pending/paused. Ausência de resposta e vazio em refetch não confirmam ausência de registros.
   const leituraEmAndamento = isLoading || isPending || (!isError && (!emprestimos || (isFetching && emprestimos.length === 0)));

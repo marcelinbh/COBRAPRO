@@ -8,10 +8,11 @@ import { ParcelaLegadaReceber } from "./ParcelaLegadaReceber";
 import { EmprestimoMultimodalReceber, EmprestimoMultimodalRenovar } from "./EmprestimoMultimodalOperacoes";
 import { MultaManualReceber, MultaManualRenovar } from "./MultaManualOperacoes";
 
-export function RecebimentoValidado({ contratoId, parcelaId, onSuccess, permitirRenovacao = false }: {
-  contratoId: number; parcelaId: number; onSuccess: () => void; permitirRenovacao?: boolean;
+export function RecebimentoValidado({ contratoId, parcelaId, onSuccess, permitirRenovacao = false, revalidarSessaoAoMontar = true }: {
+  contratoId: number; parcelaId: number; onSuccess: () => void; permitirRenovacao?: boolean; revalidarSessaoAoMontar?: boolean;
 }) {
-  const auth = trpc.auth.me.useQuery();
+  // A página47 já revalida a sessão; evitar refetch circular ao remontar seu resultado local.
+  const auth = trpc.auth.me.useQuery(undefined, { refetchOnMount: revalidarSessaoAoMontar });
   const user = !auth.isError && !auth.isLoading && !auth.isFetching ? auth.data : undefined;
   const scope = `${user?.id ?? 0}:${contratoId}:${parcelaId}`;
   const currentScope = useRef(scope);
