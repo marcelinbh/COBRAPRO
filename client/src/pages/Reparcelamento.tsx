@@ -1,5 +1,7 @@
 import { useEffect,useRef,useState } from 'react';
 import { trpc } from '@/lib/trpc';
+import { useSearch } from 'wouter';
+import { contratoReparcelamentoDaBusca } from '@/lib/legacyFinanceNavigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
@@ -12,6 +14,7 @@ import {lerIntencao43} from '../../../shared/reparcelamento43Intencao';
 import {enviarIntencao43,recuperarIntencao43} from '../../../shared/reparcelamento43Fluxo';
 
 export default function Reparcelamento() {
+  const contratoInicial = contratoReparcelamentoDaBusca(useSearch());
   const auth=trpc.auth.me.useQuery(undefined,{retry:false,refetchOnWindowFocus:true});
   const owner=!auth.isError&&!auth.isLoading&&!auth.isFetching ? auth.data?.id : undefined;
   const identity=useRef(owner),epoch=useRef(0),mounted=useRef(true);
@@ -76,7 +79,7 @@ export default function Reparcelamento() {
   if(!visible)return <main className="p-6"><p>Conferindo sessão da empresa atual...</p></main>;
   return <main className="p-6 space-y-5 max-w-4xl">
     <h1 className="text-2xl font-semibold">Reparcelamento</h1>
-    <ReparcelamentoAtual47 key={owner} owner={owner!} permitido={!pending}/>
+    <ReparcelamentoAtual47 key={`${owner}:${contratoInicial ?? ""}`} owner={owner!} permitido={!pending} contratoInicial={contratoInicial}/>
     <h2 className="text-xl font-semibold">Legado43 — fluxo separado</h2>
     <p>O fluxo43 permanece restrito ao legado inteiramente aberto; nenhum fallback atual25 para origem21 ou43.</p>
     {erro&&<div role="alert"><p>{erro}</p>{!pending&&<Button variant="outline" disabled={busy} onClick={()=>setErro('')}>Voltar à conferência</Button>}</div>}

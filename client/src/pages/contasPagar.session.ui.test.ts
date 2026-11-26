@@ -293,7 +293,7 @@ describe('ContasPagar: isolamento local entre sessões, interação sem navegado
     response.resolve(confirmation(old, 'pagar', original)); await ui.flush();
     expect(ui.text()).not.toContain('Operação confirmada, mas intenção'); expect(h.error).not.toHaveBeenCalled(); expect(data.has(storeKey(old, 'pagar'))).toBe(true);
     h.create.mockImplementationOnce(async input => confirmation(old + 1, 'criar', input)); await ui.click('Criar despesa atômica');
-    expect(h.success).toHaveBeenCalledOnce(); expect(h.invalidate).toHaveBeenCalledTimes(5); expect(ui.dialog('Nova despesa avulsa').props.open).toBe(false);
+    expect(h.success).toHaveBeenCalledOnce(); expect(h.invalidate).toHaveBeenCalledTimes(8); expect(ui.dialog('Nova despesa avulsa').props.open).toBe(false);
     expect(data.has(storeKey(old + 1, 'criar'))).toBe(false); expectFresh();
   });
 

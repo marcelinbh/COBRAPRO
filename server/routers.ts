@@ -3504,46 +3504,7 @@ const contasPagarRouter = router({
       return { success: true };
     }),
 
-  sincronizarCaixa: protectedProcedure.mutation(async ({ ctx }) => {
-    // A antiga rotina criava saídas ao abrir telas e podia alterar o livro-caixa
-    // sem revisão do operador. Ela permanece bloqueada até ser substituída por
-    // uma reconciliação que apresente divergências antes de qualquer correção.
-    if (process.env.ENABLE_LEGACY_CASH_SYNC === 'true') {
-      // Mantido apenas para recuperação controlada de instalações legadas.
-      // Não configurar em produção: o fluxo abaixo não apresenta prévia.
-    } else {
-      throw new TRPCError({
-        code: 'PRECONDITION_FAILED',
-        message: 'A sincronização automática do caixa foi desativada. Use apenas a conferência financeira revisada.',
-      });
-    }
-
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-    const { data: pagas, error: contasErro } = await supabase.from('contas_pagar')
-      .select('id, valor, descricao, conta_caixa_id, data_pagamento')
-      .eq('user_id', ctx.user.id).in('status', ['paga', 'pago']).not('conta_caixa_id', 'is', null);
-    if (contasErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: contasErro.message });
-
-    let corrigidas = 0;
-    for (const conta of pagas ?? []) {
-      const descricao = descricaoPagamentoConta(conta.id, conta.descricao);
-      const descricaoLegada = `Pagamento: ${conta.descricao}`;
-      const { data: existente, error: existenteErro } = await supabase.from('transacoes_caixa')
-        .select('id').eq('user_id', ctx.user.id).eq('conta_caixa_id', conta.conta_caixa_id)
-        .eq('tipo', 'saida').eq('categoria', 'despesa_operacional').in('descricao', [descricao, descricaoLegada]).limit(1).maybeSingle();
-      if (existenteErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: existenteErro.message });
-      if (!existente) {
-        const { error: inserirErro } = await supabase.from('transacoes_caixa').insert({
-          conta_caixa_id: conta.conta_caixa_id, tipo: 'saida', categoria: 'despesa_operacional', valor: conta.valor,
-          descricao, data_transacao: conta.data_pagamento ?? new Date().toISOString(), user_id: ctx.user.id,
-        });
-        if (inserirErro) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: inserirErro.message });
-        corrigidas++;
-      }
-    }
-    return { success: true, corrigidas };
-  }),
+  // Sync retirado: baixa atômica já produz sua perna; consulta nunca fabrica ledger.
 
   excluir: protectedProcedure
     .input(z.object({ id: z.number() }))

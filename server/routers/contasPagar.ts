@@ -10,6 +10,7 @@ import { financialIntentRecoveryInput } from "../../shared/financialIntentRecove
 import { reconcileFinancialIntent } from "../services/financialIntentRecovery";
 import { cancelamentoPendenteInput } from "../../shared/despesaCancelamentoPendente";
 import { executarCancelamentoPendente, capacidadesCancelamento } from "../services/despesaCancelamentoPendente";
+import { conferirDespesasCaixa } from "../services/conferenciaDespesasCaixa";
 
 const expenseColumns = 'id, descricao, categoria, valor::text, data_vencimento, data_pagamento, status, recorrente, frequencia, conta_caixa_id, observacoes, user_id, createdAt, updatedAt';
 const ledgerColumns = 'id::text, conta_caixa_id, tipo, categoria, descricao, valor::text, data_transacao, contrato_id, parcela_id, createdAt, user_id';
@@ -219,6 +220,8 @@ export const contasPagarRouter = router({
   }),
   recuperarCancelamentoPendente: protectedProcedure.input(cancelamentoPendenteInput).mutation(async ({ ctx, input }) =>
     executarCancelamentoPendente(await fonte(), ctx.user.id, input, true)),
-  editar: rejeitar, update: rejeitar, cancelar: rejeitar, excluir: rejeitar, recorrencia: rejeitar, sincronizarCaixa: rejeitar,
+  conferirCaixa: protectedProcedure.input(z.object({ leituraId: z.string().uuid(), contaCaixaId: z.number().int().positive().max(2147483647).optional() }).strict()).query(async ({ ctx, input }) =>
+    conferirDespesasCaixa(await fonte(), ctx.user.id, input.contaCaixaId)),
+  editar: rejeitar, update: rejeitar, cancelar: rejeitar, excluir: rejeitar, recorrencia: rejeitar,
 });
 export type ContasPagarRouter = typeof contasPagarRouter;

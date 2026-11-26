@@ -46,9 +46,10 @@ vi.mock("@/components/Caixa37Operacoes", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("@/lib/trpc", () => ({ trpc: {
-  useUtils: () => ({ caixa: {
+  useUtils: () => ({ contasPagar: { conferirCaixa: { invalidate: vi.fn() } }, caixa: {
     contas: { invalidate: mocks.invalidateContas }, transacoes: { invalidate: mocks.invalidateTransacoes }, contasParaOperacao37: { invalidate: vi.fn() }, conferencia: { invalidate: vi.fn() },
   } }),
+  contasPagar: { conferirCaixa: { useQuery: () => ({ data: undefined, isError: false, error: null, isFetching: false, refetch: vi.fn() }) } },
   auth: { me: { useQuery: () => mocks.auth } },
   caixa: {
     consultarObservacao45: { useQuery: () => ({ data: undefined, isError: false, error: null, isFetching: false, refetch: vi.fn() }) },

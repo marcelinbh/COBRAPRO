@@ -56,7 +56,7 @@ describe('router real e adapter isolado, mocks SOMENTE de transporte', () => {
     c.rpcIsolated.mockResolvedValueOnce({ data: { success: true }, error: null }); await expect(executarCancelamentoPendente(c, 1, input)).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
     c.rpcIsolated.mockResolvedValueOnce({ data: null, error: { code: 'PGRST106' } }); await expect(executarCancelamentoPendente(c, 1, input)).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' }); expect(c.from).not.toHaveBeenCalled();
   });
-  it.each(['editar', 'update', 'cancelar', 'excluir', 'recorrencia', 'sincronizarCaixa'] as const)('entrada genérica %s continua bloqueada', async action => { await expect(caller()[action]({ id: 18 })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' }); expect(h.source).not.toHaveBeenCalled(); });
+  it.each(['editar', 'update', 'cancelar', 'excluir', 'recorrencia'] as const)('entrada genérica %s continua bloqueada', async action => { await expect(caller()[action]({ id: 18 })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' }); expect(h.source).not.toHaveBeenCalled(); });
 });
 describe('closure terminal com prova e CAS, sem reset/DELETE',()=>{
   const fenced=()=>({...proof('not_executed'),fence:{fenceId:'44444444-4444-4444-8444-444444444444',instante:result.instante}});

@@ -90,7 +90,7 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
     expect(html).not.toContain("loans.manageLoans");
     expect(h.mutate).not.toHaveBeenCalled();
   });
-  it.each(["t('loans.pay')", "Receber / renovar", "t('loans.details')", "t('loanDetails.editLoan')", "Aplicar Multa"])("handler real %s abre a ficha de origem e não executa mutação antiga", fragment => {
+  it.each(["Receber / conferir", "Receber / renovar", "t('loans.details')", "Alterar juros, valores ou vencimentos", "Aplicar Multa"])("handler real %s abre a ficha de origem e não executa mutação antiga", fragment => {
     clickCardButton(fragment);
     expect(h.navigate).toHaveBeenCalledWith("/emprestimos/31"); expect(h.mutate).not.toHaveBeenCalled();
     expect(h.legacyFineModal).not.toHaveBeenCalled();

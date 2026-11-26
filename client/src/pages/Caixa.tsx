@@ -19,6 +19,7 @@ import { Caixa37Aporte, Caixa37Transferencia, type ContaOpcao37 } from "@/compon
 import { copiarJsonCaixa37, CAIXA37_MAX_ID } from "../../../shared/caixa37";
 import { z } from "zod";
 import { CaixaManutencao45 } from "@/components/CaixaManutencao45";
+import ConferenciaDespesasCaixa from "@/components/ConferenciaDespesasCaixa";
 
 const metadata37Schema = z.object({
   empresaId: z.number().int().positive().max(CAIXA37_MAX_ID),
@@ -152,7 +153,7 @@ function ConferenciaCaixa({ leituraId }: { leituraId: string }) {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="gap-2">
-          <ClipboardCheck className="h-4 w-4" /> Conferir caixa
+          <ClipboardCheck className="h-4 w-4" /> Diagnóstico legado
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto">
@@ -164,7 +165,7 @@ function ConferenciaCaixa({ leituraId }: { leituraId: string }) {
 
         <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-3 text-sm text-blue-100 flex gap-2">
           <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-blue-400" />
-          <span>Esta conferência é somente leitura: ela não cria, edita ou apaga lançamentos. Revise as divergências antes de qualquer ajuste manual.</span>
+          <span>Diagnóstico legado somente leitura. Este leitor não certifica saldo nem vínculo de despesas: usa descrições, pode omitir status pago e dados podem ser limitados. Para despesas por conta use Conferir despesas e caixa; diferenças não autorizam ajuste manual. Parcelas permanecem no diagnóstico legado.</span>
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -294,6 +295,7 @@ export function CaixaEmpresa({ userId, atual }: { userId: number; atual: () => b
     utils.caixa.transacoes.invalidate();
     utils.caixa.contasParaOperacao37.invalidate();
     utils.caixa.conferencia.invalidate();
+    utils.contasPagar.conferirCaixa.invalidate();
   };
 
   return (
@@ -304,6 +306,7 @@ export function CaixaEmpresa({ userId, atual }: { userId: number; atual: () => b
           <p className="text-sm text-muted-foreground mt-1">{t('cashbox.transactions')}</p>
         </div>
         <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+          <ConferenciaDespesasCaixa userId={userId} atual={atual} />
           <ConferenciaCaixa leituraId={leituraId} />
           <CaixaManutencao45 userId={userId} atual={atual} onSuccess={invalidarTudo} />
           <NovaConta onSuccess={invalidarTudo} disabled={!atual()} atual={atual} />

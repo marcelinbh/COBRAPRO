@@ -102,13 +102,13 @@ function CalendarioSessao({ userId, sessionScope, contratoId, onSuccess }: { use
   }
   return <>
     <Button variant="outline" size="sm" onClick={() => setOpen(true)}>Calendário / conferir</Button>
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Calendário mensal auditado</DialogTitle></DialogHeader>
+    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Alterar vencimentos mensais</DialogTitle></DialogHeader>
       <p>Somente contrato mensal integralmente aberto com datas futuras, origem real25 ou21, sem recebimentos, renovação ou multa manual. Não altera valores, juros ou número de parcelas. Não apaga lançamentos.</p>
       {error && <p role="alert">{error}</p>}
       {!ready && !error && <p role="status">Conferindo intenção preservada...</p>}
       {pending ? <div><p>Conferir confirma um commit existente ou impede definitivamente qualquer execução atrasada desta UUID.</p><p className="break-all">UUID: <code>{pending.idempotencyKey}</code></p><p>Agenda preservada: {pending.vencimentos.join(", ")}</p><p>Motivo: {pending.motivo}</p></div> : <>
         {quote.isFetching && <p role="status">Conferindo elegibilidade no banco...</p>}
-        {supported && quote.isError && <p role="alert">Calendário indisponível ou contrato fora do incremento certificado. Nenhuma alteração enviada.</p>}
+        {supported && quote.isError && <p role="alert">Calendário indisponível para este contrato. É necessário um contrato mensal aberto, com datas futuras e sem recebimentos, renovação ou multa manual. Nenhuma alteração enviada.</p>}
         {supported && !quote.isFetching && !quote.isError && quote.data?.parcelasIds.map((id, i) => <label key={id}>Parcela {i + 1}<Input type="date" value={datas[i] ?? ""} disabled={busy || !ready} onChange={e => setDatas(prev => prev.map((d, k) => i === k ? e.target.value : d))} /></label>)}
         {supported && <label>Motivo auditável<Input value={motivo} maxLength={500} disabled={busy || !ready} onChange={e => setMotivo(e.target.value)} /></label>}
       </>}

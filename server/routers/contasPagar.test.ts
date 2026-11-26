@@ -73,7 +73,7 @@ describe('contasPagarRouter RPC exclusiva', () => {
     for (const acao of ['criar', 'pagar', 'estornar'] as const) await expect((caller()[acao] as any)(inputs[acao])).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
     expect(mocked.cliente).not.toHaveBeenCalled();
   });
-  it.each(['editar', 'update', 'cancelar', 'excluir', 'recorrencia', 'sincronizarCaixa'] as const)('%s rejeita claramente sem fallback mesmo com flags antigas', async acao => {
+  it.each(['editar', 'update', 'cancelar', 'excluir', 'recorrencia'] as const)('%s rejeita claramente sem fallback mesmo com flags antigas', async acao => {
     vi.stubEnv('ENABLE_LEGACY_CASH_SYNC', 'true'); await expect((caller()[acao] as any)({ id: 9 })).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: expect.stringContaining('não são suportados') }); expect(mocked.cliente).not.toHaveBeenCalled();
   });
   it('recorrência pública é rejeitada antes da chamada', async () => { await expect(caller().criar({ ...inputs.criar, recorrente: true } as any)).rejects.toMatchObject({ code: 'BAD_REQUEST' }); expect(mocked.cliente).not.toHaveBeenCalled(); });

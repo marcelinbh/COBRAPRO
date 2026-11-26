@@ -9,7 +9,7 @@ import { ChevronLeft, ChevronRight, Calendar, List, LayoutGrid, X, MessageCircle
 import { dataHojeBrasilia, dataVencimentoCivil, formatarData, formatarMoeda } from "../../../shared/finance";
 import { statusCalendarioParcela } from "../../../shared/parcelasCalendar";
 import { useLocation } from "wouter";
-import { toast } from "sonner";
+import { RecebimentoValidado } from "@/components/RecebimentoValidado";
 
 const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -66,13 +66,8 @@ export default function Calendario() {
   const [diaSelecionado, setDiaSelecionado] = useState<number | null>(null);
   const [, navigate] = useLocation();
 
-  const { data: parcelasRaw } = trpc.parcelas.list.useQuery({});
+  const { data: parcelasRaw, refetch } = trpc.parcelas.list.useQuery({});
   const { data: koletores } = (trpc as any).koletores?.list?.useQuery?.() ?? { data: [] };
-  const pagarMutation = (trpc.parcelas as any).pagar?.useMutation ? (trpc.parcelas as any).pagar.useMutation({
-    onSuccess: () => { toast.success(t('toast_success.parcela_paga_com_sucesso')); },
-    onError: () => toast.error(t('toast_error.erro_ao_pagar_parcela')),
-  }) : { mutate: () => {}, isPending: false };
-
   // Filtrar por cobrador
   const parcelas = useMemo(() => {
     if (!parcelasRaw) return [];
@@ -511,14 +506,9 @@ export default function Calendario() {
                         >
                           <MessageCircle className="h-3 w-3" /> WhatsApp
                         </Button>
-                        <Button
-                          size="sm"
-                          className="flex-1 h-6 text-[10px] gap-1 bg-success hover:bg-success/90"
-                          onClick={() => pagarMutation.mutate({ id: p.id, valorPago: parseFloat(p.valorOriginal) })}
-                          disabled={pagarMutation.isPending}
-                        >
-                          <CheckCircle className="h-3 w-3" /> Pagar
-                        </Button>
+                        {Number.isInteger(p.contratoId) && p.contratoId > 0 && Number.isInteger(p.id) && p.id > 0
+                          ? <RecebimentoValidado contratoId={p.contratoId} parcelaId={p.id} permitirRenovacao onSuccess={() => { void refetch(); }} />
+                          : <span role="alert">Parcela sem identificação de contrato válida; atualize a consulta.</span>}
                       </div>
                     )}
                     {p.contratoId && (
@@ -526,7 +516,7 @@ export default function Calendario() {
                         size="sm"
                         variant="link"
                         className="h-5 p-0 text-[10px] text-muted-foreground"
-                        onClick={() => navigate(`/emprestimos?contrato=${p.contratoId}`)}
+                        onClick={() => navigate(`/emprestimos/${p.contratoId}`)}
                       >
                         Ver contrato →
                       </Button>

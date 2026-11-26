@@ -1,31 +1,23 @@
 'use client';
 import { useTranslation } from 'react-i18next';
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useLocation, useParams } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
-} from '@/components/ui/dialog';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
-} from '@/components/ui/select';
-import {
-  MessageCircle, Edit2, AlertTriangle, DollarSign, TrendingUp,
-  Trash2, FileText, Send, ArrowLeft, Download, CheckCircle, Loader2, Pencil, Filter, History, Clock
+  MessageCircle, AlertTriangle,
+  Trash2, FileText, Send, ArrowLeft, Download, Loader2, History, Clock
 } from 'lucide-react';
 import { formatarMoeda, formatarData } from '../../../shared/finance';
 import { trpc } from '@/lib/trpc';
-import { avisoDePendenciasPosPagamento } from '@/lib/pagamentoConfirmado';
 import { badgeContrato, badgeParcela } from '@/lib/statusEmprestimoBadge';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
 import { ManutencaoJuros48 } from '@/components/ManutencaoJuros48';
 import { ManutencaoCalendario } from '@/components/ManutencaoCalendario';
 import { MultaManualAplicar } from '@/components/MultaManualOperacoes';
+import { rotaReparcelamentoAtual } from '@/lib/legacyFinanceNavigation';
 
 // Calendário46 posterior à manutenção48 preserva valores atuais, somente após prova fechada criação25→46/48.
 export default function EmprestimoDetalhes() {
@@ -35,103 +27,18 @@ export default function EmprestimoDetalhes() {
   const { id } = useParams<{ id: string }>();
   const emprestimoId = parseInt(id || '0');
 
-  // Estado dos modais de ação
-  const [modalPagar, setModalPagar] = useState(false);
-  const [modalPagarJuros, setModalPagarJuros] = useState(false);
-  const [modalEditarJuros, setModalEditarJuros] = useState(false);
   const [modalDeletar, setModalDeletar] = useState(false);
-
-  // Campos dos modais
-  const [contaCaixaId, setContaCaixaId] = useState('');
-  const [valorCustomPagar, setValorCustomPagar] = useState('');
-  const [valorCustomJuros, setValorCustomJuros] = useState('');
-  const [novaTaxa, setNovaTaxa] = useState('');
   const [loadingWpp, setLoadingWpp] = useState(false);
-  const [gerandoPDF, setGerandoPDF] = useState(false);
-  const [pagamentoRealizado, setPagamentoRealizado] = useState<{ valorPago: number; parcelaNum: number } | null>(null);
-
-  // Estado para editar parcela individualmente
-  const [parcelaEditando, setParcelaEditando] = useState<{ id: number; valor: string; data: string } | null>(null);
-  // Estado para pagar parcela individual
-  const [parcelaPagando, setParcelaPagando] = useState<{ id: number; numero: number; valor: number } | null>(null);
-  const [valorPagIndividual, setValorPagIndividual] = useState('');
-  const [contaPagIndividual, setContaPagIndividual] = useState('');
+  const [gerandoPDF] = useState(false);
   const [filtroStatus, setFiltroStatus] = useState<'todas' | 'pendente' | 'paga' | 'atrasada'>('todas');
-  // Estado para criar nova parcela
-  const [showNovaParcela, setShowNovaParcela] = useState(false);
-  const [novaParcelaData, setNovaParcelaData] = useState('');
-  const [novaParcelaValor, setNovaParcelaValor] = useState('');
-  // Estado para pagamento com data/juros customizados
-  const [dataPagamentoCustom, setDataPagamentoCustom] = useState('');
-  const [jurosCustomDetalhes, setJurosCustomDetalhes] = useState('');
-  const [idempotencyKeyPagamento, setIdempotencyKeyPagamento] = useState('');
-  const [idempotencyKeyJuros, setIdempotencyKeyJuros] = useState('');
-  const [idempotencyKeyParcela, setIdempotencyKeyParcela] = useState('');
 
   const utils = trpc.useUtils();
-  const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: config } = trpc.configuracoes.get.useQuery();
 
   const { data: emprestimo, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.obterDetalhes.useQuery(
     { id: emprestimoId },
     { enabled: emprestimoId > 0 }
   );
-
-  const pagarTotalMutation = trpc.parcelas.registrarPagamento.useMutation({
-    onSuccess: (data, variables) => {
-      const parcelaNum = emprestimo?.todasParcelas?.find((p: any) => p.id === variables.parcelaId)?.numero_parcela ?? 1;
-      setPagamentoRealizado({ valorPago: variables.valorPago, parcelaNum });
-      const aviso = avisoDePendenciasPosPagamento(data);
-      if (aviso) toast.warning(aviso); else toast.success(t('toast_success.pagamento_registrado'));
-      refetch();
-      utils.contratos.listComParcelas.invalidate();
-      utils.dashboard.kpis.invalidate();
-    },
-    onError: (e) => toast.error('Erro ao registrar pagamento: ' + e.message),
-  });
-
-  const pagarJurosMutation = trpc.parcelas.pagarJuros.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.juros_pagos_empréstimo_renovado'));
-      setModalPagarJuros(false);
-      refetch();
-      utils.contratos.listComParcelas.invalidate();
-    },
-    onError: (e) => toast.error('Erro ao pagar juros: ' + e.message),
-  });
-
-  const editarJurosMutation = trpc.contratos.editarJuros.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.taxa_de_juros_atualizada'));
-      setModalEditarJuros(false);
-      setNovaTaxa('');
-      refetch();
-      utils.contratos.listComParcelas.invalidate();
-    },
-    onError: (e) => toast.error('Erro: ' + e.message),
-  });
-
-  const criarParcelaMutation = trpc.parcelas.criarParcela.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.parcela_criada_com_sucesso'));
-      setShowNovaParcela(false);
-      setNovaParcelaData('');
-      setNovaParcelaValor('');
-      refetch();
-      utils.contratos.listComParcelas.invalidate();
-    },
-    onError: (e: any) => toast.error('Erro ao criar parcela: ' + e.message),
-  });
-
-  const editarParcelaMutation = trpc.parcelas.editarParcela.useMutation({
-    onSuccess: () => {
-      toast.success(t('toast_success.parcela_atualizada'));
-      setParcelaEditando(null);
-      refetch();
-      utils.contratos.listComParcelas.invalidate();
-    },
-    onError: (e: any) => toast.error('Erro ao atualizar parcela: ' + e.message),
-  });
 
   // Pending/paused e ausência de resposta não comprovam exclusão do contrato.
   const leituraEmAndamento = emprestimoId > 0 && !isError && (
@@ -175,9 +82,7 @@ export default function EmprestimoDetalhes() {
 
   const diasAtraso = emprestimo.parcelasComAtraso?.[0]?.diasAtraso ?? 0;
   const jurosAtraso = emprestimo.parcelasComAtraso?.[0]?.jurosAtraso ?? 0;
-  const totalComAtraso = emprestimo.parcelasComAtraso?.[0]?.totalComAtraso ?? 0;
   const isAtrasado = diasAtraso > 0;
-  const isQuitado = emprestimo.status === 'quitado';
   const statusBadge = badgeContrato(emprestimo.status, isAtrasado);
   const parcela = emprestimo.todasParcelas?.find((p: any) => ['pendente', 'atrasada', 'vencendo_hoje', 'parcial'].includes(p.status)) ?? emprestimo.todasParcelas?.find((p: any) => ['paga', 'pago'].includes(p.status));
   const atualizarFinanceiro = () => {
@@ -187,55 +92,6 @@ export default function EmprestimoDetalhes() {
     void utils.caixa.invalidate();
     void utils.parcelas.invalidate();
   };
-  const saldoParcial = parcela?.status === 'parcial' ? parseFloat(String(parcela.saldo_residual ?? '0')) : 0;
-  const valorOriginalParcela = parcela
-    ? (saldoParcial > 0 ? saldoParcial : parseFloat(String(parcela.valor_original ?? '0')))
-    : 0;
-  const valorJurosParcela = emprestimo.valorJurosParcela;
-
-  const handlePagar = () => {
-    if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
-    if (!parcela) { toast.error(t('toast_error.nenhuma_parcela_pendente')); return; }
-    const idempotencyKey = idempotencyKeyPagamento || crypto.randomUUID();
-    if (!idempotencyKeyPagamento) setIdempotencyKeyPagamento(idempotencyKey);
-    const valor = valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela);
-    const jurosVal = jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : undefined;
-    const dataManual = dataPagamentoCustom || undefined;
-    pagarTotalMutation.mutate({
-      parcelaId: parcela.id,
-      valorPago: valor,
-      contaCaixaId: parseInt(contaCaixaId),
-      valorJurosCustom: jurosVal,
-      dataPagamento: dataManual,
-      idempotencyKey,
-    });
-  };
-
-  const handleCriarParcela = () => {
-    if (!novaParcelaData) { toast.error(t('toast_error.informe_a_data_de_vencimento')); return; }
-    const valor = novaParcelaValor ? parseFloat(novaParcelaValor) : (emprestimo?.valorPrincipal ?? 0);
-    if (valor <= 0) { toast.error(t('toast_error.informe_um_valor_válido')); return; }
-    criarParcelaMutation.mutate({
-      contratoId: emprestimoId,
-      dataVencimento: novaParcelaData,
-      valorOriginal: valor,
-    });
-  };
-
-  const handlePagarJuros = () => {
-    if (!contaCaixaId) { toast.error(t('toast_error.selecione_uma_conta')); return; }
-    if (!parcela) { toast.error(t('toast_error.nenhuma_parcela_pendente')); return; }
-    const valor = valorCustomJuros ? parseFloat(valorCustomJuros) : valorJurosParcela;
-    const idempotencyKey = idempotencyKeyJuros || crypto.randomUUID();
-    if (!idempotencyKeyJuros) setIdempotencyKeyJuros(idempotencyKey);
-    pagarJurosMutation.mutate({
-      parcelaId: parcela.id,
-      valorJurosPago: valor,
-      contaCaixaId: parseInt(contaCaixaId),
-      idempotencyKey,
-    });
-  };
-
   const handleWhatsApp = async (tipo: 'atraso' | 'preventivo' = 'atraso') => {
     if (!emprestimo.clienteWhatsapp) { toast.error(t('toast_error.telefone_whatsapp_não_cadastrado')); return; }
     setLoadingWpp(true);
@@ -263,7 +119,7 @@ export default function EmprestimoDetalhes() {
   const handleGerarComprovante = async () => {
     // A ficha não carrega prova de recebimento durável por operação. Status
     // ou primeiro registro não permitem inventar valor, data ou pagamento.
-    toast.info('Comprovante indisponível nesta ficha sem prova financeira por operação. Consulte a confirmação auditada em Receber / conferir.');
+    toast.info('Comprovante indisponível nesta ficha sem prova financeira por operação. Consulte a confirmação da operação em Receber / conferir.');
   };
 
   return (
@@ -424,59 +280,6 @@ export default function EmprestimoDetalhes() {
                     {emprestimo.todasParcelas
                       ?.filter((p: any) => filtroStatus === 'todas' || p.status === filtroStatus)
                       .map((p: any) => (
-                        parcelaEditando?.id === p.id ? (
-                          <tr key={p.id} className="border-b border-border/50 bg-muted/20">
-                            <td className="px-3 py-2 text-foreground">#{p.numero_parcela}</td>
-                            <td className="px-2 py-1">
-                              <Input
-                                type="date"
-                                value={parcelaEditando!.data}
-                                onChange={e => setParcelaEditando(prev => prev ? { ...prev, data: e.target.value } : null)}
-                                className="h-7 text-xs w-36"
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                              />
-                            </td>
-                            <td className="px-2 py-1 text-right">
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={parcelaEditando!.valor}
-                                onChange={e => setParcelaEditando(prev => prev ? { ...prev, valor: e.target.value } : null)}
-                                className="h-7 text-xs w-28 text-right"
-                                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-                              />
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <Badge variant={badgeParcela(p.status, emprestimo.status).variant}>
-                                {badgeParcela(p.status, emprestimo.status).label}
-                              </Badge>
-                            </td>
-                            <td className="px-3 py-2 text-center">{/* Pagar - modo edição */}</td>
-                            <td className="px-2 py-1 text-center">
-                              <div className="flex gap-1 justify-center">
-                                <button
-                                  onClick={() => editarParcelaMutation.mutate({
-                                    parcelaId: p.id,
-                                    novoValor: parcelaEditando ? (parseFloat(parcelaEditando.valor) || undefined) : undefined,
-                                    novaDataVencimento: parcelaEditando ? (parcelaEditando.data || undefined) : undefined,
-                                  })}
-                                  disabled={editarParcelaMutation.isPending}
-                                  className="p-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white"
-                                  title="Salvar"
-                                >
-                                  <CheckCircle className="h-3.5 w-3.5" />
-                                </button>
-                                <button
-                                  onClick={() => setParcelaEditando(null)}
-                                  className="p-1 rounded bg-muted hover:bg-muted/80 text-foreground"
-                                  title="Cancelar"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ) : (
                           <tr key={p.id} className="border-b border-border/50 hover:bg-muted/30">
                             <td className="px-3 py-2 text-foreground">#{p.numero_parcela}</td>
                             <td className="px-3 py-2 text-foreground">{formatarData(p.data_vencimento)}</td>
@@ -487,88 +290,18 @@ export default function EmprestimoDetalhes() {
                               </Badge>
                             </td>
                             <td className="px-3 py-2 text-center">
-                              {p.status !== 'paga' && (
-                                <button
-                                  disabled
-                                  onClick={() => setParcelaEditando({
-                                    id: p.id,
-                                    valor: String(parseFloat(p.valor_original).toFixed(2)),
-                                    data: p.data_vencimento?.split('T')[0] ?? '',
-                                  })}
-                                  className="p-1 rounded hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors"
-                                  title="Editar parcela"
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </button>
-                              )}
+                              <a href="#manutencao-financeira" className="text-sm underline" title="Usar calendário completo ou manutenção de valores futuros">Alterar datas / valores</a>
                             </td>
                             <td className="px-3 py-2 text-center">
                               <RecebimentoValidado contratoId={emprestimo.id} parcelaId={p.id} permitirRenovacao onSuccess={atualizarFinanceiro} />
                             </td>
                           </tr>
-                        )
                     ))}
                   </tbody>
                 </table>
               </div>
-              {/* Botão e formulário para adicionar nova parcela */}
-              {!isQuitado && (
-                <div className="mt-3">
-                  {!showNovaParcela ? (
-                    <button
-                      disabled
-                      title="Adicionar parcelas manualmente está bloqueado. Use o fluxo de renovação validado."
-                      onClick={() => setShowNovaParcela(true)}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
-                    >
-                      <span className="text-base leading-none">⊕</span>
-                      Adicionar Nova Parcela
-                    </button>
-                  ) : (
-                    <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 space-y-3">
-                      <p className="text-sm font-semibold text-foreground">Nova Parcela</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs">Data de Vencimento *</Label>
-                          <Input
-                            type="date"
-                            value={novaParcelaData}
-                            onChange={e => setNovaParcelaData(e.target.value)}
-                            className="mt-1 h-8 text-sm [color-scheme:dark]"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs">Valor (R$)</Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder={`Padrão: ${formatarMoeda(emprestimo.valorPrincipal)}`}
-                            value={novaParcelaValor}
-                            onChange={e => setNovaParcelaValor(e.target.value)}
-                            className="mt-1 h-8 text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleCriarParcela}
-                          disabled={criarParcelaMutation.isPending || !novaParcelaData}
-                          className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
-                        >
-                          {criarParcelaMutation.isPending ? 'Criando...' : 'Salvar Parcela'}
-                        </button>
-                        <button
-                          onClick={() => { setShowNovaParcela(false); setNovaParcelaData(''); setNovaParcelaValor(''); }}
-                          className="px-4 py-2 rounded-lg border border-border text-sm text-muted-foreground hover:bg-muted/50 transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
+              <p className="text-sm text-muted-foreground">Para uma nova quantidade de parcelas, simule o reparcelamento mensal. Para renovar pagando juros, abra Receber / conferir na parcela; a origem determina a operação disponível.</p>
+              <Button variant="outline" onClick={() => setLocation(rotaReparcelamentoAtual(emprestimo.id))}>Simular reparcelamento mensal</Button>
             </div>
           </div>
         )}
@@ -595,14 +328,12 @@ export default function EmprestimoDetalhes() {
       </div>
 
       {/* Botões de Ação */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-6 border-t border-border">
+      <div id="manutencao-financeira" className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-6 border-t border-border">
         {parcela && <RecebimentoValidado contratoId={emprestimo.id} parcelaId={parcela.id} permitirRenovacao onSuccess={atualizarFinanceiro} />}
-        <Button disabled title="Edição financeira manual bloqueada para preservar a auditoria." className="gap-2" variant="outline" size="sm" onClick={() => { setNovaTaxa(String(emprestimo.taxaJuros)); setModalEditarJuros(true); }}>
-          <Edit2 className="h-4 w-4" /> Editar Juros
-        </Button>
         <ManutencaoJuros48 contratoId={emprestimo.id} parcelasIds={(emprestimo.todasParcelas??[]).map((p: {id:number})=>p.id)} onSuccess={atualizarFinanceiro} />
         <ManutencaoCalendario contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
         <MultaManualAplicar contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
+        <Button variant="outline" size="sm" onClick={() => setLocation(rotaReparcelamentoAtual(emprestimo.id))}>Reparcelar mensal</Button>
         {emprestimo.clienteWhatsapp && (
           <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp}>
             {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
@@ -621,274 +352,6 @@ export default function EmprestimoDetalhes() {
           <Trash2 className="h-4 w-4" /> Deletar
         </Button>
       </div>
-
-      {/* ── MODAL PAGAR ── */}
-      <Dialog open={modalPagar} onOpenChange={(v) => { setModalPagar(v); if (!v) setPagamentoRealizado(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>REGISTRAR PAGAMENTO</DialogTitle>
-            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
-          </DialogHeader>
-          {pagamentoRealizado ? (
-            <div className="space-y-4">
-              <div className="flex flex-col items-center gap-3 py-4">
-                <div className="w-16 h-16 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                  <CheckCircle className="h-8 w-8 text-emerald-500" />
-                </div>
-                <div className="text-center">
-                  <div className="text-lg font-bold text-emerald-500">Pagamento Registrado!</div>
-                  <div className="text-sm text-muted-foreground">{emprestimo.clienteNome}</div>
-                  <div className="text-2xl font-bold text-foreground mt-1">{formatarMoeda(pagamentoRealizado.valorPago)}</div>
-                  <div className="text-xs text-muted-foreground">Parcela {pagamentoRealizado.parcelaNum}</div>
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1 gap-1.5" onClick={handleGerarComprovante}>
-                  <Download className="h-3.5 w-3.5" /> Comprovante PDF
-                </Button>
-                <Button className="flex-1" onClick={() => { setPagamentoRealizado(null); setModalPagar(false); }}>{t('common.close')}</Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* Resumo Capital / Juros / Total */}
-              <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span>{t('common.capital')}</span>
-                  <span>{formatarMoeda(emprestimo.valorPrincipal)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>{t('common.interest')}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-amber-400">{formatarMoeda(jurosCustomDetalhes ? parseFloat(jurosCustomDetalhes) : valorJurosParcela)}</span>
-                    <button
-                      type="button"
-                      className="text-[10px] text-muted-foreground underline hover:text-foreground"
-                      onClick={() => setJurosCustomDetalhes(jurosCustomDetalhes ? '' : valorJurosParcela.toFixed(2))}
-                    >
-                      {jurosCustomDetalhes ? 'usar padrão' : 'editar'}
-                    </button>
-                  </div>
-                </div>
-                {jurosCustomDetalhes !== '' && (
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="Valor dos juros (R$)"
-                    value={jurosCustomDetalhes}
-                    onChange={e => setJurosCustomDetalhes(e.target.value)}
-                    className="h-8 text-sm"
-                  />
-                )}
-                {isAtrasado && (
-                  <div className="flex justify-between text-red-400 border-t border-border pt-2">
-                    <span>Total com Atraso ({diasAtraso} dias)</span>
-                    <span className="font-semibold">{formatarMoeda(totalComAtraso)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between border-t border-border pt-2 font-semibold">
-                  <span>{t('common.total')}</span>
-                  <span className="text-emerald-400">{formatarMoeda(valorCustomPagar ? parseFloat(valorCustomPagar) : (isAtrasado ? totalComAtraso : valorOriginalParcela))}</span>
-                </div>
-              </div>
-              {/* Valor personalizado */}
-              <div>
-                <Label className="text-xs">Valor a Pagar (R$)</Label>
-                <Input
-                  type="number"
-                  step="0.01"
-                  placeholder={`Padrão: ${formatarMoeda(isAtrasado ? totalComAtraso : valorOriginalParcela)}`}
-                  value={valorCustomPagar}
-                  onChange={e => setValorCustomPagar(e.target.value)}
-                  className="mt-1 h-9 text-sm"
-                />
-              </div>
-              {/* Data de pagamento manual */}
-              <div>
-                <Label className="text-xs">Data do Pagamento</Label>
-                <Input
-                  type="date"
-                  value={dataPagamentoCustom}
-                  onChange={e => setDataPagamentoCustom(e.target.value)}
-                  className="mt-1 h-9 text-sm [color-scheme:dark]"
-                  placeholder="Hoje (padrão)"
-                />
-                {!dataPagamentoCustom && (
-                  <p className="text-[10px] text-muted-foreground mt-1">Deixe em branco para usar a data de hoje</p>
-                )}
-              </div>
-              {/* Conta de Caixa */}
-              <div>
-                <Label className="text-xs">Conta de Caixa</Label>
-                <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
-                  <SelectContent>
-                    {(contas ?? []).map((c: any) => (
-                      <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" className="flex-1" onClick={() => setModalPagar(false)}>{t('common.cancel')}</Button>
-                <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" disabled={!contaCaixaId || pagarTotalMutation.isPending} onClick={handlePagar}>
-                  {pagarTotalMutation.isPending ? 'Processando...' : 'Confirmar'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* ── MODAL PAGAR JUROS ── */}
-      <Dialog open={modalPagarJuros} onOpenChange={(v) => { setModalPagarJuros(v); if (!v) { setValorCustomJuros(''); setContaCaixaId(''); setIdempotencyKeyJuros(''); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>PAGAR SÓ JUROS</DialogTitle>
-            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-sm">
-              <p className="text-amber-400 font-semibold">Juros por parcela: {formatarMoeda(valorJurosParcela)}</p>
-              <p className="text-xs text-muted-foreground mt-1">Pagando apenas os juros, o contrato é renovado sem abater o principal.</p>
-            </div>
-            <div>
-              <Label className="text-xs">Valor dos Juros (deixe em branco para usar o valor padrão)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder={String(valorJurosParcela.toFixed(2))}
-                value={valorCustomJuros}
-                onChange={e => setValorCustomJuros(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Conta de Caixa</Label>
-              <Select value={contaCaixaId} onValueChange={setContaCaixaId}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
-                <SelectContent>
-                  {(contas ?? []).map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setModalPagarJuros(false)}>{t('common.cancel')}</Button>
-              <Button className="flex-1 bg-amber-600 hover:bg-amber-700" disabled={!contaCaixaId || pagarJurosMutation.isPending} onClick={handlePagarJuros}>
-                {pagarJurosMutation.isPending ? 'Processando...' : 'Confirmar'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── MODAL EDITAR JUROS ── */}
-      <Dialog open={modalEditarJuros} onOpenChange={(v) => { setModalEditarJuros(v); if (!v) setNovaTaxa(''); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>EDITAR TAXA DE JUROS</DialogTitle>
-            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-muted/50 border border-border text-sm">
-              <p className="text-muted-foreground">Taxa atual: <span className="font-bold text-foreground">{emprestimo.taxaJuros}% {emprestimo.tipoTaxa}</span></p>
-            </div>
-            <div>
-              <Label>Nova Taxa de Juros (%)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                placeholder="Ex: 5"
-                value={novaTaxa}
-                onChange={e => setNovaTaxa(e.target.value)}
-                className="mt-1"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setModalEditarJuros(false)}>{t('common.cancel')}</Button>
-              <Button
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-                disabled={!novaTaxa.trim() || editarJurosMutation.isPending}
-                onClick={() => editarJurosMutation.mutate({ id: emprestimo.id, novaTaxa })}
-              >
-                {editarJurosMutation.isPending ? 'Salvando...' : 'Salvar'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* ── MODAL PAGAR PARCELA INDIVIDUAL ── */}
-      <Dialog open={!!parcelaPagando} onOpenChange={(v) => { if (!v) { setParcelaPagando(null); setValorPagIndividual(''); setContaPagIndividual(''); setIdempotencyKeyParcela(''); } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>PAGAR PARCELA #{parcelaPagando?.numero}</DialogTitle>
-            <DialogDescription>{emprestimo.clienteNome}</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="p-3 rounded-lg bg-muted/50 border border-border space-y-2 text-sm">
-              <div className="flex justify-between items-center">
-                <span>Parcela #{parcelaPagando?.numero}</span>
-                <span className="text-emerald-400 font-semibold">{formatarMoeda(parcelaPagando?.valor ?? 0)}</span>
-              </div>
-            </div>
-            <div>
-              <Label className="text-xs">Valor a Pagar (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                placeholder={`Padrão: ${formatarMoeda(parcelaPagando?.valor ?? 0)}`}
-                value={valorPagIndividual}
-                onChange={e => setValorPagIndividual(e.target.value)}
-                className="mt-1 h-9 text-sm"
-              />
-            </div>
-            <div>
-              <Label className="text-xs">Conta de Caixa</Label>
-              <Select value={contaPagIndividual} onValueChange={setContaPagIndividual}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Selecione a conta" /></SelectTrigger>
-                <SelectContent>
-                  {(contas ?? []).map((c: any) => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setParcelaPagando(null)}>{t('common.cancel')}</Button>
-              <Button
-                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
-                disabled={!contaPagIndividual || !idempotencyKeyParcela || pagarTotalMutation.isPending}
-                onClick={() => {
-                  if (!parcelaPagando) return;
-                  if (!contaPagIndividual) { toast.error('Selecione uma conta de Caixa'); return; }
-                  const valorFinal = valorPagIndividual ? parseFloat(valorPagIndividual) : parcelaPagando.valor;
-                  pagarTotalMutation.mutate({
-                    parcelaId: parcelaPagando.id,
-                    valorPago: valorFinal,
-                    contaCaixaId: parseInt(contaPagIndividual),
-                    idempotencyKey: idempotencyKeyParcela,
-                  }, {
-                    onSuccess: () => {
-                      toast.success(`Parcela #${parcelaPagando.numero} paga com sucesso!`);
-                      setParcelaPagando(null);
-                      setValorPagIndividual('');
-                      setContaPagIndividual('');
-                      refetch();
-                    },
-                  });
-                }}
-              >
-                {pagarTotalMutation.isPending ? 'Processando...' : 'Confirmar Pagamento'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* ── MODAL DELETAR ── */}
       <DeleteEmprestimoDialog

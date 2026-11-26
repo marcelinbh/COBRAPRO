@@ -13,6 +13,7 @@ import { Receipt, Plus, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CancelamentoPendente from '@/components/CancelamentoPendente';
 import EdicaoDespesa49 from '@/components/EdicaoDespesa49';
+import ConferenciaDespesasCaixa from '@/components/ConferenciaDespesasCaixa';
 import {
   DespesasIntentStore, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload,
   diaCivilBrt, dinheiroDespesa, moedaDespesa,
@@ -32,7 +33,9 @@ let proximaSessaoCache = 0;
 export default function ContasPagar() {
   // Usar apenas o id do contexto de sessão; não persistir resposta de auth/tokens.
   const auth = trpc.auth.me.useQuery(undefined, { retry: false });
-  const userId = !auth.isError && !auth.isLoading ? auth.data?.id : undefined;
+  const userId = !auth.isError && !auth.error && !auth.isLoading && !auth.isFetching &&
+    Number.isSafeInteger(auth.data?.id) && (auth.data?.id ?? 0) > 0
+    ? auth.data!.id : undefined;
   const usuarioAtual = useRef(userId);
   usuarioAtual.current = userId;
   // Identidade por transição, inclusive A -> B -> A: uma resposta de A antigo não pertence ao novo A.
@@ -106,7 +109,7 @@ export default function ContasPagar() {
         setNovo(false); setPagarId(null); setEstornarId(null); setContaCaixaId(''); setMotivo(''); setForm(freshForm());
         toast.success(`${intent.action === 'criar' ? 'Despesa criada' : intent.action === 'pagar' ? 'Pagamento registrado' : 'Estorno registrado sem excluir a baixa'}. Operação ${result.operationId}`);
         // Falha de consulta não altera a confirmação nem dispara intenção nova. Não invalidar a nova sessão.
-        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contasParaOperacao37.invalidate(), utils.caixa.transacoes.invalidate(), utils.dashboard.kpis.invalidate()]);
+        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contasParaOperacao37.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate(), utils.caixa.conferencia.invalidate(), expensesUtils.contasPagar.conferirCaixa.invalidate(), utils.dashboard.kpis.invalidate()]);
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Resultado desconhecido';
@@ -127,7 +130,7 @@ export default function ContasPagar() {
       if (r.status === 'confirmed') {
         s.confirmed(intent.action, intent.idempotencyKey);
         toast.success('Operação original confirmada na reconciliação; nenhuma nova operação enviada.');
-        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contasParaOperacao37.invalidate(), utils.caixa.transacoes.invalidate()]);
+        void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contasParaOperacao37.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate(), utils.caixa.conferencia.invalidate(), expensesUtils.contasPagar.conferirCaixa.invalidate()]);
       }
     } catch (e) { if (pertenceSessao() && usuarioAtual.current === intent.userId) toast.error(`${(e as Error).message} Não execução NÃO comprovada; nenhum descarte permitido.`); }
     finally { s.release(intent.action); if (pertenceSessao() && usuarioAtual.current === intent.userId) { inFlight.current = false; setBusy(false); sync(s); } }
@@ -176,7 +179,8 @@ export default function ContasPagar() {
       <div><h1 className="text-2xl font-bold flex gap-2"><Receipt />Contas a Pagar</h1><p className="text-sm text-muted-foreground">Despesas novas no trilho atômico; histórico somente consulta.</p></div>
       <Button disabled={!habilitado || locked('criar')} onClick={() => setNovo(true)}><Plus className="h-4 w-4 mr-2" />Nova despesa</Button>
     </div>
-    <p className="text-sm border rounded-lg p-3">Legado requer conferência. Edição pendente por sucessão20 e cancelamento lógico têm disponibilidade independente abaixo; exclusão física e recorrência continuam bloqueadas. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
+    {userId && <ConferenciaDespesasCaixa key={`${userId}:${sessao.cacheId}`} userId={userId} atual={pertenceSessao} />}
+    <p className="text-sm border rounded-lg p-3">O saldo do livro é automático; não existe sincronização financeira ao abrir a tela. Legado requer conferência. Edição pendente por sucessão20 e cancelamento lógico têm disponibilidade independente abaixo; exclusão física e recorrência continuam bloqueadas. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
     {auth.isError ? <p role="alert">Erro ao identificar a sessão. Nenhuma operação disponível.</p> : auth.isLoading ? <p role="status">Carregando sessão...</p> : !userId ? <p role="alert">Autentique-se para consultar despesas.</p> : null}
     {userId && (capacidades.isError ? <p role="alert">Não foi possível verificar a disponibilidade do trilho. Escritas bloqueadas.</p> : capacidades.isLoading ? <p role="status">Verificando disponibilidade...</p> : !habilitado ? <p role="alert">Despesas prospectivas desabilitadas; nenhum lançamento será feito no legado.</p> : null)}
     {avisoStorage && <p role="alert" className="text-amber-500 border p-3 rounded-lg break-words">{avisoStorage}</p>}

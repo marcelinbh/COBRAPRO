@@ -56,8 +56,8 @@ describe('Uso dos rótulos na fonte real de apresentação (não teste React mon
     expect(list).toContain('badgeContrato(emp.status, diasAtraso > 0)');
     expect(list).toContain('{statusBadge.label}');
   });
-  it('as duas tabelas usam o mesmo rótulo de parcela', () => {
-    expect(details.match(/\{badgeParcela\(p.status, emprestimo.status\)\.label\}/g)).toHaveLength(2);
+  it('a tabela ativa usa o rótulo explícito de parcela; o modal antigo foi removido', () => {
+    expect(details.match(/\{badgeParcela\(p.status, emprestimo.status\)\.label\}/g)).toHaveLength(1);
     expect(details).not.toContain("{p.status === 'paga' ? 'Paga' : p.status === 'atrasada' ? 'Atrasada' : 'Pendente'}");
   });
   it('o texto secundário de juros não apresenta cancelado como Em dia', () => {
