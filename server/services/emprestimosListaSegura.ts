@@ -1,6 +1,7 @@
 // Endpoint novo, somente leitura. O endpoint estrito, fichas e writers não são alterados.
 import { TRPCError } from "@trpc/server";
-import { lerProjecaoVinculada51 } from "./obrigacoes51Leitura";
+import { lerProjecaoLista51 } from "./obrigacoes51Leitura";
+import { canonical51 } from "../../shared/obrigacoes51";
 import { apresentarEmprestimo } from "./emprestimosApresentacao";
 import { lerCotacoesApresentacaoMulta } from "./multaManualApresentacao";
 import { dataHojeBrasilia } from "./businessDate";
@@ -127,6 +128,20 @@ export async function listarEmprestimosSeguros(client: Client | null | undefined
   const bad = new Set<number>();
   for (const c of contracts) if (!id(c.cliente_id) || !customersById.has(c.cliente_id)) bad.add(c.id);
   for (const p of parcelMeta) if (p.user_id !== userId || !id(p.cliente_id) || p.cliente_id !== byId.get(p.contrato_id)!.cliente_id) bad.add(p.contrato_id);
+  // Prova51 ANTES de qualquer valor/nome. Somente recusas locais estritas
+  // previstas pela fonte0051 viram placeholder; todo erro global continua fatal.
+  const states = new Map<number, NonNullable<Awaited<ReturnType<typeof lerProjecaoLista51>>>>();
+  await eachBounded(contractIds.filter(cid => !bad.has(cid)), async cid => {
+    const parent = byId.get(cid)!, expected = parcelMeta.filter(p => p.contrato_id === cid);
+    const parentNow = await own(() => contractQuery(META_CONTRATO, [cid]).eq('cliente_id', parent.cliente_id), META_CONTRATO, r => r.id === cid && contractValid(r));
+    if (!sameMetadata([parent], parentNow, ['id', 'user_id', 'cliente_id', 'koletor_id']) || !sameMetadata(expected, await metadataRead([cid]), ['id', 'user_id', 'contrato_id', 'cliente_id'])) return failLink();
+    const state = await lerProjecaoLista51(db, userId, cid, expected.map(p => ({ id: p.id, user_id: p.user_id, contrato_id: p.contrato_id, cliente_id: p.cliente_id })), async () => {
+      const review = await metadataRead([cid]);
+      if (!sameMetadata(expected, review, ['id', 'user_id', 'contrato_id', 'cliente_id'])) return failLink();
+      return review.map(p => ({ id: p.id, user_id: p.user_id, contrato_id: p.contrato_id, cliente_id: p.cliente_id }));
+    });
+    if (state === null) bad.add(cid); else states.set(cid, state);
+  });
   const safeIds = contractIds.filter(cid => !bad.has(cid)), safeSet = new Set(safeIds);
   const safeCustomers = [...new Set(safeIds.map(cid => byId.get(cid)!.cliente_id))], safeCustomerSet = new Set(safeCustomers);
   const safeMeta = parcelMeta.filter(p => safeSet.has(p.contrato_id)), safeMetaById = new Map(safeMeta.map(p => [p.id, p]));
@@ -166,11 +181,14 @@ export async function listarEmprestimosSeguros(client: Client | null | undefined
       if (!sameMetadata(safeMeta.filter(p => p.contrato_id === c.id), review, ['id', 'user_id', 'contrato_id', 'cliente_id'])) return failLink();
       return review as any;
     });
-    const estado51 = await lerProjecaoVinculada51(db, userId, c.id, safeMeta.filter(p => p.contrato_id === c.id).map(p => ({ id: p.id, user_id: p.user_id, contrato_id: p.contrato_id, cliente_id: p.cliente_id })), async () => {
+    // Reprova depois das leituras monetárias: mudança válida/recusa também
+    // invalida a resposta inteira, sem esconder race como placeholder tardio.
+    const estado51 = await lerProjecaoLista51(db, userId, c.id, safeMeta.filter(p => p.contrato_id === c.id).map(p => ({ id: p.id, user_id: p.user_id, contrato_id: p.contrato_id, cliente_id: p.cliente_id })), async () => {
       const review = await metadataRead([c.id]);
       if (!sameMetadata(safeMeta.filter(p => p.contrato_id === c.id), review, ['id', 'user_id', 'contrato_id', 'cliente_id'])) return failLink();
       return review.map(p => ({ id: p.id, user_id: p.user_id, contrato_id: p.contrato_id, cliente_id: p.cliente_id }));
     });
+    if (estado51 === null || canonical51(estado51) !== canonical51(states.get(c.id))) return failLink();
     // Reuso da apresentação corrente; não adota dívida nem reconstrói fórmula financeira.
     const presentation = apresentarEmprestimo(c as any, ps as any[], hoje, daily, percentage, quotes, estado51), capital = cents(c.valor_principal);
     capitalCents = sumSafe(capitalCents, capital); receiveCents = sumSafe(receiveCents, cents(presentation.totalReceber)); paidCents = sumSafe(paidCents, cents(presentation.totalPago));

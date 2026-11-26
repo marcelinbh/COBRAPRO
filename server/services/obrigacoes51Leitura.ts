@@ -10,7 +10,31 @@ export type FonteLeitura51 = ClienteLeitura51 & { from(table: string): any };
 function falhar51(): never {
   throw new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Estado efetivo51 não confirmado; valores e cobrança indisponíveis. Atualize para conferir, sem novo cadastro nem saldo zero presumido.' });
 }
-async function estadoCompleto51(client: ClienteLeitura51, uid: number, cid: number, ids: readonly number[]): Promise<Projection51> {
+type RecusaLista51 = { recusaLista51: true; code: string; message: string };
+/** Pins textuais da fonte0051; nunca classifica erro de rede, catálogo ou envelope
+ * malformado como recusa local. Não executa getters do objeto de erro do SDK. */
+function recusaLista51(fields: Record<string, unknown>): RecusaLista51 | null {
+  if (fields.data !== null || !Number.isInteger(fields.status) ||
+    (Object.hasOwn(fields, 'success') && fields.success !== false) ||
+    (Object.hasOwn(fields, 'count') && fields.count !== null) ||
+    (Object.hasOwn(fields, 'statusText') && typeof fields.statusText !== 'string')) return null;
+  const raw = fields.error;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || ![Object.prototype, null].includes(Object.getPrototypeOf(raw))) return null;
+  const e: Record<string, unknown> = Object.create(null);
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string' || !['code', 'message', 'details', 'hint'].includes(key)) return null;
+    const d = Object.getOwnPropertyDescriptor(raw, key)!;
+    if (!d.enumerable || !('value' in d)) return null;
+    e[key] = d.value;
+  }
+  if ((Object.hasOwn(e, 'details') && e.details !== null) || (Object.hasOwn(e, 'hint') && e.hint !== null)) return null;
+  const expected = e.code === '42501' && fields.status === 403 && e.message === '51 vínculos próprios completos obrigatórios; sem saneamento'
+    || e.code === '23514' && fields.status === 400 && ['51 obrigação registrada ambígua', '51 valores registrados inválidos', '51 residual parcial ambíguo', '51 aliases/baixa registrada ambíguos'].includes(e.message as string);
+  return expected ? { recusaLista51: true, code: e.code as string, message: e.message as string } : null;
+}
+async function estadoCompleto51(client: ClienteLeitura51, uid: number, cid: number, ids: readonly number[]): Promise<Projection51>;
+async function estadoCompleto51(client: ClienteLeitura51, uid: number, cid: number, ids: readonly number[], lista: true): Promise<Projection51 | RecusaLista51>;
+async function estadoCompleto51(client: ClienteLeitura51, uid: number, cid: number, ids: readonly number[], lista = false): Promise<Projection51 | RecusaLista51> {
   let r;
   try { r = await client.rpc('rpc_estado_obrigacoes51', { p_user_id: uid, p_contrato_id: cid }); }
   catch { return falhar51(); }
@@ -21,6 +45,10 @@ async function estadoCompleto51(client: ClienteLeitura51, uid: number, cid: numb
     const d = Object.getOwnPropertyDescriptor(r, key)!;
     if (!d.enumerable || !('value' in d)) return falhar51();
     fields[key] = d.value;
+  }
+  if (lista && Object.hasOwn(fields, 'data')) {
+    const local = recusaLista51(fields);
+    if (local) return local;
   }
   if (!Object.hasOwn(fields, 'data') || fields.error !== null ||
     (Object.hasOwn(fields, 'success') && fields.success !== true) ||
@@ -54,6 +82,29 @@ export async function lerProjecaoVinculada51(
   const final = await estadoCompleto51(client, uid, cid, ids);
   if (canonical51(first) !== canonical51(final)) return falhar51();
   return final;
+}
+/** Exclusivo da lista segura, APÓS prova global de pai/cliente/escopo. Recusa
+ * SQL prevista pode indisponibilizar este contrato, jamais autorizar cobrança.
+ * Metadados e o mesmo resultado são reconferidos inclusive quando recusado. */
+export async function lerProjecaoLista51(
+  client: ClienteLeitura51, uid: number, cid: number,
+  metadados: readonly MetadadoParcela51[], reler: () => Promise<readonly MetadadoParcela51[]>,
+): Promise<Projection51 | null> {
+  let ids: number[];
+  let selection: MetadadoParcela51[];
+  try {
+    ids = validarMetadados51(metadados, uid, cid);
+    selection = metadados.map(row => ({ id: row.id, user_id: row.user_id, contrato_id: row.contrato_id, cliente_id: row.cliente_id }));
+  } catch { return falhar51(); }
+  const first = await estadoCompleto51(client, uid, cid, ids, true);
+  const reviewed = await reler();
+  try {
+    const after = validarMetadados51(reviewed, uid, cid), byId = new Map(reviewed.map(row => [row.id, row]));
+    if (after.length !== ids.length || after.some(id => !ids.includes(id)) || selection.some(row => row.cliente_id !== byId.get(row.id)?.cliente_id)) return falhar51();
+  } catch { return falhar51(); }
+  const final = await estadoCompleto51(client, uid, cid, ids, true);
+  if (canonical51(first) !== canonical51(final)) return falhar51();
+  return 'recusaLista51' in final ? null : final;
 }
 /** Para leitores legados com seleção filtrada, primeiro lê o conjunto COMPLETO
  * somente de metadados, sem usar status/valores REST para decidir eventos51. */
