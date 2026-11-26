@@ -53,7 +53,9 @@ describe('Fallback local da lista, sem estado financeiro autorizado', () => {
   it('hunk da página preserva badge e query estrita e só monta após PRECONDITION_FAILED', () => {
     const src = readFileSync(new URL('../pages/Emprestimos.tsx', import.meta.url), 'utf8');
     expect(src).toContain('import { badgeContrato }'); expect(src).toContain('if (isError && deveUsarListaSegura(erroLista)) return <EmprestimosListaSeguraFallback');
-    expect(src).toContain('trpc.contratos.listComParcelas.useQuery();'); expect(src).not.toContain('listLeituraSegura.useQuery');
+    expect(src).toContain('trpc.contratos.listComParcelas.useQuery(undefined, {');
+    expect(src).toContain('retry: (failureCount, error) => !deveUsarListaSegura(error) && failureCount < 3,');
+    expect(src).not.toContain('listLeituraSegura.useQuery');
     expect(src.indexOf('if (isError && deveUsarListaSegura')).toBeLessThan(src.indexOf('if (leituraEmAndamento || isError)'));
   });
 });

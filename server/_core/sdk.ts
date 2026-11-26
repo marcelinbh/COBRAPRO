@@ -358,10 +358,7 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    // Telemetria de login é registrada separadamente, fora da resposta de login.
 
     return user;
   }

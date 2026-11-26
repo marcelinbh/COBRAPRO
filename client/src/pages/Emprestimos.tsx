@@ -2189,7 +2189,9 @@ export default function Emprestimos() {
   const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  const { data: emprestimos, error: erroLista, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery();
+  const { data: emprestimos, error: erroLista, isPending, isLoading, isError, isFetching, refetch } = trpc.contratos.listComParcelas.useQuery(undefined, {
+    retry: (failureCount, error) => !deveUsarListaSegura(error) && failureCount < 3,
+  });
   const { data: contas } = trpc.caixa.contas.useQuery();
   const { data: koletores } = trpc.cobradores.list.useQuery();
   const { data: recebimentosData, isLoading: loadingRecebimentos } = trpc.whatsapp.recebimentos.useQuery(
