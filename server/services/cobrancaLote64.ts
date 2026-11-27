@@ -169,7 +169,9 @@ async function readOutboxes(sb: Client64, uid: number, keys: string[]): Promise<
   const response = copy64(await sb.from('whatsapp_outbox')
     .select(columns, { count: 'exact' }).eq('user_id', uid).in('chave_deduplicacao', keys)
     .order('id', { ascending: true }).limit(keys.length).range(0, keys.length - 1));
+  // SDK atual inclui success:true; envelopes anteriores podem omitir o discriminador.
   const page = z.object({ data: z.array(z.unknown()).max(20), error: z.null(),
+    success: z.literal(true).optional(),
     count: z.number().int().min(0).max(keys.length),
     status: z.number().int().min(200).max(299).optional(), statusText: z.string().optional(),
   }).strict().parse(response);
