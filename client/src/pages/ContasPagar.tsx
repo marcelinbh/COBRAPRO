@@ -218,8 +218,8 @@ export default function ContasPagar() {
           ].map(([label, total, qtd]) => <Card key={String(label)}><CardContent className="p-4"><p className="text-sm">{label}</p><p className="text-xl font-bold">{moedaDespesa(String(total))}</p><p className="text-xs">{qtd} contas</p></CardContent></Card>)}</div>}
     </section>
     <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
-    {userId && <CancelamentoPendente key={`${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} onOriginalEncerrado={originaisEncerrados} />}
-    {userId && <EdicaoDespesa49 key={`${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} originaisRevision={originaisRevision} selecao={selecaoEdicao} />}
+    {userId && <CancelamentoPendente key={`cancelamento38c:${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} onOriginalEncerrado={originaisEncerrados} />}
+    {userId && <EdicaoDespesa49 key={`edicao49:${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} originaisRevision={originaisRevision} selecao={selecaoEdicao} />}
     <section aria-label="Lista de despesas" className="space-y-3">
       {!userId ? <p role="status">Consulta indisponível sem sessão.</p> : lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
         : lista.isLoading || !lista.data ? <p role="status">{userId ? 'Carregando despesas...' : 'Consulta indisponível sem sessão.'}</p>
