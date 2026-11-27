@@ -12,7 +12,7 @@ type Item = { id: number; descricao: string; podeCancelarPendente: boolean; orig
  * O original fica fora da lista filtrada, não é removido por confirmação/reload.
  * Fechamento CAS somente mediante recovery terminal, recibo por UUID preservado.
  */
-export default function CancelamentoPendente({ userId, itens }: { userId: number; itens: Item[] }) {
+export default function CancelamentoPendente({ userId, itens, onOriginalEncerrado }: { userId: number; itens: Item[]; onOriginalEncerrado?: (userId: number) => void }) {
   const session = useMemo(() => ({ userId, generation: ++nextGeneration, closed: false }), [userId]);
   const current = useRef(session); current.current = session;
   const valid = () => current.current === session && !session.closed;
@@ -54,9 +54,9 @@ export default function CancelamentoPendente({ userId, itens }: { userId: number
   const cancel = trpc.contasPagar.cancelarPendente.useMutation({ retry: false });
   const recovery = trpc.contasPagar.recuperarCancelamentoPendente.useMutation({ retry: false });
   const utils = trpc.useUtils();
-  const canWrite = ready === session && valid() && cap.data?.habilitado === true && !cap.isError && !busy && !message && !store.blocked;
+  const canWrite = ready === session && valid() && cap.data?.habilitado === true && !cap.isError && !cap.isLoading && !cap.isFetching && !busy && !message && !store.blocked;
   async function send(intent: IntencaoCancelamentoPendente, recover: boolean, close = false) {
-    if (!valid() || inflight.current || (!recover && (cap.data?.habilitado !== true || cap.isError || confirmed || store.blocked))) return;
+    if (!valid() || inflight.current || (!recover && (cap.data?.habilitado !== true || cap.isError || cap.isLoading || cap.isFetching || confirmed || store.blocked))) return;
     const token = store.acquire(); if (!token) return;
     inflight.current = true; setBusy(true);
     try {
@@ -68,6 +68,8 @@ export default function CancelamentoPendente({ userId, itens }: { userId: number
         if (!proof) throw new Error('Fechamento exige recovery terminal');
         store.close(token, intent, proof);
         if (proof.status === 'confirmed') void Promise.allSettled([utils.contasPagar.listar.invalidate(), utils.contasPagar.resumo.invalidate()]);
+        if (!valid()) return;
+        onOriginalEncerrado?.(userId);
         setOriginal(null); setSelected(''); setMotivo(''); setConfirmed(false); setMessage('');
         toast.success('Intenção encerrada com prova e recibo preservados. Próximo cancelamento disponível quando habilitado.');
         return;
@@ -98,8 +100,8 @@ export default function CancelamentoPendente({ userId, itens }: { userId: number
   if (ready !== session) return <p role="status">Atualizando sessão de cancelamento...</p>;
   return <section aria-label="Cancelamento pendente auditado" className="border rounded-lg p-4 space-y-3">
     <h2 className="font-semibold">Cancelar obrigação pendente</h2>
-    <p className="text-sm">Somente despesa avulsa20 intacta e nunca paga. Não exclui registro nem movimenta Caixa. Edição, exclusão e recorrência continuam bloqueadas.</p>
-    {cap.isError ? <p role="alert">Disponibilidade não comprovada; escritas bloqueadas.</p> : !cap.data?.habilitado ? <p role="status">Cancelamento novo desabilitado. Conferência/fechamento da intenção original continua disponível.</p> : null}
+    <p className="text-sm">Somente despesa avulsa20 intacta e nunca paga. Não exclui registro nem movimenta Caixa. Edição de metadados pendentes tem painel49 próprio; valor, exclusão física e recorrência não são alterados aqui.</p>
+    {cap.isError ? <p role="alert">Disponibilidade não comprovada; escritas bloqueadas.</p> : cap.isLoading || cap.isFetching || !cap.data ? <p role="status">Consultando disponibilidade do cancelamento; nenhuma escrita nova será feita.</p> : !cap.data.habilitado ? <p role="status">Cancelamento novo desligado no banco (OFF). Conferência/fechamento da intenção original continua disponível.</p> : null}
     {message && <p role="alert">{message}</p>}
     {original && <p className="text-sm">A conferência aguarda a operação no servidor. Se não houve execução, fecha definitivamente esta UUID por fence durável; não há reenvio possível após esse fechamento.</p>}
     {original ? <div className="space-y-2">

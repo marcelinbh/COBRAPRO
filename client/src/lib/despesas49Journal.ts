@@ -22,7 +22,8 @@ export class Despesas49Journal {
     return this.lock(() => {
       if (!this.current()) throw new Error('Sessão49 encerrada.');
       if (this.read()) throw new Error('Intenção49 original pendente: não substituir UUID/pedido.');
-      const input = edicao49Input.parse({ idempotencyKey: crypto.randomUUID(), request: edicao49Request.parse(request) });
+      const parsed = edicao49Request.parse(request);
+      const input = edicao49Input.parse({ idempotencyKey: crypto.randomUUID(), request: parsed });
       const raw = JSON.stringify(input);
       this.storage!.setItem(this.key, raw);
       if (this.storage!.getItem(this.key) !== raw) throw new Error('CAS49 de preparação falhou.');
@@ -40,16 +41,34 @@ export class Despesas49Journal {
   assertCurrent(j: Journal49): void {
     if (!this.current() || j.key !== this.key || !this.storage || this.storage.getItem(this.key) !== j.raw) throw new Error('Intenção/sessão49 mudou. Original preservado.');
   }
-  /** Somente recovery terminal, sob mesmo lock do callback, pode fechar CAS. */
-  closeInsideLock(j: Journal49, proof: Recovery49): boolean {
-    validarRecovery49(proof, this.owner, j.input);
-    if (!this.current() || this.storage!.getItem(this.key) !== j.raw) return false;
+  /** Prova é lida apenas para o UUID/pedido atual, nunca inferida de ausência. */
+  readProof(j: Journal49): Recovery49 | null {
+    this.assertCurrent(j);
+    const raw = this.storage!.getItem(`cobrapro:despesas49:${this.owner}:receipt:${j.input.idempotencyKey}`);
+    if (raw === null) return null;
+    const saved = JSON.parse(raw);
+    const proof = validarRecovery49(saved.proof, this.owner, j.input);
+    if (JSON.stringify({ input: j.input, proof }) !== raw) throw new Error('Recibo49 existente divergente.');
+    this.assertCurrent(j);
+    return proof;
+  }
+  /** Sob o mesmo lock: conservar prova terminal também ao conferir sem fechar.
+   * Assim uma UUID not_executed nunca volta a ter retry após reload. */
+  saveProofInsideLock(j: Journal49, proof: Recovery49): void {
+    validarRecovery49(proof, this.owner, j.input); this.assertCurrent(j);
     const receiptKey = `cobrapro:despesas49:${this.owner}:receipt:${j.input.idempotencyKey}`;
     const raw = JSON.stringify({ input: j.input, proof });
     const old = this.storage!.getItem(receiptKey);
     if (old !== null && old !== raw) throw new Error('Recibo49 existente divergente.');
-    this.storage!.setItem(receiptKey, raw);
+    if (old === null) this.storage!.setItem(receiptKey, raw);
     if (this.storage!.getItem(receiptKey) !== raw || this.storage!.getItem(this.key) !== j.raw) throw new Error('CAS49 mudou; original preservado.');
+    this.assertCurrent(j);
+  }
+  /** Somente recovery terminal, sob mesmo lock do callback, pode fechar CAS. */
+  closeInsideLock(j: Journal49, proof: Recovery49): boolean {
+    validarRecovery49(proof, this.owner, j.input);
+    if (!this.current() || this.storage!.getItem(this.key) !== j.raw) return false;
+    this.saveProofInsideLock(j, proof);
     this.storage!.removeItem(this.key);
     if (this.storage!.getItem(this.key) !== null) throw new Error('Remoção49 não confirmada; original e recibo preservados.');
     return true;

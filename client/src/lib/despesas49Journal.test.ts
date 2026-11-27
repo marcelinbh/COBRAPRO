@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Despesas49Journal, type Locks49 } from './despesas49Journal';
 const request = { despesaId: 10, origemOperationId: '20000000-0000-4000-8000-000000000001', estadoHash: 'a'.repeat(64), descricao: 'Editada', categoria: 'outros', dataVencimento: '2030-02-28', observacoes: '', motivo: 'Corrigir' };
 class Memory {
@@ -54,5 +54,30 @@ describe('journal49 crash/storage faults reais', () => {
  it('crash após preparar antesPOST e apósPOST sem resposta: reload mesma UUID, nunca substituta',async()=>{
   const m=new Memory(),l=new Locks(),a=new Despesas49Journal(7,m,l,()=>true),j=await a.prepare(request),reload=new Despesas49Journal(7,m,l,()=>true);
   expect(reload.read()).toEqual(j);await expect(a.run(j,async()=>{throw Error('response lost');})).rejects.toThrow('response lost');expect(reload.read()).toEqual(j);await expect(reload.prepare(request)).rejects.toThrow('original pendente');
+ });
+});
+
+
+describe('hotfix49 prova terminal durável e request antes de UUID',()=>{
+ it('validação rejeita data civil/motivo antes de randomUUID e persistência',async()=>{
+  const uuid=vi.spyOn(crypto,'randomUUID'),m=new Memory(),a=new Despesas49Journal(7,m,new Locks(),()=>true);
+  try { await expect(a.prepare({...request,dataVencimento:'2030-02-30'})).rejects.toThrow();await expect(a.prepare({...request,motivo:''})).rejects.toThrow();expect(uuid).not.toHaveBeenCalled();expect(m.m.size).toBe(0); }
+  finally {uuid.mockRestore();}
+ });
+ it('conferir not_executed conserva pending e prova exata, reload lê fence sem reenviar/fechar',async()=>{
+  const m=new Memory(),l=new Locks(),a=new Despesas49Journal(7,m,l,()=>true),j=await a.prepare(request),p=proof(j);
+  await a.run(j,async()=>a.saveProofInsideLock(j,p));expect(a.read()!.raw).toBe(j.raw);
+  const reload=new Despesas49Journal(7,m,l,()=>true);expect(reload.readProof(reload.read()!)).toEqual(p);expect(m.getItem(j.key)).toBe(j.raw);expect(m.m.size).toBe(2);
+  expect(await reload.run(j,async()=>reload.closeInsideLock(j,p))).toBe(true);expect(m.getItem(j.key)).toBeNull();expect(m.getItem(`cobrapro:despesas49:7:receipt:${j.input.idempotencyKey}`)).toContain('not_executed');
+ });
+ it('prova de outro owner ou pedido divergente nunca autoriza leitura terminal/closure',async()=>{
+  const m=new Memory(),a=new Despesas49Journal(7,m,new Locks(),()=>true),j=await a.prepare(request),k=`cobrapro:despesas49:7:receipt:${j.input.idempotencyKey}`;
+  m.setItem(k,JSON.stringify({input:j.input,proof:proof(j,8)}));expect(()=>a.readProof(j)).toThrow('owner');expect(m.getItem(j.key)).toBe(j.raw);
+  m.setItem(k,JSON.stringify({input:{...j.input,request:{...request,motivo:'Divergente'}},proof:proof(j)}));expect(()=>a.readProof(j)).toThrow('divergente');expect(m.getItem(j.key)).toBe(j.raw);
+ });
+ it('falha write-then-throw ao salvar prova conserva fence e head exatos no reload',async()=>{
+  const m=new Memory(),l=new Locks(),a=new Despesas49Journal(7,m,l,()=>true),j=await a.prepare(request);const set=m.setItem.bind(m);
+  m.setItem=(k,v)=>{set(k,v);throw Error('after receipt write');};await expect(a.run(j,async()=>a.saveProofInsideLock(j,proof(j)))).rejects.toThrow('after receipt');expect(m.getItem(j.key)).toBe(j.raw);
+  expect(new Despesas49Journal(7,m,l,()=>true).readProof(j)).toEqual(proof(j));
  });
 });

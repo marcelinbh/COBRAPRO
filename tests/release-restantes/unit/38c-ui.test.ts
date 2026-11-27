@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as React from 'react';
 import { CancelamentoPendenteStore } from '../../../shared/despesaCancelamentoPendente';
-const h = vi.hoisted(() => ({ current: null as any, cap: { habilitado: true }, cancel: vi.fn(), recover: vi.fn(), success: vi.fn(), invalidate: vi.fn(), network: vi.fn() }));
+const h = vi.hoisted(() => ({ current: null as any, cap: { habilitado: true }, cancel: vi.fn(), recover: vi.fn(), success: vi.fn(), invalidate: vi.fn(), network: vi.fn(), closed: vi.fn(), capLoading: false, capError: false }));
 vi.mock('react', async original => {
  const actual = await original<typeof React>();
  return { ...actual,
@@ -14,11 +14,11 @@ vi.mock('react', async original => {
 vi.mock('@/components/ui/button',()=>({Button:'button'}));
 vi.mock('@/components/ui/input',()=>({Input:'input'}));
 vi.mock('sonner',()=>({toast:{success:h.success}}));
-vi.mock('@/lib/trpc',()=>({trpc:{contasPagar:{capacidadesCancelamentoPendente:{useQuery:()=>({data:h.cap,isError:false})},cancelarPendente:{useMutation:()=>({mutateAsync:h.cancel})},recuperarCancelamentoPendente:{useMutation:()=>({mutateAsync:h.recover})}},useUtils:()=>({contasPagar:{listar:{invalidate:h.invalidate},resumo:{invalidate:h.invalidate}}})}}));
+vi.mock('@/lib/trpc',()=>({trpc:{contasPagar:{capacidadesCancelamentoPendente:{useQuery:()=>({data:h.cap,isError:h.capError,isLoading:h.capLoading})},cancelarPendente:{useMutation:()=>({mutateAsync:h.cancel})},recuperarCancelamentoPendente:{useMutation:()=>({mutateAsync:h.recover})}},useUtils:()=>({contasPagar:{listar:{invalidate:h.invalidate},resumo:{invalidate:h.invalidate}}})}}));
 import Component from '../../../client/src/components/CancelamentoPendente';
 class Harness {
  values:any[]=[];deps:any[]=[];cleanups:any[]=[];effects:any[]=[];cursor=0;dirty=true;tree:any;writes=0;owner=1;items:any[]=[];frames:any[]=[];
- render(){let n=0;do{this.dirty=false;this.cursor=0;h.current=this;this.tree=Component({userId:this.owner,itens:this.items});this.frames.push(this.tree);this.effects.splice(0).forEach(f=>f());if(++n>25)throw new Error('render loop');}while(this.dirty);return this;}
+ render(){let n=0;do{this.dirty=false;this.cursor=0;h.current=this;this.tree=Component({userId:this.owner,itens:this.items,onOriginalEncerrado:h.closed});this.frames.push(this.tree);this.effects.splice(0).forEach(f=>f());if(++n>25)throw new Error('render loop');}while(this.dirty);return this;}
  async flush(){for(let i=0;i<24;i++){await Promise.resolve();if(this.dirty)this.render();}}
  nodes(root=this.tree){const a:any[]=[];const walk=(n:any)=>{if(!n)return;if(Array.isArray(n))return n.forEach(walk);if(typeof n!=='object')return;a.push(n);walk(n.props?.children);};walk(root);return a;}
  text(root=this.tree):string {const walk=(n:any):string=>n==null||typeof n==='boolean'?'':Array.isArray(n)?n.map(walk).join(' '):typeof n==='object'?walk(n.props?.children):String(n);return walk(root);}
@@ -34,7 +34,7 @@ const confirmation=(userId:number,input:any)=>({contrato:'despesa_cancelamento_p
 let ui:Harness,data:Map<string,string>,storage:any;
 function pending(owner=1){return new CancelamentoPendenteStore(owner,storage).begin(payload,()=>key);}
 function deferred(){let resolve!:(v:any)=>void;const promise=new Promise(r=>resolve=r);return{resolve,promise};}
-beforeEach(()=>{vi.resetAllMocks();vi.stubGlobal('React',React);h.cap={habilitado:true};data=new Map();storage={get length(){return data.size;},key:vi.fn((i:number)=>[...data.keys()][i]??null),getItem:vi.fn((k:string)=>data.get(k)??null),setItem:vi.fn((k:string,v:string)=>data.set(k,v))};vi.stubGlobal('window',{sessionStorage:storage});h.network.mockImplementation(()=>{throw new Error('rede proibida');});vi.stubGlobal('fetch',h.network);h.cancel.mockRejectedValue(new Error('timeout'));ui=new Harness();ui.items=[{id:18,descricao:'Despesa A',podeCancelarPendente:true,origemOperationId:origin}];});
+beforeEach(()=>{vi.resetAllMocks();vi.stubGlobal('React',React);h.cap={habilitado:true};h.capLoading=false;h.capError=false;data=new Map();storage={get length(){return data.size;},key:vi.fn((i:number)=>[...data.keys()][i]??null),getItem:vi.fn((k:string)=>data.get(k)??null),setItem:vi.fn((k:string,v:string)=>data.set(k,v))};vi.stubGlobal('window',{sessionStorage:storage});h.network.mockImplementation(()=>{throw new Error('rede proibida');});vi.stubGlobal('fetch',h.network);h.cancel.mockRejectedValue(new Error('timeout'));ui=new Harness();ui.items=[{id:18,descricao:'Despesa A',podeCancelarPendente:true,origemOperationId:origin}];});
 afterEach(()=>{ui.close();expect(h.network).not.toHaveBeenCalled();vi.unstubAllGlobals();});
 describe('UI cancelamento offline: interação e callbacks reais do componente',()=>{
  it('armazena antes de chamar writer e timeout mantém retry exato',async()=>{
@@ -60,16 +60,26 @@ describe('UI cancelamento offline: interação e callbacks reais do componente',
 describe('UI closure terminal e flag dinâmica',()=>{
   const evidence=(o:any,status='confirmed')=>({contrato:o.contrato,userId:1,idempotencyKey:key,request:payload,status,result:status==='confirmed'?confirmation(1,o.input):null,fence:status==='not_executed'?{fenceId:'44444444-4444-4444-8444-444444444444',instante:'2026-11-24T18:00:00+00:00'}:null});
   it.each(['confirmed','not_executed'])('encerra %s gateOFF, preserva recibo e próximo cancelamento reaparece gateON sem reload',async status=>{
-    const o=pending();h.cap={habilitado:false};h.recover.mockResolvedValue(evidence(o,status));ui.render();await ui.click('Encerrar intenção');expect(h.cancel).not.toHaveBeenCalled();expect(ui.button('Confirmar cancelamento')).toBeDefined();expect(ui.button('Confirmar cancelamento').props.disabled).toBe(true);expect(data.size).toBe(2);
+    const o=pending();h.cap={habilitado:false};h.recover.mockResolvedValue(evidence(o,status));ui.render();await ui.click('Encerrar intenção');expect(h.cancel).not.toHaveBeenCalled();expect(h.closed).toHaveBeenCalledWith(1);expect(ui.button('Confirmar cancelamento')).toBeDefined();expect(ui.button('Confirmar cancelamento').props.disabled).toBe(true);expect(data.size).toBe(2);
     h.cap={habilitado:true};ui.render();ui.change('cancelamento-despesa','18');ui.change('cancelamento-motivo','Próxima');await ui.click('Confirmar cancelamento');expect(h.cancel).toHaveBeenCalledTimes(1);expect(h.cancel.mock.calls[0][0].idempotencyKey).not.toBe(key);expect(data.size).toBe(2);
   });
   it('unknown não libera head, botão de retry continua mesma UUID',async()=>{
     const o=pending();h.recover.mockResolvedValue(evidence(o,'unknown'));ui.render();await ui.click('Encerrar intenção');expect(ui.text()).toContain(key);expect(ui.button('Confirmar cancelamento')).toBeUndefined();expect(data.size).toBe(1);
   });
   it('callback closure A→B→A nunca fecha head antigo',async()=>{
-    const o=pending(),wait=deferred();h.recover.mockReturnValue(wait.promise);ui.render();await ui.click('Encerrar intenção');ui.owner=2;ui.render();ui.owner=1;ui.render();wait.resolve(evidence(o));await ui.flush();expect(data.size).toBe(1);expect(ui.text()).toContain(key);expect(h.invalidate).not.toHaveBeenCalled();
+    const o=pending(),wait=deferred();h.recover.mockReturnValue(wait.promise);ui.render();await ui.click('Encerrar intenção');ui.owner=2;ui.render();ui.owner=1;ui.render();wait.resolve(evidence(o));await ui.flush();expect(data.size).toBe(1);expect(ui.text()).toContain(key);expect(h.invalidate).not.toHaveBeenCalled();expect(h.closed).not.toHaveBeenCalled();
   });
   it('flagON→OFF bloqueia novo envio na UI sem remount e não bloqueia recovery',async()=>{
     ui.render();ui.change('cancelamento-despesa','18');ui.change('cancelamento-motivo','Duplicada');h.cap={habilitado:false};ui.render();expect(ui.button('Confirmar cancelamento').props.disabled).toBe(true);expect(h.cancel).not.toHaveBeenCalled();
   });
+});
+
+
+describe('hotfix49 evento38c e texto operacional',()=>{
+ it('conferência sem closure não notifica liberação; unknown não notifica nem altera head',async()=>{
+  const o=pending();h.recover.mockResolvedValue({contrato:o.contrato,userId:1,idempotencyKey:key,request:payload,status:'unknown',result:null,fence:null});ui.render();await ui.click('Encerrar intenção');expect(h.closed).not.toHaveBeenCalled();expect(data.size).toBe(1);
+ });
+ it('loading é consulta em andamento e não anuncia OFF/edição bloqueada',()=>{
+  h.capLoading=true;ui.render();expect(ui.text()).toContain('Consultando disponibilidade do cancelamento');expect(ui.text()).not.toContain('desligado no banco (OFF)');expect(ui.text()).not.toContain('Edição, exclusão e recorrência continuam bloqueadas');expect(ui.text()).toContain('painel49 próprio');
+ });
 });

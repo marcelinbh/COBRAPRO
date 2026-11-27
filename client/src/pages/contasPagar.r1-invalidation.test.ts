@@ -6,6 +6,7 @@ const confirmed = { success: true, acao: 'pagar', userId: 31, chaveIdempotencia:
 function handlers() {
   let current = true;
   const user = { current: 31 }, flight = { current: false }, errors = vi.fn(), success = vi.fn(), setters = vi.fn(), sync = vi.fn();
+  const originaisEncerrados = vi.fn();
   const s = { acquire: vi.fn(() => true), release: vi.fn(), confirmed: vi.fn() };
   const mutations = { criar: { mutateAsync: vi.fn() }, pagar: { mutateAsync: vi.fn().mockResolvedValue(confirmed) }, estornar: { mutateAsync: vi.fn() }, reconciliacao: { mutateAsync: vi.fn().mockResolvedValue({ status: 'confirmed' }) } };
   const invalidations: Record<string, ReturnType<typeof vi.fn>> = {};
@@ -18,13 +19,13 @@ function handlers() {
   const declarations = ['enviar', 'reconciliar'].map(n => declaration(ast, n).getText(ast)).join('\n');
   const bindings = { ...mutations, habilitado: true, recovery: {}, pertenceSessao: () => current, usuarioAtual: user, inFlight: flight,
     setBusy: setters, setNovo: setters, setPagarId: setters, setEstornarId: setters, setContaCaixaId: setters, setMotivo: setters, setForm: setters, setRecovery: setters,
-    freshForm: () => ({}), toast: { error: errors, success }, sync, utils, expensesUtils: utils,
+    freshForm: () => ({}), originaisEncerrados, toast: { error: errors, success }, sync, utils, expensesUtils: utils,
     // Evidence validator is confined: use checked statuses to exercise UI control flow,
     // not to recertify the untouched financial evidence implementation.
     assertRecoveryEvidence: (r: any) => { if (r.invalid) throw Error('invalid evidence fixture'); return r; },
   };
   const fns = compile(`${declarations}\nreturn {enviar,reconciliar};`, bindings);
-  return { ...fns, s, mutations, invalidations, setters, errors, success, sync, flight, user, obsolete: () => { current = false; user.current = 42; } };
+  return { ...fns, s, originaisEncerrados, mutations, invalidations, setters, errors, success, sync, flight, user, obsolete: () => { current = false; user.current = 42; } };
 }
 const targets = ['caixa.contas', 'caixa.conferencia', 'contasPagar.conferirCaixa'];
 function none(h: ReturnType<typeof handlers>) { Object.values(h.invalidations).forEach(fn => expect(fn).not.toHaveBeenCalled()); }
@@ -33,6 +34,7 @@ describe('R1 callbacks de despesa — real AST handlers, mocks confined', () => 
   it('confirmed invalida saldo e as duas conferências uma vez, sem soma otimista', async () => {
     const h = handlers(); await h.enviar(intent, h.s);
     expect(h.s.confirmed).toHaveBeenCalledWith('pagar', intent.idempotencyKey);
+    expect(h.originaisEncerrados).toHaveBeenCalledWith(31);
     targets.forEach(t => expect(h.invalidations[t]).toHaveBeenCalledTimes(1));
     expect(h.mutations.pagar.mutateAsync).toHaveBeenCalledWith({ ...intent.payload, idempotencyKey: intent.idempotencyKey });
     expect(h.mutations.criar.mutateAsync).not.toHaveBeenCalled(); expect(h.mutations.estornar.mutateAsync).not.toHaveBeenCalled();
@@ -51,7 +53,7 @@ describe('R1 callbacks de despesa — real AST handlers, mocks confined', () => 
     const h = handlers(); h.mutations.reconciliacao.mutateAsync.mockResolvedValueOnce(status === 'invalid' ? { invalid: true } : { status });
     await h.reconciliar(intent, h.s);
     if (status === 'confirmed') { targets.forEach(t => expect(h.invalidations[t]).toHaveBeenCalledTimes(1)); expect(h.s.confirmed).toHaveBeenCalledTimes(1); }
-    else { none(h); expect(h.s.confirmed).not.toHaveBeenCalled(); }
+    else { none(h); expect(h.s.confirmed).not.toHaveBeenCalled(); expect(h.originaisEncerrados).not.toHaveBeenCalled(); }
     expect(h.mutations.pagar.mutateAsync).not.toHaveBeenCalled(); expect(h.mutations.criar.mutateAsync).not.toHaveBeenCalled(); expect(h.mutations.estornar.mutateAsync).not.toHaveBeenCalled();
   });
   it.each(['enviar', 'reconciliar'] as const)('%s callback tardio não invalida nem atualiza outra empresa', async name => {
@@ -59,7 +61,7 @@ describe('R1 callbacks de despesa — real AST handlers, mocks confined', () => 
     (name === 'enviar' ? h.mutations.pagar : h.mutations.reconciliacao).mutateAsync.mockReturnValueOnce(gate.promise);
     const work = h[name](intent, h.s), before = h.setters.mock.calls.length;
     h.obsolete(); gate.resolve(name === 'enviar' ? confirmed : { status: 'confirmed' }); await work;
-    none(h); expect(h.setters).toHaveBeenCalledTimes(before); expect(h.success).not.toHaveBeenCalled(); expect(h.errors).not.toHaveBeenCalled(); expect(h.sync).not.toHaveBeenCalled();
+    none(h); expect(h.originaisEncerrados).not.toHaveBeenCalled(); expect(h.setters).toHaveBeenCalledTimes(before); expect(h.success).not.toHaveBeenCalled(); expect(h.errors).not.toHaveBeenCalled(); expect(h.sync).not.toHaveBeenCalled();
     // Completion of old intent is permitted in its own store; never in the current UI.
     expect(h.s.release).toHaveBeenCalledTimes(1);
   });

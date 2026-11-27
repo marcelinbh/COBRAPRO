@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Receipt, Plus, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CancelamentoPendente from '@/components/CancelamentoPendente';
-import EdicaoDespesa49 from '@/components/EdicaoDespesa49';
+import EdicaoDespesa49, { type OriginaisRevision49, type SelecaoEdicao49 } from '@/components/EdicaoDespesa49';
 import ConferenciaDespesasCaixa from '@/components/ConferenciaDespesasCaixa';
 import {
   DespesasIntentStore, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload,
@@ -56,6 +56,18 @@ export default function ContasPagar() {
   const [contaCaixaId, setContaCaixaId] = useState('');
   const [motivo, setMotivo] = useState('');
   const [form, setForm] = useState(freshForm);
+  const [originaisRevision, setOriginaisRevision] = useState<OriginaisRevision49 | undefined>();
+  const [selecaoEdicao, setSelecaoEdicao] = useState<SelecaoEdicao49 | null>(null);
+  const revisionEdicao = useRef(0);
+  function originaisEncerrados(owner: number) {
+    if (!pertenceSessao() || owner !== userId) return;
+    // Evento não libera por si: painel49 relê journal/inventário sem apagar originais.
+    setOriginaisRevision({ userId: owner, revision: ++revisionEdicao.current });
+  }
+  function selecionarEdicao(despesaId: number) {
+    if (!userId || !pertenceSessao() || lista.isError || lista.isLoading || lista.isFetching || !lista.data?.some(d => d.id === despesaId && d.podePagar)) return;
+    setSelecaoEdicao({ userId, despesaId, revision: ++revisionEdicao.current });
+  }
   const store = useMemo(() => {
     if (!userId) return null;
     let storage: StorageDespesas | null = null;
@@ -70,6 +82,7 @@ export default function ContasPagar() {
     setAvisoStorage(''); setRecovery({}); setBusy(false); inFlight.current = false;
     setFiltroStatus('todos'); setNovo(false); setPagarId(null); setEstornarId(null);
     setContaCaixaId(''); setMotivo(''); setForm(freshForm());
+    setOriginaisRevision(undefined); setSelecaoEdicao(null);
     sync(store); setSessaoUi(sessao);
   }, [store, sessao]);
   const utils = trpc.useUtils();
@@ -106,6 +119,7 @@ export default function ContasPagar() {
       if (result.success !== true || result.acao !== intent.action || result.userId !== intent.userId || result.chaveIdempotencia.toLowerCase() !== intent.idempotencyKey.toLowerCase() || !result.operationId) throw new Error('Confirmação incompatível; requer conferência com a MESMA chave.');
       s.confirmed(intent.action, intent.idempotencyKey);
       if (pertenceSessao() && usuarioAtual.current === intent.userId) {
+        originaisEncerrados(intent.userId);
         setNovo(false); setPagarId(null); setEstornarId(null); setContaCaixaId(''); setMotivo(''); setForm(freshForm());
         toast.success(`${intent.action === 'criar' ? 'Despesa criada' : intent.action === 'pagar' ? 'Pagamento registrado' : 'Estorno registrado sem excluir a baixa'}. Operação ${result.operationId}`);
         // Falha de consulta não altera a confirmação nem dispara intenção nova. Não invalidar a nova sessão.
@@ -129,6 +143,7 @@ export default function ContasPagar() {
       setRecovery(prev => ({ ...prev, [intent.idempotencyKey]: r }));
       if (r.status === 'confirmed') {
         s.confirmed(intent.action, intent.idempotencyKey);
+        originaisEncerrados(intent.userId);
         toast.success('Operação original confirmada na reconciliação; nenhuma nova operação enviada.');
         void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate(), utils.caixa.contasParaOperacao37.invalidate(), utils.caixa.contas.invalidate(), utils.caixa.transacoes.invalidate(), utils.caixa.conferencia.invalidate(), expensesUtils.contasPagar.conferirCaixa.invalidate()]);
       }
@@ -139,6 +154,7 @@ export default function ContasPagar() {
     if (!store || !pertenceSessao() || inFlight.current || usuarioAtual.current !== intent.userId) return;
     try {
       store.closeRejected(intent.action, recovery[intent.idempotencyKey]);
+      originaisEncerrados(intent.userId);
       setNovo(false); setPagarId(null); setEstornarId(null); setContaCaixaId(''); setMotivo(''); sync(store);
       toast.success('Intenção comprovadamente não executada encerrada. Selecione explicitamente os dados da próxima operação.');
     } catch (e) { toast.error((e as Error).message); }
@@ -202,8 +218,8 @@ export default function ContasPagar() {
           ].map(([label, total, qtd]) => <Card key={String(label)}><CardContent className="p-4"><p className="text-sm">{label}</p><p className="text-xl font-bold">{moedaDespesa(String(total))}</p><p className="text-xs">{qtd} contas</p></CardContent></Card>)}</div>}
     </section>
     <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
-    {userId && <CancelamentoPendente userId={userId} itens={!lista.isError && lista.data ? lista.data : []} />}
-    {userId && <EdicaoDespesa49 userId={userId} itens={!lista.isError && lista.data ? lista.data : []} />}
+    {userId && <CancelamentoPendente key={`${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} onOriginalEncerrado={originaisEncerrados} />}
+    {userId && <EdicaoDespesa49 key={`${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} originaisRevision={originaisRevision} selecao={selecaoEdicao} />}
     <section aria-label="Lista de despesas" className="space-y-3">
       {!userId ? <p role="status">Consulta indisponível sem sessão.</p> : lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
         : lista.isLoading || !lista.data ? <p role="status">{userId ? 'Carregando despesas...' : 'Consulta indisponível sem sessão.'}</p>
@@ -213,6 +229,7 @@ export default function ContasPagar() {
               {d.observacoes && <p className="text-sm">{d.observacoes}</p>}
               {d.recorrente && <p className="text-xs">Recorrência histórica ({d.periodicidade ?? 'não informada'}); geração indisponível.</p>}
               {d.mensagemConferencia && <p className="text-sm text-amber-500">{d.mensagemConferencia}</p>}
+              {d.podePagar && <Button variant="outline" size="sm" disabled={lista.isFetching} onClick={() => selecionarEdicao(d.id)} aria-controls="edicao-despesa49">Editar</Button>}
               {d.podePagar && <Button size="sm" disabled={!habilitado || locked('pagar')} onClick={() => { setPagarId(d.id); setContaCaixaId(ativas?.length === 1 ? String(ativas[0].id) : ''); }}>Registrar pagamento atômico</Button>}
               {d.podeEstornar && <Button variant="outline" size="sm" disabled={!habilitado || locked('estornar')} onClick={() => { setEstornarId(d.id); setMotivo(''); }}><Undo2 className="h-4 w-4 mr-2" />Estornar pagamento original</Button>}
             </CardContent></Card>)}

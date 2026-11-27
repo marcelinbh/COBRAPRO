@@ -74,6 +74,8 @@ vi.mock('@/lib/trpc', async () => {
   } };
 });
 import ContasPagar from './ContasPagar';
+import EdicaoDespesa49 from '@/components/EdicaoDespesa49';
+import CancelamentoPendente from '@/components/CancelamentoPendente';
 
 class HarnessReact {
   values: any[] = []; deps: any[] = []; cleanups: any[] = []; effects: any[] = [];
@@ -385,4 +387,29 @@ describe('B1/B2: regressões privadas sobre a página REAL, sem browser', () => 
     expect(data.has(storeKey(a,'pagar'))).toBe(true); await ui.click('Encerrar após'); expect(data.has(storeKey(a,'pagar'))).toBe(false); expect(data.has(storeKey(b,'pagar'))).toBe(true);
     expect(h.pay).not.toHaveBeenCalled(); expect(h.create).not.toHaveBeenCalled(); expect(h.reverse).not.toHaveBeenCalled();
   });
+});
+
+
+describe('hotfix49 integração da página: escolha explícita e eventos owner scoped',()=>{
+ function painel49() { return ui.nodes().find(n=>n.type===EdicaoDespesa49); }
+ function painel38c() { return ui.nodes().find(n=>n.type===CancelamentoPendente); }
+ it('Editar só existe na linha elegível e encaminha seleção/cotação sem qualquer writer20',async()=>{
+  await mount();expect(ui.nodes('button').filter(n=>ui.text(n)==='Editar')).toHaveLength(1);
+  await ui.click('Editar');const panel=painel49();expect(panel.props.selecao).toMatchObject({userId:h.user.id,despesaId:101});expect(panel.props.itens.map((i:any)=>i.id)).toEqual([101,102]);expect(h.pay).not.toHaveBeenCalled();expect(h.create).not.toHaveBeenCalled();expect(h.reverse).not.toHaveBeenCalled();
+  const old=h.user.id,selection=panel.props.selecao;await switchOwner(old+1);expect(painel49().props.selecao).toBeNull();expect(painel49().key).not.toBe(panel.key);expect(selection.userId).toBe(old);
+ });
+ it('recovery20 terminal confirmed emite revisão após closure real; unknown não emite nem apaga',async()=>{
+  const owner=h.user.id;begin(owner);h.reconcile.mockImplementationOnce(async request=>({...proof(owner,request),status:'unknown',proof:null,fenceId:null}));await mount();
+  await ui.click('Reconciliar UUID');expect(painel49().props.originaisRevision).toBeUndefined();expect(data.has(storeKey(owner,'pagar'))).toBe(true);
+  h.reconcile.mockImplementationOnce(async request=>({...proof(owner,request),status:'confirmed',fenceId:null,result:{operationId:op}}));await ui.click('Reconciliar UUID');expect(data.has(storeKey(owner,'pagar'))).toBe(false);expect(painel49().props.originaisRevision).toMatchObject({userId:owner});expect(h.pay).not.toHaveBeenCalled();
+ });
+ it('fence20 só libera49 após encerrar por prova, não apenas consultar',async()=>{
+  const owner=h.user.id;begin(owner);await mount();await ui.click('Reconciliar UUID');expect(painel49().props.originaisRevision).toBeUndefined();expect(data.has(storeKey(owner,'pagar'))).toBe(true);
+  await ui.click('Encerrar após');expect(data.has(storeKey(owner,'pagar'))).toBe(false);expect(painel49().props.originaisRevision).toMatchObject({userId:owner});expect(h.pay).not.toHaveBeenCalled();
+ });
+ it('callback38c recebe owner exato; callback antigo A→B→A não injeta revisão na nova sessão',async()=>{
+  await mount();const a=h.user.id,old=painel38c().props.onOriginalEncerrado;
+  old(a+1);ui.render();expect(painel49().props.originaisRevision).toBeUndefined();old(a);ui.render();expect(painel49().props.originaisRevision).toMatchObject({userId:a});
+  await switchOwner(a+1);await switchOwner(a);const writes=ui.writes;old(a);await ui.flush();expect(ui.writes).toBe(writes);expect(painel49().props.originaisRevision).toBeUndefined();
+ });
 });
