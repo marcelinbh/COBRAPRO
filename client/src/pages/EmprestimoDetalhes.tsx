@@ -21,6 +21,7 @@ import { ManutencaoJuros48 } from '@/components/ManutencaoJuros48';
 import { ManutencaoCalendario } from '@/components/ManutencaoCalendario';
 import { MultaManualAplicar } from '@/components/MultaManualOperacoes';
 import { rotaReparcelamentoAtual } from '@/lib/legacyFinanceNavigation';
+import { useAcoesListaEmprestimo62 } from '@/lib/useAcoesListaEmprestimo62';
 
 // Calendário46 posterior à manutenção48 preserva valores atuais, somente após prova fechada criação25→46/48.
 export default function EmprestimoDetalhes() {
@@ -42,6 +43,7 @@ export default function EmprestimoDetalhes() {
     { id: emprestimoId },
     { enabled: emprestimoId > 0 }
   );
+  useAcoesListaEmprestimo62({ id, emprestimo, isPending, isLoading, isError, isFetching });
 
   // Pending/paused e ausência de resposta não comprovam exclusão do contrato.
   const leituraEmAndamento = emprestimoId > 0 && !isError && (
@@ -349,12 +351,17 @@ export default function EmprestimoDetalhes() {
 
       {/* Botões de Ação */}
       <div id="manutencao-financeira" className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-6 border-t border-border">
-        {parcela && <RecebimentoValidado contratoId={emprestimo.id} parcelaId={parcela.id} permitirRenovacao onSuccess={atualizarFinanceiro} />}
+        <div id="receber-conferir" tabIndex={-1} className="rounded-lg border border-border p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          {parcela ? <RecebimentoValidado contratoId={emprestimo.id} parcelaId={parcela.id} permitirRenovacao onSuccess={atualizarFinanceiro} /> :
+            <p className="text-sm text-muted-foreground">Nenhuma parcela disponível para receber nesta ficha. Abra a aba Detalhes para conferir as parcelas; nenhuma parcela será escolhida pelo atalho.</p>}
+        </div>
         <ManutencaoJuros48 contratoId={emprestimo.id} parcelasIds={(emprestimo.todasParcelas??[]).map((p: {id:number})=>p.id)} onSuccess={atualizarFinanceiro} />
         <ManutencaoCalendario contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
-        <OperacoesObrigacao51 contratoId={emprestimo.id} alvoInicial={{ tipo: 'contrato' }} label="Adicionar parcela / editar obrigação / quitar" onSuccess={atualizarFinanceiro} />
+        <div id="editar-obrigacao" tabIndex={-1} className="rounded-lg border border-border p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <OperacoesObrigacao51 contratoId={emprestimo.id} alvoInicial={{ tipo: 'contrato' }} acaoInicial="editar" label="Adicionar parcela / editar obrigação / quitar" onSuccess={atualizarFinanceiro} />
+        </div>
         <MultaManualAplicar contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
-        <Button variant="outline" size="sm" onClick={() => setLocation(rotaReparcelamentoAtual(emprestimo.id))}>Reparcelar mensal</Button>
+        <Button id="reparcelar" variant="outline" size="sm" onClick={() => setLocation(rotaReparcelamentoAtual(emprestimo.id))}>Reparcelar mensal</Button>
         {emprestimo.clienteWhatsapp && (
           <Button className="gap-2" variant="outline" size="sm" onClick={() => handleWhatsApp(isAtrasado ? 'atraso' : 'preventivo')} disabled={loadingWpp || emprestimo.arquivado || emprestimo.statusObrigacao !== 'ativo'}>
             {loadingWpp ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageCircle className="h-4 w-4" />}
@@ -369,7 +376,7 @@ export default function EmprestimoDetalhes() {
           <FileText className="h-4 w-4" />
           {gerandoPDF ? 'Gerando...' : 'Comprovante'}
         </Button>
-        <Button title="Renúncia sem estorno ou arquivo de contrato encerrado; nunca exclusão do histórico." className="gap-2" variant="destructive" size="sm" onClick={() => setModalDeletar(true)}>
+        <Button id="cancelar-arquivar" title="Renúncia sem estorno ou arquivo de contrato encerrado; nunca exclusão do histórico." className="gap-2" variant="destructive" size="sm" onClick={() => setModalDeletar(true)}>
           <Trash2 className="h-4 w-4" /> Cancelar / arquivar
         </Button>
       </div>

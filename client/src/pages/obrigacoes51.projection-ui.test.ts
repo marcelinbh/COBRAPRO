@@ -52,6 +52,8 @@ function mounted(path: string, name: string, data: any, extras: Record<string, a
     dataHojeBrasilia: () => '2026-11-26', dataVencimentoCivil: (v: any) => String(v).slice(0, 10),
     diferencaDiasCivis: (a: string, b: string) => (Date.parse(b) - Date.parse(a)) / 86400000,
     statusCalendarioParcela: (s: string) => s, rotaReparcelamentoAtual: (id: number) => `/reparcelamento?contratoId=${id}`,
+    rotaAcaoListaEmprestimo62: (id: number, hash: string) => `/emprestimos/${id}${hash}`,
+    useAcoesListaEmprestimo62: () => {}, // Destinos62 cobertos pelo hook real em seus testes próprios.
     deveUsarListaSegura: (e: any) => e?.data?.code === 'PRECONDITION_FAILED',
     toast: { info: () => {}, error: () => {}, success: () => {} },
     financial, mutateAsync: trap, localStorage: financial, sessionStorage: financial, navigator: financial,

@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { badgeContrato } from "@/lib/statusEmprestimoBadge";
 import { noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, type Arquivo51 } from "@/lib/obrigacoes51Apresentacao";
+import { rotaAcaoListaEmprestimo62 } from "@/lib/acoesListaEmprestimo62";
 
 import type { ListaSeguraEmprestimos } from "../../../shared/emprestimosListaSegura";
 const moeda = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
@@ -80,6 +81,12 @@ export function EmprestimosListaSegura({ data, onRefresh, isFetching = false }: 
           <p>A — obrigação adicional não desembolsada: {referenciaMonetaria51(item.obrigacaoAdicional)}. Não é capital, juros ou lucro.</p>
           <p className="text-xs">{REFERENCIA51}</p>
           <a href={`/emprestimos/${item.id}`}>Abrir ficha com validação própria</a>
+          <nav aria-label={`Ações na ficha do empréstimo ${item.id}`} className="mt-3 flex flex-wrap gap-2">
+            <a href={rotaAcaoListaEmprestimo62(item.id, '#receber-conferir')} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Receber / conferir</a>
+            <a href={rotaAcaoListaEmprestimo62(item.id, '#editar-obrigacao')} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Editar obrigação</a>
+            <a href={rotaAcaoListaEmprestimo62(item.id, '#reparcelar')} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Reparcelar</a>
+            <a href={rotaAcaoListaEmprestimo62(item.id, '#cancelar-arquivar')} className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">Cancelar / arquivar</a>
+          </nav>
         </article>)}
     </div>
     {items.length === 0 && data.items.length > 0 && <p>Nenhum empréstimo neste filtro; o escopo confirmado e o histórico foram preservados.</p>}

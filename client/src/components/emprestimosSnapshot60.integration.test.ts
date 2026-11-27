@@ -3,6 +3,7 @@ import { compile, code, Hooks, ReactTree, source, text, treeNodes } from '../lib
 import { noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51 } from '../lib/obrigacoes51Apresentacao';
 import { badgeContrato } from '../lib/statusEmprestimoBadge';
 import { AVISO_LISTA_INCOMPLETA, type ListaSeguraEmprestimos } from '../../../shared/emprestimosListaSegura';
+import { rotaAcaoListaEmprestimo62 } from '../lib/acoesListaEmprestimo62';
 
 const fixture = (): ListaSeguraEmprestimos => ({ version: 'loan_list_read_v1', userId: 41,
   items: [
@@ -17,6 +18,7 @@ function renderer() {
   const component = compile(code(ast, 'EmprestimosListaSegura') + '\nreturn EmprestimosListaSegura;', {
     ...hooks.bindings(), noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, badgeContrato,
     moeda: (value: number) => `R$ ${value.toFixed(2)}`,
+    rotaAcaoListaEmprestimo62,
   });
   return (data: ListaSeguraEmprestimos, onRefresh = () => {}) => hooks.render(component, { data, onRefresh });
 }
