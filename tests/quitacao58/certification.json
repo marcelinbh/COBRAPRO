@@ -1,0 +1,952 @@
+{
+  "SQLSHA256": "cf0e949d9628b6de51a1b9cd9c52272cfbda072ffc3e9a80ea89c4f975cd6b72",
+  "baseCommit": "845b53af8205415a8e78d9dae85fce9ad170f218",
+  "onlySQLRuntimeDelta": [
+    "obrigacoes51.validar_livro_recebimento new closed helper",
+    "obrigacoes51.cotacao prosrc",
+    "obrigacoes51.manifesto assinatura"
+  ],
+  "installerChangedFromFinal30OnlyLines": [
+    25,
+    49,
+    52
+  ],
+  "original360PinsAndMetadataExpressionsExact": true,
+  "globalWitnessesExact": true,
+  "portProvenance": {
+    "full31.mjs": {
+      "certifiedSourceSHA256": "443259e39724cb39e41d98ea424a06ef4e097750eb273b1324e0cec529718433",
+      "portedSHA256": "2066ff1670c4d83c1dc5fc3bd9f79d37a79f0c763a73e906b8c786d3c2b7bd48",
+      "pathRelocationsOnly": [
+        [
+          "../final30/fixture-config30.mjs",
+          "./fixture-config30.mjs"
+        ],
+        [
+          "../final29/linked29.mjs",
+          "./linked29.mjs"
+        ],
+        [
+          "../../tree/tests/composition-obrigacoes/predecessor-sources.json",
+          "../composition-obrigacoes/predecessor-sources.json"
+        ],
+        [
+          "../../tree/tests/installer-profile/profile-tools.mjs",
+          "../installer-profile/profile-tools.mjs"
+        ],
+        [
+          "../../tree/tests/installer-profile/synthetic-baseline.mjs",
+          "../installer-profile/synthetic-baseline.mjs"
+        ],
+        [
+          "../../tree/tests/sucessores53/red53.mjs",
+          "../sucessores53/red53.mjs"
+        ],
+        [
+          "../../tree/tests/sucessores53/green53.mjs",
+          "../sucessores53/green53.mjs"
+        ],
+        [
+          "../../tree/tests/composition-obrigacoes/inclusao52.mjs",
+          "../composition-obrigacoes/inclusao52.mjs"
+        ],
+        [
+          "../../tree/tests/composition-obrigacoes/scenarios51.mjs",
+          "../composition-obrigacoes/scenarios51.mjs"
+        ],
+        [
+          "../../tree/tests/composition-obrigacoes/statefix51.mjs",
+          "../composition-obrigacoes/statefix51.mjs"
+        ],
+        [
+          "../../tree/tests/composition-obrigacoes/adversarial52.mjs",
+          "../composition-obrigacoes/adversarial52.mjs"
+        ]
+      ],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "proof-installer31.mjs": {
+      "certifiedSourceSHA256": "17da69fe2fb7182313f412c6328c33ed50ab90241211f4ff3216cce25f8b4591",
+      "portedSHA256": "34d8b956ddd04c1cc71ad1c74330bae3061a0a134676a66e1459bd41a5140a51",
+      "pathRelocationsOnly": [
+        [
+          "./installer58-final31.sql",
+          "../../drizzle/0058_quitacao_conta_alvo.sql"
+        ],
+        [
+          "const W=candidate+'/..'",
+          "const W=candidate+'/tests/quitacao58'"
+        ]
+      ],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "installer-tests31.mjs": {
+      "certifiedSourceSHA256": "6fb2db748d96e91bd6a4edb79100da8d89f8781fcc61710014c4d393b2a592cd",
+      "portedSHA256": "7cb9e9b97279abda7815c20d042d5cefba70804343366343a28454e7c3c2f764",
+      "pathRelocationsOnly": [
+        [
+          "../final30/roleconfig-tests30.mjs",
+          "./roleconfig-tests30.mjs"
+        ],
+        [
+          "../final28/witness-query28.sql",
+          "./witness-query28.sql"
+        ],
+        [
+          "../final30/installer58-final30.sql",
+          "./old30-rejected.fixture.sql"
+        ]
+      ],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "target31.mjs": {
+      "certifiedSourceSHA256": "51b4fa9c080a749f15a758e660a54cdffc1c0bf1060fd60a5ac57aa1dcd01731",
+      "portedSHA256": "55a15970bd5d282d3d7f2baee792f3e23256aee26b132609812e2275aaaa1e0d",
+      "pathRelocationsOnly": [
+        [
+          "../../tree/tests/calendario46/physical-frozen.json",
+          "../calendario46/physical-frozen.json"
+        ]
+      ],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "races31.mjs": {
+      "certifiedSourceSHA256": "bfc265451f2c5243661f13c1374e3e959a6219c6de98d7602bdef05310a71a2e",
+      "portedSHA256": "bfc265451f2c5243661f13c1374e3e959a6219c6de98d7602bdef05310a71a2e",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "native-fixture31.mjs": {
+      "certifiedSourceSHA256": "e401d595e3706943f840c506819da1b8b6838499be6684b557c1ad8304103f48",
+      "portedSHA256": "e401d595e3706943f840c506819da1b8b6838499be6684b557c1ad8304103f48",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "public-extras-fixture31.json": {
+      "certifiedSourceSHA256": "63ed10ef833a7e7d3e50e2377e95ba861e7e4d2cb2c0ec02e1ac9b0fe84ee980",
+      "portedSHA256": "63ed10ef833a7e7d3e50e2377e95ba861e7e4d2cb2c0ec02e1ac9b0fe84ee980",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "linked29.mjs": {
+      "certifiedSourceSHA256": "e4feab419a31027deb3966e023a324a3712793777fa155401f8852ba4c712dca",
+      "portedSHA256": "e4feab419a31027deb3966e023a324a3712793777fa155401f8852ba4c712dca",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "fixture-config30.mjs": {
+      "certifiedSourceSHA256": "68919b0c45661727c50bb791ff1b28aaceed8dc43282bd7967756eff6706f11a",
+      "portedSHA256": "68919b0c45661727c50bb791ff1b28aaceed8dc43282bd7967756eff6706f11a",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "roleconfig-tests30.mjs": {
+      "certifiedSourceSHA256": "74fe9a498fa5ec2dd828e8e21b792cb680b221545626909c3957f63463a49e54",
+      "portedSHA256": "74fe9a498fa5ec2dd828e8e21b792cb680b221545626909c3957f63463a49e54",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "witness-query28.sql": {
+      "certifiedSourceSHA256": "7acc8403f8f81cb6168b6925b923d798be31e07b67a191f85390c3e00af5e7d9",
+      "portedSHA256": "7acc8403f8f81cb6168b6925b923d798be31e07b67a191f85390c3e00af5e7d9",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "old30-rejected.fixture.sql": {
+      "certifiedSourceSHA256": "4fb160937077af21befbfb9a7bc060bba30a53daad21e1fcc5997121da148fad",
+      "portedSHA256": "4fb160937077af21befbfb9a7bc060bba30a53daad21e1fcc5997121da148fad",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "candidate-helper.sql": {
+      "certifiedSourceSHA256": "400740ba8ede9ce32e71b71597f64f501fa9ccf87b80f82876f3bc4976712c6b",
+      "portedSHA256": "400740ba8ede9ce32e71b71597f64f501fa9ccf87b80f82876f3bc4976712c6b",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    },
+    "candidate-cotacao.sql": {
+      "certifiedSourceSHA256": "87940824543a30547f8ea7a83ea62bb0059b7eb05c4b93dd84a42b06f8a63ce1",
+      "portedSHA256": "87940824543a30547f8ea7a83ea62bb0059b7eb05c4b93dd84a42b06f8a63ce1",
+      "pathRelocationsOnly": [],
+      "inverseRestoresExactCertifiedSource": true
+    }
+  },
+  "privateCertification": {
+    "private": {
+      "status": "GREEN",
+      "installerProbes": 56,
+      "original51Regressions": 31,
+      "scenarios53": 11,
+      "genuine52Scenarios": 6,
+      "adversarial52Cases": 14,
+      "targetCases": 6,
+      "races": [
+        {
+          "kind": "same-UUID",
+          "cid": 1037,
+          "UUIDs": [
+            "0d4e6f51-95ed-4969-96a2-bffc1585991e",
+            "0d4e6f51-95ed-4969-96a2-bffc1585991e"
+          ],
+          "outcomes": [
+            {
+              "status": "fulfilled",
+              "value": {
+                "status": "confirmed",
+                "userId": 1,
+                "versao": "obrigacoes51_v1",
+                "request": {
+                  "motivo": "Synthetic integrity race27",
+                  "proposta": {
+                    "acao": "quitar",
+                    "contaCaixaId": 1,
+                    "valorRecebido": "100.00",
+                    "reconhecoDinheiroReal": true
+                  },
+                  "contratoId": 1037,
+                  "estadoHash": "763c6693c140d72e88ccd92240b3699b2c470a08e8d8c60e1e563348212d0d35",
+                  "dataCalculo": "2026-11-27"
+                },
+                "resultado": {
+                  "acao": "quitar",
+                  "contratoId": 1037,
+                  "idsAfetados": [
+                    1138,
+                    1139
+                  ],
+                  "operationId": "f17d969e-ae3b-4af2-9ce9-f7cda03304ad",
+                  "valorRecebido": "100.00",
+                  "contaDestinoId": 1,
+                  "caixaPreservado": false
+                },
+                "idempotencyKey": "0d4e6f51-95ed-4969-96a2-bffc1585991e",
+                "sameIntentOnly": true
+              }
+            },
+            {
+              "status": "fulfilled",
+              "value": {
+                "status": "confirmed",
+                "userId": 1,
+                "versao": "obrigacoes51_v1",
+                "request": {
+                  "motivo": "Synthetic integrity race27",
+                  "proposta": {
+                    "acao": "quitar",
+                    "contaCaixaId": 1,
+                    "valorRecebido": "100.00",
+                    "reconhecoDinheiroReal": true
+                  },
+                  "contratoId": 1037,
+                  "estadoHash": "763c6693c140d72e88ccd92240b3699b2c470a08e8d8c60e1e563348212d0d35",
+                  "dataCalculo": "2026-11-27"
+                },
+                "resultado": {
+                  "acao": "quitar",
+                  "contratoId": 1037,
+                  "idsAfetados": [
+                    1138,
+                    1139
+                  ],
+                  "operationId": "f17d969e-ae3b-4af2-9ce9-f7cda03304ad",
+                  "valorRecebido": "100.00",
+                  "contaDestinoId": 1,
+                  "caixaPreservado": false
+                },
+                "idempotencyKey": "0d4e6f51-95ed-4969-96a2-bffc1585991e",
+                "sameIntentOnly": true
+              }
+            }
+          ],
+          "receipts": [
+            {
+              "id": 1075,
+              "parcela_id": 1138,
+              "tipo": "entrada",
+              "valor": "50.00"
+            },
+            {
+              "id": 1076,
+              "parcela_id": 1139,
+              "tipo": "entrada",
+              "valor": "50.00"
+            }
+          ]
+        },
+        {
+          "kind": "cancel-settle",
+          "cid": 1038,
+          "UUIDs": [
+            "4f7368a4-e0b3-45a3-9ec4-1685f568edcc",
+            "cfc88c62-02d9-4af2-8be9-f61020bdd83a"
+          ],
+          "outcomes": [
+            {
+              "status": "fulfilled",
+              "value": {
+                "status": "confirmed",
+                "userId": 1,
+                "versao": "obrigacoes51_v1",
+                "request": {
+                  "motivo": "Synthetic integrity race27",
+                  "proposta": {
+                    "acao": "cancelar",
+                    "alvo": {
+                      "tipo": "contrato"
+                    },
+                    "reconhecoSemEstorno": true
+                  },
+                  "contratoId": 1038,
+                  "estadoHash": "112993fc734efd6e9db400f0d0e36602fbfe60b4460a91930ca8a855bab70999",
+                  "dataCalculo": "2026-11-27"
+                },
+                "resultado": {
+                  "acao": "cancelar",
+                  "contratoId": 1038,
+                  "idsAfetados": [
+                    1140,
+                    1141
+                  ],
+                  "operationId": "1055bd3e-6a05-49cc-92ce-3293124fedcb",
+                  "valorRecebido": "0.00",
+                  "contaDestinoId": null,
+                  "caixaPreservado": true
+                },
+                "idempotencyKey": "4f7368a4-e0b3-45a3-9ec4-1685f568edcc",
+                "sameIntentOnly": true
+              }
+            },
+            {
+              "status": "rejected",
+              "code": "22023",
+              "message": "51 dinheiro real informado deve igualar exigibilidade cotada; sem quita\u00e7\u00e3o presumida/desconto impl\u00edcito"
+            }
+          ],
+          "receipts": []
+        },
+        {
+          "kind": "cancel-receipt",
+          "cid": 1039,
+          "UUIDs": [
+            "d45b8425-137e-4188-806c-f8d780670c99",
+            "b7d5de23-84e5-43be-92bb-9370f227ec09"
+          ],
+          "outcomes": [
+            {
+              "status": "rejected",
+              "code": "40001",
+              "message": "51 cota\u00e7\u00e3o/estado/BRT expirou"
+            },
+            {
+              "status": "fulfilled",
+              "value": {
+                "regra": "recebimento_multimodal_brt_v1",
+                "status": "paga",
+                "success": true,
+                "repetida": false,
+                "parcelaId": 1142,
+                "contratoId": 1039,
+                "operationId": "4e729542-0770-46cc-8659-bf0fb1f54f1f",
+                "contaCaixaId": 1,
+                "totalExigido": "50.00",
+                "dataPagamento": "2026-11-27",
+                "saldoResidual": "0.00",
+                "valorRecebido": "50.00",
+                "contratoStatus": "ativo",
+                "transacaoCaixaId": "1079",
+                "valorPagoAcumulado": "50.00"
+              }
+            }
+          ],
+          "receipts": [
+            {
+              "id": 1079,
+              "parcela_id": 1142,
+              "tipo": "entrada",
+              "valor": "50.00"
+            }
+          ]
+        },
+        {
+          "kind": "settle-receipt",
+          "cid": 1040,
+          "UUIDs": [
+            "5249e81d-bab5-4331-bf6b-d4358982773f",
+            "af334e0c-81c0-4226-9d66-7965609584ed"
+          ],
+          "outcomes": [
+            {
+              "status": "rejected",
+              "code": "22023",
+              "message": "51 dinheiro real informado deve igualar exigibilidade cotada; sem quita\u00e7\u00e3o presumida/desconto impl\u00edcito"
+            },
+            {
+              "status": "fulfilled",
+              "value": {
+                "regra": "recebimento_multimodal_brt_v1",
+                "status": "paga",
+                "success": true,
+                "repetida": false,
+                "parcelaId": 1144,
+                "contratoId": 1040,
+                "operationId": "e2163244-ce3f-4641-a555-f53dbf296df1",
+                "contaCaixaId": 1,
+                "totalExigido": "50.00",
+                "dataPagamento": "2026-11-27",
+                "saldoResidual": "0.00",
+                "valorRecebido": "50.00",
+                "contratoStatus": "ativo",
+                "transacaoCaixaId": "1081",
+                "valorPagoAcumulado": "50.00"
+              }
+            }
+          ],
+          "receipts": [
+            {
+              "id": 1081,
+              "parcela_id": 1144,
+              "tipo": "entrada",
+              "valor": "50.00"
+            }
+          ]
+        }
+      ],
+      "atomicSecondReceiptFailure": {
+        "cid": 1041,
+        "key": "4bc8d168-03d1-41b4-aeee-e33f35ba9a17",
+        "code": "2200H",
+        "message": "nextval: reached maximum value of sequence \"transacoes_caixa_id_seq\" (2147483647)",
+        "where": "SQL statement \"SELECT to_jsonb(nextval('public.transacoes_caixa_id_seq'::regclass))\"\nPL/pgSQL function public.multimodal_nova_linha(text) line 6 at EXECUTE\nPL/pgSQL function public.multimodal_mutar(integer,uuid,integer,integer,numeric,numeric,date,text,text,date,text) line 45 at assignment\nPL/pgSQL function public.rpc_receber_emprestimo_multimodal(integer,uuid,integer,integer,numeric,numeric,date,text,text,text) line 4 at RETURN\nPL/pgSQL function obrigacoes51.executar(integer,uuid,jsonb,boolean) line 55 at assignment\nSQL function \"rpc_executar_obrigacoes51\" statement 1",
+        "firstReceiptProven": {
+          "regra": "recebimento_multimodal_brt_v1",
+          "status": "paga",
+          "success": true,
+          "repetida": false,
+          "parcelaId": 1146,
+          "contratoId": 1041,
+          "operationId": "0aef6edc-efe7-441f-bd3f-b969deae96f8",
+          "contaCaixaId": 1,
+          "totalExigido": "50.00",
+          "dataPagamento": "2026-11-27",
+          "saldoResidual": "0.00",
+          "valorRecebido": "50.00",
+          "contratoStatus": "ativo",
+          "transacaoCaixaId": "2147483647",
+          "valorPagoAcumulado": "50.00"
+        },
+        "physicalTablesExact": 119,
+        "allOwnersRowsColumnsJournalsExact": true,
+        "catalogExact": true,
+        "sequenceRestoredExact": true,
+        "writerModified": false
+      },
+      "linked37": {
+        "loan": {
+          "id": 1042,
+          "regra": "multimodal_v1",
+          "status": "ativo",
+          "success": true,
+          "repetida": false,
+          "tipoTaxa": "mensal",
+          "jurosTotal": "0.00",
+          "modalidade": "mensal",
+          "multaAtraso": "0.0000",
+          "operationId": "a6842299-f9d0-44b0-a690-a462afa06bef",
+          "parcelasIds": [
+            1148
+          ],
+          "vencimentos": [
+            "2027-01-10"
+          ],
+          "valorParcela": "10.00",
+          "totalContrato": "10.00",
+          "dataDesembolso": "2026-11-27",
+          "numeroParcelas": 1,
+          "jurosMoraDiario": "0.0000",
+          "transacaoCaixaId": "1083"
+        },
+        "transfer": {
+          "acao": "transferir",
+          "regra": "caixa37_v1",
+          "valor": "1.00",
+          "pernas": [
+            {
+              "tipo": "saida",
+              "papel": "origem",
+              "valor": "1.00",
+              "contaCaixaId": 32,
+              "transacaoCaixaId": "1084"
+            },
+            {
+              "tipo": "entrada",
+              "papel": "destino",
+              "valor": "1.00",
+              "contaCaixaId": 33,
+              "transacaoCaixaId": "1085"
+            }
+          ],
+          "success": true,
+          "repetida": false,
+          "descricao": "Synthetic linked27",
+          "operationId": "c0a1d956-1a63-45ee-98c7-54a164357b62",
+          "contaOrigemId": 32,
+          "dataTransacao": "2026-11-27",
+          "contaDestinoId": 33,
+          "idempotencyKey": "cbda852f-6647-4058-8b7e-b71a1a8bd2f0",
+          "saldoOrigemApos": "89.00",
+          "saldoDestinoApos": "101.00",
+          "saldoOrigemAntes": "90.00",
+          "saldoDestinoAntes": "100.00",
+          "saldoTotalOwnerApos": "10000000000000192.34",
+          "saldoTotalOwnerAntes": "10000000000000192.34"
+        },
+        "cases": [
+          {
+            "name": "external linked transfer base mutation refused by original pin37 guard",
+            "code": "42501",
+            "message": "Pin37 identidade/base imut\u00e1vel",
+            "where": "PL/pgSQL function public.caixa37_conta_guardar() line 3 at RAISE",
+            "noPartialDML": true
+          },
+          {
+            "name": "foreign request mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign operation owner mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign external leg reference mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign external leg snapshot mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign external pin base mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          }
+        ],
+        "original37StrictDependencies": true,
+        "guardsNeverDisabled": true,
+        "writersUnchanged": true
+      },
+      "native54Preserved": true,
+      "managedTablesNoReadOrLock": true,
+      "cleanup": {
+        "stopped": true,
+        "status": 3,
+        "pidAbsent": true,
+        "privateSocket": true,
+        "socketMode": 448,
+        "rootRemoved": true
+      }
+    },
+    "supabase": {
+      "status": "GREEN",
+      "installerProbes": 62,
+      "original51Regressions": 31,
+      "scenarios53": 11,
+      "genuine52Scenarios": 6,
+      "adversarial52Cases": 14,
+      "targetCases": 6,
+      "races": [
+        {
+          "kind": "same-UUID",
+          "cid": 1037,
+          "UUIDs": [
+            "53344ce7-0e5e-456a-b156-5c77cf7ce55e",
+            "53344ce7-0e5e-456a-b156-5c77cf7ce55e"
+          ],
+          "outcomes": [
+            {
+              "status": "fulfilled",
+              "value": {
+                "status": "confirmed",
+                "userId": 1,
+                "versao": "obrigacoes51_v1",
+                "request": {
+                  "motivo": "Synthetic integrity race27",
+                  "proposta": {
+                    "acao": "quitar",
+                    "contaCaixaId": 1,
+                    "valorRecebido": "100.00",
+                    "reconhecoDinheiroReal": true
+                  },
+                  "contratoId": 1037,
+                  "estadoHash": "19d8779c92a50cbb8a79d51b72a4479ffd7b520970c8283632e292f9ca5bc9fb",
+                  "dataCalculo": "2026-11-27"
+                },
+                "resultado": {
+                  "acao": "quitar",
+                  "contratoId": 1037,
+                  "idsAfetados": [
+                    1138,
+                    1139
+                  ],
+                  "operationId": "45d4e5a0-bab0-453f-8a85-05e28963e324",
+                  "valorRecebido": "100.00",
+                  "contaDestinoId": 1,
+                  "caixaPreservado": false
+                },
+                "idempotencyKey": "53344ce7-0e5e-456a-b156-5c77cf7ce55e",
+                "sameIntentOnly": true
+              }
+            },
+            {
+              "status": "fulfilled",
+              "value": {
+                "status": "confirmed",
+                "userId": 1,
+                "versao": "obrigacoes51_v1",
+                "request": {
+                  "motivo": "Synthetic integrity race27",
+                  "proposta": {
+                    "acao": "quitar",
+                    "contaCaixaId": 1,
+                    "valorRecebido": "100.00",
+                    "reconhecoDinheiroReal": true
+                  },
+                  "contratoId": 1037,
+                  "estadoHash": "19d8779c92a50cbb8a79d51b72a4479ffd7b520970c8283632e292f9ca5bc9fb",
+                  "dataCalculo": "2026-11-27"
+                },
+                "resultado": {
+                  "acao": "quitar",
+                  "contratoId": 1037,
+                  "idsAfetados": [
+                    1138,
+                    1139
+                  ],
+                  "operationId": "45d4e5a0-bab0-453f-8a85-05e28963e324",
+                  "valorRecebido": "100.00",
+                  "contaDestinoId": 1,
+                  "caixaPreservado": false
+                },
+                "idempotencyKey": "53344ce7-0e5e-456a-b156-5c77cf7ce55e",
+                "sameIntentOnly": true
+              }
+            }
+          ],
+          "receipts": [
+            {
+              "id": 1075,
+              "parcela_id": 1138,
+              "tipo": "entrada",
+              "valor": "50.00"
+            },
+            {
+              "id": 1076,
+              "parcela_id": 1139,
+              "tipo": "entrada",
+              "valor": "50.00"
+            }
+          ]
+        },
+        {
+          "kind": "cancel-settle",
+          "cid": 1038,
+          "UUIDs": [
+            "e3735bbb-19b7-4583-802c-77a8c650030e",
+            "d875ea9d-b885-47ce-a636-2de8c87c71fe"
+          ],
+          "outcomes": [
+            {
+              "status": "fulfilled",
+              "value": {
+                "status": "confirmed",
+                "userId": 1,
+                "versao": "obrigacoes51_v1",
+                "request": {
+                  "motivo": "Synthetic integrity race27",
+                  "proposta": {
+                    "acao": "cancelar",
+                    "alvo": {
+                      "tipo": "contrato"
+                    },
+                    "reconhecoSemEstorno": true
+                  },
+                  "contratoId": 1038,
+                  "estadoHash": "e929b73e08ade2255d1fabe7721ace92c46b718517a3affee3fc1fc8bdd29c49",
+                  "dataCalculo": "2026-11-27"
+                },
+                "resultado": {
+                  "acao": "cancelar",
+                  "contratoId": 1038,
+                  "idsAfetados": [
+                    1140,
+                    1141
+                  ],
+                  "operationId": "342dd3a6-01fa-4a1a-ab12-d129be92e218",
+                  "valorRecebido": "0.00",
+                  "contaDestinoId": null,
+                  "caixaPreservado": true
+                },
+                "idempotencyKey": "e3735bbb-19b7-4583-802c-77a8c650030e",
+                "sameIntentOnly": true
+              }
+            },
+            {
+              "status": "rejected",
+              "code": "22023",
+              "message": "51 dinheiro real informado deve igualar exigibilidade cotada; sem quita\u00e7\u00e3o presumida/desconto impl\u00edcito"
+            }
+          ],
+          "receipts": []
+        },
+        {
+          "kind": "cancel-receipt",
+          "cid": 1039,
+          "UUIDs": [
+            "2e19bc6c-395c-4a52-973b-706abcf8231d",
+            "ffb70cac-a2d8-486b-8cf5-f97425811a2d"
+          ],
+          "outcomes": [
+            {
+              "status": "rejected",
+              "code": "40001",
+              "message": "51 cota\u00e7\u00e3o/estado/BRT expirou"
+            },
+            {
+              "status": "fulfilled",
+              "value": {
+                "regra": "recebimento_multimodal_brt_v1",
+                "status": "paga",
+                "success": true,
+                "repetida": false,
+                "parcelaId": 1142,
+                "contratoId": 1039,
+                "operationId": "241f335d-8e5a-4114-893b-a068d45c75df",
+                "contaCaixaId": 1,
+                "totalExigido": "50.00",
+                "dataPagamento": "2026-11-27",
+                "saldoResidual": "0.00",
+                "valorRecebido": "50.00",
+                "contratoStatus": "ativo",
+                "transacaoCaixaId": "1079",
+                "valorPagoAcumulado": "50.00"
+              }
+            }
+          ],
+          "receipts": [
+            {
+              "id": 1079,
+              "parcela_id": 1142,
+              "tipo": "entrada",
+              "valor": "50.00"
+            }
+          ]
+        },
+        {
+          "kind": "settle-receipt",
+          "cid": 1040,
+          "UUIDs": [
+            "37aba254-6b2c-4a8e-ada5-b0e61b0bfe4a",
+            "511a9257-39bf-468e-bb59-dc17b2b7d256"
+          ],
+          "outcomes": [
+            {
+              "status": "rejected",
+              "code": "22023",
+              "message": "51 dinheiro real informado deve igualar exigibilidade cotada; sem quita\u00e7\u00e3o presumida/desconto impl\u00edcito"
+            },
+            {
+              "status": "fulfilled",
+              "value": {
+                "regra": "recebimento_multimodal_brt_v1",
+                "status": "paga",
+                "success": true,
+                "repetida": false,
+                "parcelaId": 1144,
+                "contratoId": 1040,
+                "operationId": "eba3d867-b6d3-464f-a7f6-21e77af1ddf0",
+                "contaCaixaId": 1,
+                "totalExigido": "50.00",
+                "dataPagamento": "2026-11-27",
+                "saldoResidual": "0.00",
+                "valorRecebido": "50.00",
+                "contratoStatus": "ativo",
+                "transacaoCaixaId": "1081",
+                "valorPagoAcumulado": "50.00"
+              }
+            }
+          ],
+          "receipts": [
+            {
+              "id": 1081,
+              "parcela_id": 1144,
+              "tipo": "entrada",
+              "valor": "50.00"
+            }
+          ]
+        }
+      ],
+      "atomicSecondReceiptFailure": {
+        "cid": 1041,
+        "key": "6116ca8a-3150-4ec4-abec-5a901ee48dd0",
+        "code": "2200H",
+        "message": "nextval: reached maximum value of sequence \"transacoes_caixa_id_seq\" (2147483647)",
+        "where": "SQL statement \"SELECT to_jsonb(nextval('public.transacoes_caixa_id_seq'::regclass))\"\nPL/pgSQL function public.multimodal_nova_linha(text) line 6 at EXECUTE\nPL/pgSQL function public.multimodal_mutar(integer,uuid,integer,integer,numeric,numeric,date,text,text,date,text) line 45 at assignment\nPL/pgSQL function public.rpc_receber_emprestimo_multimodal(integer,uuid,integer,integer,numeric,numeric,date,text,text,text) line 4 at RETURN\nPL/pgSQL function obrigacoes51.executar(integer,uuid,jsonb,boolean) line 55 at assignment\nSQL function \"rpc_executar_obrigacoes51\" statement 1",
+        "firstReceiptProven": {
+          "regra": "recebimento_multimodal_brt_v1",
+          "status": "paga",
+          "success": true,
+          "repetida": false,
+          "parcelaId": 1146,
+          "contratoId": 1041,
+          "operationId": "71a85856-1f27-4339-9008-795f097339a1",
+          "contaCaixaId": 1,
+          "totalExigido": "50.00",
+          "dataPagamento": "2026-11-27",
+          "saldoResidual": "0.00",
+          "valorRecebido": "50.00",
+          "contratoStatus": "ativo",
+          "transacaoCaixaId": "2147483647",
+          "valorPagoAcumulado": "50.00"
+        },
+        "physicalTablesExact": 119,
+        "allOwnersRowsColumnsJournalsExact": true,
+        "catalogExact": true,
+        "sequenceRestoredExact": true,
+        "writerModified": false
+      },
+      "linked37": {
+        "loan": {
+          "id": 1042,
+          "regra": "multimodal_v1",
+          "status": "ativo",
+          "success": true,
+          "repetida": false,
+          "tipoTaxa": "mensal",
+          "jurosTotal": "0.00",
+          "modalidade": "mensal",
+          "multaAtraso": "0.0000",
+          "operationId": "97bedfbd-5c39-4b9d-b887-249b31316f42",
+          "parcelasIds": [
+            1148
+          ],
+          "vencimentos": [
+            "2027-01-10"
+          ],
+          "valorParcela": "10.00",
+          "totalContrato": "10.00",
+          "dataDesembolso": "2026-11-27",
+          "numeroParcelas": 1,
+          "jurosMoraDiario": "0.0000",
+          "transacaoCaixaId": "1083"
+        },
+        "transfer": {
+          "acao": "transferir",
+          "regra": "caixa37_v1",
+          "valor": "1.00",
+          "pernas": [
+            {
+              "tipo": "saida",
+              "papel": "origem",
+              "valor": "1.00",
+              "contaCaixaId": 32,
+              "transacaoCaixaId": "1084"
+            },
+            {
+              "tipo": "entrada",
+              "papel": "destino",
+              "valor": "1.00",
+              "contaCaixaId": 33,
+              "transacaoCaixaId": "1085"
+            }
+          ],
+          "success": true,
+          "repetida": false,
+          "descricao": "Synthetic linked27",
+          "operationId": "e5567c04-8007-46ea-9d17-906cc7e10857",
+          "contaOrigemId": 32,
+          "dataTransacao": "2026-11-27",
+          "contaDestinoId": 33,
+          "idempotencyKey": "04cb4a21-3439-4d49-b26b-d7e49d97805a",
+          "saldoOrigemApos": "89.00",
+          "saldoDestinoApos": "101.00",
+          "saldoOrigemAntes": "90.00",
+          "saldoDestinoAntes": "100.00",
+          "saldoTotalOwnerApos": "10000000000000192.34",
+          "saldoTotalOwnerAntes": "10000000000000192.34"
+        },
+        "cases": [
+          {
+            "name": "external linked transfer base mutation refused by original pin37 guard",
+            "code": "42501",
+            "message": "Pin37 identidade/base imut\u00e1vel",
+            "where": "PL/pgSQL function public.caixa37_conta_guardar() line 3 at RAISE",
+            "noPartialDML": true
+          },
+          {
+            "name": "foreign request mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign operation owner mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign external leg reference mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign external leg snapshot mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          },
+          {
+            "name": "foreign external pin base mutation",
+            "code": "42501",
+            "message": "Prova/pin/fence37 imut\u00e1vel",
+            "guardPreserved": true
+          }
+        ],
+        "original37StrictDependencies": true,
+        "guardsNeverDisabled": true,
+        "writersUnchanged": true
+      },
+      "native54Preserved": true,
+      "managedTablesNoReadOrLock": true,
+      "cleanup": {
+        "stopped": true,
+        "status": 3,
+        "pidAbsent": true,
+        "privateSocket": true,
+        "socketMode": 448,
+        "rootRemoved": true
+      }
+    }
+  },
+  "productionPostflight": {
+    "appliedOnceUTC": "2026-11-27T12:41:43Z",
+    "pins361Exact": true,
+    "original15VerifiersPassed": true,
+    "financial97AllColumnsAllOwnersEqual": true,
+    "other14SealsExact": true,
+    "all70NonfinancialFunctionsExact": true,
+    "rolesAndDatabaseConfigUnchanged": true,
+    "noHistoricalRepair": true,
+    "platform100": false,
+    "UISettlementNotYetSubmitted": true
+  }
+}

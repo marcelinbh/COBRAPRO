@@ -1454,3 +1454,14 @@ Este fechamento complementa, sem apagar, os registros anteriores que ainda descr
 - [ ] Checkpoint/push/publicação deste novo incremento e smoke produtivo ainda não certificados neste registro; não confundir gate local com produção.
 
 Limites preservados: leitura APP não é snapshot transacional e não elimina TOCTOU/ABA; queries por contrato limitadas a4 em voo, sem SLA real de latência; SSR/mocks da lista não substituem smoke autenticado de produção. Cheques por último; Kiwify/ofertas, novas mensagens WhatsApp/fila/replays, saneamento histórico, roles, plano e reinícios permanecem fora deste incremento. Não declarar plataforma100%.
+
+## Incremento58 — 27/11/2026 09:42 BRT
+
+- [x] SQL exato `0058_quitacao_conta_alvo.sql` SHA `cf0e949d9628b6de51a1b9cd9c52272cfbda072ffc3e9a80ea89c4f975cd6b72` certificado em dois perfis PostgreSQL17, sem modificar fontes/selos originais para fazer o fixture passar.
+- [x] Instalação Supabase UMA vez09:41:43; pós-conferência361 pinos, 15 verificadores originais, 97 financeiros todas as colunas/empresas iguais, 14 selos preservados e 70 extras não financeiros exatos.
+- [x] Helper fechado da conta-alvo; owner/locks/todos os vínculos relevantes mantidos. Nenhum saneamento dos seis vínculos legados divergentes, sem alteração dos writers35/37/51 ou do compiled54.
+- [ ] Versionamento/publicação58 e conferência Live dos dois destinos — pendentes neste registro.
+- [ ] Quitação real13 do contrato fictício463 e arquivo posterior, somente com readback/UUID único; nenhuma submissão neste certificado.
+- [ ] Lista: candidata59 NÃO liberada, fanout4 e serial1 reais falharam57014 apesar dos cinco gates privados aprovados.
+- [ ] Agenda WhatsApp: resposta natural200 não certifica envio/entrega; não houve novo envio de teste nem fila geral.
+- [ ] Cheques por último; Kiwify/ofertas fora do escopo. Não declarar plataforma100%.

@@ -1,0 +1,162 @@
+[
+  {
+    "proname": "blacklist_access_guard",
+    "args": "",
+    "body_hash": "e5e0175dcb68fcb5dc659d1435499c910c037e360ec6c128125783cacd650f11",
+    "acl": "{postgres=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "blacklist_delete_empty_owned",
+    "args": "target_id integer, owner_id integer",
+    "body_hash": "65e60515ea19f3669bb51e53de8ca2abe3df7a7a07bd09ff8de9491550f9647f",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "blacklist_fotos_guard",
+    "args": "",
+    "body_hash": "c0b4f192a1b00691c1e6e258a2e1c9ee5dbea08a54748d1623e804dba5aa995c",
+    "acl": "{postgres=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "consume_password_reset_and_revoke_sessions",
+    "args": "p_token_hash text, p_password_hash text",
+    "body_hash": "e524e2a3ed88a98b15f7b9ec8d7425e3a9d1c7d16fafe6a03184c1a210dcea61",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog, public"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "kiwify_blacklist_identity",
+    "args": "",
+    "body_hash": "e3cf72d59b128b5a39ef91f89ae96606f187364c764d62ca362c478fa1d61b66",
+    "acl": "{postgres=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "kiwify_blacklist_immutable",
+    "args": "",
+    "body_hash": "c904bf80dddcba0906ce18c51f00099185fc0252b6d055e1852a49fce0affcda",
+    "acl": "{postgres=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "kiwify_buyer_identity",
+    "args": "",
+    "body_hash": "68dd9dabba58d9dbc79afe24fb9454ce54ebef571aa18506cdc61adf18ae990b",
+    "acl": "{postgres=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "revogar_sessoes_ao_alterar_senha",
+    "args": "",
+    "body_hash": "4407ad666c206b34f22ce3ef7d818dbb30160ee165c9893b4379c95bcf5df55c",
+    "acl": "{=X/postgres,postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog, public"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_concluir_onboarding",
+    "args": "p_user_id integer, p_nome_empresa text, p_nome_conta text, p_tipo_conta text",
+    "body_hash": "c03e6dd33a495a5eb5b2491c74c9855c82a20c3b52dd2d8ceca57acd0be9aa37",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog, pg_temp"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_kiwify_blacklist_access",
+    "args": "p_user_id integer",
+    "body_hash": "722adf8671214f17bb526716165cc86b31529130176767905b7a208291948d6c",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_kiwify_blacklist_consume",
+    "args": "p_event jsonb",
+    "body_hash": "bc3323053a8a5b8822d41e20176093079d92c00d996e17e7170dfc5f9370c2ac",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_kiwify_blacklist_find_users",
+    "args": "p_email text",
+    "body_hash": "98e4f27297ed4275c9c223261a53326ab8c0d16f1ec6a545c4c2117ed8edc3fe",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_kiwify_blacklist_order_binding",
+    "args": "p_order_id text",
+    "body_hash": "ce31a020d6dc6e65ce50bd3176b7dbd7e132bf41cd47081630a07dbccf4f1fdd",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_kiwify_buyer_invite_claim",
+    "args": "p_claim jsonb",
+    "body_hash": "4438d362a6cadd79b0b280355049f26b69e62d17b59008175f76696378b6e096",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_kiwify_buyer_invite_finish",
+    "args": "p_result jsonb",
+    "body_hash": "0dbe734de60744b1d072e174b1dbe082d227ceea38294821b16a4eef37e3c3d8",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  },
+  {
+    "proname": "rpc_kiwify_buyer_provision",
+    "args": "p_buyer jsonb",
+    "body_hash": "f2653c3688cfe2175c9c9d085a055023d41c054e89243bc06f73ffe658646662",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "proconfig": [
+      "search_path=pg_catalog"
+    ],
+    "owner": "postgres"
+  }
+]
