@@ -152,12 +152,29 @@ export function mapearSnapshot60(raw: unknown, owner: number): ListaSeguraEmpres
     warning: complete ? null : AVISO_LISTA_INCOMPLETA };
 }
 
-/** Serviço de uma única RPC. Erro SQL/network nunca vira placeholder ou snapshot vazio. */
+const statementTimeout60 = z.object({
+  data: z.null(),
+  error: z.object({ code: z.literal('57014'), message: z.literal('canceling statement due to statement timeout'),
+    details: z.string().nullable(), hint: z.string().nullable() }).strict(),
+  status: z.literal(500), count: z.null().optional(), statusText: z.string().optional(),
+}).strict();
+
+// Único site RPC, mesma instância/owner; copyJson precede qualquer predicado de retry.
+async function fetchSnapshot60(client: Client60, owner: number): Promise<unknown> {
+  let response;
+  try { response = await client.rpc(RPC60, { p_user_id: owner }); } catch { return readFail(); }
+  try { return copyJson(response); } catch { return readFail(); }
+}
+
+/** Apenas leitura: uma repetição no timeout nativo exato; nunca recuperação financeira ou vazio por erro. */
 export async function listarEmprestimosSnapshot60(client: Client60 | null | undefined, owner: unknown): Promise<ListaSeguraEmprestimos> {
   if (!int32.safeParse(owner).success) throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Sessão inválida.' });
   if (!client) return readFail();
-  let response;
-  try { response = await client.rpc(RPC60, { p_user_id: owner }); } catch { return readFail(); }
+  let response = await fetchSnapshot60(client, owner as number);
+  if (statementTimeout60.safeParse(response).success) {
+    await new Promise<void>(resolve => setTimeout(resolve, 250));
+    response = await fetchSnapshot60(client, owner as number);
+  }
   let envelope: { data: unknown; error: unknown; status?: number; statusText?: string; count?: null; success?: boolean };
   try { envelope = z.object({ data: z.unknown(), error: z.unknown(), status: z.number().int().min(200).max(299).optional(), statusText: z.string().optional(), count: z.null().optional(), success: z.literal(true).optional() }).strict().parse(copyJson(response)); }
   catch { return readFail(); }
