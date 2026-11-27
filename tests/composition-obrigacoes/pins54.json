@@ -1,0 +1,163 @@
+{
+  "baseCommit": "c6b78c549395bb5b06bd58187871d5dac3e9a5d5",
+  "historicalSources": {
+    "drizzle/0034_rpc_recebimento_legado_validado.sql": "615d0b81fb1a41b5dd205214ebddc7e32f0d75576022df66905bc90396959ad0",
+    "drizzle/0035_rpc_ciclo_emprestimos_multimodal.sql": "6e5c11587d571e64a51585488c2fad7075f4d5dfeb9202a3a5dced795a9c0b03",
+    "drizzle/0036_rpc_multa_manual_fixa.sql": "7194c1f7038eb9e36358330614249b66575075bef465fcfe3c8aca59a4fed21f",
+    "drizzle/0037_rpc_aporte_transferencia_caixa.sql": "2acc5c0840e77a1131fa02d04f0b1faf85bbdb0430071b73477a276ded312334",
+    "drizzle/0044_manutencao_emprestimos.sql": "16cb42492a21e1b79d208dd82e6b9bdf79579fa746cdff620226939614951f76",
+    "drizzle/0045_caixa_manutencao_observacao_auditada.sql": "8cec2a580792d47216b23891f73bc6fd58094fb8c44bcb17d252ad4f41516ac1",
+    "drizzle/0046_calendario25_governado.sql": "ec67ec73246271771fcbe0e25fb9c235aaa437cba76e58330f4723ef739c0a0f",
+    "drizzle/0047_reparcelamento_atual.sql": "1b0a6e9bac53b00e859db9ef3fe3cd61b21a22401c5156a7e36250eb22a64175",
+    "drizzle/0048_manutencao25_governada.sql": "218468f779c33d68e1093cd3ca1bfbca37fddb12761828b5d885b3ef4d913ebd",
+    "drizzle/0049_manutencao_despesas.sql": "6b44cc2b28565147605f4183154e42205953b1faee86f35fec9eec22975601bb",
+    "drizzle/0038c_cancelamento_pendente_isolado.sql": "5fe0f34f68ed727da7058ff1fad9883fb36b6d38400ef65964a66d578d5bb261",
+    "drizzle/0051_composicao_obrigacoes.sql": "4df5a5b8fe7b3f0ed88be71e9376779e79a3c24f5a043fc64f7813dda6c18365"
+  },
+  "originalBodySha256": "791ce1e7352d9a72e2a8ece9ab0126594622a266d85bee69d3f7e057702981ab",
+  "compiledBodySha256": "8f587261d12bad22e26b6a3381f2c8004c6ab950faf1a9c3dd5e6932778e7074",
+  "compiledDDLSha256": "c491d7b504973b7ed5226347d6b464676764e18281acf6700417896def5a7652",
+  "uniqueBodies": [
+    "obrigacoes51.verificar",
+    "public.legados_verificar",
+    "public.multimodal_verificar",
+    "public.multa36_verificar",
+    "public.caixa37_verificar",
+    "manutencao44.verificar",
+    "caixa_manutencao45.verificar",
+    "calendario46.verificar",
+    "private47.verificar",
+    "manutencao48.verificar",
+    "despesas49.verificar",
+    "despesa_cancelamento_v1.verificar"
+  ],
+  "removedCallStatements": [
+    {
+      "parent": "public.multa36_verificar",
+      "child": "public.multimodal_verificar"
+    },
+    {
+      "parent": "public.multa36_verificar",
+      "child": "public.legados_verificar"
+    },
+    {
+      "parent": "public.caixa37_verificar",
+      "child": "public.multa36_verificar"
+    },
+    {
+      "parent": "manutencao44.verificar",
+      "child": "public.caixa37_verificar"
+    },
+    {
+      "parent": "caixa_manutencao45.verificar",
+      "child": "public.caixa37_verificar"
+    },
+    {
+      "parent": "calendario46.verificar",
+      "child": "public.caixa37_verificar"
+    },
+    {
+      "parent": "calendario46.verificar",
+      "child": "manutencao44.verificar"
+    },
+    {
+      "parent": "calendario46.verificar",
+      "child": "caixa_manutencao45.verificar"
+    },
+    {
+      "parent": "private47.verificar",
+      "child": "public.caixa37_verificar"
+    },
+    {
+      "parent": "manutencao48.verificar",
+      "child": "public.caixa37_verificar"
+    },
+    {
+      "parent": "manutencao48.verificar",
+      "child": "manutencao44.verificar"
+    },
+    {
+      "parent": "manutencao48.verificar",
+      "child": "caixa_manutencao45.verificar"
+    },
+    {
+      "parent": "despesas49.verificar",
+      "child": "public.caixa37_verificar"
+    },
+    {
+      "parent": "despesa_cancelamento_v1.verificar",
+      "child": "public.caixa37_verificar"
+    },
+    {
+      "parent": "despesas49.verificar",
+      "child": "caixa_manutencao45.verificar"
+    }
+  ],
+  "contexts": {
+    "public.legados_verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "public.multimodal_verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "public.multa36_verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "public.caixa37_verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "manutencao44.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "caixa_manutencao45.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "calendario46.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "private47.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "manutencao48.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "despesas49.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "despesa_cancelamento_v1.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp",
+    "obrigacoes51.verificar": "void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp"
+  },
+  "blocks": {
+    "public.legados_verificar": {
+      "bodySha256": "4bb4925e1a76510f7f2f41a911892c6eb24ce26464c4e19699bbc4cb14bb49c3",
+      "path": "drizzle/0034_rpc_recebimento_legado_validado.sql"
+    },
+    "public.multimodal_verificar": {
+      "bodySha256": "7dc7acd5a53f51f5f16c2702ee1bcd77344aa9eec436bac7c880b1c25ac0a3b0",
+      "path": "drizzle/0035_rpc_ciclo_emprestimos_multimodal.sql"
+    },
+    "public.multa36_verificar": {
+      "bodySha256": "dbfaceb9994018331bd7308590e9f4cb597c3475452713d9d0cd45c4bd2dd45f",
+      "path": "drizzle/0036_rpc_multa_manual_fixa.sql"
+    },
+    "public.caixa37_verificar": {
+      "bodySha256": "9a5329cf96c4d571d59990cda6943906f77d3b7ff64b086a8a81971ac8abd581",
+      "path": "drizzle/0037_rpc_aporte_transferencia_caixa.sql"
+    },
+    "manutencao44.verificar": {
+      "bodySha256": "e1a7f5b3c6a0b138e428e12505f4681005cdf1c0d00c3f028cc4b1a65a6953ad",
+      "path": "drizzle/0044_manutencao_emprestimos.sql"
+    },
+    "caixa_manutencao45.verificar": {
+      "bodySha256": "7fede673d9cc0d3fa53f27d5ef6b187c629861905d6e19aca0876a6146af37f6",
+      "path": "drizzle/0045_caixa_manutencao_observacao_auditada.sql"
+    },
+    "calendario46.verificar": {
+      "bodySha256": "09cb0dd93eaaee06fa0bbc13bd8ada7cbdad93d9c61c5c39934941fbd92da874",
+      "path": "drizzle/0046_calendario25_governado.sql"
+    },
+    "private47.verificar": {
+      "bodySha256": "e65c931a8772724ea92d6af2948132d78162d978dede8ea3e7395c644b5b4ad8",
+      "path": "drizzle/0047_reparcelamento_atual.sql"
+    },
+    "manutencao48.verificar": {
+      "bodySha256": "c2c544854349be8b9b7e3cd7428ff42064610ef96c5f85399ec4b3040166b031",
+      "path": "drizzle/0048_manutencao25_governada.sql"
+    },
+    "despesas49.verificar": {
+      "bodySha256": "85b4baeb80d7901d7bb98a39b34f1cf236095ee1866ab54f97b80b654460c144",
+      "path": "drizzle/0049_manutencao_despesas.sql"
+    },
+    "despesa_cancelamento_v1.verificar": {
+      "bodySha256": "9841c58a9e7496dd7008695ca235d15205ff12cf5f44c72b6bada3016d96b277",
+      "path": "drizzle/0038c_cancelamento_pendente_isolado.sql"
+    },
+    "obrigacoes51.verificar": {
+      "bodySha256": "791ce1e7352d9a72e2a8ece9ab0126594622a266d85bee69d3f7e057702981ab",
+      "path": "drizzle/0051_composicao_obrigacoes.sql"
+    }
+  },
+  "allowedCatalogDelta": "obrigacoes51.verificar.prosrc only",
+  "allowedDML": "obrigacoes51.manifesto.assinatura only; install-time derived expected hash",
+  "pinCount": 326
+}
