@@ -1,0 +1,100 @@
+{
+  "changed": [
+    {
+      "name": "private47.validar",
+      "old": "096b37700f58db7658d67d63f0975d1bfa8adb63eeda10d42567c9cda2313664",
+      "new": "644b1e8cc8f6a2657545ec68adf2d3776d30e4ce9da1154302231363b4ad3fac"
+    },
+    {
+      "name": "public.multimodal_guardar",
+      "old": "5559bb655bd9c839b4bc24945d122002da65665744cf28ab6fa8116c7958407d",
+      "new": "9ffd539c65c24271b1b779237fee9162bfc36e93a0735928dcf7f977987e1c24"
+    }
+  ],
+  "new": [
+    {
+      "name": "sucessores53.hash",
+      "body": "ad95c9ac0f3d569429a85b97b2ae3db0e8d022019eb2f330f19043bfc0030f4d"
+    },
+    {
+      "name": "sucessores53.proposta",
+      "body": "95a55ed6cf71ab4287c6456a79f56e2c87cccd83d5dbfadc62ef336b8ae5f592"
+    },
+    {
+      "name": "sucessores53.request",
+      "body": "df1b701fcbe8b88eacc32aae14df3aeedd2e57b88af5672313cfbde40d5ce732"
+    },
+    {
+      "name": "sucessores53.abertas",
+      "body": "0303303e1a0b2e9802ceacdd1eecc0aa8bfdfb010f414a193286bf22fb4a1291"
+    },
+    {
+      "name": "sucessores53.plano",
+      "body": "e9a6d7e6bdb9bfb8c4e8c19ad6851b849011ae9deb7f002eda936cae9b5fbc89"
+    },
+    {
+      "name": "sucessores53.recebimento",
+      "body": "980633498683ee53e9db7d3e2997eabddc4877882f254bd3e1d2cec660196a79"
+    },
+    {
+      "name": "sucessores53.replay",
+      "body": "8133b4115294993add1d73782e6c26bf7f7639571a62dceeae06b7ddfb3056c8"
+    },
+    {
+      "name": "sucessores53.closure",
+      "body": "fe345d9368f9e432f30bda2fb8d9e91b50bf08eaa99006e0d03ad51f8aa6d129"
+    },
+    {
+      "name": "sucessores53.cotar",
+      "body": "01e2994bd6cb64ea04a0bab344f7fb982c031fdd8eaa060bf393c2638f404d92"
+    },
+    {
+      "name": "sucessores53.consumir",
+      "body": "9326a432953535b8ca258ef76467e45384939122e415dc54f79b8a26af6860c8"
+    },
+    {
+      "name": "sucessores53.escrever",
+      "body": "e487826545f5b513f34959343d7396fcc58a38ba0afae3220914d8037f472b71"
+    },
+    {
+      "name": "sucessores53.executar",
+      "body": "3ee8f142cf09004f4aa352d87c1cea17c698fdae309fa5ae27450a2d854e9595"
+    },
+    {
+      "name": "sucessores53.estado",
+      "body": "5c31fd3c6cd1d45252aab0452741858dac1fc346c5f1669c7805cfafe976a55c"
+    },
+    {
+      "name": "sucessores53.imutavel",
+      "body": "b5962beb4db08e6ab8e18f0556e2da72691cc8f2e195823db84ad61792c23049"
+    },
+    {
+      "name": "sucessores53.commit_check",
+      "body": "cc1a2fac5e8d9fc24da48deb0704b746d2995e19559e7c100c87422721dc92c5"
+    },
+    {
+      "name": "sucessores53.metadata",
+      "body": "3fd9971f07415afeefe826b0c5c76c13fdc28d6a9c09561927ca7b248e1e771e"
+    },
+    {
+      "name": "sucessores53.verificar",
+      "body": "68ba74200f5dc7f0269b2dc9251d753953330500b8d500760ca69f65d45a4d39"
+    },
+    {
+      "name": "public.rpc_cotar_sucessores53",
+      "body": "92da8394c9084230be64f65d695399891a0ee4d09112d6c81b6dd6f2a8807d11"
+    },
+    {
+      "name": "public.rpc_executar_sucessores53",
+      "body": "11127dc6efd3a238ebdfaddfa9ea2d5d7b9f99cd87bcdf10f62f5e681deedb7c"
+    },
+    {
+      "name": "public.rpc_conferir_sucessores53",
+      "body": "4e109578046587b90cd9d74de4de69927c0bdc02cb221edd7e067eaf450506f1"
+    },
+    {
+      "name": "public.rpc_estado_sucessores53",
+      "body": "b5f3311bab869dfaff24d4a773d736430e6e5430965be2dfc41f17979592c6ab"
+    }
+  ]
+}

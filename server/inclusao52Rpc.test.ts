@@ -1,0 +1,12 @@
+import {describe,it,expect,vi} from 'vitest';
+import {capacidadeInclusao52} from '../shared/inclusao52';
+import {capacidade52} from './services/inclusao52Rpc';
+import {executar51} from './services/obrigacoes51Rpc';
+const cap={versao:'inclusao52_v1',predecessor:'obrigacoes51_v1',disponivel:true,coortes:['prospectivo21_mensal','multimodal35_semanal','multimodal35_quinzenal','multimodal35_diario','legado34_mensal_estrito'],classificacao:'obrigacao_adicional_nao_desembolsada',caixaPreservado:true};
+describe('capacidade explícita52 e facade51 preservada',()=>{
+ it('exige contrato literal completo e não adota disponibilidade51 antiga',()=>{expect(capacidadeInclusao52.parse(cap)).toEqual(cap);expect(capacidadeInclusao52.safeParse({versao:'obrigacoes51_v1',disponivel:true}).success).toBe(false);for(const bad of [{...cap,coortes:['Price']},{...cap,caixaPreservado:false},{...cap,extra:true}])expect(capacidadeInclusao52.safeParse(bad).success).toBe(false);});
+ it('consulta apenas uma nova facade de catálogo, fail-closed em erro ou shape antigo',async()=>{const rpc=vi.fn().mockResolvedValue({data:cap,error:null});expect(await capacidade52({rpc})).toEqual(cap);expect(rpc).toHaveBeenCalledWith('rpc_capacidade_inclusao52',{});rpc.mockResolvedValue({data:{versao:'obrigacoes51_v1',disponivel:true},error:null});await expect(capacidade52({rpc})).rejects.toThrow();expect(rpc).toHaveBeenCalledTimes(2);});
+ it('owner ctx21/legado/não mensal permanece em uma facade51 com pedido textual e sem origem inventada',async()=>{
+  for(const contratoId of [21,34,35]){const input={ownerId:1,sessionScope:'a'.repeat(64),idempotencyKey:'11111111-1111-4111-8111-111111111111',contratoId,proposta:{acao:'adicionar' as const,valor:'17.35',dataVencimento:'2027-04-10',classificacao:'obrigacao_adicional_nao_desembolsada' as const},estadoHash:'b'.repeat(64),dataCalculo:'2026-11-26',motivo:'Teste52'};const {ownerId,sessionScope,idempotencyKey,...request}=input;const closed={status:'confirmed',versao:'obrigacoes51_v1',sameIntentOnly:true,userId:1,idempotencyKey,request,resultado:{operationId:'22222222-2222-4222-8222-222222222222',contratoId,acao:'adicionar',idsAfetados:[36],valorRecebido:'0.00',contaDestinoId:null,caixaPreservado:true}};const rpc=vi.fn().mockResolvedValue({data:closed,error:null});expect(await executar51({rpc},1,input)).toEqual(closed);expect(rpc).toHaveBeenCalledWith('rpc_executar_obrigacoes51',{p_user_id:1,p_chave:idempotencyKey,p_request:request});await expect(executar51({rpc},2,input)).rejects.toThrow();expect(rpc).toHaveBeenCalledTimes(1);}
+ });
+});

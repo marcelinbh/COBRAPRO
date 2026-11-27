@@ -1,0 +1,285 @@
+{
+  "predecessors": [
+    {
+      "name": "obrigacoes51.base",
+      "bodyHash": "4a5115587ce0bd319926d79937bfd933296be1496f00f4bc6d79c3da400ab24a",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.eventos_leitura",
+      "bodyHash": "97f9a7dbbedb4f7c45895722eade6e993b53a6ff62407720349a247a8d2f2e58",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "obrigacoes51.estado",
+      "bodyHash": "e2de56a3c3e254d0069c1b91a6263b198892bf47e7810f4ef4ab83d581136a97",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "obrigacoes51.plano",
+      "bodyHash": "ca5507f11e8cc4f61928884e496304d9db436c2a89eaaec175df034d9ca2b4f4",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.replay21",
+      "bodyHash": "934fa60548a334ceb1b22e101a54d9a6b240508e0938b2543bbfd9e6f6606bc8",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "manutencao44.validar",
+      "bodyHash": "032e35f48c8ca55db584d1b8571a37a4bd60bafb5e4afff3f7a854e0c54ec48a",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.cotacao",
+      "bodyHash": "0532a81507be4897e0786a16670343ab9a51cc75c19adff67bc962cf2589d91f",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.executar",
+      "bodyHash": "4ffa2054bfdba5d84cfc28800e455258465db6aacf02e7ec95884f8e38478a56",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "public.ciclo_guardar",
+      "bodyHash": "7cb00fa10c6ff29198ef7b346e97f7e9018a86b1b557de6bf4f649456b694e24",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "public.legados_guardar",
+      "bodyHash": "52a26732ed696c3ed7c5b4f595b86f2889931d352705aeab1805204e6fd1fc81",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "public.legados_validar",
+      "bodyHash": "1ba94cebfe1585a7be290e2c9f08c6f37ded4f7a8878d66f1634c1881c9a1601",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    }
+  ],
+  "successors": [
+    {
+      "name": "obrigacoes51.base",
+      "bodyHash": "19c1a8986974444e699e87a40640a25768291d0a3c0ec20b3d33c92bce758f24",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.eventos_leitura",
+      "bodyHash": "e6fbe9c6a8823c8de858d76b4482e3d06033c5779f6ebf405c961fd52da92b70",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "obrigacoes51.estado",
+      "bodyHash": "cbdb504680ef4d27df0ed4b7171354545c3c6c8c3c152f3d98090f8ddfde971b",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "obrigacoes51.plano",
+      "bodyHash": "cb575b453113ccbe2e5a0baed27d3e7183f396d9c87878329fd9fa67fe5832af",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.replay21",
+      "bodyHash": "dbc1e4b4f015b6036964c24848af0a76ca6a8dad15efd0a0874ed8ff92907679",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "manutencao44.validar",
+      "bodyHash": "184dad23a7d3a8fd6f54a5354a2dd09660971b0e7f15b796bad0cdd0114c8af1",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.cotacao",
+      "bodyHash": "73b7a390ffd043198985eae42e8d892bec1a24e159f17eae0cda98b5b915fa57",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "obrigacoes51.executar",
+      "bodyHash": "846fdc658f7ed58b519b62c66d73bb1d41c7643bd5fc855d4c366356bf0ff801",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "public.ciclo_guardar",
+      "bodyHash": "3c3bf035a3dd8a0b817cddda0b04851b808d83fedc70531dc7fc1d99c5c5aa66",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "public.legados_guardar",
+      "bodyHash": "16549fd46e41abbbff304dd3fd3df3f18a10758dd640407798cad56ebcec2537",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "public.legados_validar",
+      "bodyHash": "58d2d9afe8c86dbe27344bdad0d6a011ec7098896fef5a46776730615c777a63",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.plano",
+      "bodyHash": "7d63b4eea6064a40897a7a2f72c3a0ba23dc74fc6b8961dbffde4c02ff9c3e75",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.consumir",
+      "bodyHash": "6749704400d7c07ce16eabbf5f038884512021c7ba6310ec91fd9c58846881a4",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "inclusao52.escrever",
+      "bodyHash": "5b8d071f35ad042b23e1d76c92d9e0d913adba441c9b3dcd732189abe8641d9a",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.provar",
+      "bodyHash": "6c838ab5d648b71fcb337681ad86c0dd48ed92379376074e79df3e228fe50a6a",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.historico_valido",
+      "bodyHash": "f45bf25dec2f3349caedc00b093ddd7f14b6f39b09c1c2d67b4c0d319e89d021",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "inclusao52.commit_check",
+      "bodyHash": "002d44bbf2275b923ae0f715b324a5be55b738a941671087a1d1bd4e78c4b373",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "inclusao52.provar35",
+      "bodyHash": "683de1daec82f41ab882c21ce3d2c4de2cd2677c8c753aae2047d43b2512376b",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.validar35",
+      "bodyHash": "6e9639e1105dfe76b2cc3dfd6d8e58181d9e85dbc712d69ef9e6f42228da58e8",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.validar",
+      "bodyHash": "08cfd6d4a4015634678998447628930f30fb448e5338641b022926023a7c11ad",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.adicionar",
+      "bodyHash": "5c78149f6bb5d68b3dd9e7fb6055e0c9adc76803f0acdc77e24d03efa56c7210",
+      "config": [
+        "search_path=pg_catalog, pg_temp",
+        "TimeZone=UTC"
+      ]
+    },
+    {
+      "name": "inclusao52.metadata",
+      "bodyHash": "07f5c179922c216d3b9475180cc9799672056f5c8fc31299a2f3101cf61630e8",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "inclusao52.verificar",
+      "bodyHash": "a37ebb05e7186063f0b2bd3594a8cbf28d3294cf3fe3bf99c4d8d0da46b23ce0",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    },
+    {
+      "name": "public.rpc_capacidade_inclusao52",
+      "bodyHash": "5316e00d1f818800ad19ffdb5684d3768e7a83f5bfafd00d2d76f7eb7a92554c",
+      "config": [
+        "search_path=pg_catalog, pg_temp"
+      ]
+    }
+  ],
+  "allowlist": [
+    "obrigacoes51.base",
+    "obrigacoes51.eventos_leitura",
+    "obrigacoes51.estado",
+    "obrigacoes51.plano",
+    "obrigacoes51.replay21",
+    "manutencao44.validar",
+    "obrigacoes51.cotacao",
+    "obrigacoes51.executar",
+    "public.ciclo_guardar",
+    "public.legados_guardar",
+    "public.legados_validar"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "versao": "inclusao52_v1",
+  "coortes": [
+    "prospectivo21_mensal",
+    "multimodal35_semanal",
+    "multimodal35_quinzenal",
+    "multimodal35_diario",
+    "legado34_mensal_estrito"
+  ],
+  "disponivel": true,
+  "predecessor": "obrigacoes51_v1",
+  "classificacao": "obrigacao_adicional_nao_desembolsada",
+  "caixaPreservado": true
+}

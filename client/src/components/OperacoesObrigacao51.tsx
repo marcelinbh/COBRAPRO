@@ -1,4 +1,6 @@
+import { withFinance53,assertNoOtherFinance53 } from '../../../shared/financialCoordination53';
 import { useEffect, useRef, useState } from 'react';
+import { capacidadeInclusaoUi52 } from '../../../shared/inclusao52';
 import { hashKey } from '@tanstack/react-query';
 import { z } from 'zod';
 import { trpc } from '@/lib/trpc';
@@ -100,6 +102,7 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
   const [value, setValue] = useState(''), [date, setDate] = useState(''), [reason, setReason] = useState('');
   const [accountId, setAccountId] = useState(''); // Nunca default conta de origem/primeira conta.
   const [consent, setConsent] = useState(false), [reviewed, setReviewed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [capability, setCapability] = useState(false), [state, setState] = useState<Projection51 | null>(null);
   const [accounts, setAccounts] = useState<ReturnType<typeof contasPropriasUi51> | null>(null);
   const [dataError, setDataError] = useState(''), [quoteError, setQuoteError] = useState('');
@@ -112,6 +115,7 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
     trpc: { abortOnUnmount: true },
   };
   const capabilitySource = trpc.obrigacoes51.capacidade.useQuery(undefined, options);
+  const expandedSource = trpc.obrigacoes51.capacidadeInclusao.useQuery(undefined, options);
   const stateSource = trpc.obrigacoes51.estado.useQuery({ contratoId }, options);
   const accountsSource = trpc.caixa.contasParaOperacao37.useQuery(undefined, options);
   const execute = trpc.obrigacoes51.executar.useMutation({ retry: false });
@@ -139,8 +143,8 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
   const fingerprint = canonical51({ proposal, reason: reason.trim(), consent, accountId, state });
   const formLive = useRef(fingerprint); formLive.current = fingerprint;
   const q = quotation?.fingerprint === fingerprint ? quotation.q : null;
-  const authorization = useRef({ q, proposal, reviewed, capability, state, accounts, reason, fingerprint, ready, journalError, pending });
-  authorization.current = { q, proposal, reviewed, capability, state, accounts, reason, fingerprint, ready, journalError, pending };
+  const authorization = useRef({ q, proposal, reviewed, capability, expanded, state, accounts, reason, fingerprint, ready, journalError, pending });
+  authorization.current = { q, proposal, reviewed, capability, expanded, state, accounts, reason, fingerprint, ready, journalError, pending };
   useEffect(() => { setReviewed(false); }, [fingerprint]);
   function syncDisk() {
     const loaded = lerJournal51(localStorage, scope);
@@ -157,15 +161,16 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
   }, [generation]);
   async function loadData() {
     if (!current() || flight.current || !ready || pending) return;
-    flight.current = true; setBusy(true); setCapability(false); setState(null); setAccounts(null);
+    flight.current = true; setBusy(true); setCapability(false); setExpanded(false); setState(null); setAccounts(null);
     setQuotation(null); setReviewed(false); setDataError('');
-    authorization.current.capability = false; authorization.current.q = null;
+    authorization.current.capability = false; authorization.current.expanded = false; authorization.current.q = null;
     try {
-      const [cap, projection, metadata] = await Promise.allSettled([
-        capabilitySource.refetch(), stateSource.refetch(), accountsSource.refetch(),
+      const [cap, projection, metadata, expandedProof] = await Promise.allSettled([
+        capabilitySource.refetch(), stateSource.refetch(), accountsSource.refetch(), expandedSource.refetch(),
       ]);
       if (!current()) return;
       const errors: string[] = [];
+      if (expandedProof.status === 'fulfilled' && !expandedProof.value.isError && !expandedProof.value.isFetching && !expandedProof.value.isLoading && capacidadeInclusaoUi52(expandedProof.value.data)) setExpanded(true);
       try { if (cap.status !== 'fulfilled' || cap.value.isError || cap.value.isFetching || cap.value.isLoading) throw Error();
         capacidadeUi51.parse(cap.value.data); setCapability(true);
       } catch { errors.push('Módulo em atualização: novas operações aguardam disponibilidade comprovada. A conferência de intenção existente continua disponível.'); }
@@ -181,7 +186,7 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
   useEffect(() => { if (ready && !pending && !journalError) void loadData(); }, [ready, !!pending]);
   async function quote() {
     const a = authorization.current;
-    if (!current() || flight.current || !a.ready || a.pending || a.journalError || !a.capability || !a.state || !a.proposal || legacy.length) return;
+    if ((a.proposal?.acao === 'adicionar' && !a.expanded) || !current() || flight.current || !a.ready || a.pending || a.journalError || !a.capability || !a.state || !a.proposal || legacy.length) return;
     const captured = a.proposal, fingerprintNow = a.fingerprint;
     flight.current = true; setBusy(true); setQuotation(null); setReviewed(false); setQuoteError('');
     authorization.current.q = null;
@@ -195,7 +200,7 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
   }
   function authorizedNew() {
     const a = authorization.current;
-    if (legacy.length || previousSessionPending.length) return false;
+    if (legacy.length || previousSessionPending.length || (a.proposal?.acao === 'adicionar' && !a.expanded)) return false;
     if (!current() || !a.ready || a.pending || a.journalError || !a.capability || !a.state || !a.q || !a.proposal || !a.reviewed ||
       a.fingerprint !== formLive.current || a.reason.trim().length < 3 || a.reason.trim().length > 500) return false;
     try {
@@ -214,7 +219,7 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
         proposta: a.proposal, estadoHash: a.q!.estadoHash, dataCalculo: a.q!.dataCalculo,
         idempotencyKey: crypto.randomUUID(), motivo: a.reason.trim(),
       }) : undefined;
-      const loaded = await operarJournal51({ storage: localStorage, locks: navigator.locks, scope,
+      const loaded = await operarJournal51({ storage: localStorage, locks: navigator.locks ? {request:(name,fn)=>withFinance53(navigator.locks,scope.ownerId,name,async()=>{if(!lerJournal51(localStorage,scope).pending)assertNoOtherFinance53(localStorage,scope.ownerId,chaveJournal51(scope),true);return fn();})} : undefined, scope,
         expected: disk.current, atual: current, mode, nova, autorizarNovo: authorizedNew,
         onPersisted: saved => { if (current()) { disk.current = saved.raw; setSnapshot(saved); setQuotation(null); setReviewed(false); } },
         post: exact => mode === 'conferir' ? recover.mutateAsync(exact) : execute.mutateAsync(exact),
@@ -234,7 +239,7 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
     flight.current = true; setBusy(true);
     let confirmed = false;
     try {
-      const loaded = await encerrarJournal51(localStorage, navigator.locks, scope, disk.current, current);
+      const loaded = await encerrarJournal51(localStorage, navigator.locks ? {request:(name,fn)=>withFinance53(navigator.locks,scope.ownerId,name,fn)} : undefined, scope, disk.current, current);
       if (!current()) return;
       disk.current = loaded.raw; setSnapshot(loaded); setQuotation(null); setReviewed(false); setConsent(false);
       setCapability(false); setState(null); setValue(''); setDate(''); setReason(''); setAccountId('');
@@ -253,7 +258,7 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
   async function reread() {
     if (!current() || flight.current || !navigator.locks) return;
     flight.current = true; setBusy(true);
-    try { await navigator.locks.request(chaveLock51(scope), async () => { if (current()) { syncDisk(); setJournalError(''); setReady(true); } }); }
+    try { await withFinance53(navigator.locks,scope.ownerId,chaveLock51(scope), async () => { if (current()) { syncDisk(); setJournalError(''); setReady(true); } }); }
     catch (e) { if (current()) setJournalError((e as Error).message); }
     finally { flight.current = false; if (current()) setBusy(false); }
   }
@@ -289,12 +294,13 @@ export function ObrigacaoSessao51({ contratoId, ownerId, sessionScope, alvoInici
         {action === 'quitar' && <><p>Quitação GLOBAL do contrato, não apenas da parcela. Digite o total efetivamente recebido; o servidor exige igualdade com o total devido e confirma a conta escolhida. Nas origens com conta vinculada, outra conta é recusada, nunca substituída.</p>
           <label className="block">Conta do caixa que recebeu<select aria-label="Conta que recebeu o dinheiro" className="w-full rounded border bg-background p-2" value={accountId} onChange={e => setAccountId(e.target.value)}><option value="">Selecione explicitamente</option>{accounts?.map(c => <option key={c.id} value={c.id}>{c.nome} (#{c.id})</option>)}</select></label></>}
         {(action === 'adicionar' || action === 'editar' || action === 'quitar') && <label className="block">{action === 'editar' ? 'Novo valor da parcela (opcional se alterar a data)' : action === 'quitar' ? 'Dinheiro realmente recebido (R$)' : 'Valor da obrigação adicional (R$)'}<Input aria-label="Valor da operação" value={value} inputMode="decimal" placeholder="100,00" onChange={e => setValue(e.target.value)} /></label>}
-        {(action === 'adicionar' || action === 'editar') && <label className="block">{action === 'editar' ? 'Novo vencimento individual (opcional se alterar valor)' : 'Vencimento da nova parcela'}<Input aria-label="Data de vencimento da operação" type="date" value={date} onChange={e => setDate(e.target.value)} /></label>}
+        {(action === 'adicionar' || action === 'editar') && <label className="block">{action === 'editar' ? 'Novo vencimento individual (opcional se alterar valor)' : 'Vencimento explícito da obrigação A no próximo período canônico'}<Input aria-label="Data de vencimento da operação" type="date" value={date} onChange={e => setDate(e.target.value)} /></label>}
         {action === 'editar' && <p className="text-sm">Valor e data informados juntos serão aplicados no mesmo pedido, somente na parcela selecionada. O servidor valida principal e vizinhos do calendário.</p>}
         <label className="block">Motivo auditável<Input aria-label="Motivo da operação" value={reason} maxLength={500} onChange={e => setReason(e.target.value)} /></label>
-        {(action === 'adicionar' || action === 'cancelar' || action === 'quitar') && <label className="flex items-start gap-2"><input aria-label="Reconhecer natureza da operação" type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />{action === 'adicionar' ? 'Reconheço obrigação adicional NÃO desembolsada. Não representa novo empréstimo, principal enviado ou caixa.' : action === 'cancelar' ? 'Autorizo renúncia à obrigação selecionada SEM estorno, devolução presumida do capital ou apagamento do histórico.' : `Confirmo dinheiro real recebido na conta explicitamente escolhida ${accountId ? `#${accountId}` : '(a selecionar)'}, para quitar o contrato inteiro.`}</label>}
-        <Button variant="outline" disabled={!proposal || !capability || !state || busy || reason.trim().length < 3} onClick={() => void quote()}>Obter cotação e prévia</Button>
+        {(action === 'adicionar' || action === 'cancelar' || action === 'quitar') && <label className="flex items-start gap-2"><input aria-label="Reconhecer natureza da operação" type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} />{action === 'adicionar' ? 'Reconheço obrigação adicional NÃO desembolsada. Não representa novo empréstimo, principal enviado, juros contratuais ou caixa.' : action === 'cancelar' ? 'Autorizo renúncia à obrigação selecionada SEM estorno, devolução presumida do capital ou apagamento do histórico.' : `Confirmo dinheiro real recebido na conta explicitamente escolhida ${accountId ? `#${accountId}` : '(a selecionar)'}, para quitar o contrato inteiro.`}</label>}
+        <Button variant="outline" disabled={!proposal || !capability || (action === 'adicionar' && !expanded) || !state || busy || reason.trim().length < 3} onClick={() => void quote()}>Obter cotação e prévia</Button>
       </fieldset>
+      {action === 'adicionar' && !expanded && <p role="alert">Inclusão expandida indisponível: capacidade52 exata necessária. Price, legado não mensal e contratos pagos/parciais permanecem fora do recorte. Conferência de intenção existente permanece disponível.</p>}
       {quoteError && <p role="alert">{quoteError}</p>}
       {q && <div className="rounded border p-3 space-y-2" aria-label="Prévia autoritativa da obrigação"><p>{labels[q.proposta.acao]} • data Brasília: {q.dataCalculo}. Total anterior R$ {q.totalAntes} → total posterior R$ {q.totalDepois}. Obrigação adicional R$ {q.obrigacaoAdicional}.</p><p>Parcelas afetadas: {q.idsAfetados.join(', ')}. {q.caixaPreservado ? 'Caixa e recebimentos anteriores preservados.' : `Entrada real R$ ${q.valorExigido} na conta #${q.contaDestinoId} (${accounts?.find(c => c.id === q.contaDestinoId)?.nome ?? 'nome indisponível'}).`}</p><p className="break-all text-xs">Snapshot: {q.estadoHash}. A cotação não reserva valores; mudança de estado/dia exige nova cotação.</p>
         <label className="flex items-center gap-2"><input aria-label="Confirmar prévia exata" type="checkbox" checked={reviewed} onChange={e => setReviewed(e.target.checked)} />Revisei a proposta, o alvo, a data, os valores e a conta desta prévia.</label></div>}

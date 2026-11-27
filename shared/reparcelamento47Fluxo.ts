@@ -1,6 +1,7 @@
+import { withFinance53,assertNoOtherFinance53 } from './financialCoordination53';
 import { z } from 'zod';
 import { reparcelamento47ExecucaoSchema,conferirResultado47,type Reparcelamento47Execucao,type Reparcelamento47Resultado } from './reparcelamento47';
-export type Storage47={getItem(k:string):string|null;setItem(k:string,v:string):void;removeItem(k:string):void};
+export type Storage47={getItem(k:string):string|null;setItem(k:string,v:string):void;removeItem(k:string):void;readonly length?:number;key?(i:number):string|null};
 export type Locks47={request<T>(name:string,callback:()=>Promise<T>):Promise<T>};
 const key=(owner:number)=>`cobrapro:reparcelar47:v2:empresa:${owner}`;
 const terminalPointerKey=(owner:number)=>`${key(owner)}:ultimo-terminal`;
@@ -38,9 +39,10 @@ function close(storage:Storage47,owner:number,raw:string,input:Reparcelamento47E
 }
 export async function enviarIntencao47(storage:Storage47,locks:Locks47|undefined,owner:number,session:string,input:Reparcelamento47Execucao,atual:()=>boolean,send:(i:Reparcelamento47Execucao)=>Promise<Reparcelamento47Resultado>){
  if(!locks)throw Error('WebLocks obrigatório47; nenhum envio');
- return locks.request(key(owner),async()=>{
+ return withFinance53(locks,owner,key(owner),async()=>{
  if(!atual())throw Error('Sessão47 mudou; nenhum envio');
  if(lerIntencao47(storage,owner))throw Error('Journal47 pendente: confira mesma UUID antes de outra ação');
+ assertNoOtherFinance53(storage,owner,key(owner));
  const record=recordSchema.parse({version:2,owner,session,revision:crypto.randomUUID(),phase:'pending',input});const raw=JSON.stringify(record);cas(storage,owner,null,raw);
  if(!atual())throw Error('Sessão47 mudou após persistência; preservar na empresa original');
  const value=await send(record.input);
@@ -51,7 +53,7 @@ export async function enviarIntencao47(storage:Storage47,locks:Locks47|undefined
 }
 export async function recuperarIntencao47(storage:Storage47,locks:Locks47|undefined,owner:number,session:string,atual:()=>boolean,recover:(i:Reparcelamento47Execucao)=>Promise<{status:'confirmed';result:Reparcelamento47Resultado}|{status:'not_executed';idempotencyKey:string}>){
  if(!locks)throw Error('WebLocks obrigatório47; nenhuma conferência');
- return locks.request(key(owner),async()=>{
+ return withFinance53(locks,owner,key(owner),async()=>{
  if(!atual())throw Error('Sessão47 mudou');
  const original=storage.getItem(key(owner)),record=lerIntencao47(storage,owner);if(!record)throw Error('Nenhuma intenção47 persistida');
  // Sessão nova da MESMA empresa somente recupera: claim CAS dentro do WebLock, nunca send.

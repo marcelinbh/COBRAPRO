@@ -1,3 +1,4 @@
+import { withFinance53,assertNoOtherFinance53 } from '../../../shared/financialCoordination53';
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
@@ -59,12 +60,13 @@ function CalendarioSessao({ userId, sessionScope, contratoId, onSuccess }: { use
       setError("Este navegador não oferece coordenação segura entre abas. Nenhum envio foi autorizado.");
       flight.current = false; return;
     }
-    await navigator.locks.request(storageKey, async () => {
+    await withFinance53(navigator.locks,userId,storageKey, async () => {
     try {
       if (!active.current) return;
       checkDisk();
       let intent = pending;
       if (!intent) {
+        assertNoOtherFinance53(localStorage,userId,storageKey);
         if (conferir || !supported || !quote.data || quote.isFetching || quote.isError) return;
         intent = calendario44Schema.parse({ contratoId, idempotencyKey: crypto.randomUUID(), estadoHash: quote.data.estadoHash, vencimentos: datas, motivo });
         const raw = JSON.stringify(intent);
@@ -89,7 +91,7 @@ function CalendarioSessao({ userId, sessionScope, contratoId, onSuccess }: { use
   async function closeConfirmed() {
     if (!terminal || !pending || busy || flight.current || !navigator.locks) return;
     flight.current = true;
-    await navigator.locks.request(storageKey, async () => {
+    await withFinance53(navigator.locks,userId,storageKey, async () => {
     try {
       if (!active.current) return;
       checkDisk();

@@ -20,6 +20,7 @@ import { recebimentosLegadosRouter } from "./routers/recebimentosLegados";
 import { multaManualRouter } from "./routers/multaManual";
 import { manutencaoFinanceira48Router } from "./routers/manutencaoFinanceira48";
 import { obrigacoes51Router } from './routers/obrigacoes51';
+import { sucessores53Router } from './routers/sucessores53';
 import { manutencaoEmprestimosRouter } from "./routers/manutencaoEmprestimos";
 import { cheques40Procedures } from "./routers/cheques40";
 import { telefone41Writers } from "./routers/telefone41";
@@ -3758,6 +3759,7 @@ export const appRouter = router({
   multaManual: multaManualRouter,
   manutencaoFinanceira48: manutencaoFinanceira48Router,
   obrigacoes51: obrigacoes51Router,
+  sucessores53: sucessores53Router,
   manutencaoEmprestimos: manutencaoEmprestimosRouter,
   vendas: vendasRouter,
   cheques: chequesRouter,

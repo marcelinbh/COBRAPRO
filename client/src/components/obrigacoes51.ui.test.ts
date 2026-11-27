@@ -19,7 +19,7 @@ vi.mock('@/lib/trpc', () => {
     auth: { me: { useQuery: () => ({ data: { id: h.owner }, isError: h.authError, isLoading: false, isFetching: h.authFetching }) } },
     obrigacoes51: {
       sessao: { useQuery: (input: any, options: any) => { h.calls.push({ name: 'session', input, options }); return { data: { userId: h.owner, sessionScope: h.scope }, isError: h.sessionError, isLoading: false, isFetching: h.sessionFetching, refetch: vi.fn() }; } },
-      capacidade: query('capability', h.cap), estado: query('state', h.state),
+      capacidadeInclusao: query('expanded', async()=>({data:{versao:'inclusao52_v1',predecessor:'obrigacoes51_v1',disponivel:true,coortes:['prospectivo21_mensal','multimodal35_semanal','multimodal35_quinzenal','multimodal35_diario','legado34_mensal_estrito'],classificacao:'obrigacao_adicional_nao_desembolsada',caixaPreservado:true}})), capacidade: query('capability', h.cap), estado: query('state', h.state),
       executar: { useMutation: (options: any) => { h.calls.push({ name: 'execute', options }); return { mutateAsync: h.execute }; } },
       conferir: { useMutation: (options: any) => { h.calls.push({ name: 'recover', options }); return { mutateAsync: h.recover }; } },
     },
@@ -97,7 +97,7 @@ beforeEach(() => {
   data = new Map(); held = '';
   const storage = { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => data.set(k, v), removeItem: (k: string) => data.delete(k),
     get length() { return data.size; }, key: (n: number) => [...data.keys()][n] ?? null };
-  vi.stubGlobal('localStorage', storage); vi.stubGlobal('navigator', { locks: { request: async (name: string, fn: () => Promise<any>) => { expect(held).toBe(''); held = name; try { return await fn(); } finally { held = ''; } } } });
+  vi.stubGlobal('localStorage', storage); vi.stubGlobal('navigator', { locks: { request: async (name: string, fn: () => Promise<any>) => { const previous=held; expect(name).not.toBe(previous); if(previous) { expect(previous).toBe(`cobrapro:financeiro:owner:${h.owner}`); expect(name).toBe(chaveLock51(scope())); } else expect(name).toBe(`cobrapro:financeiro:owner:${h.owner}`); held=name; try { return await fn(); } finally { held=previous; } } } });
   vi.stubGlobal('crypto', { randomUUID: vi.fn(() => uuid) });
   h.cap.mockResolvedValue({ data: { versao: 'obrigacoes51_v1', disponivel: true } });
   h.state.mockImplementation(async () => ({ data: projection() })); h.accounts.mockImplementation(async () => ({ data: { empresaId: h.owner, contas: [{ id: 17, nome: 'Dinheiro da empresa', tipo: 'dinheiro' }, { id: 18, nome: 'Banco da empresa', tipo: 'banco' }] } }));

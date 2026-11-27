@@ -15,6 +15,7 @@ import { trpc } from '@/lib/trpc';
 import { badgeContrato, badgeParcela } from '@/lib/statusEmprestimoBadge';
 import { DeleteEmprestimoDialog } from '@/components/DeleteEmprestimoDialog';
 import { OperacoesObrigacao51 } from '@/components/OperacoesObrigacao51';
+import { ManutencaoSucessor53 } from '@/components/ManutencaoSucessor53';
 import { RecebimentoValidado } from '@/components/RecebimentoValidado';
 import { ManutencaoJuros48 } from '@/components/ManutencaoJuros48';
 import { ManutencaoCalendario } from '@/components/ManutencaoCalendario';
@@ -243,6 +244,7 @@ export default function EmprestimoDetalhes() {
             <div className="rounded border p-3 space-y-2">
               <h2 className="font-semibold">Editar / operações do contrato</h2>
               <OperacoesObrigacao51 contratoId={emprestimo.id} alvoInicial={{ tipo: 'contrato' }} onSuccess={atualizarFinanceiro} />
+              <ManutencaoSucessor53 contratoId={emprestimo.id} onSuccess={atualizarFinanceiro} />
               <p className="text-sm text-muted-foreground">Adicionar parcela manual é obrigação adicional não desembolsada. Reparcelamento redistribui dívida existente; não substitui inclusão.</p>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">

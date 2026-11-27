@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import * as protocol from '../../../shared/manutencaoFinanceira48';
+import * as coordination53 from '../../../shared/financialCoordination53';
 import { code, compile, declaration, deferred, Hooks, source } from '../lib/r1BoundaryHarness';
 
 const userId = 31, contratoId = 462, scope = 'a'.repeat(64);
@@ -26,7 +27,7 @@ function setup(result: any = confirmed) {
   const ret = fn.body!.statements.at(-1)!;
   // Only the terminal JSX return is instrumented; all handlers/effects are the real source.
   const instrumented = code(ast, 'JurosSessao48').replace(ret.getText(ast), 'return {send,close};');
-  const component = compile(`${instrumented}\nreturn JurosSessao48;`, { ...hooks.bindings(), ...protocol, trpc, navigator: { locks: { request: lock } }, localStorage: storage, crypto: { randomUUID: () => { throw Error('No new UUID allowed'); } } });
+  const component = compile(`${instrumented}\nreturn JurosSessao48;`, { ...hooks.bindings(), ...protocol, ...coordination53, trpc, navigator: { locks: { request: lock } }, localStorage: storage, crypto: { randomUUID: () => { throw Error('No new UUID allowed'); } } });
   const render = () => hooks.render(component, { contratoId, parcelasIds: [900], userId, scope, onSuccess: callback });
   render(); hooks.flush();
   return { hooks, map, storage, events, execute, recover, callback, lock, render, fail: (f: string) => { failure = f; }, wait: () => { gate = deferred(); return gate; } };

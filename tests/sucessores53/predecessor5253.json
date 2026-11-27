@@ -1,0 +1,18 @@
+{
+  "chain": {
+    "drizzle/0051_composicao_obrigacoes.sql": "4df5a5b8fe7b3f0ed88be71e9376779e79a3c24f5a043fc64f7813dda6c18365",
+    "drizzle/0052_inclusao_expandida.sql": "9ef96a0b0daed0e3994a3ae70ab5d29365000724d9be6224c617725312c11556"
+  },
+  "resolved": {
+    "private47.validar": {
+      "source": "drizzle/0047_reparcelamento_atual.sql",
+      "bodySha256": "096b37700f58db7658d67d63f0975d1bfa8adb63eeda10d42567c9cda2313664",
+      "definitionSha256": "6fd2a04de251a45dcb2f6ee549c878a9103e94f1e518ef1b157923ee1a4fc40d"
+    },
+    "public.multimodal_guardar": {
+      "source": "drizzle/0047_reparcelamento_atual.sql",
+      "bodySha256": "5559bb655bd9c839b4bc24945d122002da65665744cf28ab6fa8116c7958407d",
+      "definitionSha256": "08e9e31104ab124f1bec869202d27deedde965463ace252bd5a5aaf78867787e"
+    }
+  }
+}
