@@ -7,6 +7,7 @@ import { normalizarCotacaoMulta, type CotacaoMulta } from '../../shared/multaMan
 import { dataMultimodalValida } from '../../shared/emprestimosMultimodalCalculo';
 import { apresentarEmprestimo } from './emprestimosApresentacao';
 import { AVISO_LISTA_INCOMPLETA, type ListaSeguraEmprestimos } from '../../shared/emprestimosListaSegura';
+import { resumirParcelasLista63 } from './resumoParcelasLista63';
 
 export const RPC60 = 'rpc_lista_emprestimos60';
 export const LOCAL_REASONS60 = [
@@ -143,7 +144,8 @@ export function mapearSnapshot60(raw: unknown, owner: number): ListaSeguraEmpres
     items.push({ kind: 'validated', id: c.id, clienteId: cli.id, clienteNome: cli.nome,
       modalidade: c.modalidade, status: shown.status!, statusFinanceiroOriginal: c.status,
       statusObrigacao: state.statusObrigacao, arquivado: state.arquivado, obrigacaoAdicional: state.obrigacaoAdicional,
-      obrigacaoAtual: shown.obrigacaoAtual!, capital: cCents / 100, totalReceber: shown.totalReceber, totalPago: shown.totalPago });
+      obrigacaoAtual: shown.obrigacaoAtual!, capital: cCents / 100, totalReceber: shown.totalReceber, totalPago: shown.totalPago,
+      resumoParcelas: resumirParcelasLista63(state, ordered, s.dataCalculo) });
   }
   const complete = unavailableCount === 0;
   return { version: 'loan_list_read_v1', userId: owner, items,

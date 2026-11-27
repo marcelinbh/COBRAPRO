@@ -1,5 +1,16 @@
 // PROPOSTA NÃO APLICADA. Exclusivo da listagem; não é uma autorização financeira.
 export const AVISO_LISTA_INCOMPLETA = "Consulta parcial: valores validados somente. Há empréstimos indisponíveis; os totais não representam toda a carteira. Relatórios desta consulta são incompletos. Não cadastre novamente uma dívida existente.";
+/** Contagens da projeção51; arquivo é atributo sobreposto. DATE do mesmo snapshot60. */
+export type ResumoParcelasLista63 = {
+  total: number;
+  abertas: number;
+  pagas: number;
+  canceladas: number;
+  transferidas: number;
+  arquivadas: number;
+  proximoVencimento: string | null;
+  dataReferencia: string;
+};
 export type EmprestimoValidadoLista = {
   kind: "validated";
   id: number;
@@ -15,6 +26,8 @@ export type EmprestimoValidadoLista = {
   capital: number;
   totalReceber: number;
   totalPago: number;
+  /** Ausência em consumidores anteriores não é zero nem prova de vencimento. */
+  resumoParcelas?: ResumoParcelasLista63;
 };
 export type EmprestimoIndisponivelLista = {
   kind: "unavailable";
