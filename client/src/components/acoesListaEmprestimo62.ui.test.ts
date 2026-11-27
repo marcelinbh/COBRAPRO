@@ -8,7 +8,7 @@ import { HASHES_ACOES_LISTA62 } from '../lib/acoesListaEmprestimo62';
 import type { ListaSeguraEmprestimos } from '../../../shared/emprestimosListaSegura';
 
 const queries = vi.hoisted(() => ({ auth: vi.fn(), safe: vi.fn() }));
-vi.mock('../lib/trpc', () => ({ trpc: { auth: { me: { useQuery: queries.auth } }, contratos: { listLeituraSegura: { useQuery: queries.safe } } } }));
+vi.mock('../lib/trpc', () => ({ trpc: { auth: { me: { useQuery: queries.auth } }, contratos: { listLeituraSegura: { useQuery: queries.safe } }, useUtils: () => ({ client: {} }), cobrancaLista64: { enviar: { useMutation: () => ({ mutateAsync: vi.fn() }) } } } }));
 import { EmprestimosListaSegura } from './EmprestimosListaSegura';
 import { EmprestimosListaSeguraFallback } from './EmprestimosListaSeguraFallback';
 const data: ListaSeguraEmprestimos = {

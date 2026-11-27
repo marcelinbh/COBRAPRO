@@ -1,6 +1,6 @@
 import React from 'react';
 import { trpc } from '@/lib/trpc';
-import { EmprestimosListaSegura } from './EmprestimosListaSegura';
+import { EmprestimosLista64Conectada as EmprestimosListaSegura } from './EmprestimosLista64Conectada';
 
 // Compatibilidade com o consumidor strict legado; não inicia nem oferece leitura strict.
 type Props = { onRetryStrict?: () => void; isRetryingStrict?: boolean };

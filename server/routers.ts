@@ -8,6 +8,7 @@ import { veiculosRouter } from "./routers/veiculos";
 import { assinaturasRouter } from "./routers/assinaturas";
 import { backupRouter } from "./routers/backup";
 import { whatsappEvolutionRouter } from "./routers/whatsappEvolution";
+import { cobrancaLista64Router } from "./routers/cobrancaLista64";
 import { perfilRouter } from "./routers/perfil";
 import { relatorioDiarioRouter } from "./routers/relatorioDiario";
 import { notificacoesRouter } from "./routers/notificacoes";
@@ -3745,6 +3746,7 @@ export const appRouter = router({
   caixa: caixaRouter,
   portal: portalRouter,
   whatsapp: whatsappRouter,
+  cobrancaLista64: cobrancaLista64Router,
   relatorios: relatoriosRouter,
   configuracoes: configuracoesRouter,
   cobradores: cobradoresRouter,
