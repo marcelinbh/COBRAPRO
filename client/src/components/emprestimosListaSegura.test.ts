@@ -1,6 +1,7 @@
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const query = vi.hoisted(() => ({ useQuery: vi.fn(), auth: vi.fn() }));
 vi.mock('../lib/trpc', () => ({ trpc: { auth: { me: { useQuery: query.auth } }, contratos: { listLeituraSegura: query } } }));
@@ -10,7 +11,7 @@ import { AVISO_LISTA_INCOMPLETA, deveUsarListaSegura, type ListaSeguraEmprestimo
 const partial: ListaSeguraEmprestimos = { version: 'loan_list_read_v1', userId: 41, items: [{ kind: 'validated', id: 1, clienteId: 2, clienteNome: 'Cliente próprio <script>alert(1)</script>', modalidade: 'mensal', status: 'ativo', statusFinanceiroOriginal: 'ativo', statusObrigacao: 'ativo', arquivado: false, obrigacaoAdicional: '0.00', obrigacaoAtual: '80.00', capital: 100, totalReceber: 80, totalPago: 20 }, { kind: 'unavailable', id: 42, message: 'Empréstimo indisponível: não foi possível confirmar seus vínculos.' }], coverage: { scopedContracts: 2, validatedContracts: 1, unavailableContracts: 1, complete: false, label: 'validados somente' }, totals: { label: 'validados somente', values: { capital: 100, totalReceber: 80, totalPago: 20 } }, warning: AVISO_LISTA_INCOMPLETA };
 const render = (data: ListaSeguraEmprestimos) => renderToStaticMarkup(React.createElement(EmprestimosListaSegura, { data, onRefresh: () => {} }));
 beforeEach(() => { vi.clearAllMocks(); query.auth.mockReturnValue({ data: { id: 41 }, isFetching: false, isError: false, isPending: false, isLoading: false }); });
-describe('Fallback local da lista, sem estado financeiro autorizado', () => {
+describe('Entrada direta da lista60, sem estado financeiro autorizado', () => {
   it.each([null, undefined, {}, { code: 'PRECONDITION_FAILED' }, { data: { code: 'INTERNAL_SERVER_ERROR' } }, { data: { code: 'UNAUTHORIZED' } }, { data: { code: 'NOT_FOUND' } }, { status: 412 }, { status: 207 }])('não ativa por objeto/status não tRPC %j', value => expect(deveUsarListaSegura(value)).toBe(false));
   it('ativa SOMENTE pelo código tRPC 412 mesmo em batch207', () => { expect(deveUsarListaSegura({ data: { code: 'PRECONDITION_FAILED', httpStatus: 412 }, status: 207 })).toBe(true); });
   it('partial explícito, placeholder sem nome/contato/valor/link/ações, nome validado escapado', () => {
@@ -50,12 +51,23 @@ describe('Fallback local da lista, sem estado financeiro autorizado', () => {
   it('somente card validado abre a ficha guardada existente', () => {
     const html = render(partial); expect(html).toContain('href="/emprestimos/1"'); expect(html).not.toContain('href="/emprestimos/42"');
   });
-  it('hunk da página preserva badge e query estrita e só monta após PRECONDITION_FAILED', () => {
+  it('página monta componente60 sem precursor strict; APIs e implementação antigas permanecem', () => {
     const src = readFileSync(new URL('../pages/Emprestimos.tsx', import.meta.url), 'utf8');
-    expect(src).toContain('import { badgeContrato }'); expect(src).toContain('if (isError && deveUsarListaSegura(erroLista)) return <EmprestimosListaSeguraFallback');
+    const ast = ts.createSourceFile('Emprestimos.tsx', src, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const page = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'Emprestimos') as ts.FunctionDeclaration;
+    expect(page.body?.getText(ast)).toBe('{\n  return <EmprestimosListaSeguraFallback />;\n}');
+    expect(page.body?.getText(ast)).not.toMatch(/useQuery|useMutation|listComParcelas/);
+    expect(src).toContain('function EmprestimosListaEstritaLegada()');
     expect(src).toContain("trpc.contratos.listComParcelas.useQuery({ arquivo: 'todos' }, {");
-    expect(src).toContain('retry: (failureCount, error) => !deveUsarListaSegura(error) && failureCount < 3,');
-    expect(src).not.toContain('listLeituraSegura.useQuery');
-    expect(src.indexOf('if (isError && deveUsarListaSegura')).toBeLessThan(src.indexOf('if (leituraEmAndamento || isError)'));
+    expect(src).toContain('import { badgeContrato }');
+  });
+  it('consumidor direto saudável nunca oferece ou chama retry strict', () => {
+    query.useQuery.mockReturnValue({ data: partial, isError: false, isPending: false, isFetching: false });
+    const onRetryStrict = vi.fn();
+    const html = renderToStaticMarkup(React.createElement(EmprestimosListaSeguraFallback, { onRetryStrict }));
+    expect(html).toContain('Cliente próprio'); expect(html).not.toContain('Tentar leitura completa');
+    expect(onRetryStrict).not.toHaveBeenCalled();
+    expect(render(partial)).toContain('ATIVO — conferir atrasos na ficha');
+    expect(render(partial)).not.toContain('EM DIA');
   });
 });

@@ -1,4 +1,4 @@
-// PROPOSTA NÃO APLICADA. Renderizar só após falha PRECONDITION_FAILED do endpoint estrito.
+// Lista60: apresentação do snapshot confirmado, sem autorizar alterações financeiras.
 import React, { useState } from "react";
 import { badgeContrato } from "@/lib/statusEmprestimoBadge";
 import { noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, type Arquivo51 } from "@/lib/obrigacoes51Apresentacao";
@@ -10,8 +10,17 @@ export function EmprestimosListaSegura({ data, onRefresh, isFetching = false }: 
   data: ListaSeguraEmprestimos; onRefresh: () => void; isFetching?: boolean;
 }) {
   const [arquivo, setArquivo] = useState<Arquivo51>('operacional');
+  const [busca, setBusca] = useState('');
+  const [modalidade, setModalidade] = useState('todos');
+  const [statusObrigacao, setStatusObrigacao] = useState('todos');
+  const modalidades = [...new Set(data.items.flatMap(item => item.kind === 'validated' ? [item.modalidade] : []))].sort();
   // Coverage/totais são do conjunto integral provado, jamais da seleção visual.
-  const items = data.items.filter(item => item.kind === 'unavailable' || noArquivo51(item, arquivo));
+  // Não se conhece cliente/modalidade/status de um indisponível: nunca ocultá-lo.
+  const items = data.items.filter(item => item.kind === 'unavailable' || (
+    noArquivo51(item, arquivo) && item.clienteNome.toLocaleLowerCase('pt-BR').includes(busca.trim().toLocaleLowerCase('pt-BR')) &&
+    (modalidade === 'todos' || item.modalidade === modalidade) &&
+    (statusObrigacao === 'todos' || item.statusObrigacao === statusObrigacao)
+  ));
   const totals = data.totals.values;
   return <section aria-label="Consulta segura de empréstimos" className="space-y-4">
     <p role="status">Modo de leitura segura. Esta consulta não autoriza recebimentos nem alterações financeiras.</p>
@@ -32,7 +41,28 @@ export function EmprestimosListaSegura({ data, onRefresh, isFetching = false }: 
     <div role="group" aria-label="Arquivo dos empréstimos" className="flex gap-2">
       {(['operacional', 'historico', 'todos'] as const).map(a => <button key={a} type="button" aria-pressed={arquivo === a} onClick={() => setArquivo(a)}>{a === 'operacional' ? 'Operacionais' : a === 'historico' ? 'Histórico' : 'Todos'}</button>)}
     </div>
-    <p className="text-sm">O filtro altera somente os cards. Coverage e totais validados acima incluem o histórico; itens indisponíveis permanecem visíveis em todos os filtros.</p>
+    <div className="flex flex-wrap items-end gap-3" role="group" aria-label="Filtros dos empréstimos validados">
+      <label className="flex flex-col gap-1">Buscar por cliente
+        <input type="search" value={busca} onChange={event => setBusca(event.target.value)} placeholder="Nome do cliente"
+          className="rounded-lg border bg-background px-3 py-2 text-foreground" />
+      </label>
+      <label className="flex flex-col gap-1">Modalidade
+        <select value={modalidade} onChange={event => setModalidade(event.target.value)} className="rounded-lg border bg-background px-3 py-2 text-foreground">
+          <option value="todos">Todas as modalidades</option>
+          {modalidades.map(value => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </label>
+      <label className="flex flex-col gap-1">Estado da obrigação
+        <select value={statusObrigacao} onChange={event => setStatusObrigacao(event.target.value)} className="rounded-lg border bg-background px-3 py-2 text-foreground">
+          <option value="todos">Todos os estados</option>
+          <option value="ativo">Ativa</option>
+          <option value="quitado">Quitada</option>
+          <option value="encerrado_por_cancelamento">Encerrada por cancelamento</option>
+        </select>
+      </label>
+      <button type="button" onClick={() => { setBusca(''); setModalidade('todos'); setStatusObrigacao('todos'); setArquivo('operacional'); }}>Limpar filtros</button>
+    </div>
+    <p className="text-sm">Os filtros alteram somente os cards. Coverage e totais validados acima incluem o histórico; itens indisponíveis permanecem visíveis em todos os filtros. O estado da obrigação não substitui a conferência de atrasos e parcelas na ficha.</p>
     <div className="grid gap-4 md:grid-cols-2">
       {items.map(item => item.kind === 'unavailable' ?
         <article key={item.id} aria-label={`Empréstimo ${item.id} indisponível`} className="rounded-lg border p-4">
@@ -45,7 +75,7 @@ export function EmprestimosListaSegura({ data, onRefresh, isFetching = false }: 
           <p>Capital histórico: {moeda(item.capital)}</p>
           <p>A receber: {moeda(item.totalReceber)}</p>
           <p>Recebido: {moeda(item.totalPago)}</p>
-          <p>{item.modalidade} · {badgeContrato(statusContrato51(item)).label}{item.arquivado ? ' · Arquivado' : ''}. Somente leitura; ações permanecem no fluxo completo validado.</p>
+          <p>{item.modalidade} · {item.status === 'ativo' && item.statusObrigacao === 'ativo' ? 'ATIVO — conferir atrasos na ficha' : badgeContrato(statusContrato51(item)).label}{item.arquivado ? ' · Arquivado' : ''}. Somente leitura; ações permanecem no fluxo completo validado.</p>
           <p>Obrigação registrada51: {referenciaMonetaria51(item.obrigacaoAtual)}</p>
           <p>A — obrigação adicional não desembolsada: {referenciaMonetaria51(item.obrigacaoAdicional)}. Não é capital, juros ou lucro.</p>
           <p className="text-xs">{REFERENCIA51}</p>

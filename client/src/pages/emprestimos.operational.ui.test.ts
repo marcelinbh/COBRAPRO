@@ -9,7 +9,8 @@ vi.mock("react-i18next", () => ({ useTranslation: () => ({ t: (key: string) => k
 vi.mock("wouter", () => ({ useLocation: () => ["/emprestimos", h.navigate], useParams: () => ({ id: '31' }) }));
 vi.mock("@/lib/trpc", () => ({ trpc: {
   useUtils: () => new Proxy({}, { get: () => ({ invalidate: vi.fn() }) }),
-  contratos: { listComParcelas: { useQuery: () => h.query }, obterDetalhes: { useQuery: () => h.query }, editarJuros: { useMutation: () => ({ mutate: h.mutate }) }, aplicarMulta: { useMutation: () => ({ mutate: h.mutate }) } },
+  auth: { me: { useQuery: () => ({ data: { id: 41 }, isFetching: false, isLoading: false, isPending: false, isError: false }) } },
+  contratos: { listLeituraSegura: { useQuery: () => h.query }, listComParcelas: { useQuery: () => h.query }, obterDetalhes: { useQuery: () => h.query }, editarJuros: { useMutation: () => ({ mutate: h.mutate }) }, aplicarMulta: { useMutation: () => ({ mutate: h.mutate }) } },
   parcelas: new Proxy({}, { get: () => ({ useMutation: () => ({ mutate: h.mutate }) }) }),
   configuracoes: { get: { useQuery: () => ({ data: {} }) } },
   caixa: { contas: { useQuery: () => ({ data: [] }) } },
@@ -33,9 +34,12 @@ function clickCardButton(fragment: string) {
   const expr = (attr.initializer as ts.JsxExpression).expression!.getText(ast);
   new Function("setLocation", "emp", "setShowAplicarMultaModal", `return (${expr})();`)(h.navigate, { id: 31 }, h.legacyFineModal);
 }
+const emptyList60 = () => ({ version: 'loan_list_read_v1', userId: 41, items: [],
+  coverage: { scopedContracts: 0, validatedContracts: 0, unavailableContracts: 0, complete: true, label: 'validados somente' },
+  totals: { label: 'validados somente', values: { capital: 0, totalReceber: 0, totalPago: 0 } }, warning: null });
 beforeEach(() => {
   vi.clearAllMocks(); vi.stubGlobal("React", React);
-  h.query = { data: [], isPending: false, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() };
+  h.query = { data: emptyList60(), isPending: false, isLoading: false, isError: false, isFetching: false, refetch: vi.fn() };
 });
 afterEach(() => vi.unstubAllGlobals());
 describe("Empréstimos: novo cadastro independente da leitura e entrada segura de pagamentos", () => {
@@ -50,12 +54,12 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
     h.query.isError = true;
     h.query.data = [{ ...{ id: 1, clienteId: 2, clienteNome: "Cache antigo não apresentar", valorPrincipal: "999999.00", totalReceber: 999999, parcelasComAtraso: [], modalidade: "mensal" } }];
     const html = renderToStaticMarkup(React.createElement(Emprestimos));
-    expect(html).toContain("Tentar novamente"); expect(html).toContain("Não cadastre novamente uma dívida já existente");
+    expect(html).toContain("Tentar consulta segura novamente"); expect(html).toContain("Não cadastre novamente uma dívida existente");
     expect(html).not.toContain("Cache antigo não apresentar"); expect(html).not.toContain("999.999");
   });
   it("vazio confirmado continua vazio sem erro inventado", () => {
     const html = renderToStaticMarkup(React.createElement(Emprestimos));
-    expect(html).toContain("Nenhum empréstimo encontrado"); expect(html).not.toContain("Não foi possível carregar os empréstimos");
+    expect(html).toContain("Nenhum empréstimo no escopo confirmado."); expect(html).not.toContain("indisponível para a sessão confirmada");
   });
   it("observer real pendente/pausado sem dados não apresenta ausência de empréstimos", () => {
     const client = new QueryClient();
@@ -68,7 +72,7 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
       h.query = observer.getCurrentResult();
       expect(h.query).toMatchObject({ status: "pending", fetchStatus: "paused", isPending: true, isLoading: false, isError: false, data: undefined });
       const html = renderToStaticMarkup(React.createElement(Emprestimos));
-      expect(html).toContain("Carregando empréstimos...");
+      expect(html).toContain("Confirmando vínculos da consulta segura...");
       expect(html).toContain("Novo empréstimo");
       expect(html).not.toContain("Nenhum empréstimo encontrado");
       expect(html).not.toContain("loans.manageLoans");
@@ -80,11 +84,11 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
   });
   it.each([
     { data: undefined, isPending: false, isLoading: false, isFetching: false },
-    { data: [], isPending: false, isLoading: false, isFetching: true },
+    { data: emptyList60(), isPending: false, isLoading: false, isFetching: true },
   ])("sem resposta ou vazio em reconferência não é vazio confirmado %j", flags => {
     Object.assign(h.query, flags);
     const html = renderToStaticMarkup(React.createElement(Emprestimos));
-    expect(html).toContain("Carregando empréstimos...");
+    expect(html).toContain("Confirmando vínculos da consulta segura...");
     expect(html).toContain("Novo empréstimo");
     expect(html).not.toContain("Nenhum empréstimo encontrado");
     expect(html).not.toContain("loans.manageLoans");
@@ -103,6 +107,7 @@ describe("Empréstimos: novo cadastro independente da leitura e entrada segura d
 });
 
 describe('Ficha: falha não apaga contrato nem apresenta cache como certificado', () => {
+  beforeEach(() => { h.query.data = []; });
   it('observer real pendente/pausado não informa que o empréstimo não existe', () => {
     const client = new QueryClient();
     const onlineBefore = onlineManager.isOnline();

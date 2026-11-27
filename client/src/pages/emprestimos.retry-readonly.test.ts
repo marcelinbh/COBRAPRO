@@ -27,8 +27,10 @@ function exactlyOne<T extends ts.Node>(nodes: ts.Node[], label: string): T {
   if (nodes.length !== 1) throw new Error(`${label}: expected 1 AST node, found ${nodes.length}`);
   return nodes[0] as T;
 }
+// O reader strict foi preservado, mas a rota não o monta mais. Estas regressões
+// continuam cobrindo sua política histórica; a entrada60 é testada separadamente.
 const page = exactlyOne<ts.FunctionDeclaration>(find(ast, node =>
-  ts.isFunctionDeclaration(node) && node.name?.text === "Emprestimos"), "page");
+  ts.isFunctionDeclaration(node) && node.name?.text === "EmprestimosListaEstritaLegada"), "legacy strict implementation");
 const strictQuery = exactlyOne<ts.CallExpression>(find(page, node =>
   ts.isCallExpression(node) && node.expression.getText(ast) === "trpc.contratos.listComParcelas.useQuery"), "strict query");
 function evaluate(expression: ts.Expression, bindings: Record<string, unknown>): unknown {
@@ -103,7 +105,7 @@ afterEach(async () => {
 });
 afterAll(() => vi.unstubAllGlobals());
 
-describe("strict loan-list read-only retry policy (real TanStack observer, offline)", () => {
+describe("preserved legacy strict retry policy, not the list60 entry (real TanStack observer, offline)", () => {
   it("uses installed TanStack 5.90.2 and the actual browser default, without setting global retry", () => {
     const require = createRequire(import.meta.url);
     const pkg = JSON.parse(readFileSync(require.resolve("@tanstack/react-query/package.json"), "utf8"));

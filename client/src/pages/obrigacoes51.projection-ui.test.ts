@@ -152,8 +152,14 @@ describe('Projeção51 UI: números reais, histórico imutável e fronteiras con
     }
     expect(JSON.stringify(safe)).toBe(before);
   });
-  it('todos os modos de empréstimos recebem todos e filtram arquivos sem trocar total36 por51', () => {
-    const rows = [loan(462), loan(463, { arquivado: true })], m = mounted('./Emprestimos.tsx', 'Emprestimos', rows);
+  it('entrada da lista monta diretamente o componente snapshot, sem queries strict antes', () => {
+    const m = mounted('./Emprestimos.tsx', 'Emprestimos', []);
+    const tree = m.render();
+    expect(tree.type).toBe('EmprestimosListaSeguraFallback');
+    expect(m.queries).toEqual([]);
+  });
+  it('modos strict legados preservados recebem todos e filtram arquivos sem trocar total36 por51', () => {
+    const rows = [loan(462), loan(463, { arquivado: true })], m = mounted('./Emprestimos.tsx', 'EmprestimosListaEstritaLegada', rows);
     let tree = m.render(); expect(m.queries[0]).toEqual({ arquivo: 'todos' });
     expect(treeNodes(tree, n => n.type === 'EmprestimoCardCobra').map(n => n.props.emp.id)).toEqual([462]);
     m.invoke(button(tree, 'Histórico').props.onClick); tree = m.render();

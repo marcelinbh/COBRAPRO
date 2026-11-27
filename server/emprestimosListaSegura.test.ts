@@ -50,14 +50,16 @@ function source() {
   return { from, rpc, backend, tables, calls, setFault: (fn: typeof fault) => { fault = fn; } };
 }
 const moneyCalls = (f: ReturnType<typeof source>) => f.calls.filter(c => /valor_original|valor_principal/.test(c.fields));
-const safe = async (f: ReturnType<typeof source>) => { dbMock.getSupabaseClientAsync.mockResolvedValue(f.backend); return caller().listLeituraSegura(); };
+// Preserva a cobertura do reader REST legado. A procedure usa snapshot60 e tem
+// testes de caller próprios em emprestimosSnapshot60.test.ts (não há fallback REST).
+const safe = (f: ReturnType<typeof source>) => listarEmprestimosSeguros(f.backend, 41);
 function addBadOwn(f: ReturnType<typeof source>) {
   f.tables.contratos.push({ ...contract, id: 42, cliente_id: 43, valor_principal: '987654.32' });
   f.tables.clientes.push({ id: 43, user_id: 41, nome: 'Nome próprio indisponível não exposto' });
   f.tables.parcelas.push({ ...parcel, id: 44, contrato_id: 42, cliente_id: 999, user_id: 99, valor_original: '876543.21' });
 }
 beforeEach(() => { vi.clearAllMocks(); dbMock.getDb.mockImplementation(() => { throw new Error('Drizzle proibido'); }); });
-describe('Caller real: lista segura isolada', () => {
+describe('Lista segura legada preservada e gates do caller de leitura60', () => {
   it('autenticação antes do backend e nenhum scope fornecido pelo cliente', async () => {
     await expect(caller(null).listLeituraSegura()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
     await expect(caller({ id: 0 }).listLeituraSegura()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
@@ -236,9 +238,9 @@ describe('Caller real: lista segura isolada', () => {
   it('data inválida recusa antes de qualquer query', async () => {
     const f = source(); await expect(listarEmprestimosSeguros(f, 41, '2026-99-99')).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' }); expect(f.from).not.toHaveBeenCalled();
   });
-  it('endpoint estrito original CONTINUA recusando o mesmo vínculo, enquanto o novo mostra OWN placeholder', async () => {
+  it('endpoint estrito CONTINUA recusando o vínculo; reader legado preservado mostra OWN placeholder', async () => {
     const f = source(); addBadOwn(f); dbMock.getSupabaseClientAsync.mockResolvedValue(f.backend);
     await expect(caller().listComParcelas()).rejects.toMatchObject({ code: 'PRECONDITION_FAILED' });
-    expect((await caller().listLeituraSegura()).items.map(i => i.kind)).toEqual(['validated', 'unavailable']);
+    expect((await safe(f)).items.map(i => i.kind)).toEqual(['validated', 'unavailable']);
   });
 });

@@ -506,6 +506,13 @@ function EmprestimoCardCobra({
 
 // ─── PÁGINA PRINCIPAL ──────────────────────────────────────────────────────────
 export default function Emprestimos() {
+  return <EmprestimosListaSeguraFallback />;
+}
+
+// Implementação estrita preservada, mas não montada pela rota da lista60.
+// Queries, writers e cards históricos permanecem inalterados; a ficha segue sendo
+// a fronteira de validação para ações. Não usá-la como precursor do snapshot.
+function EmprestimosListaEstritaLegada() {
   const { t, i18n } = useTranslation();
   const [busca, setBusca] = useState("");
   const [arquivo, setArquivo] = useState<Arquivo51>("operacional");
