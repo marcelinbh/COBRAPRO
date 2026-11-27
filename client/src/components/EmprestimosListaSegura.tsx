@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { badgeContrato } from "@/lib/statusEmprestimoBadge";
 import { noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, type Arquivo51 } from "@/lib/obrigacoes51Apresentacao";
 import { rotaAcaoListaEmprestimo62 } from "@/lib/acoesListaEmprestimo62";
+import { ExportarLista66 } from "./ExportarLista66";
 
 import type { ListaSeguraEmprestimos } from "../../../shared/emprestimosListaSegura";
 const moeda = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
@@ -93,6 +94,7 @@ export function EmprestimosListaSegura({ data, onRefresh, isFetching = false, re
     </div>
     <p className="text-sm leading-relaxed text-muted-foreground">Os filtros alteram somente os cards. Coverage e totais validados acima incluem o histórico; itens indisponíveis permanecem visíveis em todos os filtros. O estado da obrigação não substitui a conferência de atrasos e parcelas na ficha.</p>
     <p className="text-sm text-muted-foreground">Empréstimos validados aparecem primeiro. Os registros indisponíveis continuam abaixo, sem ocultar dívidas existentes.</p>
+    <ExportarLista66 data={data} items={items} filtros={{ arquivo, busca, modalidade, statusObrigacao }} disabled={isFetching || loteEmCurso} />
     {renderCobranca && <section aria-label="Seleção para cobrança" className="min-w-0 rounded-xl border border-border bg-card p-4 text-card-foreground space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h3 className="font-semibold">Cobrança em lote pelo WhatsApp</h3>

@@ -19,6 +19,7 @@ function renderer() {
     ...hooks.bindings(), noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, badgeContrato,
     moeda: (value: number) => `R$ ${value.toFixed(2)}`,
     rotaAcaoListaEmprestimo62,
+    ExportarLista66: () => null,
   });
   return (data: ListaSeguraEmprestimos, onRefresh = () => {}) => hooks.render(component, { data, onRefresh });
 }

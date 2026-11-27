@@ -20,7 +20,7 @@ const button = (tree: any, label: string) => { const result = treeNodes(tree, n 
 const checks = (tree: any) => treeNodes(tree, n => n.type === 'input' && n.props.type === 'checkbox');
 const selectionHarness = (data = list()) => {
   const hooks = new Hooks(), props = { data, onRefresh: vi.fn(), renderCobranca: vi.fn((p: any) => hooks.bindings().React.createElement('aside', { 'aria-label': 'Lote simulado' }, p.contratoIds.join(','))) };
-  const component = compile(`${body('components/EmprestimosListaSegura.tsx')}\nreturn EmprestimosListaSegura;`, { ...hooks.bindings(), badgeContrato, noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, rotaAcaoListaEmprestimo62 });
+  const component = compile(`${body('components/EmprestimosListaSegura.tsx')}\nreturn EmprestimosListaSegura;`, { ...hooks.bindings(), badgeContrato, noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, rotaAcaoListaEmprestimo62, ExportarLista66: () => null });
   const render = () => hooks.render(component, props);
   const open = () => { button(render(), 'Selecionar para cobrar').props.onClick(); return render(); };
   const chosen = () => props.renderCobranca.mock.calls.at(-1)?.[0]?.contratoIds ?? [];

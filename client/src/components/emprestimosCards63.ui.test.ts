@@ -97,6 +97,7 @@ const localBoundary = () => {
   const component = compile(`${body}\nreturn EmprestimosListaSegura;`, {
     ...hooks.bindings(), badgeContrato, noArquivo51, referenciaMonetaria51,
     statusContrato51, REFERENCIA51, rotaAcaoListaEmprestimo62,
+    ExportarLista66: () => null,
   });
   return { hooks, component };
 };
