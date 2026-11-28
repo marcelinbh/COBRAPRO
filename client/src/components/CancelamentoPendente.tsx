@@ -49,7 +49,7 @@ export default function CancelamentoPendente({ userId, itens, onOriginalEncerrad
     setReady(session);
     return () => { session.closed = true; };
   }, [session, store]);
-  const options = useMemo(() => ({ retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined, staleTime: 0, refetchInterval: 5000, refetchOnWindowFocus: true, queryKeyHashFn: (key: readonly unknown[]) => hashKey(['cancelamento-pendente', session, key]) }), [session]);
+  const options = useMemo(() => ({ retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined, staleTime: 0, refetchInterval: 5000, refetchOnWindowFocus: true, queryKeyHashFn: (key: readonly unknown[]) => hashKey(['cancelamento-pendente', session, key]), trpc: { abortOnUnmount: true } }), [session]);
   const cap = trpc.contasPagar.capacidadesCancelamentoPendente.useQuery(undefined, options);
   const cancel = trpc.contasPagar.cancelarPendente.useMutation({ retry: false });
   const recovery = trpc.contasPagar.recuperarCancelamentoPendente.useMutation({ retry: false });

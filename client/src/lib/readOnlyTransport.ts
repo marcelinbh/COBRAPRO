@@ -1,3 +1,4 @@
+import { availabilityRead71Paths } from "./availabilityRead71";
 import type { Operation } from "@trpc/client";
 
 // Isolar somente estas leituras; mutations e demais queries mantêm batching.
@@ -6,6 +7,7 @@ const isolatedReadOnlyPaths = new Set([
   "contratos.listComParcelas",
   "contratos.listLeituraSegura",
   "contratos.obterDetalhes",
+  ...availabilityRead71Paths,
 ]);
 
 export function shouldIsolateReadOnlyQuery(

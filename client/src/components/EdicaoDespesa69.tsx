@@ -39,7 +39,7 @@ export default function EdicaoDespesa69({ userId, itens, onConfirmed }: { userId
     discover(); setReady(session);
     return () => { session.closed = true; };
   }, [session, journal]);
-  const options = useMemo(() => ({ retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined, queryKeyHashFn: (key: readonly unknown[]) => hashKey(['despesas69', session.generation, userId, key]) }), [session]);
+  const options = useMemo(() => ({ retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined, queryKeyHashFn: (key: readonly unknown[]) => hashKey(['despesas69', session.generation, userId, key]), trpc: { abortOnUnmount: true } }), [session]);
   const cap = trpc.despesas69.capacidades.useQuery(undefined, options);
   const quote = trpc.despesas69.cotar.useMutation({ retry: false });
   const edit = trpc.despesas69.editar.useMutation({ retry: false });

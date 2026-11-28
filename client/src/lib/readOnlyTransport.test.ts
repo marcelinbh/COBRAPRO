@@ -6,6 +6,7 @@ import { createHTTPServer } from "@trpc/server/adapters/standalone";
 import superjson from "superjson";
 import { z } from "zod";
 import { shouldIsolateReadOnlyQuery } from "./readOnlyTransport";
+import { createAvailabilityRead71Fetch } from "./availabilityRead71";
 
 const allowed = ["auth.me", "contratos.listComParcelas", "contratos.listLeituraSegura", "contratos.obterDetalhes"];
 const source = readFileSync(new URL("../main.tsx", import.meta.url), "utf8");
@@ -78,11 +79,11 @@ describe("read-only tRPC transport isolation", () => {
       return nativeFetch(input, { ...init, headers, signal: AbortSignal.timeout(5000) });
     };
     function client(useOriginalBatch: boolean) {
-      const config = new Function("httpBatchLink", "httpLink", "splitLink", "superjson", "shouldIsolateReadOnlyQuery", "globalThis", `return (${configuration});`)(
+      const config = new Function("httpBatchLink", "httpLink", "splitLink", "superjson", "shouldIsolateReadOnlyQuery", "availabilityFetch", "globalThis", `return (${configuration});`)(
         (options: any) => httpBatchLink({ ...options, url }),
         (options: any) => httpLink({ ...options, url }),
         useOriginalBatch ? (options: any) => options.false : splitLink,
-        superjson, shouldIsolateReadOnlyQuery, { fetch: fetcher },
+        superjson, shouldIsolateReadOnlyQuery, createAvailabilityRead71Fetch(fetcher, url), { fetch: fetcher },
       );
       return createTRPCUntypedClient<typeof router>(config);
     }

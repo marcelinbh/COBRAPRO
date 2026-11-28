@@ -4,6 +4,7 @@ import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, httpLink, splitLink, TRPCClientError } from "@trpc/client";
 import { shouldIsolateReadOnlyQuery } from "@/lib/readOnlyTransport";
+import { createAvailabilityRead71Fetch } from "@/lib/availabilityRead71";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import i18n from './i18n/i18n';
@@ -43,6 +44,8 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+const availabilityFetch = createAvailabilityRead71Fetch((input, init) => globalThis.fetch(input, init), window.location.href);
+
 const trpcClient = trpc.createClient({
   links: [
     splitLink({
@@ -51,7 +54,7 @@ const trpcClient = trpc.createClient({
         url: "/api/trpc",
         transformer: superjson,
         fetch(input, init) {
-          return globalThis.fetch(input, {
+          return availabilityFetch(input, {
             ...(init ?? {}),
             credentials: "include",
           });

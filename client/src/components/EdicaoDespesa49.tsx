@@ -94,7 +94,7 @@ export default function EdicaoDespesa49({ userId, itens, originaisRevision, sele
   useEffect(() => {
     if (ready === session && originaisRevision?.userId === userId && !flight.current) revalidarLocal();
   }, [session, ready, originaisRevision?.userId, originaisRevision?.revision]);
-  const options = useMemo(() => ({ retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined, queryKeyHashFn: (key: readonly unknown[]) => hashKey(['despesas49', session.generation, userId, key]) }), [session]);
+  const options = useMemo(() => ({ retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined, queryKeyHashFn: (key: readonly unknown[]) => hashKey(['despesas49', session.generation, userId, key]), trpc: { abortOnUnmount: true } }), [session]);
   const cap = trpc.despesas49.capacidades.useQuery(undefined, options);
   const quote = trpc.despesas49.cotar.useMutation({ retry: false });
   const edit = trpc.despesas49.editar.useMutation({ retry: false });
