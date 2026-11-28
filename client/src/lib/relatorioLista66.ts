@@ -11,6 +11,10 @@ export type FiltrosLista66 = {
   busca: string;
   modalidade: string;
   statusObrigacao: string;
+  vencimento?: 'todos' | 'atrasados' | 'emdia';
+  cobrador?: string;
+  etiqueta?: string;
+  modo?: 'cards' | 'pastas';
 };
 
 export type RelatorioLista66 = {
@@ -99,6 +103,10 @@ export function criarRelatorioLista66(
       typeof filtros.statusObrigacao !== 'string') {
     invalido66('descrição dos filtros inválida');
   }
+  if ((filtros.vencimento !== undefined && !['todos', 'atrasados', 'emdia'].includes(filtros.vencimento)) ||
+      (filtros.modo !== undefined && !['cards', 'pastas'].includes(filtros.modo)) ||
+      (filtros.cobrador !== undefined && typeof filtros.cobrador !== 'string') ||
+      (filtros.etiqueta !== undefined && typeof filtros.etiqueta !== 'string')) invalido66('descritores67 inválidos');
 
   const porId = new Map<number, ItemLista66>();
   let validados = 0;
@@ -148,6 +156,8 @@ export function criarRelatorioLista66(
   const avisos: string[] = [];
   if (!coverage.complete) avisos.push(AVISO_LISTA_INCOMPLETA);
   if (totals === null) avisos.push('Relatório parcial: totais indisponíveis nesta leitura; ausência de valor não significa zero.');
+  avisos.push('ALLscope: cobertura e totais incluem o histórico autorizado. Pastas são visuais; exportação usa a mesma seleção plana dos cards, inclusive pastas fechadas.');
+  avisos.push('Vencimento67: atraso DATE < referência; em dia DATE >= referência somente na obrigação operacional ativa. Ausência de resumo não presume pagamento.');
   avisos.push(ESCOPO_TOTAIS66);
   avisos.push('Somente leitura do snapshot carregado; não é cotação de baixa nem autorização de recebimento.');
   avisos.push('Arquivo é um atributo separado: não representa pagamento, cancelamento ou transferência.');
@@ -166,6 +176,11 @@ export function criarRelatorioLista66(
     ['Busca por cliente', filtros.busca],
     ['Modalidade', filtros.modalidade],
     ['Estado da obrigação', filtros.statusObrigacao],
+    ['Vencimento na data da consulta', filtros.vencimento ?? 'todos'],
+    ['Cobrador no escopo autorizado', filtros.cobrador ?? 'Todos no escopo autorizado'],
+    ['Etiqueta própria / histórica', filtros.etiqueta ?? 'Todas'],
+    ['Modo visual', filtros.modo ?? 'cards'],
+    ['Escopo de organização', 'ALLscope — metadados associáveis somente aos validados; desconhecidos não presumidos'],
     ['Empréstimos no escopo carregado', String(coverage.scopedContracts)],
     ['Empréstimos validados no escopo', String(coverage.validatedContracts)],
     ['Empréstimos indisponíveis no escopo', String(coverage.unavailableContracts)],

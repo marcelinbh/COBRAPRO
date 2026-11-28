@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const query = vi.hoisted(() => ({ useQuery: vi.fn(), auth: vi.fn() }));
-vi.mock('../lib/trpc', () => ({ trpc: { auth: { me: { useQuery: query.auth } }, contratos: { listLeituraSegura: query }, useUtils: () => ({ client: {} }), cobrancaLista64: { enviar: { useMutation: () => ({ mutateAsync: vi.fn() }) } } } }));
+vi.mock('../lib/trpc', () => ({ trpc: { auth: { me: { useQuery: query.auth } }, contratos: { listLeituraSegura: query }, useUtils: () => ({ client: {} }), etiquetasLista67: { criar: { useMutation: () => ({ mutateAsync: vi.fn() }) }, remover: { useMutation: () => ({ mutateAsync: vi.fn() }) }, aplicar: { useMutation: () => ({ mutateAsync: vi.fn() }) } }, cobrancaLista64: { enviar: { useMutation: () => ({ mutateAsync: vi.fn() }) } } } }));
 import { EmprestimosListaSegura } from './EmprestimosListaSegura';
 import { EmprestimosListaSeguraFallback } from './EmprestimosListaSeguraFallback';
 import { AVISO_LISTA_INCOMPLETA, deveUsarListaSegura, type ListaSeguraEmprestimos } from '../../../shared/emprestimosListaSegura';

@@ -1,3 +1,4 @@
+import * as controles67 from '../lib/emprestimosListaControles67';
 // @vitest-environment node
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -20,7 +21,7 @@ const button = (tree: any, label: string) => { const result = treeNodes(tree, n 
 const checks = (tree: any) => treeNodes(tree, n => n.type === 'input' && n.props.type === 'checkbox');
 const selectionHarness = (data = list()) => {
   const hooks = new Hooks(), props = { data, onRefresh: vi.fn(), renderCobranca: vi.fn((p: any) => hooks.bindings().React.createElement('aside', { 'aria-label': 'Lote simulado' }, p.contratoIds.join(','))) };
-  const component = compile(`${body('components/EmprestimosListaSegura.tsx')}\nreturn EmprestimosListaSegura;`, { ...hooks.bindings(), badgeContrato, noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, rotaAcaoListaEmprestimo62, ExportarLista66: () => null });
+  const component = compile(`${body('components/EmprestimosListaSegura.tsx')}\nreturn EmprestimosListaSegura;`, { ...hooks.bindings(), ...controles67, badgeContrato, noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, rotaAcaoListaEmprestimo62, ExportarLista66: () => null });
   const render = () => hooks.render(component, props);
   const open = () => { button(render(), 'Selecionar para cobrar').props.onClick(); return render(); };
   const chosen = () => props.renderCobranca.mock.calls.at(-1)?.[0]?.contratoIds ?? [];
@@ -31,7 +32,7 @@ const preview = (ids = [31]): Preview64 => ({ userId: 41, dataReferencia: '2026-
 const controllerHarness = (ids = [31]) => {
   const hooks = new Hooks(), api = { preparar: vi.fn(async () => preview(ids)), status: vi.fn(async () => ({ connected: true })), enviar: vi.fn(async (token: string) => result(Number(token.split('-')[1]))) };
   const props = { userId: 41, contratoIds: ids, api, onBusy: vi.fn() };
-  const component = compile(`${body('components/CobrancaLote64.tsx')}\nreturn CobrancaLote64;`, { ...hooks.bindings(), preview64Schema, resultado64Schema });
+  const component = compile(`${body('components/CobrancaLote64.tsx')}\nreturn CobrancaLote64;`, { ...hooks.bindings(), ...controles67, preview64Schema, resultado64Schema });
   const render = () => hooks.render(component, props);
   const settle = () => { const tree = render(); hooks.flush(); return tree; };
   settle();

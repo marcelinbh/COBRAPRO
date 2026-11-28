@@ -1,3 +1,4 @@
+import * as controles67 from '../lib/emprestimosListaControles67';
 // @vitest-environment node
 // Etapa63: SSR React real; o harness abaixo serve apenas à boundary local dos filtros.
 import React from 'react';
@@ -95,7 +96,7 @@ const localBoundary = () => {
     .map(node => node.getText(ast).replace(/^export\s+(?:default\s+)?/, '')).join('\n');
   const hooks = new Hooks();
   const component = compile(`${body}\nreturn EmprestimosListaSegura;`, {
-    ...hooks.bindings(), badgeContrato, noArquivo51, referenciaMonetaria51,
+    ...hooks.bindings(), ...controles67, badgeContrato, noArquivo51, referenciaMonetaria51,
     statusContrato51, REFERENCIA51, rotaAcaoListaEmprestimo62,
     ExportarLista66: () => null,
   });
@@ -224,7 +225,7 @@ describe('Cards63: snapshot validado em SSR React real', () => {
       const article = card(render(lista([validado({ modalidade })])));
       expect(plain(article)).toContain(modalidade);
       expect(plain(article)).toContain('ATIVO — conferir atrasos na ficha');
-      expect(plain(article)).not.toContain('EM DIA');
+      expect(plain(article)).toContain('Em dia na data da consulta');
       counts(article, resumo());
       expect(plain(article)).toContain(`A receber: ${moeda(789.01)}`);
     }

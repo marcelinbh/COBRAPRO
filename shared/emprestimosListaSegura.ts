@@ -49,6 +49,8 @@ export type ListaSeguraEmprestimos = {
   };
   totals: { label: "validados somente"; values: TotaisValidadosLista | null };
   warning: typeof AVISO_LISTA_INCOMPLETA | null;
+  /** Mapa paralelo67; não clona cards nem modifica a prova financeira60. */
+  organizacao67?: import('./emprestimosListaControles67').OrganizacaoLista67;
 };
 
 /** A decisão usa o código tRPC, não o status HTTP do batch (que pode ser 207). */

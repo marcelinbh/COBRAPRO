@@ -16,6 +16,7 @@ vi.mock("@/lib/trpc", () => ({ trpc: {
   caixa: { contas: { useQuery: () => ({ data: [] }) } },
   cobradores: { list: { useQuery: () => ({ data: [] }) } },
   whatsapp: { recebimentos: { useQuery: () => ({ data: undefined }) }, cobrarLote: { useMutation: () => ({ mutate: h.mutate }) } },
+  etiquetasLista67: { criar: { useMutation: () => ({ mutateAsync: h.mutate }) }, remover: { useMutation: () => ({ mutateAsync: h.mutate }) }, aplicar: { useMutation: () => ({ mutateAsync: h.mutate }) } },
   cobrancaLista64: { enviar: { useMutation: () => ({ mutateAsync: h.mutate }) } },
 } }));
 import Emprestimos from "./Emprestimos";

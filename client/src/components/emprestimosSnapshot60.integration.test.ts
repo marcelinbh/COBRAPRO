@@ -1,3 +1,4 @@
+import * as controles67 from '../lib/emprestimosListaControles67';
 import { describe, expect, it, vi } from 'vitest';
 import { compile, code, Hooks, ReactTree, source, text, treeNodes } from '../lib/r1BoundaryHarness';
 import { noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51 } from '../lib/obrigacoes51Apresentacao';
@@ -16,7 +17,7 @@ const fixture = (): ListaSeguraEmprestimos => ({ version: 'loan_list_read_v1', u
 function renderer() {
   const hooks = new Hooks(), ast = source('components/EmprestimosListaSegura.tsx');
   const component = compile(code(ast, 'EmprestimosListaSegura') + '\nreturn EmprestimosListaSegura;', {
-    ...hooks.bindings(), noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, badgeContrato,
+    ...hooks.bindings(), ...controles67, noArquivo51, referenciaMonetaria51, statusContrato51, REFERENCIA51, badgeContrato,
     moeda: (value: number) => `R$ ${value.toFixed(2)}`,
     rotaAcaoListaEmprestimo62,
     ExportarLista66: () => null,

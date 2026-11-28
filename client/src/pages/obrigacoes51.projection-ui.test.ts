@@ -3,6 +3,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { Hooks, text, treeNodes } from '../lib/r1BoundaryHarness';
+import * as controles67 from '../lib/emprestimosListaControles67';
 
 /** Executa corpos/handlers REAIS, não strings nem import da aplicação/backend.
  * VM sem require/process/ENV/network/SQL/storage; todas as fronteiras de escrita
@@ -45,7 +46,7 @@ function mounted(path: string, name: string, data: any, extras: Record<string, a
   const utils = new Proxy({}, { get: () => new Proxy({}, { get: () => ({ invalidate: () => {}, query: trap }) }) });
   const financial = new Proxy({}, { get: trap });
   const bindings: any = {
-    ...hooks.bindings(), ...presentation, ...badges, EmprestimoCardCobra: 'EmprestimoCardCobra', HistoricoAba: 'HistoricoAba',
+    ...hooks.bindings(), ...presentation, ...badges, ...controles67, EmprestimoCardCobra: 'EmprestimoCardCobra', HistoricoAba: 'HistoricoAba',
     useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'pt' } }),
     useLocation: () => ['/emprestimos', (v: string) => navigations.push(v)], useParams: () => ({ id: '462' }),
     formatarMoeda: money, formatarData: (v: any) => v == null ? 'Sem data' : String(v),

@@ -2,7 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { protectedProcedure } from '../_core/trpc';
 import { getSupabaseClientAsync } from '../db';
-import { listarEmprestimosSnapshot60 } from '../services/snapshot60-reader';
+import { listarEmprestimosSnapshot67 } from '../services/snapshot67-reader';
 
 /** Somente leitura. Nenhum user/koletor/contrato fornecido pelo cliente. */
 export const listaSeguraEmprestimosProcedure = protectedProcedure.input(z.void()).query(async ({ ctx }) => {
@@ -12,5 +12,5 @@ export const listaSeguraEmprestimosProcedure = protectedProcedure.input(z.void()
   let client;
   try { client = await getSupabaseClientAsync(); }
   catch { throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Não foi possível confirmar a leitura dos empréstimos. Tente novamente.' }); }
-  return listarEmprestimosSnapshot60(client, ctx.user.id);
+  return listarEmprestimosSnapshot67(client, ctx.user.id);
 });
