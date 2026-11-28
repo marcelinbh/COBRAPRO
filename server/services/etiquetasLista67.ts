@@ -8,7 +8,7 @@ export async function executarEtiqueta67(client: Client60 | null | undefined, ow
   if (!client) return fail();
   let response: unknown;
   try { response = copiarJson67(await client.rpc(`rpc_etiquetas_${acao}67`, { ...args, p_user_id: owner })); } catch { return fail(); }
-  const envelope = z.object({ data: z.unknown(), error: z.unknown(), status: z.number().int().optional(), statusText: z.string().optional(), count: z.null().optional() }).strict().safeParse(response);
+  const envelope = z.object({ success: z.literal(true).optional(), data: z.unknown(), error: z.unknown(), status: z.number().int().optional(), statusText: z.string().optional(), count: z.null().optional() }).strict().safeParse(response);
   if (!envelope.success) return fail();
   const r = envelope.data;
   if (r.error !== null) {
