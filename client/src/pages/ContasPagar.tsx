@@ -13,6 +13,7 @@ import { Receipt, Plus, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import CancelamentoPendente from '@/components/CancelamentoPendente';
 import EdicaoDespesa49, { type OriginaisRevision49, type SelecaoEdicao49 } from '@/components/EdicaoDespesa49';
+import RecorrenciaDespesas68 from '@/components/RecorrenciaDespesas68';
 import ConferenciaDespesasCaixa from '@/components/ConferenciaDespesasCaixa';
 import {
   DespesasIntentStore, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload,
@@ -87,6 +88,11 @@ export default function ContasPagar() {
   }, [store, sessao]);
   const utils = trpc.useUtils();
   const expensesUtils = despesasTrpc.useUtils();
+  // Binding aditivo: o painel68 atual também invalida essas consultas internamente.
+  const callbacksRecorrencia68 = { onChanged: () => {
+    if (!pertenceSessao()) return;
+    void Promise.allSettled([expensesUtils.contasPagar.listar.invalidate(), expensesUtils.contasPagar.resumo.invalidate()]);
+  } };
   // O input RPC não muda. O hash privado evita adotar cache compartilhado/placeholder de outra sessão.
   const options = useMemo(() => ({
     enabled: !!userId, retry: false, gcTime: 0, initialData: undefined, placeholderData: undefined,
@@ -196,7 +202,7 @@ export default function ContasPagar() {
       <Button disabled={!habilitado || locked('criar')} onClick={() => setNovo(true)}><Plus className="h-4 w-4 mr-2" />Nova despesa</Button>
     </div>
     {userId && <ConferenciaDespesasCaixa key={`${userId}:${sessao.cacheId}`} userId={userId} atual={pertenceSessao} />}
-    <p className="text-sm border rounded-lg p-3">O saldo do livro é automático; não existe sincronização financeira ao abrir a tela. Legado requer conferência. Edição pendente por sucessão20 e cancelamento lógico têm disponibilidade independente abaixo; exclusão física e recorrência continuam bloqueadas. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
+    <p className="text-sm border rounded-lg p-3">O saldo do livro é automático; não existe sincronização financeira ao abrir a tela. Legado requer conferência. Edição pendente por sucessão20 e cancelamento lógico têm disponibilidade independente abaixo; exclusão física não está disponível. Séries recorrentes são configuradas no painel68 separado, sem pagamento automático. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
     {auth.isError ? <p role="alert">Erro ao identificar a sessão. Nenhuma operação disponível.</p> : auth.isLoading ? <p role="status">Carregando sessão...</p> : !userId ? <p role="alert">Autentique-se para consultar despesas.</p> : null}
     {userId && (capacidades.isError ? <p role="alert">Não foi possível verificar a disponibilidade do trilho. Escritas bloqueadas.</p> : capacidades.isLoading ? <p role="status">Verificando disponibilidade...</p> : !habilitado ? <p role="alert">Despesas prospectivas desabilitadas; nenhum lançamento será feito no legado.</p> : null)}
     {avisoStorage && <p role="alert" className="text-amber-500 border p-3 rounded-lg break-words">{avisoStorage}</p>}
@@ -220,6 +226,7 @@ export default function ContasPagar() {
     <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
     {userId && <CancelamentoPendente key={`cancelamento38c:${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} onOriginalEncerrado={originaisEncerrados} />}
     {userId && <EdicaoDespesa49 key={`edicao49:${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} originaisRevision={originaisRevision} selecao={selecaoEdicao} />}
+    {userId && <RecorrenciaDespesas68 key={`recorrencia68:${userId}:${sessao.cacheId}`} userId={userId} refreshToken={lista.dataUpdatedAt} {...callbacksRecorrencia68} />}
     <section aria-label="Lista de despesas" className="space-y-3">
       {!userId ? <p role="status">Consulta indisponível sem sessão.</p> : lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>
         : lista.isLoading || !lista.data ? <p role="status">{userId ? 'Carregando despesas...' : 'Consulta indisponível sem sessão.'}</p>
@@ -227,7 +234,7 @@ export default function ContasPagar() {
             : lista.data.map(d => <Card key={d.id}><CardContent className="p-4 space-y-2">
               <div className="flex justify-between gap-3"><div><p className="font-semibold">{d.descricao}</p><p className="text-xs text-muted-foreground">#{d.id} · {categorias[d.categoria as keyof typeof categorias] ?? d.categoria} · Vence: {dataLabel(d.dataVencimento)}</p></div><div className="text-right"><p className="font-bold">{moedaDespesa(d.valor)}</p><Badge variant="outline">{d.status === 'cancelada' ? (d.dataPagamento === null ? 'Cancelada sem baixa' : 'Estornada (baixa preservada)') : (statuses[d.status as keyof typeof statuses] ?? d.status)}</Badge></div></div>
               {d.observacoes && <p className="text-sm">{d.observacoes}</p>}
-              {d.recorrente && <p className="text-xs">Recorrência histórica ({d.periodicidade ?? 'não informada'}); geração indisponível.</p>}
+              {d.recorrente && <p className="text-xs">Recorrência histórica ({d.periodicidade ?? 'não informada'}); não é uma série68 ativa. Cadastre uma nova série explicitamente.</p>}
               {d.mensagemConferencia && <p className="text-sm text-amber-500">{d.mensagemConferencia}</p>}
               {d.podePagar && <Button variant="outline" size="sm" disabled={lista.isFetching} onClick={() => selecionarEdicao(d.id)} aria-controls="edicao-despesa49">Editar</Button>}
               {d.podePagar && <Button size="sm" disabled={!habilitado || locked('pagar')} onClick={() => { setPagarId(d.id); setContaCaixaId(ativas?.length === 1 ? String(ativas[0].id) : ''); }}>Registrar pagamento atômico</Button>}
@@ -241,7 +248,7 @@ export default function ContasPagar() {
         <Label htmlFor="despesa-valor">Valor exato (R$)</Label><Input id="despesa-valor" inputMode="decimal" placeholder="100,01" disabled={locked('criar')} value={form.valor} onChange={e => setForm({ ...form, valor: e.target.value })} />
         <Label htmlFor="despesa-vencimento">Data civil de vencimento</Label><Input id="despesa-vencimento" type="date" disabled={locked('criar')} value={form.dataVencimento} onChange={e => setForm({ ...form, dataVencimento: e.target.value })} />
         <Label htmlFor="despesa-observacoes">Observações</Label><Textarea id="despesa-observacoes" disabled={locked('criar')} value={form.observacoes} maxLength={10000} onChange={e => setForm({ ...form, observacoes: e.target.value })} />
-        <p className="text-sm">Recorrência indisponível. Não há lançamentos automáticos.</p>
+        <p className="text-sm">Este formulário cria somente avulsa. Para recorrência, configure uma série no painel68; pagamento permanece manual.</p>
         <Button disabled={!habilitado || locked('criar')} onClick={novaDespesa}>{busy ? 'Aguardando confirmação...' : 'Criar despesa atômica'}</Button>
       </div>
     </DialogContent></Dialog>

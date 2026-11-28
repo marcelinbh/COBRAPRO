@@ -1,6 +1,7 @@
 import { reparcelamento43Router } from './routers/reparcelamento43';
 import { reparcelamento47Router } from './routers/reparcelamento47';
 import { despesas49Router } from './routers/despesas49';
+import { despesasRecorrencia68Router } from './routers/despesasRecorrencia68';
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -3756,6 +3757,7 @@ export const appRouter = router({
   reparcelamentoAtual: reparcelamento47Router,
   contasPagar: contasPagarProspectivasRouter,
   despesas49: despesas49Router,
+  despesasRecorrencia68: despesasRecorrencia68Router,
   emprestimosProspectivos: emprestimosProspectivosRouter,
   emprestimosMultimodal: emprestimosMultimodalRouter,
   renovacaoProspectiva: renovacaoProspectivaRouter,

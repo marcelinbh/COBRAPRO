@@ -8,6 +8,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerAuthRoutes } from "../authRoutes";
 import { registerWebhookRoutes } from "../webhookRoutes";
 import { registerNotificacoesScheduledRoutes } from "../notificacoesScheduledRoutes";
+import { registerDespesasRecorrenciaScheduledRoutes } from "../despesasRecorrenciaScheduledRoutes";
 import { registerKiwifyWebhookRoutes } from "../kiwifyWebhook";
 import { registerBlackListPhotoRoutes } from "../blacklistPhotoRoutes";
 import { appRouter } from "../routers";
@@ -91,6 +92,7 @@ async function startServer() {
 
   // A rota existente agora resolve taskUid/owner e persiste observação sem PII.
   registerNotificacoesScheduledRoutes(app);
+  registerDespesasRecorrenciaScheduledRoutes(app);
 
   // ─── Heartbeat de status: sem escrita financeira ───────────────────────────
   // O status civil é derivado na listagem. Este endpoint não altera parcelas
