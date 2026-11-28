@@ -48,7 +48,7 @@ function fixture() {
   });
   const page = compile(`const despesasTrpc=trpc; const categorias={outros:'Outros'}; const statuses={pendente:'Pendente'}; const freshForm=()=>({descricao:'',categoria:'outros',valor:'',dataVencimento:diaCivilBrt(),observacoes:''}); const dataLabel=(d)=>d; const acoes=['criar','pagar','estornar']; let proximaSessaoCache=0; ${code(source('pages/ContasPagar.tsx'), 'ContasPagar')}\nreturn ContasPagar;`, {
     ...hooks.bindings(), ...ui, trpc, hashKey, DespesasIntentStore, diaCivilBrt, dinheiroDespesa, moedaDespesa, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload, assertRecoveryEvidence, canCloseRejectedIntent,
-    RecorrenciaDespesas68: 'Panel68', EdicaoDespesa49: 'Panel49', CancelamentoPendente: 'Panel38c', toast: { success: vi.fn(), error: vi.fn() }, window: { sessionStorage: memory },
+    RecorrenciaDespesas68: 'Panel68', EdicaoDespesa69: 'Panel69', EdicaoDespesa49: 'Panel49', CancelamentoPendente: 'Panel38c', toast: { success: vi.fn(), error: vi.fn() }, window: { sessionStorage: memory },
   });
   let pageTree: any, panelTree: any;
   function render() {

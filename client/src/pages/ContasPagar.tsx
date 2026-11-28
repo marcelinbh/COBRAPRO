@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import CancelamentoPendente from '@/components/CancelamentoPendente';
 import EdicaoDespesa49, { type OriginaisRevision49, type SelecaoEdicao49 } from '@/components/EdicaoDespesa49';
 import RecorrenciaDespesas68 from '@/components/RecorrenciaDespesas68';
+import EdicaoDespesa69 from '@/components/EdicaoDespesa69';
 import ConferenciaDespesasCaixa from '@/components/ConferenciaDespesasCaixa';
 import {
   DespesasIntentStore, criarDespesaPayload, pagarDespesaPayload, estornarDespesaPayload,
@@ -202,7 +203,7 @@ export default function ContasPagar() {
       <Button disabled={!habilitado || locked('criar')} onClick={() => setNovo(true)}><Plus className="h-4 w-4 mr-2" />Nova despesa</Button>
     </div>
     {userId && <ConferenciaDespesasCaixa key={`${userId}:${sessao.cacheId}`} userId={userId} atual={pertenceSessao} />}
-    <p className="text-sm border rounded-lg p-3">O saldo do livro é automático; não existe sincronização financeira ao abrir a tela. Legado requer conferência. Edição pendente por sucessão20 e cancelamento lógico têm disponibilidade independente abaixo; exclusão física não está disponível. Séries recorrentes são configuradas no painel68 separado, sem pagamento automático. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
+    <p className="text-sm border rounded-lg p-3">O saldo do livro é automático; não existe sincronização financeira ao abrir a tela. Legado requer conferência. Edição pendente por sucessão20 (metadados49 ou inclusive valor69) e cancelamento lógico têm disponibilidade independente abaixo. Editar por linha seleciona apenas o painel49, com valor preservado e sem confirmar; para alterar inclusive valor, selecione explicitamente a despesa no painel69. A edição69 altera somente esta ocorrência, não a série futura; exclusão física não está disponível. Séries recorrentes são configuradas no painel68 separado, sem pagamento automático. Estorno acrescenta entrada do mesmo valor na conta original, sem apagar a saída; a obrigação fica encerrada.</p>
     {auth.isError ? <p role="alert">Erro ao identificar a sessão. Nenhuma operação disponível.</p> : auth.isLoading ? <p role="status">Carregando sessão...</p> : !userId ? <p role="alert">Autentique-se para consultar despesas.</p> : null}
     {userId && (capacidades.isError ? <p role="alert">Não foi possível verificar a disponibilidade do trilho. Escritas bloqueadas.</p> : capacidades.isLoading ? <p role="status">Verificando disponibilidade...</p> : !habilitado ? <p role="alert">Despesas prospectivas desabilitadas; nenhum lançamento será feito no legado.</p> : null)}
     {avisoStorage && <p role="alert" className="text-amber-500 border p-3 rounded-lg break-words">{avisoStorage}</p>}
@@ -226,6 +227,7 @@ export default function ContasPagar() {
     <div className="flex flex-wrap gap-2">{['todos', ...Object.keys(statuses)].map(s => <Button key={s} size="sm" variant={filtroStatus === s ? 'default' : 'outline'} onClick={() => setFiltroStatus(s)}>{s === 'todos' ? 'Todas' : statuses[s as keyof typeof statuses]}</Button>)}</div>
     {userId && <CancelamentoPendente key={`cancelamento38c:${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} onOriginalEncerrado={originaisEncerrados} />}
     {userId && <EdicaoDespesa49 key={`edicao49:${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} originaisRevision={originaisRevision} selecao={selecaoEdicao} />}
+    {userId && <EdicaoDespesa69 key={`valor69:${userId}:${sessao.cacheId}`} userId={userId} itens={!lista.isError && !lista.isLoading && !lista.isFetching && lista.data ? lista.data : []} />}
     {userId && <RecorrenciaDespesas68 key={`recorrencia68:${userId}:${sessao.cacheId}`} userId={userId} refreshToken={lista.dataUpdatedAt} {...callbacksRecorrencia68} />}
     <section aria-label="Lista de despesas" className="space-y-3">
       {!userId ? <p role="status">Consulta indisponível sem sessão.</p> : lista.isError ? <div role="alert">Não foi possível consultar despesas: {lista.error.message} <Button variant="outline" onClick={() => void lista.refetch()}>Tentar consulta</Button></div>

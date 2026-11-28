@@ -1,4 +1,5 @@
 import { reparcelamento43Router } from './routers/reparcelamento43';
+import { despesas69Router } from './routers/despesas69';
 import { reparcelamento47Router } from './routers/reparcelamento47';
 import { despesas49Router } from './routers/despesas49';
 import { despesasRecorrencia68Router } from './routers/despesasRecorrencia68';
@@ -3756,6 +3757,7 @@ export const appRouter = router({
   reparcelamento: reparcelamento43Router,
   reparcelamentoAtual: reparcelamento47Router,
   contasPagar: contasPagarProspectivasRouter,
+  despesas69: despesas69Router,
   despesas49: despesas49Router,
   despesasRecorrencia68: despesasRecorrencia68Router,
   emprestimosProspectivos: emprestimosProspectivosRouter,
