@@ -1,3 +1,4 @@
+import { vendasCatalogoRouter } from './routers/catalogoProdutos';
 import { reparcelamento43Router } from './routers/reparcelamento43';
 import { despesas69Router } from './routers/despesas69';
 import { reparcelamento47Router } from './routers/reparcelamento47';
@@ -3372,65 +3373,7 @@ const contasPagarRouter = router({
 });
 
 // ─── VENDAS DE PRODUTOS ──────────────────────────────────────────────────────────
-const vendasRouter = router({
-  listarProdutos: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    if (db) {
-      try { return db.select().from(produtos).where(and(eq(produtos.ativo, true), eq(produtos.userId, ctx.user.id))).orderBy(desc(produtos.createdAt)); }
-      catch (err) { console.warn('[vendas.listarProdutos] Drizzle failed:', (err as Error).message); resetDb(); }
-    }
-    const supabase = await getSupabaseClientAsync();
-    if (!supabase) return [];
-    const { data } = await supabase.from('produtos').select('*').eq('ativo', true).eq('user_id', ctx.user.id).order('createdAt', { ascending: false });
-    return data ?? [];
-  }),
-
-  criarProduto: protectedProcedure
-    .input(z.object({ nome: z.string().min(1), descricao: z.string().optional(), preco: z.number().positive(), estoque: z.number().int().min(0).default(0) }))
-    .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (db) {
-        try {
-          const result = await db.insert(produtos).values({ nome: input.nome, descricao: input.descricao, preco: input.preco.toFixed(2), estoque: input.estoque, userId: ctx.user.id }).returning({ id: produtos.id });
-          return { success: true, id: result[0].id };
-        } catch (err) { console.warn('[vendas.criarProduto] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      const { data, error } = await supabase.from('produtos').insert({ nome: input.nome, descricao: input.descricao ?? null, preco: input.preco, estoque: input.estoque, user_id: ctx.user.id }).select('id').single();
-      if (error) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: error.message });
-      return { success: true, id: data.id };
-    }),
-
-  atualizarEstoque: protectedProcedure
-    .input(z.object({ id: z.number(), estoque: z.number().int().min(0) }))
-    .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (db) {
-        try { await db.update(produtos).set({ estoque: input.estoque }).where(and(eq(produtos.id, input.id), eq(produtos.userId, ctx.user.id))); return { success: true }; }
-        catch (err) { console.warn('[vendas.atualizarEstoque] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('produtos').update({ estoque: input.estoque }).eq('id', input.id).eq('user_id', ctx.user.id);
-      return { success: true };
-    }),
-
-  desativarProduto: protectedProcedure
-    .input(z.object({ id: z.number() }))
-    .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (db) {
-        try { await db.update(produtos).set({ ativo: false }).where(and(eq(produtos.id, input.id), eq(produtos.userId, ctx.user.id))); return { success: true }; }
-        catch (err) { console.warn('[vendas.desativarProduto] Drizzle failed, trying REST:', (err as Error).message); resetDb(); }
-      }
-      const supabase = await getSupabaseClientAsync();
-      if (!supabase) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'DB unavailable' });
-      await supabase.from('produtos').update({ ativo: false }).eq('id', input.id).eq('user_id', ctx.user.id);
-      return { success: true };
-    }),
-});
-
+const vendasRouter = vendasCatalogoRouter;
 // ─── DESCONTO DE CHEQUES ──────────────────────────────────────────────────────────
 const chequesRouter = router({
   listar: protectedProcedure
